@@ -1,8 +1,25 @@
 # Запуск с рабочего стола
 
-## Один ярлык
+## Пульт (рекомендуется)
 
-**Рекомендуется:** **`scripts\start-radar-full.bat`** → **3 окна** (биржи + TG + join acc2/acc3).
+**Один ярлык, без чёрных cmd:**
+
+| Способ | Команда / файл |
+|--------|----------------|
+| Двойной клик | **`scripts\start-radar-desktop.bat`** |
+| Вручную | из корня repo: `.venv\Scripts\python.exe scripts\radar_desktop.py` |
+
+В окне пульта: **▶ Старт** / **⏹ Стоп**, индикаторы **Биржи · TG · Join**, вкладки логов `data\radar.log` и `data\tg_join.log`, кнопка **Обновить статус** (то же, что ℹ в боте).
+
+Пауза радара — только в Telegram-боте (кнопка ℹ / «Пауза»), в пульте не дублируется.
+
+Перед повторным стартом пульт сам вызывает стоп (как `stop-radar.bat`). Второй экземпляр пульта не откроется (`data\.radar_desktop.lock`).
+
+---
+
+## Три окна cmd (запасной способ)
+
+**`scripts\start-radar-full.bat`** → **3 окна** (биржи + TG + join acc2/acc3).
 
 | Окно | Что делает |
 |------|------------|
@@ -12,7 +29,7 @@
 
 **Только 2 окна** — если ярлык на **`start-radar-all.bat`** или **`start-radar.bat`** (биржи + TG, **без** join acc2/acc3). Для волны 2 на acc2/acc3 нужен **full** или отдельно `scripts\start-join-daemons.bat`.
 
-Перед перезапуском: **`scripts\stop-radar.bat`** (убирает дубли `tg_main`).
+Перед перезапуском: **`scripts\stop-radar.bat`** или **⏹ Стоп** в пульте (убирает дубли `tg_main`).
 
 ---
 
@@ -61,3 +78,5 @@ SELECT source, COUNT(*) FROM leads GROUP BY source ORDER BY source;
 | `scripts\start-radar-full.bat` | **3 окна:** + join acc2/acc3 (рекомендуется) |
 | `scripts\start-join-daemons.bat` | только окно join (если birzhi+TG уже работают) |
 | `scripts\stop-radar.bat` | стоп процессов |
+| `scripts\start-radar-desktop.bat` | пульт (GUI, без cmd) |
+| `scripts\radar_desktop.py` | то же, из консоли |

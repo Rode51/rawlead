@@ -31,12 +31,22 @@
 
 ---
 
+## Последняя сессия (Coder)
+
+**Сделано:** пульт `scripts/radar_desktop.py` — Старт/Стоп full-радара (3 процесса без cmd), индикаторы, логи, статус из `radar_status.py`; ярлык `scripts/start-radar-desktop.bat`.
+
+**Файлы:** `scripts/radar_desktop.py`, `scripts/start-radar-desktop.bat`, `docs/ops/DESKTOP_LAUNCH.md`, `docs/ops/RUN.md`
+
+**Как проверить:** закрыть cmd радара → из корня repo: `.venv\Scripts\python.exe scripts\radar_desktop.py` → **▶ Старт** → в диспетчере 3 python, в `data/radar.log` — `радар:старт`, `тг:старт`; **⏹ Стоп** — процессы исчезают; повторный старт без 409.
+
+---
+
 ## Следующий шаг
 
 | Кто | Действие |
 |-----|----------|
-| **Coder** | Пульт: [`CODER_PROMPT.md`](CODER_PROMPT.md) |
-| **Владелец** | `backup.bat` → чат Coder с промптом |
+| **Владелец** | Проверить пульт на ПК; ярлык на `start-radar-desktop.bat` |
+| **Lead** | FOR_YOU / ROADMAP после ревью |
 | **Дальше** | WordPress — [`TZ_WP.md`](TZ_WP.md) |
 
 ---

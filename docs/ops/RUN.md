@@ -2,7 +2,7 @@
 
 Работает **Python 3.11+**. Команды ниже — из **PowerShell**. Запускайте из **корня репозитория** (папка, где лежат `src/`, `docs/`, `requirements.txt`), чтобы пути по умолчанию `data/projects.db` и `data/radar.log` совпадали с каталогом `data/` в корне проекта.
 
-**Ярлык на рабочем столе** (`start-radar.bat`) — только биржи FL+Kwork. TG-чаты и посты `tg:…` в БД — второй процесс, см. [`DESKTOP_LAUNCH.md`](DESKTOP_LAUNCH.md).
+**Пульт на рабочем столе** — [`DESKTOP_LAUNCH.md`](DESKTOP_LAUNCH.md): `scripts\start-radar-desktop.bat` (биржи + TG + join, без трёх чёрных cmd). Запасной вариант: `start-radar-full.bat` (3 окна cmd). Только биржи — `start-radar.bat`.
 
 ---
 
