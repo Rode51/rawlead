@@ -1,0 +1,6 @@
+# Не добавлять в TG_JOIN_QUEUE.csv (секция 7 Google Doc + аналоги)
+# Нормализованные фрагменты или полные ссылки — скрипт импорта должен матчить
+
+https://t.me/+ncJ_Ks6KJiw3Yjcy
+https://t.me/+fw95kR_P4sBjOTNi
+https://t.me/+-nnErkV1frMwNGYy

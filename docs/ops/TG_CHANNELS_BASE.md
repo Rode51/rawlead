@@ -109,5 +109,5 @@
 ## Чеклист Lead → Coder
 
 - [x] Lead: база и MVP-5 в docs
-- [ ] Владелец: подтвердить MVP или заменить 1–2 строки в `SOURCES_POOLS.md`
 - [x] Coder: очередь join — `scripts/tg_join_queue.py` ([`RUN.md`](RUN.md))
+- [ ] **Волна 3:** владелец → `TG_CHANNELS_EXPORT.txt` → Coder [`CODER_PROMPT.md`](../team/CODER_PROMPT.md)

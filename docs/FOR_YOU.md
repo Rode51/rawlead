@@ -59,11 +59,14 @@
 
 ## Твои шаги сейчас
 
-1. **WP §3** — 5 страниц [`ops/wp-skeleton/`](ops/wp-skeleton/)
-2. **`backup.bat`**
-3. **2–4 недели** — пользоваться радаром; записывать: лидов в день, сколько откликнул, сэкономил ли время
+**Волна 3 TG (приоритет):**
 
-Пульт v2 ✅
+1. **`backup.bat`**
+2. [Google Doc](https://docs.google.com/document/d/1KplF0v2eBr_o0ThbON17sRnfDqoMfiIkk_M3HkLtjfE/edit?usp=sharing) → все ссылки (**без §7**) в [`ops/TG_CHANNELS_EXPORT.txt`](ops/TG_CHANNELS_EXPORT.txt)
+3. **`@coder`** + [`team/CODER_PROMPT.md`](team/CODER_PROMPT.md)
+4. После Coder: пульт ▶ · раз в день `data/tg_join.log` (~3–7 дней на ~150 чатов)
+
+**Параллельно:** WP §3 · 2–4 нед пользы радаром. Пульт v2 ✅
 
 ---
 
