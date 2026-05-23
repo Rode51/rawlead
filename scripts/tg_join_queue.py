@@ -10,7 +10,11 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-from config import load_tg_join_config  # noqa: E402
+from config import (  # noqa: E402
+    load_tg_join_config,
+    telethon_monitor_accounts,
+    tg_join_in_tg_main,
+)
 from tg_join_runner import run_join_tick  # noqa: E402
 
 
@@ -41,10 +45,10 @@ async def _main() -> None:
         raise SystemExit(1)
 
     account = args.account.strip().lower()
-    if account == "acc1":
+    if tg_join_in_tg_main() and account in telethon_monitor_accounts():
         print(
-            "acc1 join в отдельном процессе запрещён (database locked). "
-            "Используйте tg_main с TG_JOIN_AUTO_ACC1=1.",
+            f"{account} join в отдельном процессе запрещён (database locked). "
+            "Используйте tg_main с TG_JOIN_IN_TG_MAIN=1.",
             flush=True,
         )
         raise SystemExit(1)

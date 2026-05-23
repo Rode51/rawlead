@@ -70,6 +70,7 @@ class ListingNotifyPlan:
     analysis: AiAnalysis | None
     ai_unavailable: bool
     task_fallback_text: str
+    tg_acc_label: str = ""
 
 
 def plan_new_listing(
@@ -152,6 +153,7 @@ def send_listing_notification(
             analysis=plan.analysis,
             ai_unavailable=plan.ai_unavailable,
             task_fallback_text=plan.task_fallback_text,
+            tg_acc_label=plan.tg_acc_label,
         )
         if pg is not None:
             pg.update_on_notify(project, analysis=plan.analysis, errors=errors)
@@ -195,9 +197,11 @@ async def process_new_listing_from_tg(
     *,
     errors: list[str],
     pg: NeonLeadStorage | None = None,
+    account: str = "",
+    chat_title: str = "",
 ) -> tuple[bool, bool]:
     """TG: пересылка оригинала (Telethon), затем разбор ботом."""
-    from tg_forward import forward_listing_to_owner
+    from tg_forward import format_tg_acc_label, forward_listing_to_owner
 
     was_new, plan = plan_new_listing(
         project, storage, word_filter, cfg, errors=errors, pg=pg
@@ -205,5 +209,21 @@ async def process_new_listing_from_tg(
     if plan is None:
         return was_new, False
 
-    await forward_listing_to_owner(client, message, cfg, errors=errors)
+    acc_label = format_tg_acc_label(account, chat_title) if account else ""
+    await forward_listing_to_owner(
+        client,
+        message,
+        cfg,
+        errors=errors,
+        account=account,
+        chat_title=chat_title,
+    )
+    if acc_label:
+        plan = ListingNotifyPlan(
+            project=plan.project,
+            analysis=plan.analysis,
+            ai_unavailable=plan.ai_unavailable,
+            task_fallback_text=plan.task_fallback_text,
+            tg_acc_label=acc_label,
+        )
     return was_new, send_listing_notification(plan, cfg, errors=errors, pg=pg)

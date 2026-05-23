@@ -22,7 +22,7 @@ from config import (
     parse_telethon_chat_ids,
     radar_timestamp,
     telethon_chat_ids_path_for_account,
-    tg_join_auto_acc1,
+    tg_join_in_tg_main,
 )
 from radar_status import (
     record_tg_message,
@@ -228,13 +228,14 @@ async def _reload_listen_chats(
     )
 
 
-async def _join_acc1_loop(
+async def _join_loop(
+    account: str,
     client,
     chat_ids: set[int],
     log_path: Path,
     storage,
 ) -> None:
-    account = "acc1"
+    account = account.strip().lower()
     join_cfg = load_tg_join_config()
 
     async def _get_client():
@@ -262,7 +263,7 @@ async def _join_acc1_loop(
             except Exception as exc:
                 _append_log(
                     log_path,
-                    f"{radar_timestamp()} тг:join:ошибка {short_err(exc)}",
+                    f"{radar_timestamp()} тг:join:{account}:ошибка {short_err(exc)}",
                 )
             await asyncio.sleep(join_cfg.daemon_interval_sec)
     finally:
@@ -320,6 +321,7 @@ def _register_message_handler(
             return
 
         errors: list[str] = []
+        display_title = (project.chat_title or chat_title or "").strip()
         was_new, notified = await process_new_listing_from_tg(
             message,
             client,
@@ -329,6 +331,8 @@ def _register_message_handler(
             cfg,
             errors=errors,
             pg=pg,
+            account=account,
+            chat_title=display_title,
         )
         ts = radar_timestamp()
         err_part = "; ".join(errors) if errors else "-"
@@ -394,21 +398,29 @@ async def run_monitor() -> None:
         raise SystemExit(1)
 
     night = "да" if is_night_window(tg_cfg) else "нет"
-    auto_join = tg_join_auto_acc1() and any(s.account == "acc1" for s in sessions)
+    join_in_main = tg_join_in_tg_main()
     for sess in sessions:
         _append_log(
             log_path,
             f"{radar_timestamp()} тг:монитор:старт account={sess.account} "
             f"чатов={len(sess.chat_ids)} ids={sorted(sess.chat_ids)} "
-            f"ночь={night} join_auto={'да' if auto_join and sess.account == 'acc1' else 'нет'}",
+            f"ночь={night} join_auto={'да' if join_in_main else 'нет'}",
         )
 
-    join_task: asyncio.Task | None = None
-    acc1_sess = next((s for s in sessions if s.account == "acc1"), None)
-    if auto_join and acc1_sess is not None:
-        join_task = asyncio.create_task(
-            _join_acc1_loop(acc1_sess.client, acc1_sess.chat_ids, log_path, storage)
-        )
+    join_tasks: list[asyncio.Task] = []
+    if join_in_main:
+        for sess in sessions:
+            join_tasks.append(
+                asyncio.create_task(
+                    _join_loop(
+                        sess.account,
+                        sess.client,
+                        sess.chat_ids,
+                        log_path,
+                        storage,
+                    )
+                )
+            )
 
     for sess in sessions:
         _register_message_handler(
@@ -425,8 +437,7 @@ async def run_monitor() -> None:
         asyncio.create_task(sess.client.run_until_disconnected())  # type: ignore[attr-defined]
         for sess in sessions
     ]
-    if join_task is not None:
-        run_tasks.append(join_task)
+    run_tasks.extend(join_tasks)
 
     try:
         await asyncio.gather(*run_tasks)
@@ -434,10 +445,11 @@ async def run_monitor() -> None:
         _append_log(log_path, f"тг:монитор FloodWait {exc.seconds}с")
         await asyncio.sleep(exc.seconds)
     finally:
-        if join_task is not None:
-            join_task.cancel()
+        for task in join_tasks:
+            task.cancel()
+        for task in join_tasks:
             try:
-                await join_task
+                await task
             except asyncio.CancelledError:
                 pass
         for sess in sessions:

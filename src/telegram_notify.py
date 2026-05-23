@@ -81,16 +81,23 @@ def format_mvp_message(
     *,
     ai_unavailable: bool = False,
     task_fallback_text: str = "",
+    tg_acc_label: str = "",
 ) -> str:
     """Формат MVP + блок «Задача» (snippet)."""
     budget = project.budget_text.strip() or "не указан"
     site, _ = _source_labels(project.source)
-    lines = [
-        f"🆕 Новый проект на {site}",
-        "",
-        project.title.strip(),
-        "",
-    ]
+    lines: list[str] = []
+    label = (tg_acc_label or "").strip()
+    if label and project.source.startswith("tg:"):
+        lines.extend([label, ""])
+    lines.extend(
+        [
+            f"🆕 Новый проект на {site}",
+            "",
+            project.title.strip(),
+            "",
+        ]
+    )
     task = _task_block_text(project, None, task_fallback_text=task_fallback_text)
     if task:
         lines.extend([task, ""])
@@ -131,18 +138,25 @@ def format_ai_message(
     analysis: AiAnalysis,
     *,
     task_fallback_text: str = "",
+    tg_acc_label: str = "",
 ) -> str:
     """Формат TZ §5.4 v3: «Задача» + разбор + черновик."""
     budget = project.budget_text.strip() or "не указан"
     site, _ = _source_labels(project.source)
     task = _task_block_text(project, analysis, task_fallback_text=task_fallback_text)
 
-    head = [
-        f"🆕 Новый проект на {site}",
-        "",
-        project.title.strip(),
-        "",
-    ]
+    head: list[str] = []
+    label = (tg_acc_label or "").strip()
+    if label and project.source.startswith("tg:"):
+        head.extend([label, ""])
+    head.extend(
+        [
+            f"🆕 Новый проект на {site}",
+            "",
+            project.title.strip(),
+            "",
+        ]
+    )
     if task:
         head.extend([task, ""])
     head.append(f"💰 {budget}")
@@ -207,17 +221,20 @@ def _message_text(
     *,
     ai_unavailable: bool = False,
     task_fallback_text: str = "",
+    tg_acc_label: str = "",
 ) -> str:
     if analysis is not None:
         return format_ai_message(
             project,
             analysis,
             task_fallback_text=task_fallback_text,
+            tg_acc_label=tg_acc_label,
         )
     return format_mvp_message(
         project,
         ai_unavailable=ai_unavailable,
         task_fallback_text=task_fallback_text,
+        tg_acc_label=tg_acc_label,
     )
 
 
@@ -228,6 +245,7 @@ def _build_payload(
     analysis: AiAnalysis | None = None,
     ai_unavailable: bool = False,
     task_fallback_text: str = "",
+    tg_acc_label: str = "",
 ) -> TelegramMessagePayload:
     return TelegramMessagePayload(
         chat_id=chat_id,
@@ -236,6 +254,7 @@ def _build_payload(
             analysis,
             ai_unavailable=ai_unavailable,
             task_fallback_text=task_fallback_text,
+            tg_acc_label=tg_acc_label,
         ),
         reply_markup=_build_reply_markup(project),
     )
@@ -251,6 +270,7 @@ def send_project_notification(
     analysis: AiAnalysis | None = None,
     ai_unavailable: bool = False,
     task_fallback_text: str = "",
+    tg_acc_label: str = "",
 ) -> None:
     """Отправляет уведомление о проекте в указанный Telegram-чат."""
     if proxies is None:
@@ -264,6 +284,7 @@ def send_project_notification(
         analysis=analysis,
         ai_unavailable=ai_unavailable,
         task_fallback_text=task_fallback_text,
+        tg_acc_label=tg_acc_label,
     )
     api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
@@ -320,6 +341,7 @@ def send_project_notification_from_config(
     analysis: AiAnalysis | None = None,
     ai_unavailable: bool = False,
     task_fallback_text: str = "",
+    tg_acc_label: str = "",
 ) -> None:
     """Обёртка для main: токен и chat_id берутся из Config."""
     send_project_notification(
@@ -331,4 +353,5 @@ def send_project_notification_from_config(
         analysis=analysis,
         ai_unavailable=ai_unavailable,
         task_fallback_text=task_fallback_text,
+        tg_acc_label=tg_acc_label,
     )

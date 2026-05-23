@@ -4,11 +4,11 @@
 
 ---
 
-## 2026-05-23 — Coder: unified TG join + acc labels in bot
+## 2026-05-23 — Coder: unified TG join + acc labels in bot (принято владельцем)
 
 - Join acc1/2/3 в `tg_main`; убран child join из пульта
 - Метка `accN · чат` в пересылке/разборе
-- [`CODE_STRUCTURE.md`](../CODE_STRUCTURE.md)
+- [`CODE_STRUCTURE.md`](../CODE_STRUCTURE.md) · `tg_queue_import.py` · 73 pending CSV
 
 ---
 

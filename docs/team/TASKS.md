@@ -6,15 +6,15 @@
 
 ## Владелец
 
-- [x] Coder: единый join + acc в боте ✅
-- [ ] Пульт ▶ — **2** процесса; `tg_join.log`; пост из чата acc2 → бот с **`acc2 · …`**
+- [x] Unified TG join + acc в боте — приёмка ✅ (2026-05-23)
+- [ ] Пульт ▶ · волна 3 join (`tg_join.log`)
 - [ ] **WP Local §3** — [`WP_LOCAL_SKELETON.md`](../ops/WP_LOCAL_SKELETON.md)
 
 ---
 
-## Следом (Lead → Coder, отдельная задача)
+## Следом (Lead → Coder)
 
-- [ ] Реорганизация `src/` по пакетам — только с [`CODE_STRUCTURE.md`](CODE_STRUCTURE.md) + правка всех путей
+- [ ] Реорганизация `src/` — [`CODE_STRUCTURE.md`](CODE_STRUCTURE.md)
 
 ## Отложено
 

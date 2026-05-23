@@ -150,7 +150,6 @@ class RadarController:
             self.children = [
                 ChildSpec("exchanges", "Биржи", "src/main.py"),
                 ChildSpec("tg", "TG", "scripts/tg_main.py"),
-                ChildSpec("join", "Join", "scripts/tg_join_daemon.py"),
             ]
 
     def _running_needles(self) -> set[str]:

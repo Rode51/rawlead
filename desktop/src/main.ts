@@ -497,7 +497,6 @@ void (async () => {
   renderLamps([
     { key: "exchanges", label: "Биржи", state: "idle", caption: "" },
     { key: "tg", label: "TG", state: "idle", caption: "" },
-    { key: "join", label: "Join", state: "idle", caption: "" },
   ]);
   setHeroMode("play");
   await resizeWindow(false);

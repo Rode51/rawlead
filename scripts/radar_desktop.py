@@ -388,7 +388,6 @@ class RadarDesktopWindow(QWidget):
         self._children: list[ChildSpec] = [
             ChildSpec("exchanges", "Биржи", "src/main.py"),
             ChildSpec("tg", "TG", "scripts/tg_main.py"),
-            ChildSpec("join", "Join", "scripts/tg_join_daemon.py"),
         ]
         self._lamps: dict[str, _LampDot] = {}
         self._starting = False

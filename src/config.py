@@ -511,14 +511,22 @@ class TgJoinConfig:
     daemon_interval_sec: int
 
 
+def tg_join_in_tg_main() -> bool:
+    """Фоновый join всех TELETHON_MONITOR_ACCOUNTS внутри tg_main."""
+    raw = os.environ.get("TG_JOIN_IN_TG_MAIN", "").strip().lower()
+    if raw:
+        return raw not in ("0", "false", "no", "off")
+    legacy = os.environ.get("TG_JOIN_AUTO_ACC1", "1").strip().lower()
+    return legacy not in ("0", "false", "no", "off")
+
+
 def tg_join_auto_acc1() -> bool:
-    """Фоновый join acc1 внутри tg_main (не отдельный процесс)."""
-    raw = os.environ.get("TG_JOIN_AUTO_ACC1", "1").strip().lower()
-    return raw not in ("0", "false", "no", "off")
+    """Deprecated: используйте tg_join_in_tg_main()."""
+    return tg_join_in_tg_main()
 
 
 def tg_join_daemon_accounts() -> list[str]:
-    """Аккаунты для scripts/tg_join_daemon.py (без monitor account)."""
+    """Deprecated: acc для ручного tg_join_daemon.py (не автозапуск)."""
     raw = os.environ.get("TG_JOIN_DAEMON_ACCOUNTS", "acc2,acc3").strip()
     if not raw:
         return []
