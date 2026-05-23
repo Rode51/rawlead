@@ -59,12 +59,9 @@
 
 ## Твои шаги сейчас
 
-**Волна 3 TG (приоритет):**
+**Волна 3 TG:** EXPORT ✅ (73 ссылки) → **`@coder`** (копипаст от Lead в чате) → после Coder пульт ▶ · `tg_join.log`
 
-1. **`backup.bat`**
-2. [Google Doc](https://docs.google.com/document/d/1KplF0v2eBr_o0ThbON17sRnfDqoMfiIkk_M3HkLtjfE/edit?usp=sharing) → все ссылки (**без §7**) в [`ops/TG_CHANNELS_EXPORT.txt`](ops/TG_CHANNELS_EXPORT.txt)
-3. **`@coder`** + [`team/CODER_PROMPT.md`](team/CODER_PROMPT.md)
-4. После Coder: пульт ▶ · раз в день `data/tg_join.log` (~3–7 дней на ~150 чатов)
+**Git** — код/docs в репо; **push на GitHub только когда попросишь**. **`backup.bat`** — для `.env` и Telethon-сессий (в Git их нет).
 
 **Параллельно:** WP §3 · 2–4 нед пользы радаром. Пульт v2 ✅
 

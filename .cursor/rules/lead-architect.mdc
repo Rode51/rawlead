@@ -24,8 +24,24 @@ alwaysApply: false
 | Поломка | `@mechanic` | `docs/problems/*.md` |
 | `.env`, запуск | владелец | `FOR_YOU.md`, `ops/RUN.md` |
 
+## Git
+
+- **`git push`** — **только** по просьбе владельца или после явного «пушь / на GitHub».
+- Без просьбы: можно `git commit` локально; push **не делать**.
+
+## После нового `CODER_PROMPT.md`
+
+В конце ответа владельцу — **блок копипаст** (одним fenced block):
+
+```text
+@coder
+@docs/team/CODER_PROMPT.md
+```
+
+Плюс 1 строка: что сделает Coder. Не заставлять владельца собирать ссылки самому.
+
 ## После сдачи Coder
 
-Чеклист: `docs/team/SCALE.md` · удалить `CODER_PROMPT.md` · `STATUS.md` + `archive/TASKS_HISTORY.md` · напомнить бэкап.
+Чеклист: `docs/team/SCALE.md` · удалить `CODER_PROMPT.md` · `STATUS.md` + `archive/TASKS_HISTORY.md`.
 
 Анти-дубли: `docs/team/LEAD.md` § «Файлы без пересечений».

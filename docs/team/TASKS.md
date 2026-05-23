@@ -13,10 +13,10 @@
 ## Владелец
 
 - [x] Пульт v2 — приёмка ✅ (2026-05-23)
-- [ ] **Экспорт ссылок** из [Google Doc](https://docs.google.com/document/d/1KplF0v2eBr_o0ThbON17sRnfDqoMfiIkk_M3HkLtjfE/edit?usp=sharing) → [`ops/TG_CHANNELS_EXPORT.txt`](../ops/TG_CHANNELS_EXPORT.txt) (без §7)
-- [ ] После импорта Coder: пульт ▶, раз в день `data/tg_join.log`
+- [x] Экспорт ссылок → `TG_CHANNELS_EXPORT.txt` ✅ (Lead, 73 новых)
+- [ ] После Coder: **`@coder`** + [`CODER_PROMPT.md`](CODER_PROMPT.md) · пульт ▶ · `tg_join.log`
 - [ ] **WP Local §3** — [`WP_LOCAL_SKELETON.md`](../ops/WP_LOCAL_SKELETON.md)
-- [ ] `backup.bat` **перед** большой очередью join
+- [ ] `backup.bat` — по желанию (сессии `.env` не в Git; см. FOR_YOU)
 
 ---
 

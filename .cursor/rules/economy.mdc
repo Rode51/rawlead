@@ -13,3 +13,5 @@ alwaysApply: true
 - Роли Cursor: `@lead-architect` · `@designer` · `@coder` · `@mechanic` · `@owner` — `.cursor/rules/`
 - **Lead = 0 кода** (только `docs/`); код — `@coder` / `@mechanic` (см. `lead-no-code.mdc`)
 - Coder: **новый чат на задачу**; цикл — `docs/team/SCALE.md`
+- **Git push** — только если владелец попросил или явно согласовал; иначе commit локально или только docs
+- **После `CODER_PROMPT.md`** — в чат владельцу: блок **копипаст** для `@coder` (см. `lead-architect.mdc`)

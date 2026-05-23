@@ -24,4 +24,4 @@
 
 ## Блокеры
 
-- Пока пустой `TG_CHANNELS_EXPORT.txt` — Coder не может импортировать ссылки
+- нет (`TG_CHANNELS_EXPORT.txt` заполнен Lead — 73 ссылки)
