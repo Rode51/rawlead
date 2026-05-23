@@ -32,7 +32,7 @@ from radar_status import (
 from tg_join_registry import register_monitor_join, unregister_monitor_join
 from tg_join_runner import run_join_tick
 from filters import default_listing_filter
-from lead_pipeline import process_new_listing, short_err
+from lead_pipeline import process_new_listing_from_tg, short_err
 from listing import ListingProject, telegram_source
 from pg_storage import pg_storage_from_config
 from storage import storage_from_config
@@ -320,7 +320,9 @@ def _register_message_handler(
             return
 
         errors: list[str] = []
-        was_new, notified = process_new_listing(
+        was_new, notified = await process_new_listing_from_tg(
+            message,
+            client,
             project,
             storage,
             word_filter,

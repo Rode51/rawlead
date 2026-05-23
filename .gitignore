@@ -23,3 +23,8 @@ data/.radar_desktop.lock
 src/data/
 
 scripts/backup.config.json
+
+# Tauri / frontend (desktop/)
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/

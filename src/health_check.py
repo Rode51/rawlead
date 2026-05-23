@@ -18,8 +18,11 @@ _DEFAULT_CHECK_MIN = 15
 _DEFAULT_ALERT_COOLDOWN_MIN = 60
 _TG_MAIN_LOCK = _PROJECT_ROOT / "data" / ".tg_main.lock"
 _TG_MONITOR_PULSE_KEY = "tg_monitor_last_pulse"
+_TG_MONITOR_START_KEY = "tg_monitor_started_at"
 # tg_main: пульс раз в 120 с; порог = 2× интервал + запас
 _TG_MONITOR_PULSE_MAX_AGE_SEC = 300
+# После тг:старт — не считать старый пульс и не слать алерт (гонка с main)
+_TG_MONITOR_WARMUP_SEC = 300
 
 
 @dataclass(frozen=True)
@@ -74,6 +77,29 @@ def is_tg_monitor_active() -> bool:
         fh.close()
 
 
+def mark_tg_monitor_started(storage: ProjectStorage) -> None:
+    """Сбросить устаревший пульс и начать окно прогрева (тг:старт)."""
+    now = int(time.time())
+    storage.set_setting(_TG_MONITOR_START_KEY, str(now))
+    storage.set_setting(_TG_MONITOR_PULSE_KEY, "0")
+
+
+def write_tg_monitor_pulse(storage: ProjectStorage) -> None:
+    storage.set_setting(_TG_MONITOR_PULSE_KEY, str(int(time.time())))
+
+
+def tg_monitor_warmup_remaining_sec(storage: ProjectStorage) -> int:
+    """Секунд до конца прогрева после тг:старт (0 — прогрев закончился)."""
+    raw = storage.get_setting(_TG_MONITOR_START_KEY, "0").strip()
+    try:
+        started = float(raw)
+    except ValueError:
+        started = 0.0
+    if started <= 0:
+        return 0
+    return max(0, int(_TG_MONITOR_WARMUP_SEC - (time.time() - started)))
+
+
 def check_tg_monitor_pulse(storage: ProjectStorage) -> TelethonHealthResult:
     """Пока tg_main держит .session — проверяем свежий пульс, без второго connect."""
     label = account_label_from_env()
@@ -89,11 +115,29 @@ def check_tg_monitor_pulse(storage: ProjectStorage) -> TelethonHealthResult:
             label,
             f"монитор активен (пульс {int(age)}с назад)",
         )
+    warmup = tg_monitor_warmup_remaining_sec(storage)
+    if warmup > 0:
+        return TelethonHealthResult(
+            True,
+            label,
+            f"прогрев после старта (~{warmup}с, пульс обновится)",
+        )
     if last_pulse <= 0:
         detail = "монитор запущен, пульс ещё не записан"
     else:
         detail = f"монитор не пульсирует ({int(age)}с без пульса)"
     return TelethonHealthResult(False, label, detail)
+
+
+def try_release_stale_tg_main_lock() -> bool:
+    """Удалить .tg_main.lock, если процесс tg_main уже не держит его."""
+    if is_tg_monitor_active():
+        return False
+    try:
+        _TG_MAIN_LOCK.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False
 
 
 def account_label_from_env() -> str:

@@ -4,7 +4,7 @@
 |------|--------|------|
 | **0** Биржи FL + Kwork | ✅ Готово | Код на ПК, бот, ИИ |
 | **1** TG-чаты | 🔜 Почти | join ✅ · 3 acc ✅ · бот «Статус» ✅ · **тест acc2** |
-| **1b** Пульт (десктоп) | ✅ | `radar_desktop.py` — [`DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
+| **1b** Пульт (десктоп) | ✅ | v2 Tauri — [`DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
 | **2** ИИ «первое ЛС» | Потом | |
 | **3** WordPress пульт | После 1b | [`team/TZ_WP.md`](team/TZ_WP.md), [`ops/WP_OWNER_STEPS.md`](ops/WP_OWNER_STEPS.md) |
 | **3b** Сайт-сервис (учёба) | Параллельно | Local WP: [`ops/WP_LOCAL_SKELETON.md`](ops/WP_LOCAL_SKELETON.md), [`team/VISION_SAAS_SITE.md`](team/VISION_SAAS_SITE.md) |

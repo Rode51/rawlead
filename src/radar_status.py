@@ -12,6 +12,7 @@ from health_check import (
     _TG_MONITOR_PULSE_KEY,
     _TG_MONITOR_PULSE_MAX_AGE_SEC,
     is_tg_monitor_active,
+    tg_monitor_warmup_remaining_sec,
 )
 from storage import ProjectStorage
 from tg_client import resolve_telethon_account
@@ -136,11 +137,16 @@ def _tg_monitor_state(storage: ProjectStorage) -> tuple[bool, str]:
         last_pulse = float(raw)
     except ValueError:
         last_pulse = 0.0
+    warmup = tg_monitor_warmup_remaining_sec(storage)
     if last_pulse <= 0:
+        if warmup > 0:
+            return True, f"прогрев (~{warmup}с)"
         return True, "старт, пульс ещё не был"
     age = int(time.time() - last_pulse)
     if age <= _TG_MONITOR_PULSE_MAX_AGE_SEC:
         return True, f"работает (пульс {age}с назад)"
+    if warmup > 0:
+        return True, f"прогрев (~{warmup}с, старый пульс {age}с)"
     return False, f"завис? ({age}с без пульса)"
 
 

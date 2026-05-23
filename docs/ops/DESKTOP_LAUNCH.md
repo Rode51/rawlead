@@ -1,19 +1,44 @@
 # Запуск с рабочего стола
 
-## Пульт (рекомендуется)
+## Пульт v2 (Tauri + HTML) — рекомендуется
 
 **Один ярлык, без чёрных cmd:**
 
 | Способ | Команда / файл |
 |--------|----------------|
 | Двойной клик | **`scripts\start-radar-desktop.bat`** |
-| Вручную | из корня repo: `.venv\Scripts\python.exe scripts\radar_desktop.py` |
+| API вручную | `.venv\Scripts\python.exe scripts\radar_control.py` |
+| UI dev (после Rust) | `cd desktop` → `npm run tauri dev` |
+| UI в браузере (отладка) | API + `cd desktop` → `npm run dev` → http://localhost:1420 |
 
-В окне пульта: **▶ Старт** / **⏹ Стоп**, индикаторы **Биржи · TG · Join**, вкладки логов `data\radar.log` и `data\tg_join.log`, кнопка **Обновить статус** (то же, что ℹ в боте).
+Пульт **Tauri 2 + WebView2**: compact 400×560 → **Play** (синий `#5B8DEF`) → логи вниз → **Stop** (зелёный `#3DD68C`). Справа вверху — **Обновить статус**. Лампы **Биржи · TG · Join**: зелёный = работает, красный = упал после старта, серый = idle (без «ожидание»).
 
-Пауза радара — только в Telegram-боте (кнопка ℹ / «Пауза»), в пульте не дублируется.
+### Первый раз (один раз на ПК)
 
-Перед повторным стартом пульт сам вызывает стоп (как `stop-radar.bat`). Второй экземпляр пульта не откроется (`data\.radar_desktop.lock`).
+1. Python venv: `py -3.11 -m venv .venv` → `pip install -r requirements.txt`
+2. **Node.js** LTS (уже нужен для `desktop/`)
+3. **Rust** — https://www.rust-lang.org/tools/install (для `npm run tauri dev` / сборки exe)
+4. WebView2 — обычно уже есть в Windows 10/11
+5. В `desktop/`: `npm install`
+
+`start-radar-desktop.bat` сам поднимает **`radar_control.py`** (HTTP `127.0.0.1:18765`), затем Tauri. Второй API не откроется (`data\.radar_desktop.lock`).
+
+### Сборка exe (после установки Rust)
+
+```bat
+cd desktop
+npm run tauri build
+```
+
+Exe: `desktop\src-tauri\target\release\` (имя по `productName` в `tauri.conf.json`).
+
+### Legacy PyQt6
+
+`.venv\Scripts\python.exe scripts\radar_desktop.py` — **deprecated**, не развивается. Ярлык переведён на Tauri.
+
+Пауза радара FL/Kwork — только в Telegram-боте (кнопка ℹ), в пульте строки про бота **нет**.
+
+Перед повторным стартом пульт вызывает стоп (как `stop-radar.bat`).
 
 ---
 
@@ -29,7 +54,7 @@
 
 **Только 2 окна** — если ярлык на **`start-radar-all.bat`** или **`start-radar.bat`** (биржи + TG, **без** join acc2/acc3). Для волны 2 на acc2/acc3 нужен **full** или отдельно `scripts\start-join-daemons.bat`.
 
-Перед перезапуском: **`scripts\stop-radar.bat`** или **⏹ Стоп** в пульте (убирает дубли `tg_main`).
+Перед перезапуском: **`scripts\stop-radar.bat`** или **Stop** в пульте (убирает дубли `tg_main`).
 
 ---
 
@@ -78,5 +103,6 @@ SELECT source, COUNT(*) FROM leads GROUP BY source ORDER BY source;
 | `scripts\start-radar-full.bat` | **3 окна:** + join acc2/acc3 (рекомендуется) |
 | `scripts\start-join-daemons.bat` | только окно join (если birzhi+TG уже работают) |
 | `scripts\stop-radar.bat` | стоп процессов |
-| `scripts\start-radar-desktop.bat` | пульт (GUI, без cmd) |
-| `scripts\radar_desktop.py` | то же, из консоли |
+| `scripts\start-radar-desktop.bat` | пульт v2 (Tauri + API) |
+| `scripts\radar_control.py` | HTTP API пульта |
+| `scripts\radar_desktop.py` | legacy PyQt6 |

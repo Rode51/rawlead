@@ -11,7 +11,7 @@ _Актуально: 2026-05-23 (фаза 1 + пульт + multi-session)._
 ```mermaid
 flowchart TB
   subgraph desktop["Пульт (рекомендуется)"]
-    GUI["scripts/radar_desktop.py\n▶ Старт / ⏹ Стоп"]
+    GUI["desktop/ Tauri + radar_control.py\n▶ Play / ⏹ Stop"]
   end
   subgraph workers["3 процесса Python (без cmd)"]
     M["src/main.py\nFL + Kwork"]
@@ -38,7 +38,7 @@ flowchart TB
 | **Биржи** | `src/main.py` | Цикл FL/Kwork, фильтр, ИИ, Bot API, `poll_commands` |
 | **TG** | `scripts/tg_main.py` → `src/tg_monitor.py` | 3× Telethon в одном asyncio; acc1 join внутри |
 | **Join** | `scripts/tg_join_daemon.py` | Очередь CSV для acc2/acc3 |
-| **Пульт** | `scripts/radar_desktop.py` | Лаунчер + логи + индикаторы; **не** парсит заказы |
+| **Пульт** | `desktop/` + `scripts/radar_control.py` | Tauri UI + HTTP API; **не** парсит заказы |
 
 Запасной запуск: `scripts/start-radar-full.bat` (3 видимых cmd). См. [`../ops/DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md).
 

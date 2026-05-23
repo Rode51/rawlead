@@ -4,12 +4,27 @@
 
 ---
 
+## Защита от кода Lead (2026-05-23)
+
+| Уровень | Что |
+|---------|-----|
+| **Правило Cursor** | `.cursor/rules/lead-no-code.mdc` — `alwaysApply: true` |
+| **Роль Lead** | `.cursor/rules/lead-architect.mdc` |
+| **Гард на код** | `.cursor/rules/code-guard.mdc` — при открытых `src/`, `scripts/` |
+| **Процесс** | Lead-чат **только** `@lead-architect`; фича/баг → **новый** чат `@coder` / `@mechanic` |
+| **Нарушение** | Владелец: `git checkout -- src/ scripts/` или откат коммита; Lead пишет `CODER_PROMPT.md` |
+
+Lead **не** «помогает быстро» править Python — даже пересылка TG, одна строка, hotfix.
+
+---
+
 ## Что делает Lead
 
 1. Приоритеты → `ROADMAP.md`, `FOR_YOU.md`
 2. Очередь → `team/TASKS.md`
 3. Сводка → `team/STATUS.md` (коротко, без дублей)
 4. ТЗ для Coder → **`team/CODER_PROMPT.md`** (один файл, см. ниже)
+4b. UI/UX (постоянная роль) → [`team/DESIGNER.md`](DESIGNER.md) + **`team/DESIGNER_PROMPT.md`** → **`DESIGN_BRIEF.md`** / `docs/design/` → обновить **`DESIGN_SYSTEM.md`** → Coder
 5. Тикеты → `problems/*.md` → Mechanic
 6. Ревью сдачи Coder → `REVIEW.md`, закрытие пунктов TASKS
 7. Цикл масштаба → [`SCALE.md`](SCALE.md)
@@ -32,7 +47,8 @@
 | Запрос владельца | Ответ Lead |
 |------------------|------------|
 | «Поправь .env» | «Только ты. Шаблон: `docs/ops/TELEGRAM_ACCOUNTS.md` § .env» |
-| «Напиши код» | Задача + **`CODER_PROMPT.md`** → чат **Coder** |
+| «Напиши код» | **`CODER_PROMPT.md`** → **Coder** |
+| «Сделай красиво / дизайн» | **`DESIGNER_PROMPT.md`** → **Designer** → утвердить **`DESIGN_BRIEF.md`** → Coder |
 | «Почини баг» | Тикет в `problems/` → чат **Mechanic** |
 | «Запусти скрипт» | «Запуск — владелец по `ops/RUN.md`» |
 

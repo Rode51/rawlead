@@ -12,14 +12,17 @@
 | Вопрос / задача | Куда | Первое сообщение |
 |-----------------|------|------------------|
 | Что делать **тебе** | **`docs/FOR_YOU.md`** | без чата |
-| План, docs, ревью | **Lead** `@lead-architect` | правило `.cursor/rules/lead-architect.mdc` |
-| **Фича** | **Coder** (новый чат) | `@coder` + `@docs/team/CODER_PROMPT.md` |
+| План, docs, ревью | **Lead** `@lead-architect` | `.cursor/rules/lead-architect.mdc` · **без кода, ever** |
+| **Дизайн UI** (постоянно) | **Designer** (новый чат) | `@designer` + `@docs/team/DESIGNER_PROMPT.md` · роль: [`DESIGNER.md`](DESIGNER.md) |
+| **Фича / код** | **Coder** (новый чат) | `@coder` + `@docs/team/CODER_PROMPT.md` |
 | **Поломка** | **Mechanic** `@mechanic` | `@docs/problems/…` + `.cursor/rules/mechanic.mdc` |
 | Brainstorm | **Gemini** → итог → Lead | — |
 
-Роли: **`.cursor/rules/`** (`@lead-architect` · `@coder` · `@mechanic` · `@owner`) · масштаб: **[`SCALE.md`](SCALE.md)** · бэкап: **[`../ops/BACKUP.md`](../ops/BACKUP.md)**
+Роли: **`.cursor/rules/`** (`@lead-architect` · `@designer` · `@coder` · `@mechanic` · `@owner`) · масштаб: **[`SCALE.md`](SCALE.md)** · бэкап: **[`../ops/BACKUP.md`](../ops/BACKUP.md)**
 
 **Не пиши Coder** «объясни весь проект» — он читает `CODER_PROMPT.md` / `TZ.md` сам.
+
+**Lead никогда не кодит** — отдельный чат `@lead-architect`; любая правка `src/` → новый чат `@coder` + `CODER_PROMPT.md`. Правила: `lead-no-code.mdc`.
 
 ---
 

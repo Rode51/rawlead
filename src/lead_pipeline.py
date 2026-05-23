@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from ai_analyze import AiAnalysis, analyze
 from budget import meets_min_budget
@@ -16,7 +17,12 @@ from telegram_notify import TelegramNotifyError, send_project_notification_from_
 
 _TELEGRAM_BOT_IN_PATH = re.compile(r"(/bot)[^/\s]+(/)")
 
-__all__ = ["short_err", "process_new_listing"]
+__all__ = [
+    "short_err",
+    "process_new_listing",
+    "process_new_listing_from_tg",
+    "ListingNotifyPlan",
+]
 
 
 def short_err(exc: BaseException, *, max_len: int = 240) -> str:
@@ -56,7 +62,17 @@ def _should_notify_after_ai(cfg: Config, analysis: AiAnalysis | None) -> bool:
     return True
 
 
-def process_new_listing(
+@dataclass(frozen=True)
+class ListingNotifyPlan:
+    """Готово к уведомлению (фильтр и ИИ пройдены)."""
+
+    project: ListingProject
+    analysis: AiAnalysis | None
+    ai_unavailable: bool
+    task_fallback_text: str
+
+
+def plan_new_listing(
     project: ListingProject,
     storage: ProjectStorage,
     word_filter: ListingWordFilter,
@@ -64,25 +80,25 @@ def process_new_listing(
     *,
     errors: list[str],
     pg: NeonLeadStorage | None = None,
-) -> tuple[bool, bool]:
-    """Возвращает (was_new, notified). Дубликат в SQLite → (False, False)."""
+) -> tuple[bool, ListingNotifyPlan | None]:
+    """Возвращает (was_new, plan). plan — только если нужно слать уведомление."""
     try:
         inserted = storage.try_record_new(project.source, project.project_id)
     except Exception as exc:
         errors.append(
             f"{project.source}:id={project.project_id} db:{short_err(exc)}"
         )
-        return False, False
+        return False, None
 
     if not inserted:
-        return False, False
+        return False, None
 
     if pg is not None:
         pg.record_new_lead(project, errors)
 
     if not word_filter.accepts_listing(project, wide=cfg.filter_wide):
         errors.append(f"{project.source}:id={project.project_id} skip:filter")
-        return True, False
+        return True, None
 
     analysis = None
     ai_unavailable = False
@@ -91,7 +107,7 @@ def process_new_listing(
     if cfg.ai_active:
         if not meets_min_budget(project.budget_text, cfg.min_budget_rub):
             errors.append(f"{project.source}:id={project.project_id} skip:budget")
-            return True, False
+            return True, None
 
         description = _resolve_description(project, cfg, errors)
         task_fallback_text = description or task_fallback_text
@@ -111,19 +127,35 @@ def process_new_listing(
             errors.append(
                 f"{project.source}:id={project.project_id} skip:ai:{analysis.verdict}"
             )
-            return True, False
+            return True, None
 
+    return True, ListingNotifyPlan(
+        project=project,
+        analysis=analysis,
+        ai_unavailable=ai_unavailable,
+        task_fallback_text=task_fallback_text,
+    )
+
+
+def send_listing_notification(
+    plan: ListingNotifyPlan,
+    cfg: Config,
+    *,
+    errors: list[str],
+    pg: NeonLeadStorage | None = None,
+) -> bool:
+    project = plan.project
     try:
         send_project_notification_from_config(
             project,
             cfg,
-            analysis=analysis,
-            ai_unavailable=ai_unavailable,
-            task_fallback_text=task_fallback_text,
+            analysis=plan.analysis,
+            ai_unavailable=plan.ai_unavailable,
+            task_fallback_text=plan.task_fallback_text,
         )
         if pg is not None:
-            pg.update_on_notify(project, analysis=analysis, errors=errors)
-        return True, True
+            pg.update_on_notify(project, analysis=plan.analysis, errors=errors)
+        return True
     except TelegramNotifyError as exc:
         errors.append(
             f"{project.source}:id={project.project_id} tg:{short_err(exc)}"
@@ -132,4 +164,46 @@ def process_new_listing(
         errors.append(
             f"{project.source}:id={project.project_id} tg:{short_err(exc)}"
         )
-    return True, False
+    return False
+
+
+def process_new_listing(
+    project: ListingProject,
+    storage: ProjectStorage,
+    word_filter: ListingWordFilter,
+    cfg: Config,
+    *,
+    errors: list[str],
+    pg: NeonLeadStorage | None = None,
+) -> tuple[bool, bool]:
+    """Возвращает (was_new, notified). Дубликат в SQLite → (False, False)."""
+    was_new, plan = plan_new_listing(
+        project, storage, word_filter, cfg, errors=errors, pg=pg
+    )
+    if plan is None:
+        return was_new, False
+    return was_new, send_listing_notification(plan, cfg, errors=errors, pg=pg)
+
+
+async def process_new_listing_from_tg(
+    message,
+    client,
+    project: ListingProject,
+    storage: ProjectStorage,
+    word_filter: ListingWordFilter,
+    cfg: Config,
+    *,
+    errors: list[str],
+    pg: NeonLeadStorage | None = None,
+) -> tuple[bool, bool]:
+    """TG: пересылка оригинала (Telethon), затем разбор ботом."""
+    from tg_forward import forward_listing_to_owner
+
+    was_new, plan = plan_new_listing(
+        project, storage, word_filter, cfg, errors=errors, pg=pg
+    )
+    if plan is None:
+        return was_new, False
+
+    await forward_listing_to_owner(client, message, cfg, errors=errors)
+    return was_new, send_listing_notification(plan, cfg, errors=errors, pg=pg)

@@ -4,6 +4,28 @@
 
 ---
 
+## 2026-05-23 — Coder: пульт v2 Tauri (принято Lead)
+
+- `scripts/radar_control.py`, `desktop/` (Tauri 2 + CSS v2), `start-radar-desktop.bat`
+- PyQt6 deprecated · см. [`DESKTOP_LAUNCH.md`](../../ops/DESKTOP_LAUNCH.md)
+
+---
+
+## 2026-05-23 — Designer: пульт v2 (ЮБуст / Tauri brief)
+
+- [`DESIGN_BRIEF.md`](../DESIGN_BRIEF.md) v2, [`DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md), canvas `fl-radar-pult-v2`
+- Lead → [`CODER_PROMPT.md`](../CODER_PROMPT.md)
+
+---
+
+## 2026-05-20 — Coder: UI пульта по DESIGN_BRIEF (принято Lead)
+
+- `scripts/radar_desktop.py` — ops-dashboard, лампы green/red/gray, токены, размеры 480×320 / 880×620
+- `docs/ops/DESKTOP_LAUNCH.md` — описание ламп
+- Дизайн: [`DESIGN_BRIEF.md`](../DESIGN_BRIEF.md)
+
+---
+
 ## 2026-05-23 — Coder: пульт управления (принято Lead)
 
 - `scripts/radar_desktop.py` — Старт/Стоп 3 процессов без cmd, логи, статус

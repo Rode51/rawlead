@@ -112,35 +112,18 @@ def _source_labels(source: str) -> tuple[str, str]:
     return "FL", "Открыть на FL"
 
 
-def _is_private_tg_post(url: str) -> bool:
-    return "/c/" in (url or "")
-
-
 def _tg_link_lines(project: ListingProject) -> list[str]:
-    lines: list[str] = []
+    """Оригинал — переслан Telethon выше; здесь только подпись и чат."""
+    lines: list[str] = ["↪️ Оригинал поста — переслано сообщением выше"]
     title = (project.chat_title or "").strip()
     if title:
         lines.append(f"📢 Чат: {title}")
-    invite = (project.chat_invite_url or "").strip()
-    if invite:
-        lines.append(f"🔗 {invite}")
-    post = (project.url or "").strip()
-    if post:
-        if _is_private_tg_post(post):
-            lines.append(f"🔗 Пост (нужно состоять в чате): {post}")
-        else:
-            lines.append(f"🔗 Пост: {post}")
     return lines
 
 
 def _tg_button_url(project: ListingProject) -> str:
-    invite = (project.chat_invite_url or "").strip()
-    post = (project.url or "").strip()
-    if invite:
-        return invite
-    if post and not _is_private_tg_post(post):
-        return post
-    return post
+    """Кнопка только на invite чата; ссылки на пост не открываются у владельца."""
+    return (project.chat_invite_url or "").strip()
 
 
 def format_ai_message(

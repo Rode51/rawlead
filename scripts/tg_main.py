@@ -23,7 +23,11 @@ from config import (  # noqa: E402
     telethon_monitor_accounts,
 )
 from storage import storage_from_config  # noqa: E402
-from health_check import run_health_check  # noqa: E402
+from health_check import (  # noqa: E402
+    mark_tg_monitor_started,
+    run_health_check,
+    write_tg_monitor_pulse,
+)
 from radar_status import reset_tg_session_stats  # noqa: E402
 from tg_monitor import reconnect_delay_sec, run_monitor  # noqa: E402
 
@@ -31,6 +35,26 @@ _POLL_SEC = 2.0
 _HEARTBEAT_SEC = 120.0
 _TG_MAIN_LOCK = _ROOT / "data" / ".tg_main.lock"
 _tg_main_lock_fh = None
+
+
+def _release_single_instance() -> None:
+    global _tg_main_lock_fh
+    if _tg_main_lock_fh is not None:
+        try:
+            if msvcrt is not None:
+                _tg_main_lock_fh.seek(0)
+                msvcrt.locking(_tg_main_lock_fh.fileno(), msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+        try:
+            _tg_main_lock_fh.close()
+        except OSError:
+            pass
+        _tg_main_lock_fh = None
+    try:
+        _TG_MAIN_LOCK.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _acquire_single_instance() -> bool:
@@ -82,15 +106,19 @@ async def _bot_poll_loop(cfg, storage, log_path: Path) -> None:
         await asyncio.sleep(_POLL_SEC)
 
 
+async def _write_pulse(cfg, storage, log_path: Path) -> None:
+    ts = radar_timestamp()
+    _append_log(log_path, f"{ts} тг:пульс")
+    write_tg_monitor_pulse(storage)
+    await asyncio.to_thread(
+        run_health_check, cfg, storage, log_path=log_path, force=False
+    )
+
+
 async def _heartbeat_loop(cfg, storage, log_path: Path) -> None:
     while True:
+        await _write_pulse(cfg, storage, log_path)
         await asyncio.sleep(_HEARTBEAT_SEC)
-        ts = radar_timestamp()
-        _append_log(log_path, f"{ts} тг:пульс")
-        storage.set_setting("tg_monitor_last_pulse", str(int(time.time())))
-        await asyncio.to_thread(
-            run_health_check, cfg, storage, log_path=log_path, force=False
-        )
 
 
 def _log_start() -> None:
@@ -116,6 +144,7 @@ async def _loop() -> None:
 
     ts = radar_timestamp()
     _append_log(log_path, f"{ts} тг:старт")
+    mark_tg_monitor_started(storage)
     reset_tg_session_stats(storage, telethon_monitor_accounts())
 
     poll_task = asyncio.create_task(_bot_poll_loop(cfg, storage, log_path))
@@ -140,6 +169,7 @@ async def _loop() -> None:
     finally:
         poll_task.cancel()
         beat_task.cancel()
+        _release_single_instance()
 
 
 if __name__ == "__main__":
@@ -150,3 +180,5 @@ if __name__ == "__main__":
         asyncio.run(_loop())
     except KeyboardInterrupt:
         print("TG-монитор остановлен.", flush=True)
+    finally:
+        _release_single_instance()

@@ -6,18 +6,10 @@
 
 ## Сейчас
 
-- **Фаза 0** — FL, Kwork, ИИ, бот ✅
-- **Фаза 1 TG** — multi-session, join, статус в боте ✅
-- **Пульт (1b)** — `radar_desktop.py` ✅ (принято Lead)
-- **Дальше** — WordPress [`TZ_WP.md`](TZ_WP.md)
-
----
-
-## Последняя сдача (Coder) — пульт
-
-- **Сделано:** GUI Старт/Стоп, 3 скрытых процесса, индикаторы, логи, статус из `radar_status.py`
-- **Файлы:** `scripts/radar_desktop.py`, `scripts/start-radar-desktop.bat`, `DESKTOP_LAUNCH.md`, `RUN.md`
-- **Проверка:** `start-radar-desktop.bat` → Старт → 3 python, логи `радар:старт` / `тг:старт` → Стоп
+- **Фаза 0–1** — FL, Kwork, TG, бот ✅
+- **Пульт v2** — Tauri + `radar_control.py` ✅ (Lead принял 2026-05-23)
+- **WP локально** — шаг 2 ✅ → шаг 3 (5 страниц)
+- **TG** — пересылка + разбор (проверить после рестарта TG)
 
 ---
 
@@ -25,11 +17,33 @@
 
 | Кто | Действие |
 |-----|----------|
-| **Владелец** | Ярлык на пульт; тест acc2; `backup.bat` |
-| **Lead** | WP — план в `TASKS` |
+| **Владелец** | `scripts\start-radar-desktop.bat` → чеклист ниже · WP §3 · `backup.bat` |
+| **Lead** | После проверки пульта — WP/TG в TASKS |
+
+---
+
+## Приёмка пульта v2 (владелец)
+
+1. `scripts\start-radar-desktop.bat` (Rust установлен → `tauri dev` или exe после `npm run tauri build`)
+2. Compact: play синий, лампы серые, **by Rode51**
+3. Play → stop зелёный, 3 python, логи вниз
+4. ▼ свернуть логи — процессы работают
+5. Stop → compact
+6. Убить один процесс → лампа «нет»
+
+Подробно: [`../ops/DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md)
+
+---
+
+## Последняя сдача (Coder) — пульт v2
+
+- `scripts/radar_control.py` — API `:18765`
+- `desktop/` — Tauri 2, HTML/CSS по DESIGN_BRIEF v2
+- `start-radar-desktop.bat` — API + Tauri
+- PyQt6 `radar_desktop.py` — deprecated
 
 ---
 
 ## Блокеры
 
-- нет
+- нет (Rust у владельца ✅)

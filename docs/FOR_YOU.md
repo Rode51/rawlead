@@ -13,7 +13,7 @@
 | **Роли для нового проекта** | [`../templates/cursor-universal/`](../templates/cursor-universal/) · `C:\Users\hramo\Templates\cursor-universal` |
 | **Как вести большой проект** | [`team/SCALE.md`](team/SCALE.md) |
 
-Роли в Cursor: `@lead-architect` · `@coder` · `@mechanic` · `@owner` (правила в `.cursor/rules/`) · Lead = docs · Coder = код (**новый чат на задачу**) · Mechanic = поломки · **ты** = `.env`, запуск, бэкап.
+Роли в Cursor: `@lead-architect` · `@designer` · `@coder` · `@mechanic` · `@owner` — `.cursor/rules/` · **Designer** = UI/UX всех проектов (docs, tier-1) · **Coder** = код · **ты** = `.env`, запуск, бэкап.
 
 ---
 
@@ -21,7 +21,7 @@
 
 - **FL + Kwork** → фильтр → ИИ → бот
 - **TG:** один процесс слушает **acc1 + acc2 + acc3** (свой файл id на аккаунт)
-- **Пульт:** `scripts\start-radar-desktop.bat` — одно окно, **Старт/Стоп** (вместо 3 cmd)
+- **Пульт v2 (Tauri):** `scripts\start-radar-desktop.bat` — play/stop, лампы, логи (вместо 3 cmd)
 - **Join:** acc1 внутри TG; acc2/acc3 — supervisor (стартуются с пультом)
 
 ---
@@ -59,11 +59,11 @@
 
 ## Твои шаги сейчас
 
-1. Ярлык на **`scripts\start-radar-desktop.bat`** → **▶ Старт**
-2. Проверка: нет 3 чёрных cmd; в боте **ℹ Статус**
-3. Тест acc2 (JS Jobs) → уведомление
-4. `scripts\backup.bat`
-5. Дальше — **WordPress** ([`team/TZ_WP.md`](team/TZ_WP.md))
+**Пульт v2 готов** — двойной клик [`scripts\start-radar-desktop.bat`](scripts/start-radar-desktop.bat) (Rust ✅). Чеклист: [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md).
+
+**WP локально:** шаг 2 ✅ → **шаг 3** — 5 страниц [`ops/wp-skeleton/`](ops/wp-skeleton/).
+
+Также: перезапуск TG (пересылка постов) · `backup.bat`
 
 ---
 

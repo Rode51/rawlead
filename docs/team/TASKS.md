@@ -6,24 +6,24 @@
 
 ## Владелец
 
-- [ ] Ярлык: `scripts\start-radar-desktop.bat`
-- [ ] Пульт: Старт → без 3 cmd → Стоп
-- [ ] Тест acc2 (JS Jobs) → бот
-- [ ] `scripts\backup.bat`
+- [ ] **Пульт v2** — приёмка: [`DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md) § чеклист
+- [ ] Опционально: `cd desktop` → `npm run tauri build` → exe без dev-режима
+- [ ] **WP Local §3** — 5 страниц — [`WP_LOCAL_SKELETON.md`](../ops/WP_LOCAL_SKELETON.md)
+- [ ] Перезапуск TG → проверить пересылку + разбор
+- [ ] `backup.bat`
 
 ---
 
 ## Следом
 
-- [ ] **WordPress** — [`TZ_WP.md`](TZ_WP.md) · [`ops/WP_OWNER_STEPS.md`](../ops/WP_OWNER_STEPS.md)
+- [ ] WP §4–5 · связь с радаром — [`TZ_WP.md`](TZ_WP.md)
 
 ## Отложено
 
-- Kwork пагинация, Avito, `.exe` PyInstaller, SaaS §10
+- Kwork пагинация, Avito, SaaS §10
 
 ---
 
 ## Заметки
 
-- Архитектура: [`ARCHITECTURE.md`](ARCHITECTURE.md)
-- Git: https://github.com/Rode51/uisness
+- Coder пульт v2 ✅ Lead 2026-05-23
