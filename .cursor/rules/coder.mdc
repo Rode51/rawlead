@@ -5,27 +5,31 @@ alwaysApply: false
 
 # Coder
 
-Ты — **Coder**. Код по задаче Lead. **Новый чат = одна задача.** После сдачи этот чат не использовать для следующей фичи.
+Ты — **Coder**. Код по задаче Lead. **Новый чат = одна задача.**
 
-## Первый ход (чат с `@coder`)
+## Первый ход (`@coder`)
 
-1. Прочитай **`docs/team/CODER_PROMPT.md`** — без него фичу **не начинать**
-2. При необходимости: `docs/team/TZ.md`, `docs/ops/FILTERS.md`, `docs/ops/PROFILE.md`
-3. Владелец обычно пишет только: `@coder` + `@docs/team/CODER_PROMPT.md` — этого достаточно
+1. **`docs/team/CODER_PROMPT.md`** — без него не начинать
+2. Карта файлов: [`docs/team/CODE_STRUCTURE.md`](docs/team/CODE_STRUCTURE.md)
+3. При необходимости: `TZ.md`, `ops/FILTERS.md`, `ops/PROFILE.md`
+
+## Структура кода (жёстко)
+
+| Правило | Деталь |
+|---------|--------|
+| **Без простыней** | Не лить огромные блоки в `tg_monitor.py` / `config.py` — выносить в отдельный файл |
+| **Один файл — одна роль** | join / forward / notify / parser — разные модули ([`CODE_STRUCTURE.md`](docs/team/CODE_STRUCTURE.md)) |
+| **Перенос папок** | Только по TZ Lead: карта путей + правка импортов, scripts, bat, RUN, пульт |
+| **После переноса** | В STATUS: «как проверить» play/stop + TG + биржи |
 
 ## После сессии
 
-`docs/team/STATUS.md` → «Последняя сессия (Coder)»: **Сделано**, **Файлы**, **Как проверить**
-
-## Разрешено
-
-- `src/`, `scripts/`, `tests/`, `requirements.txt` по задаче
+`docs/team/STATUS.md` → **Сделано** / **Файлы** / **Как проверить**
 
 ## Запрещено
 
-- `docs/team/TASKS.md`, `docs/FOR_YOU.md`, `docs/team/ARCHITECTURE.md` — Lead
-- Менять `docs/team/TZ.md` без просьбы
+- `TASKS.md`, `FOR_YOU.md`, `ARCHITECTURE.md` без Lead
 - Фичи без `CODER_PROMPT.md`
-- Поломки — чат **Mechanic**, не дублировать фикс в TASKS
+- Push GitHub без просьбы владельца
 
-Краткость и факты: `economy.mdc` · цикл: `docs/team/SCALE.md`
+`economy.mdc` · `SCALE.md`

@@ -61,10 +61,9 @@
 # Разовый прогон одного acc (до 4 join за час)
 python scripts/tg_join_queue.py --account acc2
 
-# Фон: один supervisor для acc2/acc3/acc4 (env TG_JOIN_DAEMON_ACCOUNTS)
-python scripts/tg_join_daemon.py
+# Join в фоне — внутри tg_main (TG_JOIN_IN_TG_MAIN=1), не отдельный процесс
 
-# Windows — полный радар (3 окна)
+# Windows — полный радар (2 окна: биржи + TG)
 scripts\start-radar-full.bat
 ```
 

@@ -15,3 +15,4 @@ alwaysApply: true
 - Coder: **новый чат на задачу**; цикл — `docs/team/SCALE.md`
 - **Git push** — только если владелец попросил или явно согласовал; иначе commit локально или только docs
 - **После `CODER_PROMPT.md`** — в чат владельцу: блок **копипаст** для `@coder` (см. `lead-architect.mdc`)
+- **Код:** без простыней; карта — `docs/team/CODE_STRUCTURE.md`; перенос папок — отдельное TZ + правка путей

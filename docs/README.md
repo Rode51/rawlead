@@ -58,6 +58,7 @@ docs/
 | [`team/HOW_TO_USE_CURSOR.md`](team/HOW_TO_USE_CURSOR.md) | Роли в Cursor |
 | [`team/DESIGN_BRIEF.md`](team/DESIGN_BRIEF.md) | UI пульта (эталон) |
 | [`team/ARCHITECTURE.md`](team/ARCHITECTURE.md) | Схема модулей |
+| [`team/CODE_STRUCTURE.md`](team/CODE_STRUCTURE.md) | Где какой файл; правила Coder |
 | [`team/TZ.md`](team/TZ.md) | ТЗ фазы 0 |
 | [`team/LEAD.md`](team/LEAD.md) | Регламент Lead |
 

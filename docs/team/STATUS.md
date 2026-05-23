@@ -6,9 +6,9 @@
 
 ## Сейчас
 
-- **Волна 3** — 73 pending, join по лимитам
-- **Coder** — унифицировать join (все acc в `tg_main`) + метка acc2/acc3 в боте → [`CODER_PROMPT.md`](CODER_PROMPT.md)
-- **WP** — §3 параллельно
+- **Волна 3** — 73 pending, join в `tg_main` (все acc)
+- **Приёмка** — владелец: 2 процесса, acc2 в боте
+- **WP** — §3
 
 ---
 
@@ -16,8 +16,8 @@
 
 | Кто | Что |
 |-----|-----|
-| **Владелец** | `@coder` + промпт · пульт ▶ |
-| **Coder** | см. `CODER_PROMPT.md` |
+| **Владелец** | Чеклист ниже (пульт ▶) |
+| **Lead** | После «ок» — закрыть приёмку |
 
 ---
 
@@ -27,15 +27,17 @@
 
 ---
 
-## Последняя сессия (Coder)
+## Приёмка (владелец) — unified join
 
-**Сделано:** `scripts/tg_queue_import.py`; импорт 73 ссылок (wave=3, round-robin acc1/2/3); 14 `done` без изменений.
+1. Пульт ▶ — лампы **биржи + TG** (без отдельного Join).
+2. `data/tg_join.log` — `join:ok` для acc2/acc3, без `database is locked`.
+3. Пост в чате на acc2 → в боте пересылка + разбор с **`acc2 · …`**.
+4. ℹ Статус — счётчики по acc1/2/3.
 
-**Файлы:** `scripts/tg_queue_import.py`, `docs/ops/TG_JOIN_QUEUE.csv`, `docs/ops/RUN.md`, `TG_JOIN_SCHEDULE.md`, `TG_CHANNELS_BASE.md`
+---
 
-**Как проверить:**
+## Последняя сессия (Coder) — принято Lead
 
-1. `python scripts/tg_queue_import.py --dry-run` — добавлено 0, пропуски только done/duplicate
-2. `(Select-String ",pending," docs/ops/TG_JOIN_QUEUE.csv).Count` → **73**
-3. Пульт ▶ → `data/tg_join.log` — `join:ok`, не сплошной fail/лимит
-4. Строки MVP/волна 2 (`status=done`) — без изменений
+**Сделано:** join acc1/2/3 в `tg_main`; 2 процесса; метка acc в боте; `TG_JOIN_IN_TG_MAIN`.
+
+**Карта кода:** [`CODE_STRUCTURE.md`](CODE_STRUCTURE.md) — правила без простыней.

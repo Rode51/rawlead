@@ -13,11 +13,11 @@ wave,account,status,name,link,chat_id,notes
 2,acc2,done,WP Craft,https://t.me/wpcraft,1438487841,волна2
 2,acc3,done,Чат WordPress,https://t.me/wpchat,1112882647,волна2
 2,acc3,done,Воркзавр,https://t.me/+focfZNw0vucyODcy,1063542127,дубль FL/Kwork опционально
-3,acc1,pending,invite:7VT01YU…,https://t.me/+7VT01YUvYUw5ZWYy,,волна3
-3,acc2,pending,invite:CMsMa3X…,https://t.me/+CMsMa3XGX7UyMzcy,,волна3
+3,acc1,fail,invite:7VT01YU…,https://t.me/+7VT01YUvYUw5ZWYy,,волна3
+3,acc2,fail,invite:CMsMa3X…,https://t.me/+CMsMa3XGX7UyMzcy,,волна3
 3,acc3,pending,invite:U4FIzh_…,https://t.me/+U4FIzh_OJdsHfhgB,,волна3
-3,acc1,pending,allgigs,https://t.me/allgigs,,волна3
-3,acc2,pending,backend_frontend_jobs,https://t.me/backend_frontend_jobs,,волна3
+3,acc1,done,allgigs,https://t.me/allgigs,1964722689,волна3
+3,acc2,done,backend_frontend_jobs,https://t.me/backend_frontend_jobs,1832734179,волна3
 3,acc3,pending,Bitrix_1C_Dev_Job,https://t.me/Bitrix_1C_Dev_Job,,волна3
 3,acc1,pending,bricksbuilder_ru,https://t.me/bricksbuilder_ru,,волна3
 3,acc2,pending,carbon_fields_ru,https://t.me/carbon_fields_ru,,волна3

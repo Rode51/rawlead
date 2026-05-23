@@ -71,6 +71,7 @@ Lead **не** «помогает быстро» править Python — даж
 | Правила ролей | `.cursor/rules/*.mdc` | HOW_TO_USE (ссылка) |
 | Статус в боте (ℹ) | `RUN.md` § кнопки | FOR_YOU (одна строка) |
 | Архитектура / процессы | `team/ARCHITECTURE.md` | KAK_ETO (ссылка) |
+| Карта кода, правила Coder | `team/CODE_STRUCTURE.md` | дубли в TZ |
 | Запуск пульт | `ops/DESKTOP_LAUNCH.md` | FOR_YOU, RUN |
 | Безопасность владельца | `team/SECURITY.md` | FOR_YOU (ссылка) |
 | Очередь Coder | `TASKS.md` → **`CODER_PROMPT.md`** | FOR_YOU (только ссылка) |

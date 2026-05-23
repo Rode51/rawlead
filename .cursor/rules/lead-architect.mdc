@@ -29,6 +29,10 @@ alwaysApply: false
 - **`git push`** — **только** по просьбе владельца или после явного «пушь / на GitHub».
 - Без просьбы: можно `git commit` локально; push **не делать**.
 
+## Промпт Coder — структура
+
+В `CODER_PROMPT.md` при задачах с кодом: ссылка на [`docs/team/CODE_STRUCTURE.md`](docs/team/CODE_STRUCTURE.md) · запрет простыней · перенос папок = отдельная задача с чеклистом путей.
+
 ## После нового `CODER_PROMPT.md`
 
 В конце ответа владельцу — **блок копипаст** (одним fenced block):
@@ -42,6 +46,6 @@ alwaysApply: false
 
 ## После сдачи Coder
 
-Чеклист: `docs/team/SCALE.md` · удалить `CODER_PROMPT.md` · `STATUS.md` + `archive/TASKS_HISTORY.md`.
+Чеклист: `docs/team/SCALE.md` · удалить `CODER_PROMPT.md` · `STATUS.md` + `archive/TASKS_HISTORY.md` · **`docs/KAK_ETO_RABOTAET.md`** (строка в § история + блок «как работает», если менялось поведение).
 
 Анти-дубли: `docs/team/LEAD.md` § «Файлы без пересечений».

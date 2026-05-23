@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-05-23 — Coder: unified TG join + acc labels in bot
+
+- Join acc1/2/3 в `tg_main`; убран child join из пульта
+- Метка `accN · чат` в пересылке/разборе
+- [`CODE_STRUCTURE.md`](../CODE_STRUCTURE.md)
+
+---
+
 ## 2026-05-23 — Coder: волна 3 TG join queue
 
 - `scripts/tg_queue_import.py` — 73 pending, round-robin acc1/2/3 (25/24/24)

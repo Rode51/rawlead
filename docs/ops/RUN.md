@@ -200,22 +200,19 @@ TELETHON_MONITOR_ACCOUNTS=acc1,acc2,acc3
 TELETHON_CHAT_IDS=data/telethon_chat_ids_acc1.txt
 ```
 
-Файлы `data/telethon_chat_ids_acc1.txt`, `_acc2.txt`, `_acc3.txt` (gitignore). При первом запуске `tg_main` пустой файл сидится из `done` в [`TG_JOIN_QUEUE.csv`](TG_JOIN_QUEUE.csv) для своего `account`. После join id дописывается в **свой** файл; **acc1** подхватывает без рестарта (`TG_JOIN_AUTO_ACC1=1`); acc2/acc3 — перезапуск TG или `python scripts/tg_sync_chat_ids.py --account acc2`.
+Файлы `data/telethon_chat_ids_acc1.txt`, `_acc2.txt`, `_acc3.txt` (gitignore). При первом запуске `tg_main` пустой файл сидится из `done` в [`TG_JOIN_QUEUE.csv`](TG_JOIN_QUEUE.csv) для своего `account`. После join id дописывается в **свой** файл; все monitor acc подхватывают listen без рестарта (`TG_JOIN_IN_TG_MAIN=1`, join внутри `tg_main`).
 
 Пересобрать все listen-файлы из CSV: `python scripts/tg_sync_chat_ids.py --account all`
 
-**Запуск «всё само» (рекомендуется):** один раз `scripts\start-radar-full.bat` — биржи + TG (join acc1 внутри) + **один** join-supervisor (`tg_join_daemon.py`, acc2/acc3/acc4 из `TG_JOIN_DAEMON_ACCOUNTS`). Остановка: `scripts\stop-radar.bat`.
+**Запуск «всё само» (рекомендуется):** один раз `scripts\start-radar-full.bat` — биржи + TG (join acc1/2/3 внутри `tg_main`). Остановка: `scripts\stop-radar.bat`.
 
 
 ```powershell
-# Полный радар (3 окна) — см. start-radar-full.bat
+# Полный радар (2 окна: биржи + TG) — см. start-radar-full.bat
 scripts\start-radar-full.bat
 
-# Только биржи + TG без join acc2/3
+# Только биржи + TG
 scripts\start-radar-all.bat
-
-# Отдельно join-supervisor (acc1 — только через tg_main)
-scripts\start-join-daemons.bat
 
 # Разовый join одного acc (без daemon)
 python scripts/tg_join_queue.py --account acc2

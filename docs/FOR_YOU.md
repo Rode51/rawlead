@@ -21,8 +21,8 @@
 
 - **FL + Kwork** → фильтр → ИИ → бот
 - **TG:** один процесс слушает **acc1 + acc2 + acc3** (свой файл id на аккаунт)
-- **Пульт v2 (Tauri):** `scripts\start-radar-desktop.bat` — play/stop, лампы, логи (вместо 3 cmd)
-- **Join:** acc1 внутри TG; acc2/acc3 — supervisor (стартуются с пультом)
+- **Пульт v2 (Tauri):** `start-radar-desktop.vbs` — play/stop, **2** процесса (биржи + TG)
+- **Join:** все acc внутри окна TG (`TG_JOIN_IN_TG_MAIN=1`)
 
 ---
 
