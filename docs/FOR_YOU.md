@@ -59,15 +59,19 @@
 
 ## Твои шаги сейчас
 
-**Волна 3 TG:** 73 чата в очереди (`pending`) — **пульт ▶** и раз в день `data\tg_join.log`. Как устроено: [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) § «Какой номер в какой чат».
+### Завтра (24.05)
 
-**Git** — push на GitHub ✅ 2026-05-23. **`backup.bat`** — для `.env` и сессий.
+1. **Новый чат `@coder`** → [`team/CODER_PROMPT.md`](team/CODER_PROMPT.md) (Контур 1 + ЛК `/cabinet`).
+2. Пульт ▶, VPN **выкл**, `tg_smoke.py` — зелёный свет.
+3. Скрины для портфолио: главная + кабинет.
 
-**Радар:** пульт ▶, **VPN на ПК выключен** (иначе бот/TG молчат). Проверка: `src/tg_smoke.py`.
+### С понедельника
 
-**Продукт v1:** два контура — **Дикий Запад** (только ты) и **SaaS-лента** (чистые источники). [`PRODUCT_VISION.md`](team/PRODUCT_VISION.md) §0c–0d.
+Отклики **по боту** (где «Брать» + норм бюджет), не хаотично «на всё». 1–2 сильных отклика лучше 20 слабых — радар для **отбора**, не для спама.
 
-**WP:** локальный сайт ✅ · [`design/wp/REFERENCE.md`](design/wp/REFERENCE.md) · [`ops/WP_KADENCE_INSTALL.md`](ops/WP_KADENCE_INSTALL.md).
+---
+
+**Фон:** join волна 3 · [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) · продукт [`PRODUCT_VISION.md`](team/PRODUCT_VISION.md) §0c.
 
 ---
 

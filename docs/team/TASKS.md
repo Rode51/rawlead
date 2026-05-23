@@ -6,9 +6,21 @@
 
 ## Владелец
 
-- [ ] Пульт ▶ · волна 3 join · **VPN выкл** при радаре
+### 2026-05-24 (завтра)
+
+- [ ] **Контур 1** — пульт ▶ стабильно, VPN выкл, `tg_smoke` ok
+- [ ] **ЛК на WP** — `@coder` → [`CODER_PROMPT.md`](CODER_PROMPT.md) · страница `/cabinet` для портфолио
+- [ ] **Портфолио** — скрины главной + ЛК → [`PORTFOLIO.md`](../PORTFOLIO.md)
+
+### С пн 2026-05-26
+
+- [ ] Откликаться **выборочно** по карточкам бота (вердict «Брать»), не «на всё подряд»
+- [ ] Зафиксировать 1–2 отклика/день max quality — промпт v7
+
+### Фон
+
+- [ ] Join волна 3 · Neon `.env` когда Coder дойдёт — [`NEON_CURSOR.md`](../ops/NEON_CURSOR.md)
 - [x] WP маркетинг (Kadence) — ✅
-- [ ] Neon: проект + `DATABASE_URL` в `.env` (когда Coder возьмёт schema) — [`ops/NEON_CURSOR.md`](../ops/NEON_CURSOR.md)
 
 ---
 
