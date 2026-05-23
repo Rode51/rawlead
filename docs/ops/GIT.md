@@ -1,50 +1,21 @@
 # Git — версии и GitHub
 
-**Репозиторий локально:** `git init` ✅ · ветка `main` · remote: `https://github.com/hramo/uisness.git`
-
-**Осталось один раз:** войти в GitHub и **создать пустой репозиторий** + `git push`.
+**GitHub:** https://github.com/Rode51/uisness (private) · логин **Rode51** · ветка `main` ✅
 
 ---
 
-## 1. Создай репозиторий на GitHub
+## Первый push (уже сделано)
 
-1. [github.com/new](https://github.com/new)
-2. Имя: **`uisness`**
-3. **Private**
-4. **Без** README / .gitignore / license (у нас уже есть)
-5. Create repository
+Remote: `https://github.com/Rode51/uisness.git`
 
-Если логин **не** `hramo` — после создания:
+Дальше после работы Coder:
 
 ```powershell
 cd C:\Users\hramo\uisness
-git remote set-url origin https://github.com/ТВОЙ_ЛОГИН/uisness.git
+git add .
+git commit -m "feat: описание"
+git push
 ```
-
----
-
-## 2. Вход (один раз)
-
-В PowerShell:
-
-```powershell
-gh auth login
-```
-
-Выбери: GitHub.com → HTTPS → Login with a web browser → скопируй код.
-
-Без `gh` — при `git push` откроется окно входа Git Credential Manager.
-
----
-
-## 3. Отправить код
-
-```powershell
-cd C:\Users\hramo\uisness
-git push -u origin main
-```
-
-Проверка: в браузере `https://github.com/hramo/uisness` — файлы `src/`, `docs/`.
 
 ---
 
@@ -81,4 +52,4 @@ git push
 
 ---
 
-_Если `Repository not found` — репозиторий ещё не создан на GitHub или неверный логин в `remote`._
+_Вход: `gh auth login` (аккаунт Rode51)._
