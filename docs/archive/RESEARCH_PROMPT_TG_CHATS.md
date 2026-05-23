@@ -1,5 +1,7 @@
 # Промпт для Deep Research — список TG-чатов с заказами
 
+_Архив · перенесено из `docs/ops/` · результат класть в [`../ops/SOURCES_POOLS.md`](../ops/SOURCES_POOLS.md)._
+
 Скопируй блок ниже в Gemini / ChatGPT (режим «глубокое исследование»).  
 Результат сохрани в [`SOURCES_POOLS.md`](SOURCES_POOLS.md) — колонки: название, @ или invite-ссылка, тип, зачем.
 

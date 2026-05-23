@@ -58,4 +58,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup.ps1
 
 ## Универсальный шаблон
 
-Скрипт входит в [`../../templates/cursor-universal/`](../../templates/cursor-universal/) для новых проектов.
+Скрипт для новых проектов: `C:\Users\hramo\Templates\cursor-universal`.

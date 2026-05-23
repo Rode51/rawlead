@@ -3,7 +3,7 @@
 **Статус:** v2 · утверждено Lead 2026-05-23 · canvas `r7` · Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md)  
 **Задача:** [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md)  
 **Live-превью:** `.cursor/projects/c-Users-hramo-uisness/canvases/fl-radar-pult-v2.canvas.tsx`  
-**Стек:** Tauri + HTML/CSS ([`ADR_PULT_UI_STACK.md`](ADR_PULT_UI_STACK.md)) · **без PyQt6**
+**Стек:** Tauri 2 + HTML/CSS · **без PyQt6** (решение Lead 2026-05-20, ADR в git history)
 
 ---
 
@@ -180,10 +180,22 @@
 
 ---
 
+## Как посмотреть макет
+
+| # | Источник |
+|---|----------|
+| 1 | Этот brief — токены, ASCII compact/expanded |
+| 2 | Canvas: `%USERPROFILE%\.cursor\projects\c-Users-hramo-uisness\canvases\fl-radar-pult-v2.canvas.tsx` |
+| 3 | Референс: [`../design/references/u-boost-ref.png`](../design/references/u-boost-ref.png) |
+
+**Сравнить с Coder:** `npm run dev` → http://localhost:1420 (нужен `radar_control`) · или `start-radar-desktop.vbs`. Если в браузере кнопки ок, в Tauri нет — permissions / drag-region.
+
+---
+
 ## Ссылка на v1
 
 Старая спека (PyQt/QSS): git history `DESIGN_BRIEF.md` до 2026-05-23. Логика процессов и вкладок **без изменений**.
 
 ---
 
-_Утверждено Lead 2026-05-23 → [`CODER_PROMPT.md`](CODER_PROMPT.md)_
+_Утверждено Lead 2026-05-23_

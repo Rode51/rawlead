@@ -10,7 +10,7 @@
 | **Безопасность (без кода)** | [`team/SECURITY.md`](team/SECURITY.md) |
 | **Бэкапы** | [`ops/BACKUP.md`](ops/BACKUP.md) · `scripts\backup.bat` |
 | **Git / GitHub** | https://github.com/Rode51/uisness · [`ops/GIT.md`](ops/GIT.md) |
-| **Роли для нового проекта** | [`../templates/cursor-universal/`](../templates/cursor-universal/) · `C:\Users\hramo\Templates\cursor-universal` |
+| **Роли для нового проекта** | `C:\Users\hramo\Templates\cursor-universal` |
 | **Как вести большой проект** | [`team/SCALE.md`](team/SCALE.md) |
 
 Роли в Cursor: `@lead-architect` · `@designer` · `@coder` · `@mechanic` · `@owner` — `.cursor/rules/` · **Designer** = UI/UX всех проектов (docs, tier-1) · **Coder** = код · **ты** = `.env`, запуск, бэкап.

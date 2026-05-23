@@ -17,7 +17,7 @@
 
 - [`DESIGN_BRIEF.md`](../team/DESIGN_BRIEF.md)
 - Canvas: `~\.cursor\projects\c-Users-hramo-uisness\canvases\fl-radar-pult-v2.canvas.tsx`
-- [`PULT_DESIGN_PREVIEW.md`](../ops/PULT_DESIGN_PREVIEW.md)
+- [`DESIGN_BRIEF.md`](../team/DESIGN_BRIEF.md) § «Как посмотреть макет»
 
 ---
 

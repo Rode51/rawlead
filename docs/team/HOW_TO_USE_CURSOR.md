@@ -42,19 +42,7 @@
 
 ## Цикл одной фичи
 
-Полный регламент: **[`SCALE.md`](SCALE.md)**.
-
-```
-1. Gemini/ты — идея (5–10 строк)
-2. Lead → ROADMAP + TASKS + CODER_PROMPT.md (задача 1–2 дня)
-3. Coder → НОВЫЙ чат → код + STATUS.md
-4. Ты → RUN.md, ~5 мин приёмка
-5. Lead → закрыть, FOR_YOU, TASKS_HISTORY, удалить CODER_PROMPT.md
-5b. Ты → бэкап (BACKUP.md)
-6. Повтор
-```
-
-Не ок на шаге 4 → Lead → `problems/` → Mechanic.
+Полный регламент и чеклисты: **[`SCALE.md`](SCALE.md)** (таблица шагов 1–6, Lead, владелец, бэкап).
 
 ---
 
@@ -82,21 +70,7 @@
 
 ## Файлы — шпаргалка
 
-| Файл | Кто правит |
-|------|------------|
-| `docs/team/SCALE.md` | Lead — цикл большого проекта |
-| `.cursor/rules/*.mdc` | Lead — правила ролей (Project Rules) |
-| `docs/ops/BACKUP.md` | Lead — **ты делаешь** бэкап |
-| `docs/team/SECURITY.md` | Lead — для владельца |
-| `docs/team/LEAD.md` | Lead — регламент |
-| `docs/FOR_YOU.md` | Lead — **ты читаешь** |
-| `docs/team/TASKS.md` | Lead |
-| `docs/team/CODER_PROMPT.md` | Lead (один; удалить после сдачи) |
-| `docs/team/STATUS.md` | Coder (после работы), Lead (сводка) |
-| `docs/ops/FILTERS.md`, `PROFILE.md` | **Ты** или Lead |
-| `.env` | **Только ты**, на ПК |
-| `src/` | **Coder** / **Mechanic** |
-| `docs/problems/*.md` | **Lead** → **Mechanic** |
+Иерархия документов: **[`SCALE.md`](SCALE.md)** § «Документы». Правила ролей: **`.cursor/rules/*.mdc`**.
 
 ---
 

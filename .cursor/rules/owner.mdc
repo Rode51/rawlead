@@ -25,10 +25,4 @@ alwaysApply: false
 | Поломка | `@mechanic` + `docs/problems/` |
 | План, docs | `@lead-architect` |
 
-## Ответы
-
-- Кратко, по `FOR_YOU.md`
-- Не пересказывать репозиторий
-- Нет факта в docs → «проверь STATUS / спроси Lead»
-
-`docs/team/SECURITY.md` · `docs/team/SCALE.md`
+Кратко по `FOR_YOU.md`. Нет факта в docs → STATUS / Lead. `economy.mdc` · `SECURITY.md`

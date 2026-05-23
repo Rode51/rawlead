@@ -38,7 +38,7 @@ flowchart TB
 | **Биржи** | `src/main.py` | Цикл FL/Kwork, фильтр, ИИ, Bot API, `poll_commands` |
 | **TG** | `scripts/tg_main.py` → `src/tg_monitor.py` | 3× Telethon в одном asyncio; acc1 join внутри |
 | **Join** | `scripts/tg_join_daemon.py` | Очередь CSV для acc2/acc3 |
-| **Пульт** | `desktop/` + `scripts/radar_control.py` | Tauri UI + HTTP API; **не** парсит заказы |
+| **Пульт** | `desktop/` + `scripts/radar_control.py` | Tauri 2 + WebView2, HTTP :18765; **не** парсит заказы |
 
 Запасной запуск: `scripts/start-radar-full.bat` (3 видимых cmd). См. [`../ops/DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md).
 
@@ -89,7 +89,7 @@ flowchart LR
 | Слой | Назначение | Где |
 |------|------------|-----|
 | Конфиг | `.env`, интервалы, acc, пути id | `src/config.py` |
-| Пульт | Старт/стоп, UI, tail логов | `scripts/radar_desktop.py` |
+| Пульт | Старт/стоп, UI, tail логов | `scripts/radar_control.py`, `desktop/` |
 | Биржи | FL + Kwork | `src/fl_parser.py`, `src/kwork_parser.py`, `src/main.py` |
 | TG монитор | Multi-session, handlers | `src/tg_monitor.py`, `scripts/tg_main.py` |
 | TG join | CSV очередь, daemon | `src/tg_join_runner.py`, `src/tg_join_lib.py`, `scripts/tg_join_daemon.py` |

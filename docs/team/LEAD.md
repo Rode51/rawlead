@@ -26,7 +26,7 @@ Lead **не** «помогает быстро» править Python — даж
 4. ТЗ для Coder → **`team/CODER_PROMPT.md`** (один файл, см. ниже)
 4b. UI/UX (постоянная роль) → [`team/DESIGNER.md`](DESIGNER.md) + **`team/DESIGNER_PROMPT.md`** → **`DESIGN_BRIEF.md`** / `docs/design/` → обновить **`DESIGN_SYSTEM.md`** → Coder
 5. Тикеты → `problems/*.md` → Mechanic
-6. Ревью сдачи Coder → `REVIEW.md`, закрытие пунктов TASKS
+6. Ревью сдачи Coder → [`SCALE.md`](SCALE.md) § чеклист Lead, закрытие TASKS
 7. Цикл масштаба → [`SCALE.md`](SCALE.md)
 8. **Новая фича / изменение** → строка в [`../KAK_ETO_RABOTAET.md`](../KAK_ETO_RABOTAET.md) § история (+ FOR_YOU при необходимости)
 
