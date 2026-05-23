@@ -4,6 +4,12 @@
 
 ---
 
+## 2026-05-23 — Lead: два контура owner / saas + монетизация
+
+- [`PRODUCT_VISION.md`](../PRODUCT_VISION.md) §0c–0d · [`SOURCES_SAAS.md`](../../ops/SOURCES_SAAS.md)
+
+---
+
 ## 2026-05-23 — Lead: PRODUCT_VISION 0.4 + Neon/API/WP TZ
 
 - Внутренний язык match; наружу «совместимость»

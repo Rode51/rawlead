@@ -41,7 +41,7 @@
 | `POST` | `/v1/internal/leads` | radar (API key) | upsert lead + ai_score + lead_tags |
 | `GET` | `/v1/internal/digest` | bot (API key) | top-K leads per user where rank ≥ threshold |
 
-**Не в MVP:** OAuth, webhooks оплаты, admin panel.
+**Логика read:** `/v1/feed` — только `contour = 'saas'` + `ai_score ≥ порог`. Owner bot — `contour = 'owner'`.
 
 ---
 

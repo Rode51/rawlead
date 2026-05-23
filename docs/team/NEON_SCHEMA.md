@@ -33,6 +33,7 @@
 | `ai_verdict` | TEXT | Брать / Сомнительно / Нет |
 | `lead_tags` | JSONB | теги из ИИ: `["python","fastapi","parser"]` |
 | `ai_reasons` | JSONB | 2–3 строки «почему score» (для UI) |
+| `contour` | TEXT | **`owner`** (Дикий Запад) \| **`saas`** (White Label) — см. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0c |
 | `notified_at` | TIMESTAMPTZ | legacy / owner |
 | `created_at` | TIMESTAMPTZ | |
 

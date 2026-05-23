@@ -34,7 +34,7 @@ flowchart TB
 
 **Rank на чтении:** `final_rank = ai_score×0.6 + keyword_match×0.4` (v0).
 
-**Сейчас в коде:** ingest → SQLite + опционально Neon (`pg_storage.py`); API и multi-user bot — **не реализованы**.
+**Сейчас в коде:** ingest → SQLite; весь поток = **Контур 1 (owner)**. SaaS-лента и `contour=saas` — **не реализованы**. См. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0c.
 
 ---
 
