@@ -6,9 +6,9 @@
 
 ## Сейчас
 
-- **Фаза 0–1 + пульт v2** ✅
-- **Волна 3 TG** — **73 pending** в CSV (join по лимитам, ~3–7 дней)
-- **WP локально** — §3 страницы (параллельно)
+- **Волна 3** — 73 pending, join по лимитам
+- **Coder** — унифицировать join (все acc в `tg_main`) + метка acc2/acc3 в боте → [`CODER_PROMPT.md`](CODER_PROMPT.md)
+- **WP** — §3 параллельно
 
 ---
 
@@ -16,8 +16,8 @@
 
 | Кто | Что |
 |-----|-----|
-| **Владелец** | Пульт ▶ или `start-radar-full.bat` · через сутки `data/tg_join.log` (`join:ok`) |
-| **Lead** | После стабильного join — `done` → `SOURCES_POOLS` / `TELEGRAM_CHATS.json` |
+| **Владелец** | `@coder` + промпт · пульт ▶ |
+| **Coder** | см. `CODER_PROMPT.md` |
 
 ---
 

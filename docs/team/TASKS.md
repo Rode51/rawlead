@@ -4,21 +4,24 @@
 
 ---
 
+## Coder
+
+- [ ] **TG join unified + acc2/3 в боте** — [`CODER_PROMPT.md`](CODER_PROMPT.md)
+
+---
+
 ## Владелец
 
-- [x] Пульт v2 — приёмка ✅
-- [x] Волна 3 — CSV 73 pending ✅ (Coder)
-- [ ] **Пульт ▶** · раз в день `data/tg_join.log` (~3–7 дней join)
+- [ ] Пульт ▶ · волна 3 join идёт (`tg_join.log`)
+- [ ] После Coder — приёмка: 2 процесса, уведомление с меткой acc2/acc3
 - [ ] **WP Local §3** — [`WP_LOCAL_SKELETON.md`](../ops/WP_LOCAL_SKELETON.md)
-- [ ] `backup.bat` — по желанию
 
 ---
 
 ## Следом
 
-- [ ] WP §4–5 · [`TZ_WP.md`](TZ_WP.md)
-- [ ] Фаза 2 — ИИ «первое ЛС»
+- [ ] WP §4–5 · фаза 2 ИИ «первое ЛС»
 
 ## Отложено
 
-- SaaS мультитенант · Kwork пагинация · Avito
+- SaaS · Kwork пагинация · Avito
