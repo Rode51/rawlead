@@ -1,94 +1,144 @@
 ﻿# Архитектура FL Radar
 
-Краткая схема для Lead, Coder и владельца. Детали поведения — в **`docs/team/TZ.md`**.
+Краткая схема для Lead, Coder и владельца. Поведение — **`docs/team/TZ.md`**, TG — **`docs/team/TZ_TG.md`**.
+
+_Актуально: 2026-05-23 (фаза 1 + пульт + multi-session)._
 
 ---
 
-## Поток данных (MVP)
+## Процессы на ПК (как запускается)
+
+```mermaid
+flowchart TB
+  subgraph desktop["Пульт (рекомендуется)"]
+    GUI["scripts/radar_desktop.py\n▶ Старт / ⏹ Стоп"]
+  end
+  subgraph workers["3 процесса Python (без cmd)"]
+    M["src/main.py\nFL + Kwork"]
+    T["scripts/tg_main.py\nTelethon acc1+2+3"]
+    J["scripts/tg_join_daemon.py\njoin acc2/3"]
+  end
+  DB[("data/projects.db\n+ settings")]
+  LR["data/radar.log"]
+  LJ["data/tg_join.log"]
+
+  GUI -->|subprocess| M
+  GUI -->|subprocess| T
+  GUI -->|subprocess| J
+  M --> DB
+  M --> LR
+  T --> DB
+  T --> LR
+  J --> LJ
+  T -.->|acc1 join in-process| T
+```
+
+| Процесс | Модуль | Роль |
+|---------|--------|------|
+| **Биржи** | `src/main.py` | Цикл FL/Kwork, фильтр, ИИ, Bot API, `poll_commands` |
+| **TG** | `scripts/tg_main.py` → `src/tg_monitor.py` | 3× Telethon в одном asyncio; acc1 join внутри |
+| **Join** | `scripts/tg_join_daemon.py` | Очередь CSV для acc2/acc3 |
+| **Пульт** | `scripts/radar_desktop.py` | Лаунчер + логи + индикаторы; **не** парсит заказы |
+
+Запасной запуск: `scripts/start-radar-full.bat` (3 видимых cmd). См. [`../ops/DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md).
+
+**Lock-файлы:** `data/.tg_main.lock` (один tg_main), `data/.radar_desktop.lock` (один пульт).
+
+---
+
+## Поток данных (заказ → бот)
 
 ```mermaid
 flowchart LR
-  subgraph config
-    ENV[".env"]
-    FILTERS["docs/ops/FILTERS.md"]
+  subgraph sources
+    FL["FL.ru"]
+    KW["Kwork"]
+    TGCH["TG-чаты\nacc1/2/3"]
   end
-  FL["FL.ru"]
-  KW["Kwork ✅"]
-  AV["Avito (отложено)"]
-  subgraph app["Программа на ПК"]
-    CFG["config"]
-    P["parsers"]
-    S["storage SQLite"]
+  subgraph app["Общий pipeline"]
+    P["parsers / tg_monitor"]
+    S[("SQLite\ndedup")]
     F["filters"]
-    TC["telegram_control"]
-    T["telegram_notify"]
+    AI["ai_analyze"]
+    N["telegram_notify"]
   end
-  CFG --> TC
-  TC --> S
-  PROXY["TG_PROXY_URL"]
-  TG["Telegram Bot API"]
+  subgraph control
+    TC["telegram_control\nпауза / статус"]
+    RS["radar_status\nсчётчики"]
+  end
+  BOT["Bot API\nTG_PROXY_URL"]
   U["Ты"]
 
-  ENV --> CFG
-  CFG --> P
   FL --> P
   KW --> P
-  AV -.-> P
-  P --> S
-  S --> F
-  FILTERS --> F
-  F --> T
-  ENV --> T
-  PROXY --> T
-  PROXY --> TC
-  TC --> TG
-  T --> TG --> U
+  TGCH --> P
+  P --> S --> F --> AI --> N --> BOT --> U
+  TC --> BOT
+  RS -.->|читает settings| S
+  TC -.->|format_status| RS
 ```
 
-**Сеть (MVP):** запросы к **FL / Kwork / Avito** — **напрямую** с домашнего IP (без системного VPN). Запросы к **`api.telegram.org`** — **только через `TG_PROXY_URL`** в `.env` (HTTP-прокси с логином).
+**Сеть:** FL/Kwork — домашний IP. `api.telegram.org` — **только `TG_PROXY_URL`**. Telethon — **прокси per acc** (`TELETHON_PROXY_ACC1`…).
 
-**Kwork** — в проде (этап 1.5 закрыт). **Avito** — отложено.
+**Дедуп TG:** `source = tg:{chat_id}` в `listing.telegram_source()`.
 
-**ИИ (этап 2):** после фильтра — полная страница FL + OpenRouter → расширенное сообщение в TG. См. `docs/team/TZ.md` §5.
+---
 
-**Фаза 1 (план):** ветка **Telethon** (мониторинговый аккаунт + прокси) → те же фильтр/ИИ/уведомления в личный чат через Bot API. См. **`docs/team/PRODUCT_VISION.md`**, **`docs/ROADMAP.md`**.
+## Слои (код)
 
-## Слои
+| Слой | Назначение | Где |
+|------|------------|-----|
+| Конфиг | `.env`, интервалы, acc, пути id | `src/config.py` |
+| Пульт | Старт/стоп, UI, tail логов | `scripts/radar_desktop.py` |
+| Биржи | FL + Kwork | `src/fl_parser.py`, `src/kwork_parser.py`, `src/main.py` |
+| TG монитор | Multi-session, handlers | `src/tg_monitor.py`, `scripts/tg_main.py` |
+| TG join | CSV очередь, daemon | `src/tg_join_runner.py`, `src/tg_join_lib.py`, `scripts/tg_join_daemon.py` |
+| Telethon | Сессии acc1–3 | `src/tg_client.py` |
+| Listen-списки | id чатов per acc | `data/telethon_chat_ids_accN.txt`, `scripts/tg_sync_chat_ids.py` |
+| Хранение | Дедуп, пауза, offset бота, **статус** | `src/storage.py` |
+| Статус (бот + пульт) | Счётчики, текст ℹ | `src/radar_status.py` |
+| Управление ботом | Пауза, клавиатура | `src/telegram_control.py` |
+| Уведомления | Карточки заказов | `src/telegram_notify.py` |
+| ИИ | OpenRouter | `src/ai_analyze.py` |
+| Фильтр | Слова | `src/filters.py` ← `docs/ops/FILTERS.md` |
+| Здоровье | Пульс tg_main, алерт | `src/health_check.py` |
+| Облако лидов | Опционально | `src/pg_storage.py` → Neon |
 
-| Слой | Назначение | Где в коде | MVP (по факту репо) |
-|------|------------|------------|---------------------|
-| Конфиг | Секреты, URL, интервал, пути БД/лога | `src/config.py`, `.env` | ✅ |
-| Загрузка FL | HTTP GET ленты, до 3 стр. | `src/fl_parser.py` | ✅ |
-| Загрузка Kwork | GET, JSON `wants` | `src/kwork_parser.py` | ✅ |
-| Хранение | Дедуп по `project_id` | `src/storage.py` → `data/projects.db` | ✅ |
-| Отбор | Ключевые слова | `src/filters.py` ← `docs/ops/FILTERS.md` | ✅ |
-| Уведомление | Bot API + кнопка; **через `TG_PROXY_URL`** | `src/telegram_notify.py`, `src/tg_smoke.py` | ✅ |
-| **Управление** | Пауза/старт, Reply keyboard | `src/telegram_control.py` | ✅ |
-| Оркестрация | Цикл, sleep, лог | `src/main.py` → `data/radar.log` | ✅ |
-| ИИ (этап 2) | Разбор + черновик отклика | `src/ai_analyze.py` | ✅ |
+Очередь: **`docs/team/TASKS.md`**. Сверка с **`docs/team/STATUS.md`**.
 
-Очередь Coder: **`docs/team/TASKS.md`**. После смены модулей Lead сверяет этот файл с блоком **«Последняя сессия (Coder)»** в `docs/team/STATUS.md`.
+---
+
+## Telegram (фаза 1)
+
+| Компонент | Деталь |
+|-----------|--------|
+| **Монитор** | `TELETHON_MONITOR_ACCOUNTS=acc1,acc2,acc3` → один `tg_main`, три клиента |
+| **Join acc1** | `TG_JOIN_AUTO_ACC1=1` внутри `tg_monitor` |
+| **Join acc2/3** | `tg_join_daemon.py`, лог `data/tg_join.log` |
+| **Очередь** | `docs/ops/TG_JOIN_QUEUE.csv` |
+| **Бот** | Только личный чат; не читает чужие группы |
 
 ---
 
 ## Внешние системы
 
-| Система | Протокол | Ограничения |
-|---------|----------|-------------|
-| FL.ru | HTTPS, публичные страницы | Интервал ≥ 10 мин; **без прокси** (домашний IP) |
-| Kwork / Avito (1.5) | HTTPS | Отдельные парсеры; **без прокси** |
-| Telegram | HTTPS Bot API | **Только через `TG_PROXY_URL`**; не в чужие чаты |
-| LLM (этап 2) | HTTPS API провайдера | Ключ в `.env`, не в Git |
+| Система | Протокол | Примечание |
+|---------|----------|------------|
+| FL.ru, Kwork | HTTPS | Интервал ≥ 10 мин, без прокси |
+| Telegram Bot API | HTTPS + прокси | Уведомления, кнопки |
+| Telethon | MTProto + SOCKS/HTTP per acc | Чтение чатов, join |
+| OpenRouter | HTTPS | Ключ в `.env` |
+| Neon Postgres | Опционально | `DATABASE_URL` |
+| GitHub | Git | Код: `Rode51/uisness`, секреты не в repo |
 
 ---
 
-## Что **не** входит в архитектуру (ещё)
+## Вне скоупа (пока)
 
-- **Telethon** / чтение чатов — фаза 1, см. `ROADMAP.md`
-- **Supabase** — фаза 1+ (SQLite только фаза 0)
-- Облачный бэкенд, WordPress — фазы 3–4
-- Авто-отклик на FL / автоспам в ЛС
+- WordPress пульт — фаза 3, [`TZ_WP.md`](TZ_WP.md)
+- Авто-отклик на FL / спам в ЛС
+- Avito, SaaS-мультитенант
 
 ---
 
-_Ведёт Lead. Фаза 0 актуальна на 2026-05-20; фаза 1 — после `TZ_TG.md`._
+_Ведёт Lead. После смены модулей — обновить этот файл и блок в `STATUS.md`._

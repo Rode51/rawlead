@@ -21,7 +21,8 @@
 
 - **FL + Kwork** → фильтр → ИИ → бот
 - **TG:** один процесс слушает **acc1 + acc2 + acc3** (свой файл id на аккаунт)
-- **Join:** `scripts\start-radar-full.bat` — **3 окна**: биржи, TG (acc1 join внутри), join-supervisor для acc2/acc3
+- **Пульт:** `scripts\start-radar-desktop.bat` — одно окно, **Старт/Стоп** (вместо 3 cmd)
+- **Join:** acc1 внутри TG; acc2/acc3 — supervisor (стартуются с пультом)
 
 ---
 
@@ -58,10 +59,11 @@
 
 ## Твои шаги сейчас
 
-1. **`scripts\backup.bat`**
-2. **Coder:** пульт — новый чат `@coder` + `@docs/team/CODER_PROMPT.md` (одно окно вместо 3 cmd)
-3. Пока пульт не готов — `start-radar-full.bat` как раньше
-4. Потом — **WordPress** ([`team/TZ_WP.md`](team/TZ_WP.md))
+1. Ярлык на **`scripts\start-radar-desktop.bat`** → **▶ Старт**
+2. Проверка: нет 3 чёрных cmd; в боте **ℹ Статус**
+3. Тест acc2 (JS Jobs) → уведомление
+4. `scripts\backup.bat`
+5. Дальше — **WordPress** ([`team/TZ_WP.md`](team/TZ_WP.md))
 
 ---
 

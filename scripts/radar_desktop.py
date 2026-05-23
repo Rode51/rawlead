@@ -183,32 +183,38 @@ class RadarDesktopApp:
         self._update_log_widget(self._log_join, _LOG_JOIN)
         self.root.after(1500, self._schedule_logs)
 
-    def _is_alive(self, spec: ChildSpec) -> bool:
-        if spec.popen is not None and spec.popen.poll() is None:
-            return True
-        if not spec.script_path().is_file():
-            return False
-        needle = str(spec.script_path()).replace("/", "\\")
+    def _running_needles(self) -> set[str]:
         if sys.platform != "win32":
-            return False
+            return set()
+        needles = [
+            str(s.script_path()).replace("/", "\\") for s in self._children
+        ]
         ps = (
-            f"$n = '{needle.replace(chr(39), chr(39) + chr(39))}'; "
             "Get-CimInstance Win32_Process -Filter \"name='python.exe'\" | "
-            "Where-Object { $_.CommandLine -like ('*' + $n + '*') } | "
-            "Select-Object -First 1"
+            "ForEach-Object { $_.CommandLine }"
         )
         r = subprocess.run(
             ["powershell", "-NoProfile", "-Command", ps],
             cwd=str(_ROOT),
             capture_output=True,
             text=True,
-            creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            creationflags=CREATE_NO_WINDOW,
         )
-        return bool(r.stdout.strip())
+        cmdlines = r.stdout or ""
+        return {n for n in needles if n in cmdlines}
+
+    def _is_alive(self, spec: ChildSpec, running: set[str] | None = None) -> bool:
+        if spec.popen is not None and spec.popen.poll() is None:
+            return True
+        if running is None:
+            running = self._running_needles()
+        needle = str(spec.script_path()).replace("/", "\\")
+        return needle in running
 
     def _update_indicators(self) -> None:
+        running = self._running_needles()
         for spec in self._children:
-            alive = self._is_alive(spec)
+            alive = self._is_alive(spec, running)
             lbl = self._indicator_labels[spec.key]
             if alive:
                 lbl.configure(text="🟢 работает")
@@ -295,7 +301,8 @@ class RadarDesktopApp:
             self.root.update_idletasks()
 
     def _on_close(self) -> None:
-        if any(self._is_alive(s) for s in self._children):
+        running = self._running_needles()
+        if any(self._is_alive(s, running) for s in self._children):
             if messagebox.askyesno(
                 "Выход",
                 "Остановить радар и закрыть пульт?",

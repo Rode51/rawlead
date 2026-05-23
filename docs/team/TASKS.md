@@ -4,30 +4,26 @@
 
 ---
 
-## Coder
-
-- [ ] **Пульт управления (десктоп)** — [`CODER_PROMPT.md`](CODER_PROMPT.md)
-
 ## Владелец
 
-- [x] **GitHub** — https://github.com/Rode51/uisness
-- [ ] После Coder: `python scripts/radar_desktop.py` → Старт → без 3 cmd
-- [ ] Тест acc2 (JS Jobs) — если ещё не делал
-- [ ] `scripts\backup.bat` перед пультом
+- [ ] Ярлык: `scripts\start-radar-desktop.bat`
+- [ ] Пульт: Старт → без 3 cmd → Стоп
+- [ ] Тест acc2 (JS Jobs) → бот
+- [ ] `scripts\backup.bat`
 
 ---
 
-## Следом (после пульта)
+## Следом
 
-- [ ] **WordPress пульт** — [`TZ_WP.md`](TZ_WP.md) · [`ops/WP_OWNER_STEPS.md`](../ops/WP_OWNER_STEPS.md)
+- [ ] **WordPress** — [`TZ_WP.md`](TZ_WP.md) · [`ops/WP_OWNER_STEPS.md`](../ops/WP_OWNER_STEPS.md)
 
 ## Отложено
 
-- Kwork пагинация, Avito, SaaS §10 · `.exe` PyInstaller для пульта
+- Kwork пагинация, Avito, `.exe` PyInstaller, SaaS §10
 
 ---
 
 ## Заметки
 
-- Новый код → **@coder** + `CODER_PROMPT.md`
-- Как устроено: [`../KAK_ETO_RABOTAET.md`](../KAK_ETO_RABOTAET.md)
+- Архитектура: [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- Git: https://github.com/Rode51/uisness

@@ -46,6 +46,8 @@
 | Как устроено (простым языком) | **`KAK_ETO_RABOTAET.md`** | FOR_YOU (ссылка) |
 | Правила ролей | `.cursor/rules/*.mdc` | HOW_TO_USE (ссылка) |
 | Статус в боте (ℹ) | `RUN.md` § кнопки | FOR_YOU (одна строка) |
+| Архитектура / процессы | `team/ARCHITECTURE.md` | KAK_ETO (ссылка) |
+| Запуск пульт | `ops/DESKTOP_LAUNCH.md` | FOR_YOU, RUN |
 | Безопасность владельца | `team/SECURITY.md` | FOR_YOU (ссылка) |
 | Очередь Coder | `TASKS.md` → **`CODER_PROMPT.md`** | FOR_YOU (только ссылка) |
 | Listen TG | `data/telethon_chat_ids_accN.txt` + CSV done | legacy `telethon_chat_ids.txt` → acc1 |
