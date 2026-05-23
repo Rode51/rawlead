@@ -39,7 +39,7 @@
 | Исключения | Секция 7 Doc + [`TG_JOIN_BLOCKLIST.txt`](TG_JOIN_BLOCKLIST.txt) |
 | Срок | ~**3–7 дней** на ~150 чатов при лимитах 25/сутки × 3 acc |
 | Запуск | Пульт ▶ или `start-radar-full.bat` — join не идёт без радара |
-| Импорт | Владелец → [`TG_CHANNELS_EXPORT.txt`](TG_CHANNELS_EXPORT.txt) → Coder [`CODER_PROMPT.md`](../team/CODER_PROMPT.md) |
+| Импорт | [`TG_CHANNELS_EXPORT.txt`](TG_CHANNELS_EXPORT.txt) → `python scripts/tg_queue_import.py` (см. [`RUN.md`](RUN.md)) |
 
 ---
 

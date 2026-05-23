@@ -4,19 +4,13 @@
 
 ---
 
-## Coder — волна 3 TG join
-
-- [ ] Импорт каналов → `TG_JOIN_QUEUE.csv` (`pending`, acc1/2/3) — **[`CODER_PROMPT.md`](CODER_PROMPT.md)**
-
----
-
 ## Владелец
 
-- [x] Пульт v2 — приёмка ✅ (2026-05-23)
-- [x] Экспорт ссылок → `TG_CHANNELS_EXPORT.txt` ✅ (Lead, 73 новых)
-- [ ] После Coder: **`@coder`** + [`CODER_PROMPT.md`](CODER_PROMPT.md) · пульт ▶ · `tg_join.log`
+- [x] Пульт v2 — приёмка ✅
+- [x] Волна 3 — CSV 73 pending ✅ (Coder)
+- [ ] **Пульт ▶** · раз в день `data/tg_join.log` (~3–7 дней join)
 - [ ] **WP Local §3** — [`WP_LOCAL_SKELETON.md`](../ops/WP_LOCAL_SKELETON.md)
-- [ ] `backup.bat` — по желанию (сессии `.env` не в Git; см. FOR_YOU)
+- [ ] `backup.bat` — по желанию
 
 ---
 
@@ -28,9 +22,3 @@
 ## Отложено
 
 - SaaS мультитенант · Kwork пагинация · Avito
-
----
-
-## Заметки
-
-- Волна 3: «всё в очередь», лимиты 4/час · 25/сутки · ночь 02–07 — код не менять

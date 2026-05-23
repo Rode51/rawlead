@@ -229,6 +229,8 @@ python scripts/tg_join.py
 python scripts/tg_list_dialogs.py --account acc2
 ```
 
+**Очередь join (волна 3):** ссылки в [`TG_CHANNELS_EXPORT.txt`](TG_CHANNELS_EXPORT.txt) → `python scripts/tg_queue_import.py --dry-run` → `python scripts/tg_queue_import.py`.
+
 Лог очереди join: `data/tg_join.log`. Расписание и лимиты — [`TG_JOIN_SCHEDULE.md`](TG_JOIN_SCHEDULE.md).
 
 Лог тех же строк, что у радара: `data/radar.log` (или `RADAR_LOG_PATH`). Ночью 02:00–07:00 Irkutsk пауза переподключения длиннее (`TG_RECONNECT_NIGHT_SEC`).

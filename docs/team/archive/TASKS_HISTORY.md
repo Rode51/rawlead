@@ -4,6 +4,13 @@
 
 ---
 
+## 2026-05-23 — Coder: волна 3 TG join queue
+
+- `scripts/tg_queue_import.py` — 73 pending, round-robin acc1/2/3 (25/24/24)
+- `TG_JOIN_QUEUE.csv` wave=3 · 14 `done` без изменений
+
+---
+
 ## 2026-05-23 — Владелец: пульт v2 принят
 
 - Приёмка: play/stop, —/✕, логи, вкладка «Статус», `start-radar-desktop.vbs`

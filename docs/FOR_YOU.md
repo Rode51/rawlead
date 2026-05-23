@@ -59,7 +59,7 @@
 
 ## Твои шаги сейчас
 
-**Волна 3 TG:** EXPORT ✅ (73 ссылки) → **`@coder`** (копипаст от Lead в чате) → после Coder пульт ▶ · `tg_join.log`
+**Волна 3 TG:** 73 чата в очереди (`pending`) — **пульт ▶** и раз в день `data\tg_join.log`. Как устроено: [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) § «Какой номер в какой чат».
 
 **Git** — код/docs в репо; **push на GitHub только когда попросишь**. **`backup.bat`** — для `.env` и Telethon-сессий (в Git их нет).
 

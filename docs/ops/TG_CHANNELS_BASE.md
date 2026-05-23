@@ -110,4 +110,4 @@
 
 - [x] Lead: база и MVP-5 в docs
 - [x] Coder: очередь join — `scripts/tg_join_queue.py` ([`RUN.md`](RUN.md))
-- [ ] **Волна 3:** владелец → `TG_CHANNELS_EXPORT.txt` → Coder [`CODER_PROMPT.md`](../team/CODER_PROMPT.md)
+- [x] **Волна 3:** `TG_CHANNELS_EXPORT.txt` (73) → `python scripts/tg_queue_import.py` → pending в CSV
