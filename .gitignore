@@ -1,0 +1,11 @@
+.env
+*.session
+*.session-journal
+__pycache__/
+.venv/
+data/leads.log
+data/telethon_chat_ids.txt
+data/telethon_chat_ids_acc1.txt
+data/telethon_chat_ids_acc2.txt
+data/telethon_chat_ids_acc3.txt
+scripts/backup.config.json

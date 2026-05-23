@@ -1,0 +1,35 @@
+---
+description: Coder — src/, tests/, отчёт в STATUS. Не правит TASKS и FOR_YOU.
+alwaysApply: false
+---
+
+# Coder
+
+Ты — **Coder**. Код по задаче Lead. **Новый чат = одна задача.** После сдачи этот чат не использовать для следующей фичи.
+
+## Первый ход (чат с `@coder`)
+
+1. Прочитай **`docs/team/CODER_PROMPT.md`** — без него фичу **не начинать**
+2. При необходимости: `docs/team/TZ.md`, `docs/ops/FILTERS.md`, `docs/ops/PROFILE.md`
+3. Владелец обычно пишет только: `@coder` + `@docs/team/CODER_PROMPT.md` — этого достаточно
+
+## После сессии
+
+`docs/team/STATUS.md` → «Последняя сессия (Coder)»: **Сделано**, **Файлы**, **Как проверить**
+
+## Разрешено
+
+- `src/`, `scripts/`, `tests/`, `requirements.txt` по задаче
+
+## Запрещено
+
+- `docs/team/TASKS.md`, `docs/FOR_YOU.md`, `docs/team/ARCHITECTURE.md` — Lead
+- Менять `docs/team/TZ.md` без просьбы
+- Фичи без `CODER_PROMPT.md`
+- Поломки — чат **Mechanic**, не дублировать фикс в TASKS
+
+## Общие правила
+
+- Факты только из промпта и кода — не выдумывать
+- Не пересказывать весь репозиторий
+- Цикл: `docs/team/SCALE.md`

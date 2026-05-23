@@ -1,0 +1,771 @@
+2026-05-20T08:02:28Z cards=30 new=8 notify=0 err=id=5505491 tg:TelegramNotifyError: Сетевой сбой при отправке в Telegram: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8882739264:AAE2IbURMqQadL8LJGdSd-3fo_eb6qiwzWM/sendMessage (Caused by ConnectTimeoutErr...; id=5505744 tg:TelegramNotifyError: Сетевой сбой при отправке в Telegram: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8882739264:AAE2IbURMqQadL8LJGdSd-3fo_eb6qiwzWM/sendMessage (Caused by ConnectTimeoutErr...; id=5505512 tg:TelegramNotifyError: Сетевой сбой при отправке в Telegram: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8882739264:AAE2IbURMqQadL8LJGdSd-3fo_eb6qiwzWM/sendMessage (Caused by ConnectTimeoutErr...
+2026-05-20T08:04:20Z cards=30 new=0 notify=0 err=-
+2026-05-20T08:10:22Z cards=29 new=3 notify=0 err=id=5505765 tg:TelegramNotifyError: Telegram Bot API вернул HTTP 400.
+2026-05-20T08:12:12Z cards=29 new=0 notify=0 err=-
+2026-05-20T08:13:45Z cards=29 new=1 notify=0 err=id=5505771 tg:TelegramNotifyError: Telegram Bot API вернул HTTP 400.
+2026-05-20T08:14:48Z cards=30 new=5 notify=0 err=id=5505574 tg:TelegramNotifyError: Telegram Bot API вернул HTTP 400.
+2026-05-20T08:15:43Z cards=30 new=0 notify=0 err=-
+2026-05-20T08:16:28Z cards=30 new=0 notify=0 err=-
+2026-05-20T08:17:15Z cards=30 new=0 notify=0 err=-
+2026-05-20T08:32:57Z cards=30 new=4 notify=0 err=id=5505774 tg:TelegramNotifyError: Telegram Bot API вернул HTTP 400.; id=5505772 tg:TelegramNotifyError: Telegram Bot API вернул HTTP 400.; id=5505768 tg:TelegramNotifyError: Telegram Bot API вернул HTTP 400.
+2026-05-20T08:40:23Z cycle_start
+2026-05-20T08:40:23Z cards=30 new=3 notify=0 err=id=5505775 tg:TelegramNotifyError: Telegram Bot API вернул HTTP 400. Bad Request: chat not found
+2026-05-20T08:41:08Z cycle_start
+2026-05-20T08:41:08Z cards=30 new=0 notify=0 err=-
+2026-05-20T08:44:35Z cycle_start
+2026-05-20T08:44:35Z cards=30 new=0 notify=0 err=-
+2026-05-20T08:49:32Z cycle_start
+2026-05-20T08:49:32Z cards=30 new=0 notify=0 err=-
+2026-05-20T08:55:19Z cycle_start
+2026-05-20T08:55:19Z cards=30 new=3 notify=0 err=id=5505782 tg:TelegramNotifyError: Telegram Bot API вернул HTTP 400. Bad Request: chat not found; id=5505781 tg:TelegramNotifyError: Telegram Bot API вернул HTTP 400. Bad Request: chat not found; id=5505780 tg:TelegramNotifyError: Telegram Bot API вернул HTTP 400. Bad Request: chat not found
+2026-05-20T09:16:52Z cycle_start
+2026-05-20T09:16:52Z cards=30 new=5 notify=2 err=-
+2026-05-20T09:26:55Z cycle_start
+2026-05-20T09:26:55Z cards=30 new=1 notify=1 err=-
+2026-05-20T09:36:56Z cycle_start
+2026-05-20T09:36:56Z cards=30 new=0 notify=0 err=-
+2026-05-20T09:46:57Z cycle_start
+2026-05-20T09:46:57Z cards=30 new=4 notify=0 err=id=5505793 tg:TelegramNotifyError: Сетевой сбой при отправке в Telegram: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/sendMessage (Caused by ConnectTimeoutError(<HTTPSConnection(host='api.tele...; id=5505789 tg:TelegramNotifyError: Сетевой сбой при отправке в Telegram: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/sendMessage (Caused by ConnectTimeoutError(<HTTPSConnection(host='api.tele...
+2026-05-20T09:57:38Z cycle_start
+2026-05-20T09:57:38Z cards=30 new=0 notify=0 err=-
+2026-05-20T10:04:52Z cycle_start
+2026-05-20T10:04:52Z cards=30 new=1 notify=0 err=-
+2026-05-20T10:14:53Z cycle_start
+2026-05-20T10:14:53Z cards=30 new=2 notify=2 err=-
+2026-05-20T10:21:18Z cycle_start
+2026-05-20T10:21:18Z cards=30 new=2 notify=1 err=-
+2026-05-20T10:28:31Z cycle_start
+2026-05-20T10:28:31Z cards_fl=30 cards_kwork=0 new=0 notify=0 err=-
+2026-05-20T10:29:14Z cycle_start
+2026-05-20T10:29:14Z cards_fl=30 cards_kwork=0 new=0 notify=0 err=-
+2026-05-20T10:31:58Z cycle_start
+2026-05-20T10:31:58Z cards_fl=30 cards_kwork=0 new=0 notify=0 err=-
+2026-05-20T10:33:57Z cycle_start
+2026-05-20T10:33:57Z cards_fl=30 cards_kwork=12 new=12 notify=6 err=-
+2026-05-20T10:44:05Z cycle_start
+2026-05-20T10:44:05Z cards_fl=30 cards_kwork=12 new=14 notify=8 err=-
+2026-05-20T10:49:19Z cycle_start
+2026-05-20T10:49:19Z cards_fl=89 cards_kwork=12 new=26 notify=9 err=-
+2026-05-20T10:59:31Z cycle_start
+2026-05-20T10:59:31Z cards_fl=89 cards_kwork=12 new=7 notify=5 err=-
+2026-05-20T11:09:41Z cycle_start
+2026-05-20T11:09:41Z cards_fl=89 cards_kwork=12 new=8 notify=1 err=-
+2026-05-20T11:19:45Z cycle_start
+2026-05-20T11:19:45Z cards_fl=89 cards_kwork=12 new=16 notify=4 err=-
+2026-05-20T11:21:01Z cycle_start
+2026-05-20T11:21:01Z cards_fl=89 cards_kwork=12 new=4 notify=2 err=-
+2026-05-20T11:32:48Z cycle_start
+2026-05-20T11:32:48Z cards_fl=89 cards_kwork=12 new=11 notify=3 err=-
+2026-05-20T11:42:03Z cycle_start
+2026-05-20T11:42:03Z cards_fl=89 cards_kwork=12 new=4 notify=2 err=-
+2026-05-20T11:44:56Z cycle_start
+2026-05-20T11:44:56Z cards_fl=89 cards_kwork=12 new=5 notify=1 err=-
+2026-05-20T11:53:12Z cycle_start
+2026-05-20T11:53:12Z cards_fl=89 cards_kwork=12 new=9 notify=2 err=-
+2026-05-20T12:07:35Z tg:cmd:pause
+2026-05-20T12:07:35Z tg:cmd:status
+2026-05-20T12:07:35Z tg:cmd:status
+2026-05-20T12:07:35Z tg:cmd:resume
+2026-05-20T12:07:35Z tg:cmd:status
+2026-05-20T12:07:35Z cycle_start
+2026-05-20T12:07:35Z cards_fl=89 cards_kwork=12 new=6 notify=1 err=-
+2026-05-20T12:07:45Z tg:cmd:status
+2026-05-20T12:08:18Z tg:cmd:pause
+2026-05-20T12:08:18Z tg:cmd:status
+2026-05-20T12:08:50Z tg:cmd:resume
+2026-05-20T12:13:59Z tg:cmd:status
+2026-05-20T12:13:59Z cycle_start
+2026-05-20T12:14:08Z tg:cmd:pause
+2026-05-20T12:13:59Z cards_fl=89 cards_kwork=12 new=4 notify=0 err=-
+2026-05-20T12:14:17Z tg:cmd:resume
+2026-05-20T12:17:16Z cycle_start
+2026-05-20T12:17:16Z cards_fl=89 cards_kwork=12 new=0 notify=0 err=-
+2026-05-20T12:18:04Z tg:action:status
+2026-05-20T12:18:11Z tg:action:resume
+2026-05-20T12:19:43Z cycle_start
+2026-05-20T12:19:43Z cards_fl=89 cards_kwork=12 new=0 notify=0 err=-
+2026-05-20T12:28:27Z tg:action:status
+2026-05-20T12:28:27Z cycle_start
+2026-05-20T12:28:48Z tg:action:resume
+2026-05-20T12:28:27Z cards_fl=89 cards_kwork=12 new=6 notify=0 err=-
+2026-05-20T12:38:11Z tg:action:status
+2026-05-20T12:38:53Z cycle_start
+2026-05-20T12:38:53Z cards_fl=89 cards_kwork=12 new=3 notify=0 err=-
+2026-05-20T12:43:33Z cycle_start
+2026-05-20T12:43:33Z cards_fl=89 cards_kwork=12 new=4 notify=1 err=-
+2026-05-20T12:44:17Z tg:control:getUpdates HTTP 409
+2026-05-20T12:44:29Z tg:control:getUpdates HTTP 409
+2026-05-20T12:44:40Z tg:control:getUpdates HTTP 409
+2026-05-20T12:46:18Z cycle_start
+2026-05-20T12:46:18Z cards_fl=89 cards_kwork=12 new=5 notify=0 err=-
+2026-05-20T12:55:51Z tg:action:status
+2026-05-20T12:56:36Z cycle_start
+2026-05-20T12:56:36Z cards_fl=89 cards_kwork=12 new=15 notify=2 err=-
+2026-05-20T13:08:28Z cycle_start
+2026-05-20T13:08:28Z cards_fl=89 cards_kwork=12 new=10 notify=2 err=-
+2026-05-20T13:19:12Z cycle_start
+2026-05-20T13:19:12Z cards_fl=89 cards_kwork=12 new=10 notify=1 err=-
+2026-05-20T13:29:33Z cycle_start
+2026-05-20T13:29:33Z cards_fl=89 cards_kwork=12 new=6 notify=0 err=-
+2026-05-20T13:39:55Z cycle_start
+2026-05-20T13:39:55Z cards_fl=89 cards_kwork=12 new=8 notify=1 err=-
+2026-05-20T13:51:19Z cycle_start
+2026-05-20T13:51:19Z cards_fl=89 cards_kwork=12 new=7 notify=2 err=-
+2026-05-20T14:02:35Z cycle_start
+2026-05-20T14:02:35Z cards_fl=90 cards_kwork=12 new=16 notify=2 err=-
+2026-05-20T14:14:21Z cycle_start
+2026-05-20T14:14:21Z cards_fl=90 cards_kwork=12 new=12 notify=0 err=-
+2026-05-20T14:25:11Z cycle_start
+2026-05-20T14:25:11Z cards_fl=90 cards_kwork=12 new=7 notify=0 err=-
+2026-05-21T05:39:49Z cycle_start
+2026-05-21T05:39:49Z cards_fl=89 cards_kwork=12 new=54 notify=8 err=-
+2026-05-21T05:51:47Z cycle_start
+2026-05-21T05:51:47Z cards_fl=89 cards_kwork=12 new=4 notify=1 err=-
+2026-05-21T06:02:02Z cycle_start
+2026-05-21T06:02:02Z cards_fl=89 cards_kwork=12 new=5 notify=0 err=-
+2026-05-21T06:12:11Z cycle_start
+2026-05-21T06:12:11Z cards_fl=89 cards_kwork=12 new=2 notify=0 err=-
+2026-05-21T06:22:20Z cycle_start
+2026-05-21T06:22:20Z cards_fl=89 cards_kwork=12 new=4 notify=2 err=-
+2026-05-21T06:23:21Z tg:control:ConnectionError: ('Connection aborted.', ConnectionResetError(10054, 'Удаленный хост принудительно разорвал существующее подключение', None, 10054, None))
+2026-05-21T06:32:41Z cycle_start
+2026-05-21T06:32:41Z cards_fl=89 cards_kwork=12 new=2 notify=1 err=-
+2026-05-21T06:42:56Z cycle_start
+2026-05-21T06:42:56Z cards_fl=89 cards_kwork=12 new=15 notify=0 err=-
+2026-05-21T06:53:11Z cycle_start
+2026-05-21T06:53:11Z cards_fl=89 cards_kwork=12 new=4 notify=1 err=-
+2026-05-21T07:03:31Z cycle_start
+2026-05-21T07:03:31Z cards_fl=89 cards_kwork=12 new=9 notify=2 err=-
+2026-05-21T07:14:03Z cycle_start
+2026-05-21T07:14:03Z cards_fl=89 cards_kwork=12 new=3 notify=1 err=-
+2026-05-21T07:24:22Z cycle_start
+2026-05-21T07:24:22Z cards_fl=89 cards_kwork=12 new=6 notify=2 err=-
+2026-05-21T07:35:21Z cycle_start
+2026-05-21T07:35:21Z cards_fl=89 cards_kwork=12 new=11 notify=0 err=-
+2026-05-21T07:45:39Z cycle_start
+2026-05-21T07:45:39Z cards_fl=89 cards_kwork=12 new=5 notify=0 err=-
+2026-05-21T07:51:54Z tg:control:ConnectionError: ('Connection aborted.', ConnectionResetError(10054, 'Удаленный хост принудительно разорвал существующее подключение', None, 10054, None))
+2026-05-21T07:55:55Z cycle_start
+2026-05-21T07:55:55Z cards_fl=89 cards_kwork=12 new=11 notify=0 err=-
+2026-05-21T08:06:03Z cycle_start
+2026-05-21T08:06:03Z cards_fl=89 cards_kwork=12 new=11 notify=0 err=-
+2026-05-21T08:12:25Z cycle_start
+2026-05-21T08:12:37Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-21T08:12:25Z cards_fl=89 cards_kwork=12 new=5 notify=0 err=kwork:id=3174658 tg:TelegramNotifyError: Сетевой сбой при отправке в Telegram: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/sendMessage (Caused by ProxyError('Unable to connect to proxy', NewConnect...
+2026-05-21T08:12:37Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-21T08:13:03Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-21T08:13:29Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-21T08:13:55Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-21T08:14:21Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-21T08:14:47Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-21T08:18:29Z tg:control:ConnectionError: ('Connection aborted.', ConnectionResetError(10054, 'Удаленный хост принудительно разорвал существующее подключение', None, 10054, None))
+2026-05-21T08:22:41Z cycle_start
+2026-05-21T08:22:41Z cards_fl=89 cards_kwork=12 new=6 notify=0 err=-
+2026-05-21T08:23:13Z cycle_start
+2026-05-21T08:23:13Z cards_fl=89 cards_kwork=12 new=2 notify=0 err=-
+2026-05-21T08:33:25Z cycle_start
+2026-05-21T08:33:25Z cards_fl=89 cards_kwork=12 new=6 notify=0 err=-
+2026-05-21T08:43:34Z cycle_start
+2026-05-21T08:43:34Z cards_fl=89 cards_kwork=12 new=4 notify=0 err=-
+2026-05-21T08:53:47Z cycle_start
+2026-05-21T08:53:47Z cards_fl=89 cards_kwork=12 new=11 notify=0 err=-
+2026-05-21T09:04:13Z cycle_start
+2026-05-21T09:04:13Z cards_fl=89 cards_kwork=12 new=7 notify=0 err=-
+2026-05-21T09:14:30Z cycle_start
+2026-05-21T09:14:30Z cards_fl=89 cards_kwork=12 new=7 notify=0 err=-
+2026-05-21T09:24:55Z cycle_start
+2026-05-21T09:24:55Z cards_fl=89 cards_kwork=12 new=6 notify=0 err=-
+2026-05-21T09:35:25Z cycle_start
+2026-05-21T09:35:25Z cards_fl=89 cards_kwork=12 new=12 notify=1 err=-
+2026-05-21T09:46:25Z cycle_start
+2026-05-21T09:46:25Z cards_fl=89 cards_kwork=12 new=5 notify=0 err=-
+2026-05-21T09:56:46Z cycle_start
+2026-05-21T09:56:46Z cards_fl=89 cards_kwork=12 new=3 notify=1 err=-
+2026-05-21T10:07:06Z cycle_start
+2026-05-21T10:07:06Z cards_fl=89 cards_kwork=12 new=3 notify=0 err=-
+2026-05-21T10:17:15Z cycle_start
+2026-05-21T10:17:15Z cards_fl=89 cards_kwork=12 new=7 notify=1 err=-
+2026-05-21T10:27:37Z cycle_start
+2026-05-21T10:27:37Z cards_fl=89 cards_kwork=12 new=7 notify=0 err=-
+2026-05-21T10:38:06Z cycle_start
+2026-05-21T10:38:06Z cards_fl=89 cards_kwork=12 new=9 notify=0 err=-
+2026-05-21T10:48:19Z cycle_start
+2026-05-21T10:48:19Z cards_fl=89 cards_kwork=12 new=11 notify=0 err=-
+2026-05-21T10:58:41Z cycle_start
+2026-05-21T10:58:41Z cards_fl=89 cards_kwork=12 new=10 notify=0 err=-
+2026-05-21T11:08:58Z cycle_start
+2026-05-21T11:08:58Z cards_fl=89 cards_kwork=12 new=13 notify=0 err=-
+2026-05-21T11:19:22Z cycle_start
+2026-05-21T11:19:22Z cards_fl=89 cards_kwork=12 new=13 notify=0 err=-
+2026-05-21T11:29:39Z cycle_start
+2026-05-21T11:29:39Z cards_fl=89 cards_kwork=12 new=7 notify=0 err=-
+2026-05-21T11:32:37Z cycle_start
+2026-05-21T11:32:37Z cards_fl=89 cards_kwork=12 new=3 notify=1 err=-
+2026-05-21T11:42:58Z cycle_start
+2026-05-21T11:42:58Z cards_fl=89 cards_kwork=12 new=12 notify=0 err=-
+2026-05-21T11:48:04Z cycle_start
+2026-05-21T11:48:04Z cards_fl=89 cards_kwork=12 new=3 notify=0 err=-
+2026-05-21T11:58:17Z cycle_start
+2026-05-21T11:58:17Z cards_fl=89 cards_kwork=12 new=10 notify=0 err=-
+2026-05-21T12:08:30Z cycle_start
+2026-05-21T12:08:30Z cards_fl=89 cards_kwork=12 new=9 notify=0 err=-
+2026-05-21T12:18:54Z cycle_start
+2026-05-21T12:18:54Z cards_fl=89 cards_kwork=12 new=5 notify=0 err=-
+2026-05-21T12:29:37Z cycle_start
+2026-05-21T12:29:37Z cards_fl=0 cards_kwork=12 new=8 notify=0 err=fl:fetch:FlListingError: Сетевой сбой при запросе ленты: HTTPSConnectionPool(host='www.fl.ru', port=443): Read timed out. (read timeout=30.0)
+2026-05-21T12:40:30Z cycle_start
+2026-05-21T12:40:30Z cards_fl=0 cards_kwork=12 new=4 notify=0 err=fl:fetch:FlListingError: HTTP 502 для ленты проектов (https://www.fl.ru/projects/?kind=1).
+2026-05-21T12:50:50Z cycle_start
+2026-05-21T12:50:50Z cards_fl=89 cards_kwork=12 new=6 notify=0 err=-
+2026-05-21T13:01:27Z cycle_start
+2026-05-21T13:01:27Z cards_fl=90 cards_kwork=12 new=5 notify=0 err=-
+2026-05-21T13:11:41Z cycle_start
+2026-05-21T13:11:41Z cards_fl=90 cards_kwork=12 new=6 notify=1 err=-
+2026-05-21T13:17:06Z tg:control:ConnectionError: ('Connection aborted.', ConnectionResetError(10054, 'Удаленный хост принудительно разорвал существующее подключение', None, 10054, None))
+2026-05-21T13:22:27Z cycle_start
+2026-05-21T13:22:27Z cards_fl=90 cards_kwork=12 new=10 notify=0 err=-
+2026-05-21T13:33:04Z cycle_start
+2026-05-21T13:33:04Z cards_fl=90 cards_kwork=12 new=10 notify=1 err=-
+2026-05-21T13:43:34Z cycle_start
+2026-05-21T13:43:34Z cards_fl=90 cards_kwork=12 new=5 notify=0 err=-
+2026-05-21T13:54:02Z cycle_start
+2026-05-21T13:54:02Z cards_fl=90 cards_kwork=12 new=12 notify=1 err=-
+2026-05-21T14:04:43Z cycle_start
+2026-05-21T14:04:43Z cards_fl=90 cards_kwork=12 new=6 notify=1 err=-
+2026-05-21T14:15:12Z cycle_start
+2026-05-21T14:15:12Z cards_fl=90 cards_kwork=12 new=4 notify=0 err=-
+2026-05-21T14:25:22Z cycle_start
+2026-05-21T14:25:22Z cards_fl=90 cards_kwork=12 new=4 notify=0 err=-
+2026-05-21T14:35:43Z cycle_start
+2026-05-21T14:35:43Z cards_fl=90 cards_kwork=12 new=3 notify=0 err=-
+2026-05-21T14:45:57Z cycle_start
+2026-05-21T14:45:57Z cards_fl=90 cards_kwork=12 new=5 notify=0 err=-
+2026-05-21T14:55:20Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-21T14:56:26Z cycle_start
+2026-05-21T14:56:26Z cards_fl=90 cards_kwork=12 new=3 notify=0 err=-
+2026-05-21T15:06:40Z cycle_start
+2026-05-21T15:06:40Z cards_fl=90 cards_kwork=12 new=4 notify=0 err=-
+2026-05-21T15:16:55Z cycle_start
+2026-05-21T15:16:55Z cards_fl=90 cards_kwork=12 new=3 notify=0 err=-
+2026-05-21T15:27:12Z cycle_start
+2026-05-21T15:27:12Z cards_fl=90 cards_kwork=12 new=5 notify=1 err=-
+2026-05-21T15:37:39Z cycle_start
+2026-05-21T15:37:39Z cards_fl=90 cards_kwork=12 new=4 notify=0 err=-
+2026-05-21T15:47:48Z cycle_start
+2026-05-21T15:47:48Z cards_fl=90 cards_kwork=12 new=5 notify=0 err=-
+2026-05-21T15:58:14Z cycle_start
+2026-05-21T15:58:14Z cards_fl=90 cards_kwork=12 new=7 notify=0 err=-
+2026-05-22T04:27:09Z cycle_start
+2026-05-22T04:27:09Z cards_fl=90 cards_kwork=12 new=23 notify=1 err=-
+2026-05-22T04:37:42Z cycle_start
+2026-05-22T04:37:42Z cards_fl=90 cards_kwork=12 new=7 notify=0 err=-
+2026-05-22T04:47:54Z cycle_start
+2026-05-22T04:47:54Z cards_fl=90 cards_kwork=12 new=4 notify=0 err=-
+2026-05-22T04:52:47Z cycle_start
+2026-05-22T04:52:49Z tg:control:getUpdates HTTP 409
+2026-05-22T04:52:53Z cycle_start
+2026-05-22T04:52:53Z cards_fl=90 cards_kwork=12 new=1 notify=0 err=-
+2026-05-22T05:03:06Z cycle_start
+2026-05-22T05:03:06Z cards_fl=90 cards_kwork=12 new=1 notify=0 err=-
+2026-05-22T05:13:19Z cycle_start
+2026-05-22T05:13:19Z cards_fl=90 cards_kwork=12 new=2 notify=1 err=-
+2026-05-22T05:23:35Z cycle_start
+2026-05-22T05:23:35Z cards_fl=90 cards_kwork=12 new=16 notify=1 err=-
+2026-05-22T05:34:28Z cycle_start
+2026-05-22T05:34:28Z cards_fl=90 cards_kwork=12 new=1 notify=0 err=-
+2026-05-22T05:44:37Z cycle_start
+2026-05-22T05:44:46Z cards_fl=0 cards_kwork=0 new=0 notify=0 err=cycle:FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\hramo\\uisness\\docs\\PROFILE.md'
+2026-05-22T05:54:51Z cycle_start
+2026-05-22T05:54:58Z cards_fl=0 cards_kwork=0 new=0 notify=0 err=cycle:FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\hramo\\uisness\\docs\\PROFILE.md'
+2026-05-22T06:05:03Z cycle_start
+2026-05-22T06:05:07Z cards_fl=0 cards_kwork=0 new=0 notify=0 err=cycle:FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\hramo\\uisness\\docs\\PROFILE.md'
+2026-05-22T06:08:57Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T06:09:23Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T06:09:47Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T06:09:59Z tg:control:ConnectionError: ('Connection aborted.', ConnectionResetError(10054, 'Удаленный хост принудительно разорвал существующее подключение', None, 10054, None))
+2026-05-22T06:15:11Z cycle_start
+2026-05-22T06:15:15Z cards_fl=0 cards_kwork=0 new=0 notify=0 err=cycle:FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\hramo\\uisness\\docs\\PROFILE.md'
+2026-05-22T06:20:42Z cycle_start
+2026-05-22T06:20:42Z cards_fl=90 cards_kwork=12 new=21 notify=3 err=-
+2026-05-22T06:24:41Z cycle_start
+2026-05-22T06:24:41Z cards_fl=90 cards_kwork=12 new=2 notify=0 err=-
+2026-05-22T06:34:57Z cycle_start
+2026-05-22T06:34:57Z cards_fl=90 cards_kwork=12 new=5 notify=0 err=-
+2026-05-22T06:45:11Z cycle_start
+2026-05-22T06:45:11Z cards_fl=90 cards_kwork=12 new=6 notify=0 err=-
+2026-05-22T06:55:26Z cycle_start
+2026-05-22T06:55:26Z cards_fl=90 cards_kwork=12 new=9 notify=1 err=-
+2026-05-22T07:05:59Z cycle_start
+2026-05-22T07:05:59Z cards_fl=90 cards_kwork=12 new=9 notify=0 err=-
+2026-05-22T07:16:25Z cycle_start
+2026-05-22T07:16:25Z cards_fl=90 cards_kwork=12 new=3 notify=0 err=-
+2026-05-22T07:26:51Z cycle_start
+2026-05-22T07:26:51Z cards_fl=90 cards_kwork=12 new=8 notify=0 err=-
+2026-05-22T07:30:21Z cycle_start
+2026-05-22T07:30:21Z cards_fl=90 cards_kwork=12 new=7 notify=0 err=-
+2026-05-22T07:33:49Z tg:control:ConnectionError: ('Connection aborted.', ConnectionResetError(10054, 'Удаленный хост принудительно разорвал существующее подключение', None, 10054, None))
+2026-05-22T07:41:00Z cycle_start
+2026-05-22T07:41:00Z cards_fl=90 cards_kwork=12 new=9 notify=0 err=-
+2026-05-22T07:51:44Z cycle_start
+2026-05-22T07:51:44Z cards_fl=90 cards_kwork=12 new=7 notify=0 err=-
+2026-05-22T08:02:27Z cycle_start
+2026-05-22T08:02:27Z cards_fl=90 cards_kwork=12 new=6 notify=0 err=-
+2026-05-22T08:13:06Z cycle_start
+2026-05-22T08:13:06Z cards_fl=90 cards_kwork=12 new=5 notify=0 err=-
+2026-05-22T08:23:45Z cycle_start
+2026-05-22T08:23:45Z cards_fl=90 cards_kwork=12 new=1 notify=0 err=-
+2026-05-22T08:34:02Z cycle_start
+2026-05-22T08:34:02Z cards_fl=90 cards_kwork=12 new=2 notify=0 err=-
+2026-05-22T08:44:17Z cycle_start
+2026-05-22T08:44:17Z cards_fl=90 cards_kwork=12 new=5 notify=1 err=-
+2026-05-22T08:54:56Z cycle_start
+2026-05-22T08:54:56Z cards_fl=90 cards_kwork=12 new=6 notify=0 err=-
+2026-05-22T09:05:42Z cycle_start
+2026-05-22T09:05:42Z cards_fl=90 cards_kwork=12 new=7 notify=0 err=-
+2026-05-22T09:16:17Z cycle_start
+2026-05-22T09:16:17Z cards_fl=90 cards_kwork=12 new=12 notify=0 err=-
+2026-05-22T09:27:32Z cycle_start
+2026-05-22T09:27:32Z cards_fl=90 cards_kwork=12 new=8 notify=0 err=-
+2026-05-22T09:38:34Z cycle_start
+2026-05-22T09:38:34Z cards_fl=0 cards_kwork=12 new=4 notify=0 err=fl:fetch:FlListingError: Сетевой сбой при запросе ленты: HTTPSConnectionPool(host='www.fl.ru', port=443): Max retries exceeded with url: /projects/?kind=1 (Caused by ConnectTimeoutError(<HTTPSConnection(host='www.fl.ru', port=443) at 0x290c0d3f1d...
+2026-05-22T09:49:20Z cycle_start
+2026-05-22T09:49:20Z cards_fl=90 cards_kwork=12 new=13 notify=3 err=-
+2026-05-22T10:00:50Z cycle_start
+2026-05-22T10:00:50Z cards_fl=90 cards_kwork=12 new=7 notify=0 err=-
+2026-05-22T10:11:31Z cycle_start
+2026-05-22T10:11:31Z cards_fl=90 cards_kwork=12 new=7 notify=0 err=-
+2026-05-22T10:22:10Z cycle_start
+2026-05-22T10:22:10Z cards_fl=90 cards_kwork=12 new=16 notify=0 err=-
+2026-05-22T10:33:21Z cycle_start
+2026-05-22T10:33:21Z cards_fl=90 cards_kwork=12 new=6 notify=1 err=-
+2026-05-22T10:44:06Z cycle_start
+2026-05-22T10:44:06Z cards_fl=90 cards_kwork=12 new=5 notify=0 err=-
+2026-05-22T10:54:41Z cycle_start
+2026-05-22T10:54:41Z cards_fl=90 cards_kwork=12 new=5 notify=0 err=-
+2026-05-22T11:00:03Z tg:control:ConnectionError: ('Connection aborted.', ConnectionResetError(10054, 'Удаленный хост принудительно разорвал существующее подключение', None, 10054, None))
+2026-05-22T11:05:15Z cycle_start
+2026-05-22T11:05:15Z cards_fl=90 cards_kwork=12 new=7 notify=0 err=-
+2026-05-22T11:15:53Z cycle_start
+2026-05-22T11:15:53Z cards_fl=90 cards_kwork=12 new=5 notify=0 err=-
+2026-05-22T11:26:25Z cycle_start
+2026-05-22T11:26:25Z cards_fl=90 cards_kwork=12 new=6 notify=0 err=-
+2026-05-22T11:37:06Z cycle_start
+2026-05-22T11:37:06Z cards_fl=90 cards_kwork=12 new=12 notify=0 err=-
+2026-05-22T11:48:02Z cycle_start
+2026-05-22T11:48:02Z cards_fl=90 cards_kwork=12 new=9 notify=1 err=-
+2026-05-22T11:59:06Z cycle_start
+2026-05-22T11:59:06Z cards_fl=90 cards_kwork=12 new=8 notify=0 err=-
+2026-05-22T12:07:06Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:07:32Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:07:58Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:08:24Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:08:51Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:09:17Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:09:43Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:10:09Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:10:30Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:10:30Z cycle_start
+2026-05-22T12:10:51Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:11:15Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:11:36Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:11:57Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:12:04Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:10:30Z cards_fl=90 cards_kwork=12 new=8 notify=1 err=-
+2026-05-22T12:15:57Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:22:50Z cycle_start
+2026-05-22T12:22:50Z cards_fl=90 cards_kwork=12 new=6 notify=0 err=-
+2026-05-22T12:29:16Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:29:42Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:29:52Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:30:50Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:33:11Z tg:control:ProxyError: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot***MASKED***/getUpdates?offset=39506984&timeout=0&allowed_updates=%5B%22message%22%5D (Caused by 
+2026-05-22T12:33:46Z cycle_start
+2026-05-22T12:33:46Z cards_fl=90 cards_kwork=12 new=3 notify=0 err=-
+2026-05-22T12:44:08Z cycle_start
+2026-05-22T12:44:08Z cards_fl=90 cards_kwork=12 new=3 notify=0 err=-
+2026-05-22T12:54:35Z cycle_start
+2026-05-22T12:54:35Z cards_fl=90 cards_kwork=12 new=8 notify=0 err=-
+2026-05-22T13:05:28Z cycle_start
+2026-05-22T13:05:28Z cards_fl=90 cards_kwork=12 new=6 notify=0 err=-
+2026-05-22T13:22:37Z tg_monitor_start chats=5 ids=[-1003363793339, -1001434631241, -1001333124183, -1001303819569, -1001127950512] night=False
+2026-05-22T13:26:35Z tg_msg chat=-1001127950512 msg=1930687 new=1 notify=0 err=-
+2026-05-22T13:26:43Z tg_msg chat=-1001127950512 msg=1930688 new=1 notify=0 err=-
+2026-05-22T13:40:17Z tg_msg chat=-1001127950512 msg=1930689 new=1 notify=0 err=-
+2026-05-22T13:40:21Z tg_msg chat=-1001127950512 msg=1930690 new=1 notify=0 err=-
+2026-05-22T13:48:20Z tg_msg chat=-1001127950512 msg=1930691 new=1 notify=0 err=-
+2026-05-22T13:48:24Z tg_msg chat=-1001127950512 msg=1930692 new=1 notify=0 err=-
+2026-05-22T13:48:29Z tg_msg chat=-1001127950512 msg=1930693 new=1 notify=0 err=-
+2026-05-22T13:49:10Z tg_msg chat=-1001127950512 msg=1930694 new=1 notify=0 err=-
+2026-05-22T13:49:15Z tg_msg chat=-1001127950512 msg=1930695 new=1 notify=0 err=-
+2026-05-22T13:49:20Z tg_msg chat=-1001127950512 msg=1930696 new=1 notify=0 err=-
+2026-05-22T13:49:25Z tg_msg chat=-1001127950512 msg=1930697 new=1 notify=0 err=-
+2026-05-22T13:55:19Z tg_msg chat=-1001127950512 msg=1930698 new=1 notify=0 err=-
+2026-05-22T13:56:00Z tg_msg chat=-1001127950512 msg=1930699 new=1 notify=0 err=-
+2026-05-22T14:07:08Z tg_msg chat=-1001333124183 msg=1275836 new=1 notify=0 err=-
+2026-05-22T14:07:15Z tg_msg chat=-1001333124183 msg=1275837 new=1 notify=0 err=-
+2026-05-22T14:08:57Z tg_msg chat=-1001127950512 msg=1930700 new=1 notify=0 err=-
+2026-05-22T14:09:03Z tg_msg chat=-1001127950512 msg=1930701 new=1 notify=0 err=-
+2026-05-22T14:09:14Z tg_msg chat=-1001127950512 msg=1930702 new=1 notify=0 err=-
+2026-05-22T14:09:24Z tg_msg chat=-1001127950512 msg=1930703 new=1 notify=0 err=-
+2026-05-22T14:12:22Z tg_msg chat=-1001127950512 msg=1930704 new=1 notify=0 err=-
+2026-05-22T14:12:30Z tg_msg chat=-1001127950512 msg=1930705 new=1 notify=0 err=-
+2026-05-22T14:18:01Z tg_msg chat=-1001127950512 msg=1930706 new=1 notify=0 err=-
+2026-05-22T14:18:07Z tg_msg chat=-1001127950512 msg=1930707 new=1 notify=0 err=-
+2026-05-22T14:22:01Z tg_msg chat=-1001333124183 msg=1275840 new=1 notify=0 err=-
+2026-05-22T14:22:06Z tg_msg chat=-1001333124183 msg=1275841 new=1 notify=0 err=-
+2026-05-22T14:22:12Z tg_msg chat=-1001333124183 msg=1275842 new=1 notify=0 err=-
+2026-05-22T14:22:23Z tg_msg chat=-1001333124183 msg=1275843 new=1 notify=0 err=-
+2026-05-22T14:22:55Z tg_msg chat=-1001333124183 msg=1275845 new=1 notify=0 err=-
+2026-05-22T14:23:10Z tg_msg chat=-1001333124183 msg=1275846 new=1 notify=0 err=-
+2026-05-22T14:25:32Z tg_msg chat=-1001127950512 msg=1930708 new=1 notify=0 err=-
+2026-05-22T14:25:36Z tg_msg chat=-1001127950512 msg=1930709 new=1 notify=0 err=-
+2026-05-22T14:36:44Z cycle_start
+2026-05-22T14:36:59Z tg_msg chat=-1001333124183 msg=1275847 new=1 notify=0 err=-
+2026-05-22T14:37:05Z tg_msg chat=-1001333124183 msg=1275848 new=1 notify=0 err=-
+2026-05-22T14:36:44Z cards_fl=90 cards_kwork=12 new=18 notify=1 err=fl:id=5506237 skip:budget; fl:id=5506236 skip:ai:МИМО; fl:id=5506233 skip:filter; fl:id=5506235 skip:ai:МИМО; fl:id=5506230 skip:budget; fl:id=5506231 skip:ai:МИМО; kwork:id=3181503 skip:budget; kwork:id=3181488 skip:filter; kwork:id=3181383 skip:ai:МИМО; kwork:id=3181480 skip:budget; kwork:id=3181474 skip:filter; kwork:id=3181500 skip:budget; kwork:id=3181499 skip:filter; kwork:id=3181496 skip:budget; kwork:id=3181440 skip:budget; kwork:id=3181497 skip:filter; kwork:id=3181493 skip:filter
+2026-05-22T14:39:26Z tg:action:status
+2026-05-22T14:42:10Z tg_msg chat=-1001127950512 msg=1930710 new=1 notify=0 err=-
+2026-05-22T14:42:15Z tg_msg chat=-1001127950512 msg=1930711 new=1 notify=0 err=-
+2026-05-22T14:42:23Z tg_msg chat=-1001127950512 msg=1930712 new=1 notify=0 err=-
+2026-05-22T14:51:59Z tg_msg chat=-1001333124183 msg=1275849 new=1 notify=0 err=-
+2026-05-22T14:52:10Z tg_msg chat=-1001333124183 msg=1275850 new=1 notify=0 err=-
+2026-05-22T14:52:18Z tg_msg chat=-1001333124183 msg=1275851 new=1 notify=0 err=-
+2026-05-22T14:52:21Z tg_msg chat=-1001333124183 msg=1275852 new=1 notify=0 err=-
+2026-05-22T14:52:23Z tg_msg chat=-1001333124183 msg=1275853 new=1 notify=0 err=-
+2026-05-22T14:52:28Z tg_msg chat=-1001333124183 msg=1275854 new=1 notify=0 err=-
+2026-05-22T14:54:04Z tg_msg chat=-1001127950512 msg=1930713 new=1 notify=0 err=-
+2026-05-22T14:54:22Z tg_msg chat=-1001127950512 msg=1930714 new=1 notify=0 err=-
+2026-05-22T15:00:16Z tg_msg chat=-1001127950512 msg=1930715 new=1 notify=0 err=-
+2026-05-22T15:00:22Z tg_msg chat=-1001127950512 msg=1930716 new=1 notify=0 err=-
+2026-05-22T15:07:00Z tg_msg chat=-1001333124183 msg=1275856 new=1 notify=0 err=-
+2026-05-22T15:07:05Z tg_msg chat=-1001333124183 msg=1275857 new=1 notify=0 err=-
+2026-05-22T15:20:27Z tg_msg chat=-1001127950512 msg=1930717 new=1 notify=0 err=-
+2026-05-22T15:20:32Z tg_msg chat=-1001127950512 msg=1930718 new=1 notify=0 err=-
+2026-05-22T15:21:58Z tg_msg chat=-1001333124183 msg=1275858 new=1 notify=0 err=-
+2026-05-22T15:22:07Z tg_msg chat=-1001333124183 msg=1275859 new=1 notify=0 err=-
+2026-05-22T15:22:14Z tg_msg chat=-1001333124183 msg=1275860 new=1 notify=0 err=-
+2026-05-22T15:28:15Z tg_msg chat=-1001127950512 msg=1930719 new=1 notify=0 err=-
+2026-05-22T15:28:22Z tg_msg chat=-1001127950512 msg=1930720 new=1 notify=0 err=-
+2026-05-22T15:36:57Z tg_msg chat=-1001333124183 msg=1275861 new=1 notify=0 err=-
+2026-05-22T15:48:17Z tg_msg chat=-1001127950512 msg=1930723 new=1 notify=0 err=-
+2026-05-22T15:51:56Z tg_msg chat=-1001333124183 msg=1275862 new=1 notify=0 err=-
+2026-05-22T15:52:01Z tg_msg chat=-1001333124183 msg=1275863 new=1 notify=0 err=-
+2026-05-22T15:56:27Z tg_msg chat=-1001127950512 msg=1930724 new=1 notify=0 err=-
+2026-05-22T15:57:45Z tg_msg chat=-1001127950512 msg=1930726 new=1 notify=0 err=-
+2026-05-22T15:57:51Z tg_msg chat=-1001127950512 msg=1930727 new=1 notify=0 err=-
+2026-05-22T16:03:38Z tg_msg chat=-1001127950512 msg=1930729 new=1 notify=0 err=-
+2026-05-22T16:03:44Z tg_msg chat=-1001127950512 msg=1930730 new=1 notify=0 err=-
+2026-05-22T16:06:56Z tg_msg chat=-1001333124183 msg=1275864 new=1 notify=0 err=-
+2026-05-22T16:07:02Z tg_msg chat=-1001333124183 msg=1275865 new=1 notify=0 err=-
+2026-05-22T16:08:03Z tg_msg chat=-1001127950512 msg=1930731 new=1 notify=0 err=-
+2026-05-22T16:08:18Z tg_msg chat=-1001127950512 msg=1930732 new=1 notify=0 err=-
+2026-05-22T16:12:36Z tg_msg chat=-1001127950512 msg=1930734 new=1 notify=0 err=-
+2026-05-22T16:21:58Z tg_msg chat=-1001333124183 msg=1275866 new=1 notify=0 err=-
+2026-05-22T16:22:04Z tg_msg chat=-1001333124183 msg=1275867 new=1 notify=0 err=-
+2026-05-22T16:22:10Z tg_msg chat=-1001333124183 msg=1275868 new=1 notify=0 err=-
+2026-05-22T16:22:15Z tg_msg chat=-1001333124183 msg=1275869 new=1 notify=0 err=-
+2026-05-22T16:22:22Z tg_msg chat=-1001333124183 msg=1275870 new=1 notify=0 err=-
+2026-05-22T16:22:32Z tg_msg chat=-1001333124183 msg=1275871 new=1 notify=0 err=-
+2026-05-22T16:30:24Z tg_msg chat=-1001127950512 msg=1930736 new=1 notify=0 err=-
+2026-05-22T16:36:55Z tg_msg chat=-1001333124183 msg=1275872 new=1 notify=0 err=-
+2026-05-22T16:38:10Z tg_msg chat=-1001127950512 msg=1930737 new=1 notify=0 err=-
+2026-05-22T16:38:15Z tg_msg chat=-1001127950512 msg=1930738 new=1 notify=0 err=-
+2026-05-22T16:38:20Z tg_msg chat=-1001127950512 msg=1930739 new=1 notify=0 err=-
+2026-05-22T16:44:34Z tg_msg chat=-1001127950512 msg=1930740 new=1 notify=0 err=-
+2026-05-22T16:45:12Z tg_msg chat=-1001127950512 msg=1930741 new=1 notify=0 err=-
+2026-05-22T16:45:17Z tg_msg chat=-1001127950512 msg=1930742 new=1 notify=0 err=-
+2026-05-22T16:45:22Z tg_msg chat=-1001127950512 msg=1930743 new=1 notify=0 err=-
+2026-05-22T16:48:01Z tg_msg chat=-1001127950512 msg=1930744 new=1 notify=0 err=-
+2026-05-22T16:48:06Z tg_msg chat=-1001127950512 msg=1930745 new=1 notify=0 err=-
+2026-05-22T16:51:57Z tg_msg chat=-1001333124183 msg=1275875 new=1 notify=0 err=-
+2026-05-22T16:52:13Z tg_msg chat=-1001333124183 msg=1275876 new=1 notify=0 err=-
+2026-05-22T16:52:19Z tg_msg chat=-1001333124183 msg=1275877 new=1 notify=0 err=-
+2026-05-22T16:52:22Z tg_msg chat=-1001333124183 msg=1275878 new=1 notify=0 err=-
+2026-05-22T16:52:27Z tg_msg chat=-1001333124183 msg=1275879 new=1 notify=0 err=-
+2026-05-22T16:55:16Z tg_msg chat=-1001127950512 msg=1930746 new=1 notify=0 err=-
+2026-05-22T16:55:20Z tg_msg chat=-1001127950512 msg=1930747 new=1 notify=0 err=-
+2026-05-22T16:55:25Z tg_msg chat=-1001127950512 msg=1930748 new=1 notify=0 err=-
+2026-05-22T16:58:56Z tg_msg chat=-1001127950512 msg=1930749 new=1 notify=0 err=-
+2026-05-22T17:05:43Z tg_msg chat=-1001127950512 msg=1930750 new=1 notify=0 err=-
+2026-05-22T17:05:51Z tg_msg chat=-1001127950512 msg=1930751 new=1 notify=0 err=-
+2026-05-22T17:06:24Z tg_msg chat=-1001127950512 msg=1930752 new=1 notify=1 err=-
+2026-05-22T17:06:30Z tg_msg chat=-1001127950512 msg=1930753 new=1 notify=0 err=-
+2026-05-22T17:06:54Z tg_msg chat=-1001333124183 msg=1275880 new=1 notify=0 err=-
+2026-05-22T17:07:01Z tg_msg chat=-1001333124183 msg=1275881 new=1 notify=0 err=-
+2026-05-22T17:10:01Z tg_msg chat=-1001127950512 msg=1930754 new=1 notify=0 err=-
+2026-05-22T17:10:07Z tg_msg chat=-1001127950512 msg=1930755 new=1 notify=0 err=-
+2026-05-22T17:10:12Z tg_msg chat=-1001127950512 msg=1930756 new=1 notify=0 err=-
+2026-05-22T17:22:02Z tg_msg chat=-1001333124183 msg=1275882 new=1 notify=0 err=-
+2026-05-22T17:22:09Z tg_msg chat=-1001333124183 msg=1275883 new=1 notify=0 err=-
+2026-05-22T17:22:15Z tg_msg chat=-1001333124183 msg=1275884 new=1 notify=0 err=-
+2026-05-22T17:35:15Z tg_msg chat=-1001127950512 msg=1930758 new=1 notify=0 err=-
+2026-05-22T17:35:21Z tg_msg chat=-1001127950512 msg=1930759 new=1 notify=0 err=-
+2026-05-22T17:36:58Z tg_msg chat=-1001333124183 msg=1275887 new=1 notify=0 err=-
+2026-05-22T17:47:02Z tg_msg chat=-1001127950512 msg=1930760 new=1 notify=0 err=-
+2026-05-22T17:47:06Z tg_msg chat=-1001127950512 msg=1930761 new=1 notify=0 err=-
+2026-05-22T17:51:59Z tg_msg chat=-1001333124183 msg=1275888 new=1 notify=0 err=-
+2026-05-22T17:56:39Z tg_msg chat=-1001127950512 msg=1930762 new=1 notify=0 err=-
+2026-05-22T18:00:20Z tg_msg chat=-1001127950512 msg=1930763 new=1 notify=0 err=-
+2026-05-22T18:00:27Z tg_msg chat=-1001127950512 msg=1930764 new=1 notify=0 err=-
+2026-05-22T18:06:59Z tg_msg chat=-1001333124183 msg=1275889 new=1 notify=0 err=-
+2026-05-22T18:07:07Z tg_msg chat=-1001333124183 msg=1275890 new=1 notify=0 err=-
+2026-05-22T18:07:12Z tg_msg chat=-1001333124183 msg=1275891 new=1 notify=0 err=-
+2026-05-22T18:15:36Z tg_msg chat=-1001127950512 msg=1930765 new=1 notify=0 err=-
+2026-05-22T18:15:42Z tg_msg chat=-1001127950512 msg=1930766 new=1 notify=0 err=-
+2026-05-22T18:15:47Z tg_msg chat=-1001127950512 msg=1930767 new=1 notify=0 err=-
+2026-05-22T18:21:08Z tg_msg chat=-1001127950512 msg=1930768 new=1 notify=0 err=-
+2026-05-22T18:21:12Z tg_msg chat=-1001127950512 msg=1930769 new=1 notify=0 err=-
+2026-05-22T18:21:17Z tg_msg chat=-1001127950512 msg=1930770 new=1 notify=0 err=-
+2026-05-22T18:21:22Z tg_msg chat=-1001127950512 msg=1930771 new=1 notify=0 err=-
+2026-05-22T18:21:30Z tg_msg chat=-1001127950512 msg=1930772 new=1 notify=0 err=-
+2026-05-22T18:22:00Z tg_msg chat=-1001333124183 msg=1275892 new=1 notify=0 err=-
+2026-05-22T18:37:03Z tg_msg chat=-1001333124183 msg=1275893 new=1 notify=0 err=-
+2026-05-22T18:37:09Z tg_msg chat=-1001333124183 msg=1275896 new=1 notify=0 err=-
+2026-05-22T18:37:15Z tg_msg chat=-1001333124183 msg=1275897 new=1 notify=0 err=-
+2026-05-22T18:37:19Z tg_msg chat=-1001127950512 msg=1930773 new=1 notify=0 err=-
+2026-05-22T18:37:24Z tg_msg chat=-1001127950512 msg=1930774 new=1 notify=0 err=-
+2026-05-22T18:50:20Z tg_msg chat=-1001127950512 msg=1930775 new=1 notify=0 err=-
+2026-05-22T18:50:25Z tg_msg chat=-1001127950512 msg=1930776 new=1 notify=0 err=-
+2026-05-22T18:52:00Z tg_msg chat=-1001333124183 msg=1275898 new=1 notify=0 err=-
+2026-05-22T18:52:08Z tg_msg chat=-1001333124183 msg=1275899 new=1 notify=0 err=-
+2026-05-22T18:52:15Z tg_msg chat=-1001333124183 msg=1275900 new=1 notify=0 err=-
+2026-05-22T18:52:20Z tg_msg chat=-1001333124183 msg=1275901 new=1 notify=0 err=-
+2026-05-22T19:07:03Z tg_msg chat=-1001333124183 msg=1275902 new=1 notify=0 err=-
+2026-05-22T19:07:38Z tg_msg chat=-1001333124183 msg=1275903 new=1 notify=0 err=-
+2026-05-22T19:08:59Z tg_msg chat=-1001127950512 msg=1930777 new=1 notify=0 err=-
+2026-05-22T19:09:04Z tg_msg chat=-1001127950512 msg=1930778 new=1 notify=0 err=-
+2026-05-22T19:21:00Z tg_msg chat=-1001127950512 msg=1930779 new=1 notify=0 err=-
+2026-05-22T19:22:00Z tg_msg chat=-1001333124183 msg=1275904 new=1 notify=0 err=-
+2026-05-22T19:22:07Z tg_msg chat=-1001333124183 msg=1275905 new=1 notify=0 err=-
+2026-05-22T19:30:01Z tg_msg chat=-1001127950512 msg=1930780 new=1 notify=0 err=-
+2026-05-22T19:30:06Z tg_msg chat=-1001127950512 msg=1930781 new=1 notify=0 err=-
+2026-05-22T19:30:10Z tg_msg chat=-1001127950512 msg=1930782 new=1 notify=0 err=-
+2026-05-22T19:34:11Z tg_msg chat=-1001127950512 msg=1930783 new=1 notify=0 err=-
+2026-05-22T19:34:16Z tg_msg chat=-1001127950512 msg=1930784 new=1 notify=0 err=-
+2026-05-22T19:34:21Z tg_msg chat=-1001127950512 msg=1930785 new=1 notify=0 err=-
+2026-05-22T19:40:29Z tg_msg chat=-1001127950512 msg=1930786 new=1 notify=0 err=-
+2026-05-22T19:40:33Z tg_msg chat=-1001127950512 msg=1930787 new=1 notify=0 err=-
+2026-05-22T19:52:03Z tg_msg chat=-1001333124183 msg=1275906 new=1 notify=0 err=-
+2026-05-22T19:52:10Z tg_msg chat=-1001333124183 msg=1275907 new=1 notify=0 err=-
+2026-05-22T19:52:15Z tg_msg chat=-1001333124183 msg=1275908 new=1 notify=0 err=-
+2026-05-22T19:52:20Z tg_msg chat=-1001333124183 msg=1275909 new=1 notify=0 err=-
+2026-05-22T20:00:18Z tg_msg chat=-1001127950512 msg=1930788 new=1 notify=0 err=-
+2026-05-22T20:00:23Z tg_msg chat=-1001127950512 msg=1930789 new=1 notify=0 err=-
+2026-05-22T20:07:02Z tg_msg chat=-1001333124183 msg=1275910 new=1 notify=0 err=-
+2026-05-22T20:07:04Z tg_msg chat=-1001333124183 msg=1275911 new=1 notify=0 err=-
+2026-05-22T20:11:25Z tg_msg chat=-1001127950512 msg=1930790 new=1 notify=0 err=-
+2026-05-22T20:11:30Z tg_msg chat=-1001127950512 msg=1930791 new=1 notify=0 err=-
+2026-05-22T20:18:19Z tg_msg chat=-1001127950512 msg=1930792 new=1 notify=0 err=-
+2026-05-22T20:18:24Z tg_msg chat=-1001127950512 msg=1930793 new=1 notify=0 err=-
+2026-05-22T20:18:30Z tg_msg chat=-1001127950512 msg=1930794 new=1 notify=0 err=-
+2026-05-22T20:20:27Z tg_msg chat=-1001127950512 msg=1930795 new=1 notify=0 err=-
+2026-05-22T20:20:32Z tg_msg chat=-1001127950512 msg=1930796 new=1 notify=0 err=-
+2026-05-22T20:22:02Z tg_msg chat=-1001333124183 msg=1275914 new=1 notify=0 err=-
+2026-05-22T20:22:09Z tg_msg chat=-1001333124183 msg=1275915 new=1 notify=0 err=-
+2026-05-22T20:22:14Z tg_msg chat=-1001333124183 msg=1275916 new=1 notify=0 err=-
+2026-05-22T20:37:04Z tg_msg chat=-1001333124183 msg=1275917 new=1 notify=0 err=-
+2026-05-22T20:37:10Z tg_msg chat=-1001333124183 msg=1275918 new=1 notify=0 err=-
+2026-05-22T20:43:49Z tg_msg chat=-1001127950512 msg=1930797 new=1 notify=0 err=-
+2026-05-22T20:43:54Z tg_msg chat=-1001127950512 msg=1930798 new=1 notify=0 err=-
+2026-05-22T20:52:04Z tg_msg chat=-1001333124183 msg=1275919 new=1 notify=0 err=-
+2026-05-22T20:52:08Z tg_msg chat=-1001333124183 msg=1275920 new=1 notify=0 err=-
+2026-05-22T20:52:13Z tg_msg chat=-1001333124183 msg=1275921 new=1 notify=0 err=-
+2026-05-22T20:52:17Z tg_msg chat=-1001333124183 msg=1275922 new=1 notify=0 err=-
+2026-05-22T20:52:22Z tg_msg chat=-1001333124183 msg=1275923 new=1 notify=0 err=-
+2026-05-22T20:56:24Z tg_msg chat=-1001127950512 msg=1930799 new=1 notify=0 err=-
+2026-05-22T21:07:04Z tg_msg chat=-1001333124183 msg=1275924 new=1 notify=0 err=-
+2026-05-22T21:07:09Z tg_msg chat=-1001333124183 msg=1275925 new=1 notify=0 err=-
+2026-05-22T21:07:11Z tg_msg chat=-1001333124183 msg=1275926 new=1 notify=0 err=-
+2026-05-22T21:07:16Z tg_msg chat=-1001333124183 msg=1275927 new=1 notify=0 err=-
+2026-05-22T21:10:00Z tg_msg chat=-1001127950512 msg=1930800 new=1 notify=0 err=-
+2026-05-22T21:10:06Z tg_msg chat=-1001127950512 msg=1930801 new=1 notify=0 err=-
+2026-05-22T21:22:05Z tg_msg chat=-1001333124183 msg=1275928 new=1 notify=0 err=-
+2026-05-22T21:22:10Z tg_msg chat=-1001333124183 msg=1275929 new=1 notify=0 err=-
+2026-05-22T21:22:15Z tg_msg chat=-1001333124183 msg=1275930 new=1 notify=0 err=-
+2026-05-22T21:25:44Z tg_msg chat=-1001127950512 msg=1930802 new=1 notify=0 err=-
+2026-05-22T21:25:48Z tg_msg chat=-1001127950512 msg=1930803 new=1 notify=0 err=-
+2026-05-22T21:25:53Z tg_msg chat=-1001127950512 msg=1930804 new=1 notify=0 err=-
+2026-05-22T21:25:59Z tg_msg chat=-1001127950512 msg=1930805 new=1 notify=0 err=-
+2026-05-22T21:31:11Z tg_msg chat=-1001127950512 msg=1930806 new=1 notify=0 err=-
+2026-05-22T21:31:15Z tg_msg chat=-1001127950512 msg=1930807 new=1 notify=0 err=-
+2026-05-22T21:37:04Z tg_msg chat=-1001333124183 msg=1275931 new=1 notify=0 err=-
+2026-05-22T21:37:09Z tg_msg chat=-1001333124183 msg=1275932 new=1 notify=0 err=-
+2026-05-22T21:52:05Z tg_msg chat=-1001333124183 msg=1275934 new=1 notify=0 err=-
+2026-05-22T21:52:09Z tg_msg chat=-1001333124183 msg=1275935 new=1 notify=0 err=-
+2026-05-22T21:52:14Z tg_msg chat=-1001333124183 msg=1275936 new=1 notify=0 err=-
+2026-05-22T21:52:19Z tg_msg chat=-1001333124183 msg=1275937 new=1 notify=0 err=-
+2026-05-22T22:00:05Z tg_msg chat=-1001127950512 msg=1930808 new=1 notify=1 err=-
+2026-05-22T22:07:05Z tg_msg chat=-1001333124183 msg=1275938 new=1 notify=0 err=-
+2026-05-22T22:07:10Z tg_msg chat=-1001333124183 msg=1275939 new=1 notify=0 err=-
+2026-05-22T22:07:28Z tg_msg chat=-1001333124183 msg=1275940 new=1 notify=0 err=-
+2026-05-22T22:07:41Z tg_msg chat=-1001127950512 msg=1930809 new=1 notify=0 err=-
+2026-05-22T22:07:45Z tg_msg chat=-1001127950512 msg=1930810 new=1 notify=0 err=-
+2026-05-22T22:13:11Z tg_msg chat=-1001127950512 msg=1930811 new=1 notify=0 err=-
+2026-05-22T22:13:16Z tg_msg chat=-1001127950512 msg=1930812 new=1 notify=0 err=-
+2026-05-22T22:22:06Z tg_msg chat=-1001333124183 msg=1275941 new=1 notify=0 err=-
+2026-05-22T22:37:06Z tg_msg chat=-1001333124183 msg=1275942 new=1 notify=0 err=-
+2026-05-22T22:43:43Z tg_msg chat=-1001127950512 msg=1930813 new=1 notify=0 err=-
+2026-05-22T22:43:47Z tg_msg chat=-1001127950512 msg=1930814 new=1 notify=0 err=-
+2026-05-22T22:45:09Z tg_msg chat=-1001127950512 msg=1930815 new=1 notify=0 err=-
+2026-05-22T22:52:07Z tg_msg chat=-1001333124183 msg=1275943 new=1 notify=0 err=-
+2026-05-22T22:52:09Z tg_msg chat=-1001333124183 msg=1275944 new=1 notify=0 err=-
+2026-05-22T22:52:14Z tg_msg chat=-1001333124183 msg=1275945 new=1 notify=0 err=-
+2026-05-22T22:59:19Z tg_msg chat=-1001127950512 msg=1930816 new=1 notify=0 err=-
+2026-05-22T22:59:24Z tg_msg chat=-1001127950512 msg=1930817 new=1 notify=0 err=-
+2026-05-23T03:16:27Z radar_main_start
+2026-05-23T03:16:27Z tg_main_start
+2026-05-23T03:16:28Z cycle_start
+2026-05-23T03:16:31Z tg_monitor_start chats=5 ids=[-1003363793339, -1001434631241, -1001333124183, -1001303819569, -1001127950512] night=False
+2026-05-23T03:16:27Z tg:action:status
+2026-05-23T03:16:27Z tg:action:resume
+2026-05-23T03:16:27Z tg:action:status
+2026-05-23T03:16:27Z tg:action:status
+2026-05-23T03:16:27Z tg:action:status
+2026-05-23T03:16:27Z tg:action:resume
+2026-05-23T03:16:28Z cards_fl=90 cards_kwork=12 new=20 notify=0 err=fl:id=5506247 skip:filter; fl:id=5506253 skip:ai:МИМО; fl:id=5506252 skip:ai:МИМО; fl:id=5506251 skip:ai:МИМО; fl:id=5506246 skip:ai:МИМО; fl:id=5506242 skip:filter; fl:id=5506241 skip:ai:МИМО; fl:id=5506243 skip:ai:МИМО; kwork:id=3178183 skip:ai:МИМО; kwork:id=3180102 skip:filter; kwork:id=2320782 skip:budget; kwork:id=3181757 skip:budget; kwork:id=3067386 skip:filter; kwork:id=3023753 skip:budget; kwork:id=3006063 skip:budget; kwork:id=3022517 skip:budget; kwork:id=2947248 skip:budget; kwork:id=3021586 skip:budget; kwork:id=2996484 skip:budget; kwork:id=3179305 skip:budget
+2026-05-23T03:18:00Z tg:action:status
+2026-05-23T03:18:06Z tg:action:resume
+2026-05-23T03:18:07Z tg:action:pause
+2026-05-23T03:18:13Z tg:action:status
+2026-05-23T03:18:20Z tg:action:resume
+2026-05-23T03:18:27Z tg_heartbeat
+2026-05-23T03:19:27Z radar_main_start
+2026-05-23T03:19:27Z tg_main_start
+2026-05-23T03:19:28Z cycle_start
+2026-05-23T03:19:31Z tg_monitor_start chats=5 ids=[-1003363793339, -1001434631241, -1001333124183, -1001303819569, -1001127950512] night=False
+2026-05-23T03:19:28Z cards_fl=90 cards_kwork=12 new=1 notify=0 err=kwork:id=3181771 skip:budget
+2026-05-23T03:21:27Z tg_heartbeat
+2026-05-23T03:23:27Z tg_heartbeat
+2026-05-23T03:25:26Z радар:старт
+2026-05-23T03:25:27Z тг:старт
+2026-05-23T03:25:27Z цикл:старт
+2026-05-23T03:25:30Z тг:монитор:старт чатов=5 ids=[-1003363793339, -1001434631241, -1001333124183, -1001303819569, -1001127950512] ночь=нет
+2026-05-23T03:25:27Z карточки_fl=90 карточки_kwork=12 новых=0 уведом=0 ош=-
+2026-05-23T03:26:08Z тг:команда:статус
+2026-05-23T03:27:27Z тг:пульс
+2026-05-23T03:28:04Z тг:сообщ chat=-1001127950512 msg=1930824 новый=1 увед=0 ош=tg:-1001127950512:id=1930824 skip:ai:МИМО
+2026-05-23T03:28:08Z тг:сообщ chat=-1001127950512 msg=1930825 новый=1 увед=0 ош=tg:-1001127950512:id=1930825 skip:ai:МИМО
+2026-05-23T03:28:13Z тг:сообщ chat=-1001127950512 msg=1930826 новый=1 увед=0 ош=tg:-1001127950512:id=1930826 skip:ai:МИМО
+2026-05-23T03:28:18Z тг:сообщ chat=-1001127950512 msg=1930827 новый=1 увед=0 ош=tg:-1001127950512:id=1930827 skip:ai:МИМО
+2026-05-23T03:28:24Z тг:сообщ chat=-1001127950512 msg=1930828 новый=1 увед=0 ош=tg:-1001127950512:id=1930828 skip:ai:МИМО
+2026-05-23 11:29:12 радар:старт
+2026-05-23 11:29:12 тг:старт
+2026-05-23 11:29:12 цикл:старт
+2026-05-23 11:29:12 карточки_fl=90 карточки_kwork=12 новых=0 уведом=0 ош=-
+2026-05-23 11:29:16 тг:монитор:старт чатов=5 ids=[-1003363793339, -1001434631241, -1001333124183, -1001303819569, -1001127950512] ночь=нет
+2026-05-23 11:29:26 тг:команда:статус
+2026-05-23 11:31:12 тг:пульс
+2026-05-23 11:33:12 тг:пульс
+2026-05-23 11:35:12 тг:пульс
+2026-05-23 11:37:12 тг:пульс
+2026-05-23 11:38:02 здравье:ок акк=+66953964608 66953964608
+2026-05-23 11:39:12 тг:пульс
+2026-05-23 11:39:20 цикл:старт
+2026-05-23 11:39:20 карточки_fl=90 карточки_kwork=12 новых=0 уведом=0 ош=-
+2026-05-23 11:39:38 здравье:ок акк=+66953964608 66953964608
+2026-05-23 11:39:59 тг:команда:статус
+2026-05-23 11:41:12 тг:пульс
+2026-05-23 11:43:12 тг:пульс
+2026-05-23 11:45:12 тг:пульс
+2026-05-23 11:47:12 тг:пульс
+2026-05-23 11:49:12 тг:пульс
+2026-05-23 11:49:32 цикл:старт
+2026-05-23 11:49:32 карточки_fl=90 карточки_kwork=12 новых=0 уведом=0 ош=-
+2026-05-23 11:50:41 тг:сообщ chat=-1001127950512 msg=1930829 новый=1 увед=0 ош=tg:-1001127950512:id=1930829 skip:ai:МИМО
+2026-05-23 11:50:46 тг:сообщ chat=-1001127950512 msg=1930830 новый=1 увед=0 ош=tg:-1001127950512:id=1930830 skip:ai:МИМО
+2026-05-23 11:50:51 тг:сообщ chat=-1001127950512 msg=1930831 новый=1 увед=0 ош=tg:-1001127950512:id=1930831 skip:ai:МИМО
+2026-05-23 11:51:16 радар:старт
+2026-05-23 11:51:16 тг:старт
+2026-05-23 11:51:17 цикл:старт
+2026-05-23 11:51:17 карточки_fl=90 карточки_kwork=12 новых=0 уведом=0 ош=-
+2026-05-23 11:51:20 тг:монитор:старт чатов=5 ids=[-1003363793339, -1001434631241, -1001333124183, -1001303819569, -1001127950512] ночь=нет
+2026-05-23 11:53:16 тг:пульс
+2026-05-23 12:27:29 здравье:ок акк=+66953964608 66953964608
+2026-05-23 13:25:13 радар:старт
+2026-05-23 13:25:13 тг:старт
+2026-05-23 13:25:18 тг:монитор:старт чатов=6 ids=[-1003363793339, -1001434631241, -1001367389085, -1001333124183, -1001303819569, -1001127950512] ночь=нет
+2026-05-23 13:25:27 здравье:сбой акк=+66953964608 OperationalError: database is locked
+2026-05-23 13:25:27 здравье:уведомление отправлено
+2026-05-23 13:25:28 цикл:старт
+2026-05-23 13:25:28 карточки_fl=90 карточки_kwork=12 новых=7 уведом=0 ош=fl:id=5506283 skip:ai:МИМО; kwork:id=3181782 skip:filter; kwork:id=3179307 skip:ai:МИМО; kwork:id=2994127 skip:budget; kwork:id=2994710 skip:budget; kwork:id=1800669 skip:filter; kwork:id=3043768 skip:budget
+2026-05-23 13:27:13 тг:пульс
+2026-05-23 13:29:13 тг:пульс
+2026-05-23 13:31:13 тг:пульс
+2026-05-23 13:33:13 тг:пульс
+2026-05-23 13:35:13 тг:пульс
+2026-05-23 13:35:56 цикл:старт
+2026-05-23 13:35:56 карточки_fl=90 карточки_kwork=12 новых=1 уведом=0 ош=kwork:id=3181785 skip:budget
+2026-05-23 13:37:13 тг:пульс
+2026-05-23 13:39:13 тг:пульс
+2026-05-23 13:43:01 здравье:ок акк=+66953964608 66953964608
+2026-05-23 13:43:01 здравье:уведомление отправлено
+2026-05-23 14:14:56 радар:старт
+2026-05-23 14:14:56 тг:старт
+2026-05-23 14:14:57 здравье:сбой акк=+66953964608 монитор запущен, пульс ещё не записан
+2026-05-23 14:14:57 здравье:уведомление отправлено
+2026-05-23 14:14:58 цикл:старт
+2026-05-23 14:15:01 тг:монитор:старт чатов=6 ids=[-1003363793339, -1001434631241, -1001367389085, -1001333124183, -1001303819569, -1001127950512] ночь=нет join_auto=да
+2026-05-23 14:14:58 карточки_fl=90 карточки_kwork=12 новых=6 уведом=0 ош=kwork:id=3181786 skip:ai:МИМО; kwork:id=2973742 skip:budget; kwork:id=2932500 skip:budget; kwork:id=2784764 skip:budget; kwork:id=2735092 skip:budget; kwork:id=3157104 skip:budget
+2026-05-23 14:15:57 радар:старт
+2026-05-23 14:15:57 тг:старт
+2026-05-23 14:15:57 цикл:старт
+2026-05-23 14:15:57 карточки_fl=90 карточки_kwork=12 новых=0 уведом=0 ош=-
+2026-05-23 14:16:01 тг:монитор: пропуск чата 2101594712: ValueError: Could not find the input entity for PeerUser(user_id=2101594712) (PeerUser). Please read https://docs.telethon.dev/en/stable/concepts/entities.html to find out more details.
+2026-05-23 14:16:01 тг:монитор:старт чатов=6 ids=[-1003363793339, -1001434631241, -1001367389085, -1001333124183, -1001303819569, -1001127950512] ночь=нет join_auto=да
+2026-05-23 14:16:05 тг:монитор: пропуск чата 2101594712: ValueError: Could not find the input entity for PeerUser(user_id=2101594712) (PeerUser). Please read https://docs.telethon.dev/en/stable/concepts/entities.html to find out more details.
+2026-05-23 14:16:05 тг:монитор:listen+ peers=[-1001000735083] всего=7
+2026-05-23 14:16:17 тг:команда:статус
+2026-05-23 14:37:24 радар:старт
+2026-05-23 14:37:24 тг:старт
+2026-05-23 14:37:25 здравье:сбой акк=+66953964608 монитор запущен, пульс ещё не записан
+2026-05-23 14:37:25 цикл:старт
+2026-05-23 14:37:29 тг:монитор:acc1: пропуск чата 2101594712: ValueError: Could not find the input entity for PeerUser(user_id=2101594712) (PeerUser). Please read https://docs.telethon.dev/en/stable/concepts/entities.html to find out more details.
+2026-05-23 14:37:29 тг:монитор:acc1: пропуск чата 1000735083: ValueError: Could not find the input entity for PeerUser(user_id=1000735083) (PeerUser). Please read https://docs.telethon.dev/en/stable/concepts/entities.html to find out more details.
+2026-05-23 14:37:29 тг:монитор:старт account=acc1 чатов=6 ids=[-1003363793339, -1001434631241, -1001367389085, -1001333124183, -1001303819569, -1001127950512] ночь=нет join_auto=да
+2026-05-23 14:37:25 карточки_fl=90 карточки_kwork=12 новых=3 уведом=0 ош=fl:id=5506273 skip:budget; fl:id=5506271 skip:ai:МИМО; fl:id=5506264 skip:budget
+2026-05-23 14:37:54 радар:старт
+2026-05-23 14:37:54 тг:старт
+2026-05-23 14:37:55 цикл:старт
+2026-05-23 14:37:55 карточки_fl=90 карточки_kwork=12 новых=0 уведом=0 ош=-
+2026-05-23 14:37:59 тг:монитор:acc1: пропуск чата 2101594712: ValueError: Could not find the input entity for PeerUser(user_id=2101594712) (PeerUser). Please read https://docs.telethon.dev/en/stable/concepts/entities.html to find out more details.
+2026-05-23 14:37:59 тг:монитор:acc1: пропуск чата 1000735083: ValueError: Could not find the input entity for PeerUser(user_id=1000735083) (PeerUser). Please read https://docs.telethon.dev/en/stable/concepts/entities.html to find out more details.
+2026-05-23 14:37:59 тг:монитор:старт account=acc1 чатов=6 ids=[-1003363793339, -1001434631241, -1001367389085, -1001333124183, -1001303819569, -1001127950512] ночь=нет join_auto=да
+2026-05-23 14:40:13 радар:старт
+2026-05-23 14:40:13 тг:старт
+2026-05-23 14:40:14 цикл:старт
+2026-05-23 14:40:17 тг:монитор:acc1: пропуск чата 2101594712: ValueError: Could not find the input entity for PeerUser(user_id=2101594712) (PeerUser). Please read https://docs.telethon.dev/en/stable/concepts/entities.html to find out more details.
+2026-05-23 14:40:18 тг:монитор:acc1: пропуск чата 1000735083: ValueError: Could not find the input entity for PeerUser(user_id=1000735083) (PeerUser). Please read https://docs.telethon.dev/en/stable/concepts/entities.html to find out more details.
+2026-05-23 14:40:18 тг:монитор:старт account=acc1 чатов=6 ids=[-1003363793339, -1001434631241, -1001367389085, -1001333124183, -1001303819569, -1001127950512] ночь=нет join_auto=да
+2026-05-23 14:40:14 карточки_fl=90 карточки_kwork=12 новых=1 уведом=0 ош=fl:id=5506278 skip:budget
+2026-05-23 14:43:27 радар:старт
+2026-05-23 14:43:27 тг:старт
+2026-05-23 14:43:31 цикл:старт
+2026-05-23 14:43:31 тг:монитор:acc1: пропуск чата 2101594712: ValueError: Could not find the input entity for PeerUser(user_id=2101594712) (PeerUser). Please read https://docs.telethon.dev/en/stable/concepts/entities.html to find out more details.
+2026-05-23 14:43:32 тг:монитор:acc1: пропуск чата 1000735083: ValueError: Could not find the input entity for PeerUser(user_id=1000735083) (PeerUser). Please read https://docs.telethon.dev/en/stable/concepts/entities.html to find out more details.
+2026-05-23 14:43:40 тг:монитор:старт account=acc1 чатов=6 ids=[-1003363793339, -1001434631241, -1001367389085, -1001333124183, -1001303819569, -1001127950512] ночь=нет join_auto=да
+2026-05-23 14:43:40 тг:монитор:старт account=acc2 чатов=4 ids=[-1001438487841, -1001259741019, -1001110946746, -1001049086457] ночь=нет join_auto=нет
+2026-05-23 14:43:40 тг:монитор:старт account=acc3 чатов=2 ids=[-1001112882647, -1001063542127] ночь=нет join_auto=нет
+2026-05-23 14:43:31 карточки_fl=89 карточки_kwork=12 новых=3 уведом=0 ош=fl:id=5506280 skip:ai:МИМО; fl:id=5506269 skip:ai:МИМО; fl:id=5506250 skip:ai:МИМО
+2026-05-23 14:45:27 тг:пульс
+2026-05-23 14:47:27 тг:пульс
+2026-05-23 14:49:19 радар:старт
+2026-05-23 14:49:19 тг:старт
+2026-05-23 14:49:20 цикл:старт
+2026-05-23 14:49:32 тг:монитор:старт account=acc1 чатов=8 ids=[-1003363793339, -1002101594712, -1001434631241, -1001367389085, -1001333124183, -1001303819569, -1001127950512, -1001000735083] ночь=нет join_auto=да
+2026-05-23 14:49:32 тг:монитор:старт account=acc2 чатов=4 ids=[-1001438487841, -1001259741019, -1001110946746, -1001049086457] ночь=нет join_auto=нет
+2026-05-23 14:49:32 тг:монитор:старт account=acc3 чатов=2 ids=[-1001112882647, -1001063542127] ночь=нет join_auto=нет
+2026-05-23 14:49:20 карточки_fl=90 карточки_kwork=12 новых=8 уведом=0 ош=fl:id=5506254 skip:budget; fl:id=5506258 skip:ai:МИМО; fl:id=5506282 skip:ai:МИМО; fl:id=5506275 skip:ai:МИМО; fl:id=5506257 skip:ai:МИМО; fl:id=5506268 skip:ai:МИМО; fl:id=5506288 skip:ai:МИМО; kwork:id=3179367 skip:ai:МИМО
+2026-05-23 14:51:19 тг:пульс
+2026-05-23 14:53:19 тг:пульс
+2026-05-23 14:53:19 здравье:ок акк=+66953964608 монитор активен (пульс 0с назад)
+2026-05-23 14:53:19 здравье:уведомление отправлено
+2026-05-23 14:55:20 тг:пульс
+2026-05-23 14:55:19 тг:команда:статус
+2026-05-23 14:55:37 радар:старт
+2026-05-23 14:55:38 тг:старт
+2026-05-23 14:55:38 цикл:старт
+2026-05-23 14:55:51 тг:монитор:старт account=acc1 чатов=8 ids=[-1003363793339, -1002101594712, -1001434631241, -1001367389085, -1001333124183, -1001303819569, -1001127950512, -1001000735083] ночь=нет join_auto=да
+2026-05-23 14:55:51 тг:монитор:старт account=acc2 чатов=4 ids=[-1001438487841, -1001259741019, -1001110946746, -1001049086457] ночь=нет join_auto=нет
+2026-05-23 14:55:51 тг:монитор:старт account=acc3 чатов=2 ids=[-1001112882647, -1001063542127] ночь=нет join_auto=нет
+2026-05-23 14:55:38 карточки_fl=90 карточки_kwork=12 новых=2 уведом=1 ош=fl:id=5506274 skip:filter
+2026-05-23 14:56:03 тг:команда:статус

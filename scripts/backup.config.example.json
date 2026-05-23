@@ -1,0 +1,10 @@
+{
+  "projectRoot": "C:\\path\\to\\your-project",
+  "backupRoot": "D:\\Backups",
+  "projectName": "my-project",
+  "envFile": ".env",
+  "dataDir": "data",
+  "dataFiles": [],
+  "sessionDirs": [],
+  "extraPaths": []
+}

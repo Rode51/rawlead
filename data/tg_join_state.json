@@ -1,0 +1,92 @@
+{
+  "acc2": {
+    "hour_bucket": "2026-05-23T14",
+    "joins_this_hour": 2,
+    "day_bucket": "2026-05-23",
+    "joins_today": 4,
+    "history": [
+      {
+        "at": "2026-05-23 12:58:38",
+        "link": "https://t.me/javascript_jobs_feed",
+        "status": "done",
+        "chat_id": 1110946746,
+        "already": false
+      },
+      {
+        "at": "2026-05-23 13:01:41",
+        "link": "https://t.me/ru_pythonjobs",
+        "status": "done",
+        "chat_id": 1049086457,
+        "already": false
+      },
+      {
+        "at": "2026-05-23 14:16:15",
+        "link": "https://t.me/wordpress_jobs",
+        "status": "done",
+        "chat_id": 1259741019,
+        "already": false
+      },
+      {
+        "at": "2026-05-23 14:35:42",
+        "link": "https://t.me/wpcraft",
+        "status": "done",
+        "chat_id": 1438487841,
+        "already": false
+      }
+    ],
+    "last_join_at": "2026-05-23 14:35:42"
+  },
+  "acc3": {
+    "hour_bucket": "2026-05-23T14",
+    "joins_this_hour": 1,
+    "day_bucket": "2026-05-23",
+    "joins_today": 2,
+    "history": [
+      {
+        "at": "2026-05-23 13:02:20",
+        "link": "https://t.me/wpchat",
+        "status": "done",
+        "chat_id": 1112882647,
+        "already": false
+      },
+      {
+        "at": "2026-05-23 14:35:44",
+        "link": "https://t.me/+focfZNw0vucyODcy",
+        "status": "done",
+        "chat_id": 1063542127,
+        "already": false
+      }
+    ],
+    "last_join_at": "2026-05-23 14:35:44"
+  },
+  "acc1": {
+    "hour_bucket": "2026-05-23T14",
+    "joins_this_hour": 2,
+    "day_bucket": "2026-05-23",
+    "joins_today": 3,
+    "history": [
+      {
+        "at": "2026-05-23 13:20:30",
+        "link": "https://t.me/kadrof_work",
+        "status": "done",
+        "chat_id": 1367389085,
+        "already": false
+      },
+      {
+        "at": "2026-05-23 14:15:01",
+        "link": "https://t.me/Frilanser_100",
+        "status": "done",
+        "chat_id": 2101594712,
+        "already": false
+      },
+      {
+        "at": "2026-05-23 14:16:01",
+        "link": "https://t.me/distantsiya",
+        "status": "done",
+        "chat_id": 1000735083,
+        "already": false
+      }
+    ],
+    "last_join_at": "2026-05-23 14:16:01"
+  }
+}

@@ -1,0 +1,8 @@
+# MVP: ссылки для scripts/tg_join.py (по одной на строку)
+# Источник: docs/ops/TG_CHANNELS_BASE.md
+
+https://t.me/ipomogator
+https://t.me/frilanc
+https://t.me/workk_on
+https://t.me/tgjob
+https://t.me/task_1C
