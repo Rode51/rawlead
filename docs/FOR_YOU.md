@@ -9,7 +9,7 @@
 | **3 номера + .env** | [`ops/TELEGRAM_ACCOUNTS.md`](ops/TELEGRAM_ACCOUNTS.md) |
 | **Безопасность (без кода)** | [`team/SECURITY.md`](team/SECURITY.md) |
 | **Бэкапы** | [`ops/BACKUP.md`](ops/BACKUP.md) · `scripts\backup.bat` |
-| **Git (ветки, откат кода)** | [`ops/GIT.md`](ops/GIT.md) — репо пока не включён |
+| **Git / GitHub** | [`ops/GIT.md`](ops/GIT.md) — локально ✅ · **push:** создать repo + `gh auth login` + `git push` |
 | **Роли для нового проекта** | [`../templates/cursor-universal/`](../templates/cursor-universal/) · `C:\Users\hramo\Templates\cursor-universal` |
 | **Как вести большой проект** | [`team/SCALE.md`](team/SCALE.md) |
 

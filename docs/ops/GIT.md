@@ -1,65 +1,84 @@
-# Git — версии и откат (как на GitHub)
+# Git — версии и GitHub
 
-**Зачем:** точки «вернуться сюда», ветки под задачи (пульт, WP), история **без** секретов в облаке.
+**Репозиторий локально:** `git init` ✅ · ветка `main` · remote: `https://github.com/hramo/uisness.git`
 
-**Сейчас:** папка `uisness` **не** была git-репозиторием — откаты через [`BACKUP.md`](BACKUP.md). Git удобнее для кода; бэкап `.env`/сессий — **по-прежнему** нужен.
-
----
-
-## Что не коммитить
-
-Уже в `.gitignore`: `.env`, `*.session`, `.venv`, `data/*.log`, listen-файлы, `backup.config.json`.
-
-**Никогда:** токены, пароли, сессии Telethon.
+**Осталось один раз:** войти в GitHub и **создать пустой репозиторий** + `git push`.
 
 ---
 
-## Один раз (владелец или Coder)
+## 1. Создай репозиторий на GitHub
+
+1. [github.com/new](https://github.com/new)
+2. Имя: **`uisness`**
+3. **Private**
+4. **Без** README / .gitignore / license (у нас уже есть)
+5. Create repository
+
+Если логин **не** `hramo` — после создания:
 
 ```powershell
 cd C:\Users\hramo\uisness
-git init
-git add .
-git status   # убедись: нет .env и .session
-git commit -m "initial: radar MVP + TG multi-session"
+git remote set-url origin https://github.com/ТВОЙ_ЛОГИН/uisness.git
 ```
 
-**GitHub (приватный репо):**
+---
+
+## 2. Вход (один раз)
+
+В PowerShell:
 
 ```powershell
-git remote add origin https://github.com/ТЫ/uisness.git
-git branch -M main
+gh auth login
+```
+
+Выбери: GitHub.com → HTTPS → Login with a web browser → скопируй код.
+
+Без `gh` — при `git push` откроется окно входа Git Credential Manager.
+
+---
+
+## 3. Отправить код
+
+```powershell
+cd C:\Users\hramo\uisness
 git push -u origin main
 ```
 
----
-
-## Обычный цикл (как на GitHub)
-
-| Шаг | Команда / действие |
-|-----|-------------------|
-| Перед большой задачей | `git checkout -b feature/desktop-pult` |
-| Coder сдал | `git add` нужные файлы → `git commit -m "feat: desktop control panel"` |
-| Всё ок | `git checkout main` → `git merge feature/desktop-pult` |
-| Откат | `git checkout main` → `git log` → `git checkout <хеш>` или `git revert` |
-
-**Правило:** одна задача из [`CODER_PROMPT.md`](../team/CODER_PROMPT.md) ≈ одна ветка ≈ один merge в `main`.
+Проверка: в браузере `https://github.com/hramo/uisness` — файлы `src/`, `docs/`.
 
 ---
 
-## И бэкап
+## Что не попадает в Git
 
-| Git | `backup.bat` |
-|-----|----------------|
-| Код, docs | `.env`, сессии, SQLite с данными |
-| GitHub = копия кода | Диск `D:\Backups\uisness` = полный снимок ПК |
+`.gitignore`: `.env`, `*.session`, `.venv`, `data/*.db`, `data/*.log`, listen-файлы, `backup.config.json`.
 
----
-
-## Cursor
-
-Перед «большим» рефакторингом: **commit** или ветка. Подробнее: [`../team/CURSOR_DEEP_RESEARCH_2026.md`](../team/CURSOR_DEEP_RESEARCH_2026.md) § Git.
+**Бэкап** секретов: [`BACKUP.md`](BACKUP.md) — по-прежнему нужен.
 
 ---
 
-_Lead. После `git init` — строка в [`../KAK_ETO_RABOTAET.md`](../KAK_ETO_RABOTAET.md)._
+## Обычный цикл
+
+```powershell
+git checkout -b feature/имя-задачи
+# … Coder сдал …
+git add .
+git commit -m "feat: кратко что сделано"
+git checkout main
+git merge feature/имя-задачи
+git push
+```
+
+Одна задача из [`CODER_PROMPT.md`](../team/CODER_PROMPT.md) ≈ одна ветка.
+
+---
+
+## Уже сделано локально
+
+| Коммит | Содержание |
+|--------|------------|
+| `42770ff` | initial: radar MVP + TG multi-session |
+| `2b2ad9f` | gitignore runtime data, GIT docs |
+
+---
+
+_Если `Repository not found` — репозиторий ещё не создан на GitHub или неверный логин в `remote`._

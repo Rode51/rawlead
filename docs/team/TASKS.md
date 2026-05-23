@@ -10,7 +10,7 @@
 
 ## Владелец
 
-- [ ] **Git (по желанию):** [`ops/GIT.md`](../ops/GIT.md) — `git init` + приватный GitHub
+- [ ] **GitHub:** [`ops/GIT.md`](../ops/GIT.md) — создать repo `uisness` + `gh auth login` + `git push`
 - [ ] После Coder: `python scripts/radar_desktop.py` → Старт → без 3 cmd
 - [ ] Тест acc2 (JS Jobs) — если ещё не делал
 - [ ] `scripts\backup.bat` перед пультом
