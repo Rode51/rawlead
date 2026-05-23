@@ -4,6 +4,21 @@
 
 ---
 
+## 2026-05-23 — Владелец: пульт v2 принят
+
+- Приёмка: play/stop, —/✕, логи, вкладка «Статус», `start-radar-desktop.vbs`
+- [`STATUS.md`](../STATUS.md) · [`TASKS.md`](../TASKS.md)
+
+---
+
+## 2026-05-23 — Coder: пульт regression (кнопки, window perms)
+
+- `capabilities/default.json` — minimize/close/set-size/dragging
+- `main.ts` — plugin-http, status-banner, blockDragOnClick
+- Тикет: `problems/2026-05-23-pult-buttons-regression.md`
+
+---
+
 ## 2026-05-23 — Coder: пульт v2 Tauri (принято Lead)
 
 - `scripts/radar_control.py`, `desktop/` (Tauri 2 + CSS v2), `start-radar-desktop.bat`

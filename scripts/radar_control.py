@@ -91,12 +91,16 @@ def _hidden_popen(args: list[str], cwd: Path) -> subprocess.Popen:
 
 def stop_radar_processes() -> None:
     if sys.platform == "win32":
-        subprocess.run(
-            ["powershell", "-NoProfile", "-Command", _STOP_PS],
-            cwd=str(_ROOT),
-            creationflags=CREATE_NO_WINDOW,
-            check=False,
-        )
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command", _STOP_PS],
+                cwd=str(_ROOT),
+                creationflags=CREATE_NO_WINDOW,
+                check=False,
+                timeout=12,
+            )
+        except subprocess.TimeoutExpired:
+            pass
     try:
         from health_check import try_release_stale_tg_main_lock
 
@@ -157,13 +161,17 @@ class RadarController:
             "Get-CimInstance Win32_Process -Filter \"name='python.exe'\" | "
             "ForEach-Object { $_.CommandLine }"
         )
-        r = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", ps],
-            cwd=str(_ROOT),
-            capture_output=True,
-            text=True,
-            creationflags=CREATE_NO_WINDOW,
-        )
+        try:
+            r = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", ps],
+                cwd=str(_ROOT),
+                capture_output=True,
+                text=True,
+                creationflags=CREATE_NO_WINDOW,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            return set()
         cmdlines = r.stdout or ""
         return {n for n in needles if n in cmdlines}
 
@@ -175,8 +183,8 @@ class RadarController:
         needle = str(spec.script_path()).replace("/", "\\")
         return needle in running
 
-    def workers_running(self) -> bool:
-        return any(self._is_alive(s) for s in self.children)
+    def workers_running(self, running: set[str] | None = None) -> bool:
+        return any(self._is_alive(s, running) for s in self.children)
 
     def set_ui_expanded(self, expanded: bool) -> None:
         with self._lock:
@@ -196,7 +204,8 @@ class RadarController:
             self._ever_started = True
             errors: list[str] = []
             try:
-                self.stop(silent=True)
+                # Без PowerShell-sweep — иначе /start висит 30+ с
+                self._stop_unlocked(sweep_orphans=False)
                 for spec in self.children:
                     script = spec.script_path()
                     if not script.is_file():
@@ -215,24 +224,28 @@ class RadarController:
             finally:
                 self._starting = False
 
+    def _stop_unlocked(self, *, sweep_orphans: bool = True) -> dict:
+        """Остановка без захвата lock (вызывать только из start/stop под lock)."""
+        for spec in self.children:
+            if spec.popen is not None and spec.popen.poll() is None:
+                try:
+                    spec.popen.terminate()
+                except OSError:
+                    pass
+            spec.popen = None
+        if sweep_orphans:
+            stop_radar_processes()
+        self._ui_expanded = False
+        return {"ok": True}
+
     def stop(self, silent: bool = False) -> dict:
         with self._lock:
-            for spec in self.children:
-                if spec.popen is not None and spec.popen.poll() is None:
-                    try:
-                        spec.popen.terminate()
-                    except OSError:
-                        pass
-                spec.popen = None
-            stop_radar_processes()
-            self._ui_expanded = False
-            return {"ok": True}
+            return self._stop_unlocked(sweep_orphans=True)
 
-    def lamp_state(self, spec: ChildSpec, running: set[str]) -> str:
+    def lamp_state(self, spec: ChildSpec, running: set[str], workers_active: bool) -> str:
         if self._is_alive(spec, running):
             return "ok"
-        session_active = self._ui_expanded or self.workers_running()
-        if self._ever_started and session_active:
+        if self._ever_started and (self._ui_expanded or workers_active):
             return "error"
         return "idle"
 
@@ -242,12 +255,12 @@ class RadarController:
             for spec in self.children:
                 if spec.popen is not None and spec.popen.poll() is not None:
                     spec.popen = None
-            workers = self.workers_running()
+            workers = self.workers_running(running)
             if self._ui_expanded and not workers:
                 self._ui_expanded = False
             lamps = []
             for spec in self.children:
-                state = self.lamp_state(spec, running)
+                state = self.lamp_state(spec, running, workers)
                 lamps.append(
                     {
                         "key": spec.key,

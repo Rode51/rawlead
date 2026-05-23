@@ -59,11 +59,11 @@
 
 ## Твои шаги сейчас
 
-**Пульт v2 готов** — двойной клик [`scripts\start-radar-desktop.bat`](scripts/start-radar-desktop.bat) (Rust ✅). Чеклист: [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md).
+1. **WP §3** — 5 страниц [`ops/wp-skeleton/`](ops/wp-skeleton/)
+2. **`backup.bat`**
+3. **2–4 недели** — пользоваться радаром; записывать: лидов в день, сколько откликнул, сэкономил ли время
 
-**WP локально:** шаг 2 ✅ → **шаг 3** — 5 страниц [`ops/wp-skeleton/`](ops/wp-skeleton/).
-
-Также: перезапуск TG (пересылка постов) · `backup.bat`
+Пульт v2 ✅
 
 ---
 

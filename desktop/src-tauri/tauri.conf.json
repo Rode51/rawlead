@@ -13,18 +13,23 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "FL Radar — пульт",
         "width": 400,
         "height": 560,
         "minWidth": 400,
         "maxWidth": 400,
-        "resizable": true,
-        "decorations": true,
+        "minHeight": 560,
+        "maxHeight": 760,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
         "center": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:18765 http://localhost:18765 ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost blob: data:"
     }
   },
   "bundle": {

@@ -6,7 +6,8 @@
 
 | Способ | Команда / файл |
 |--------|----------------|
-| Двойной клик | **`scripts\start-radar-desktop.bat`** |
+| Двойной клик (без консоли) | **`scripts\start-radar-desktop.vbs`** |
+| Двойной клик (с консолью в dev) | **`scripts\start-radar-desktop.bat`** |
 | API вручную | `.venv\Scripts\python.exe scripts\radar_control.py` |
 | UI dev (после Rust) | `cd desktop` → `npm run tauri dev` |
 | UI в браузере (отладка) | API + `cd desktop` → `npm run dev` → http://localhost:1420 |
@@ -31,6 +32,31 @@ npm run tauri build
 ```
 
 Exe: `desktop\src-tauri\target\release\` (имя по `productName` в `tauri.conf.json`).
+
+### Ярлык на рабочий стол
+
+**Без чёрного PowerShell:**
+
+1. Готовый файл: **`scripts\start-radar-desktop.vbs`**
+2. ПКМ по **`.vbs`** → **Отправить** → **Рабочий стол (создать ярлык)**
+
+Окно cmd **не** мелькает (режим 0). Пульт **без** стандартной полосы Windows (`decorations: false`); свернуть/закрыть — кнопки в UI справа сверху.
+
+**Через bat (будет консоль в dev-режиме):**
+
+1. Проводник → `uisness\scripts\`
+2. ПКМ по **`start-radar-desktop.bat`** → **Отправить** → **Рабочий стол (создать ярлык)**
+3. ПКМ по ярлыку → **Свойства** → **Рабочая папка:** `C:\Users\…\uisness` (корень проекта)
+4. По желанию: **Сменить значок** → любой `.ico`
+
+**После сборки exe** (удобнее, без окна npm):
+
+1. `cd desktop` → `npm run tauri build`
+2. Exe: `desktop\src-tauri\target\release\fl-radar.exe` (или `desktop.exe`)
+3. ПКМ по exe → **Отправить** → **Рабочий стол**
+4. В свойствах ярлыка **Объект:** полный путь к exe; **Рабочая папка:** `…\uisness` (чтобы находил `.venv` и `data\`)
+
+Пульт **сам** поднимает `radar_control.py` только из bat. Ярлык **только на exe** — сначала один раз запусти bat или добавь в Coder задачу «exe + sidecar API».
 
 ### Legacy PyQt6
 
@@ -106,3 +132,42 @@ SELECT source, COUNT(*) FROM leads GROUP BY source ORDER BY source;
 | `scripts\start-radar-desktop.bat` | пульт v2 (Tauri + API) |
 | `scripts\radar_control.py` | HTTP API пульта |
 | `scripts\radar_desktop.py` | legacy PyQt6 |
+
+---
+
+## Проблемы
+
+| Симптом | Причина | Решение |
+|---------|---------|---------|
+| `cargo metadata` · **program not found** | Rust не установлен или **нет в PATH** | См. ниже § Rust |
+| API не отвечает | `radar_control` не запущен | `.venv\Scripts\python.exe scripts\radar_control.py` |
+| Второй пульт | lock | Закрыть старый, `scripts\stop-radar.bat` |
+
+### Rust (обязательно для Tauri)
+
+1. Скачай **rustup**: https://www.rust-lang.org/tools/install → `rustup-init.exe`
+2. В установщике: **1) Proceed with installation (default)**
+3. **Закрой все cmd/PowerShell** и Cursor-терминал → открой заново
+4. Проверка:
+   ```powershell
+   cargo --version
+   rustc --version
+   ```
+   Должны показать версии, не «не найдено».
+5. Если всё ещё нет — в PowerShell:
+   ```powershell
+   [Environment]::SetEnvironmentVariable("Path", $env:Path + ";$env:USERPROFILE\.cargo\bin", "User")
+   ```
+   Перезапусти терминал.
+6. Снова: `scripts\start-radar-desktop.bat`
+
+**Пока Rust чинишь (временно):**
+
+- Только API + UI в браузере:
+  ```bat
+  .venv\Scripts\pythonw.exe scripts\radar_control.py
+  cd desktop
+  npm run dev
+  ```
+  Открыть http://localhost:1420
+- Или legacy: `.venv\Scripts\python.exe scripts\radar_desktop.py`

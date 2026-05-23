@@ -1,7 +1,7 @@
 :root {
   --color-bg-app: #0c0e13;
   --color-bg-surface: #141820;
-  --color-bg-log: #090b10;
+  --color-bg-log: #0c0e13;
   --color-border: #2a3140;
   --color-border-soft: #1f2430;
   --color-text: #eceef4;
@@ -25,9 +25,16 @@
   --icon-play: 128px;
   --icon-stop: 96px;
   --window-width: 400px;
-  --radius-window: 16px;
+  --radius-window: 32px;
   --radius-pill: 9999px;
+  --bg-night: linear-gradient(
+    165deg,
+    #0a0e1a 0%,
+    #141e36 38%,
+    #0f1830 68%,
+    #060810 100%
+  );
   --log-panel-height: 168px;
   --height-compact: 560px;
-  --height-expanded: 728px;
+  --height-expanded: 760px;
 }

@@ -10,5 +10,6 @@ alwaysApply: true
 - **Не утверждай факты** без файла в repo (STATUS, CSV, код) — иначе галлюцинация
 - **Один источник правды** — `docs/team/LEAD.md` § таблица
 - Промпт для роли: **либо** в `docs/` + ссылка, **либо** в чат — не оба
-- Роли Cursor: `@lead-architect` · `@coder` · `@mechanic` · `@owner` — правила в `.cursor/rules/`
+- Роли Cursor: `@lead-architect` · `@designer` · `@coder` · `@mechanic` · `@owner` — `.cursor/rules/`
+- **Lead = 0 кода** (только `docs/`); код — `@coder` / `@mechanic` (см. `lead-no-code.mdc`)
 - Coder: **новый чат на задачу**; цикл — `docs/team/SCALE.md`

@@ -4,12 +4,13 @@ call "%~dp0_radar-env.bat"
 if errorlevel 1 pause & exit /b 1
 cd /d "%RADAR_ROOT%"
 
-REM Python API (один экземпляр — lock в data\.radar_desktop.lock)
-powershell -NoProfile -Command "try { (Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:18765/health' -TimeoutSec 1).StatusCode } catch { exit 1 }" >nul 2>&1
-if errorlevel 1 (
-  start "" /B "%RADAR_ROOT%\.venv\Scripts\pythonw.exe" "%RADAR_ROOT%\scripts\radar_control.py"
-  timeout /t 1 /nobreak >nul
+REM Python API — убить зависший слушатель :18765, поднять заново
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr "127.0.0.1:18765" ^| findstr LISTENING') do (
+  taskkill /F /PID %%P >nul 2>&1
 )
+timeout /t 1 /nobreak >nul
+start "" /B "%RADAR_ROOT%\.venv\Scripts\pythonw.exe" "%RADAR_ROOT%\scripts\radar_control.py"
+timeout /t 2 /nobreak >nul
 
 cd /d "%RADAR_ROOT%\desktop"
 if not exist "node_modules\" (

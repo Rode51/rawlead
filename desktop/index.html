@@ -11,11 +11,30 @@
   <body>
     <div id="app" class="app">
       <header class="app__header">
-        <h1 class="app__title">FL RADAR</h1>
-        <button type="button" class="btn-refresh" id="btn-refresh">
-          Обновить статус
-        </button>
+        <h1 class="app__title" data-tauri-drag-region>FL RADAR</h1>
+        <div class="window-controls" aria-label="Окно">
+          <button
+            type="button"
+            class="win-btn"
+            id="btn-minimize"
+            aria-label="Свернуть"
+            title="Свернуть"
+          >
+            —
+          </button>
+          <button
+            type="button"
+            class="win-btn win-btn--close"
+            id="btn-close"
+            aria-label="Закрыть"
+            title="Закрыть"
+          >
+            ✕
+          </button>
+        </div>
       </header>
+
+      <div id="status-banner" class="status-banner" hidden role="alert"></div>
 
       <main class="app__main">
         <div class="hero-wrap">
@@ -40,7 +59,7 @@
               height="96"
               viewBox="0 0 24 24"
               aria-hidden="true"
-              hidden
+              hidden=""
             >
               <rect
                 x="7"
@@ -55,59 +74,55 @@
         </div>
 
         <div class="lamps" id="lamps" aria-live="polite"></div>
+      </main>
 
-        <section class="log-panel" id="log-panel" hidden>
-          <div class="log-panel__head">
+      <section class="log-panel" id="log-panel" hidden>
+        <div class="log-panel__head">
+          <button
+            type="button"
+            class="btn-collapse"
+            id="btn-collapse"
+            aria-label="Свернуть логи"
+            title="Свернуть логи"
+          >
+            <svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true">
+              <path id="collapse-path" d="M2 7 L5 3 L8 7 Z" fill="#ffffff" />
+            </svg>
+          </button>
+        </div>
+        <div class="log-panel__body" id="log-body">
+          <div class="log-tabs" role="tablist">
             <button
               type="button"
-              class="btn-collapse"
-              id="btn-collapse"
-              aria-label="Свернуть логи"
-              title="Свернуть логи"
+              class="log-tab log-tab--active"
+              data-tab="radar.log"
+              role="tab"
+              aria-selected="true"
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                <path
-                  id="collapse-path"
-                  d="M2 3 L5 7 L8 3 Z"
-                  fill="#ffffff"
-                />
-              </svg>
+              radar.log
+            </button>
+            <button
+              type="button"
+              class="log-tab"
+              data-tab="tg_join.log"
+              role="tab"
+              aria-selected="false"
+            >
+              tg_join.log
+            </button>
+            <button
+              type="button"
+              class="log-tab"
+              data-tab="status"
+              role="tab"
+              aria-selected="false"
+            >
+              Статус
             </button>
           </div>
-          <div class="log-panel__body" id="log-body">
-            <div class="log-tabs" role="tablist">
-              <button
-                type="button"
-                class="log-tab log-tab--active"
-                data-tab="radar.log"
-                role="tab"
-                aria-selected="true"
-              >
-                radar.log
-              </button>
-              <button
-                type="button"
-                class="log-tab"
-                data-tab="tg_join.log"
-                role="tab"
-                aria-selected="false"
-              >
-                tg_join.log
-              </button>
-              <button
-                type="button"
-                class="log-tab"
-                data-tab="status"
-                role="tab"
-                aria-selected="false"
-              >
-                Статус
-              </button>
-            </div>
-            <pre class="log-view" id="log-view" role="log"></pre>
-          </div>
-        </section>
-      </main>
+          <pre class="log-view" id="log-view" role="log"></pre>
+        </div>
+      </section>
 
       <footer class="app__footer">
         <p class="signature">by Rode51</p>

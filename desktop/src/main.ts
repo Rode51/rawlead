@@ -6,7 +6,7 @@ const POLL_STATUS_MS = 2500;
 const POLL_LOGS_MS = 1500;
 const WIDTH = 400;
 const HEIGHT_COMPACT = 560;
-const HEIGHT_EXPANDED = 728;
+const HEIGHT_EXPANDED = 760;
 
 type LampState = "idle" | "ok" | "error";
 
@@ -33,17 +33,89 @@ const logPanel = document.getElementById("log-panel")!;
 const logView = document.getElementById("log-view")!;
 const btnCollapse = document.getElementById("btn-collapse")!;
 const collapsePath = document.getElementById("collapse-path")!;
-const btnRefresh = document.getElementById("btn-refresh")!;
+const btnMinimize = document.getElementById("btn-minimize");
+const btnClose = document.getElementById("btn-close");
+const statusBanner = document.getElementById("status-banner");
 const tabButtons = document.querySelectorAll<HTMLButtonElement>(".log-tab");
 
+let httpFetch: typeof fetch = globalThis.fetch.bind(globalThis);
 let running = false;
+let heroBusy = false;
+let starting = false;
+let pollPaused = false;
 let logsOpen = false;
 let logsCollapsed = false;
 let activeTab = "radar.log";
 let logPollTimer: ReturnType<typeof setInterval> | null = null;
+let statusPollTimer: ReturnType<typeof setInterval> | null = null;
+/** Автоскролл вниз только пока пользователь не прокрутил вверх */
+let logFollowBottom = true;
+
+const LOG_SCROLL_BOTTOM_THRESHOLD = 32;
 
 function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
+}
+
+function isCanceledError(err: unknown): boolean {
+  const msg = String(err).toLowerCase();
+  return msg.includes("cancel") || msg.includes("aborted");
+}
+
+function showStatus(message: string, tone: "error" | "warn" | "ok" = "warn"): void {
+  if (!statusBanner) return;
+  statusBanner.textContent = message;
+  statusBanner.hidden = false;
+  statusBanner.classList.remove(
+    "status-banner--error",
+    "status-banner--warn",
+    "status-banner--ok",
+  );
+  statusBanner.classList.add(`status-banner--${tone}`);
+}
+
+function clearStatus(): void {
+  if (!statusBanner) return;
+  statusBanner.hidden = true;
+  statusBanner.textContent = "";
+}
+
+function blockDragOnClick(el: HTMLElement | null): void {
+  if (!el) return;
+  el.addEventListener("mousedown", (e) => e.stopPropagation());
+}
+
+async function initHttpFetch(): Promise<void> {
+  if (!isTauri()) return;
+  const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
+  httpFetch = tauriFetch as typeof fetch;
+}
+
+async function setupWindowChrome(): Promise<void> {
+  if (!isTauri()) return;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const win = getCurrentWindow();
+    try {
+      await win.setShadow(false);
+    } catch {
+      /* config shadow:false is primary */
+    }
+    btnMinimize?.addEventListener("click", (e) => {
+      e.preventDefault();
+      void win.minimize().catch((err) =>
+        showStatus(`Свернуть: ${err}`, "error"),
+      );
+    });
+    btnClose?.addEventListener("click", (e) => {
+      e.preventDefault();
+      void win.close().catch((err) => showStatus(`Закрыть: ${err}`, "error"));
+    });
+    blockDragOnClick(btnMinimize);
+    blockDragOnClick(btnClose);
+  } catch (err) {
+    showStatus(`Окно Tauri: ${err}`, "error");
+  }
 }
 
 async function resizeWindow(expanded: boolean): Promise<void> {
@@ -55,15 +127,25 @@ async function resizeWindow(expanded: boolean): Promise<void> {
     const h = expanded ? HEIGHT_EXPANDED : HEIGHT_COMPACT;
     await win.setSize(new LogicalSize(WIDTH, h));
   } catch {
-    /* preview in browser */
+    /* browser preview */
   }
 }
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, init);
+function formatApiError(status: number, text: string): string {
+  try {
+    const data = JSON.parse(text) as { errors?: string[]; error?: string };
+    if (data.errors?.length) return data.errors.join("\n");
+    if (data.error) return data.error;
+  } catch {
+    /* plain text */
+  }
+  return text || `HTTP ${status}`;
+}
+
+async function parseResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || res.statusText);
+    throw new Error(formatApiError(res.status, text));
   }
   const ct = res.headers.get("content-type") ?? "";
   if (ct.includes("application/json")) {
@@ -72,12 +154,67 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return res.text() as Promise<T>;
 }
 
+/** GET без AbortSignal — иначе Tauri даёт «Request canceled» при параллельных запросах */
+async function apiGet<T>(path: string): Promise<T> {
+  const res = await httpFetch(`${API_BASE}${path}`);
+  return parseResponse<T>(res);
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`Таймаут ${Math.round(ms / 1000)}с — ${label}`)),
+        ms,
+      );
+    }),
+  ]);
+}
+
+async function apiPost<T>(path: string, body: string, timeoutMs: number): Promise<T> {
+  const promise = httpFetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+  }).then((res) => parseResponse<T>(res));
+  return withTimeout(promise, timeoutMs, path);
+}
+
+function pauseStatusPoll(): void {
+  pollPaused = true;
+  if (statusPollTimer !== null) {
+    clearInterval(statusPollTimer);
+    statusPollTimer = null;
+  }
+}
+
+function resumeStatusPoll(): void {
+  pollPaused = false;
+  if (statusPollTimer !== null) return;
+  statusPollTimer = setInterval(() => void pollStatus(), POLL_STATUS_MS);
+}
+
 function setHeroMode(mode: "play" | "stop"): void {
   heroBtn.classList.toggle("hero--play", mode === "play");
   heroBtn.classList.toggle("hero--stop", mode === "stop");
+  heroBtn.dataset.mode = mode;
   heroBtn.setAttribute("aria-label", mode === "play" ? "Запуск" : "Остановить");
+  heroBtn.title = mode === "play" ? "Запуск" : "Остановить";
   playIcon.toggleAttribute("hidden", mode !== "play");
   stopIcon.toggleAttribute("hidden", mode !== "stop");
+}
+
+function setHeroBusy(busy: boolean): void {
+  heroBusy = busy;
+  heroBtn.disabled = busy;
+  heroBtn.classList.toggle("hero--busy", busy);
+  heroBtn.setAttribute("aria-busy", busy ? "true" : "false");
+}
+
+function lampCaptionText(caption: string): string {
+  if (caption === "работает") return "";
+  return caption;
 }
 
 function renderLamps(lamps: LampInfo[]): void {
@@ -87,21 +224,42 @@ function renderLamps(lamps: LampInfo[]): void {
     <div class="lamp" data-key="${l.key}">
       <span class="lamp__dot lamp__dot--${l.state}"></span>
       <span class="lamp__label">${l.label}</span>
-      <span class="lamp__caption">${l.caption || ""}</span>
+      <span class="lamp__caption">${lampCaptionText(l.caption)}</span>
     </div>`,
     )
     .join("");
 }
 
-function setLogsVisible(visible: boolean): void {
+function isLogNearBottom(): boolean {
+  const gap = logView.scrollHeight - logView.scrollTop - logView.clientHeight;
+  return gap <= LOG_SCROLL_BOTTOM_THRESHOLD;
+}
+
+function scrollLogToBottom(force = false): void {
+  if (!force && !logFollowBottom) return;
+  if (force) logFollowBottom = true;
+  requestAnimationFrame(() => {
+    logView.scrollTop = logView.scrollHeight;
+    requestAnimationFrame(() => {
+      logView.scrollTop = logView.scrollHeight;
+    });
+  });
+}
+
+async function setLogsVisible(visible: boolean): Promise<void> {
   logsOpen = visible;
   logPanel.hidden = !visible;
-  appEl.classList.toggle("app--logs-open", visible && !logsCollapsed);
   if (visible) {
-    void resizeWindow(true);
-    startLogPoll();
+    logPanel.removeAttribute("hidden");
   } else {
-    void resizeWindow(false);
+    logPanel.setAttribute("hidden", "");
+  }
+  appEl.classList.toggle("app--logs-open", visible && !logsCollapsed);
+  await resizeWindow(visible && !logsCollapsed);
+  if (visible && !logsCollapsed) {
+    startLogPoll();
+    scrollLogToBottom(true);
+  } else {
     stopLogPoll();
   }
 }
@@ -111,13 +269,20 @@ function setLogsCollapsed(collapsed: boolean): void {
   logPanel.classList.toggle("log-panel--collapsed", collapsed);
   collapsePath.setAttribute(
     "d",
-    collapsed ? "M3 2 L7 5 L3 8 Z" : "M2 3 L5 7 L8 3 Z",
+    collapsed ? "M2 3 L5 7 L8 3 Z" : "M2 7 L5 3 L8 7 Z",
   );
   btnCollapse.setAttribute(
     "aria-label",
     collapsed ? "Развернуть логи" : "Свернуть логи",
   );
   appEl.classList.toggle("app--logs-open", logsOpen && !collapsed);
+  void resizeWindow(logsOpen && !logsCollapsed);
+  if (!collapsed && logsOpen) {
+    startLogPoll();
+    scrollLogToBottom(true);
+  } else {
+    stopLogPoll();
+  }
 }
 
 function stopLogPoll(): void {
@@ -134,82 +299,145 @@ function startLogPoll(): void {
   logPollTimer = setInterval(() => void refreshActiveLog(), POLL_LOGS_MS);
 }
 
+const MAX_LOG_CHARS = 100_000;
+
+function trimLogText(text: string): string {
+  if (text.length <= MAX_LOG_CHARS) return text;
+  return `… (последние ${MAX_LOG_CHARS} символов)\n${text.slice(-MAX_LOG_CHARS)}`;
+}
+
 async function refreshActiveLog(): Promise<void> {
-  if (!logsOpen || logsCollapsed) return;
+  if (!logsOpen || logsCollapsed || pollPaused) return;
+  const follow = logFollowBottom;
+  const savedScrollTop = logView.scrollTop;
   try {
     if (activeTab === "status") {
-      const text = await api<string>("/status-text");
+      const text = trimLogText(await apiGet<string>("/status-text"));
       logView.textContent = text;
       logView.classList.add("log-view--status");
     } else {
-      const text = await api<string>(`/logs/${activeTab}`);
+      const text = trimLogText(await apiGet<string>(`/logs/${activeTab}`));
       logView.textContent = text;
       logView.classList.remove("log-view--status");
-      const atBottom =
-        logView.scrollHeight - logView.scrollTop - logView.clientHeight < 24;
-      if (atBottom) {
-        logView.scrollTop = logView.scrollHeight;
-      }
+    }
+    if (follow) {
+      scrollLogToBottom();
+    } else {
+      requestAnimationFrame(() => {
+        const maxTop = Math.max(0, logView.scrollHeight - logView.clientHeight);
+        logView.scrollTop = Math.min(savedScrollTop, maxTop);
+      });
     }
   } catch (err) {
+    if (isCanceledError(err)) return;
     logView.textContent = `Ошибка API: ${err}\n\nЗапущен ли scripts\\radar_control.py ?`;
+    if (follow) {
+      scrollLogToBottom();
+    } else {
+      requestAnimationFrame(() => {
+        const maxTop = Math.max(0, logView.scrollHeight - logView.clientHeight);
+        logView.scrollTop = Math.min(savedScrollTop, maxTop);
+      });
+    }
   }
 }
 
 async function pollStatus(): Promise<void> {
+  if (pollPaused || heroBusy || starting) return;
   try {
-    const data = await api<StatusPayload>("/status");
+    const data = await apiGet<StatusPayload>("/status");
     running = data.running;
     renderLamps(data.lamps);
     setHeroMode(running ? "stop" : "play");
     if (running && !logsOpen) {
-      setLogsVisible(true);
+      void setLogsVisible(true);
       setLogsCollapsed(false);
     }
-    if (!running && logsOpen) {
-      setLogsVisible(false);
+    if (!running && logsOpen && !starting && !heroBusy) {
+      void setLogsVisible(false);
       setLogsCollapsed(false);
     }
-  } catch {
-    /* API offline — keep UI state */
+    if (logsOpen && !logsCollapsed) {
+      void refreshActiveLog();
+    }
+  } catch (err) {
+    if (isCanceledError(err) || heroBusy || starting) return;
+    showStatus(`API /status: ${err}`, "warn");
+  }
+}
+
+async function runStart(): Promise<void> {
+  pauseStatusPoll();
+  try {
+    const result = await apiPost<{ ok: boolean; errors?: string[] }>(
+      "/start",
+      "{}",
+      120000,
+    );
+    if (!result.ok) {
+      showStatus(result.errors?.join("\n") ?? "Старт не удался", "error");
+      running = false;
+      setHeroMode("play");
+      await setLogsVisible(false);
+      return;
+    }
+    await apiPost(
+      "/ui-expanded",
+      JSON.stringify({ expanded: true }),
+      15000,
+    );
+    clearStatus();
+    startLogPoll();
+    await pollStatus();
+  } catch (err) {
+    if (!isCanceledError(err)) {
+      running = false;
+      setHeroMode("play");
+      showStatus(`Радар: ${err}`, "error");
+      await setLogsVisible(false);
+    }
+  } finally {
+    starting = false;
+    resumeStatusPoll();
   }
 }
 
 async function onHeroClick(): Promise<void> {
-  try {
-    if (running) {
-      await api("/stop", { method: "POST" });
+  if (heroBusy || starting) return;
+
+  if (running) {
+    setHeroBusy(true);
+    pauseStatusPoll();
+    stopLogPoll();
+    try {
+      showStatus("Остановка…", "warn");
+      await apiPost("/stop", "{}", 60000);
       running = false;
       setHeroMode("play");
-      setLogsVisible(false);
-      await api("/ui-expanded", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expanded: false }),
-      });
+      await setLogsVisible(false);
+      await apiPost("/ui-expanded", JSON.stringify({ expanded: false }), 15000);
+      clearStatus();
       await pollStatus();
-    } else {
-      const result = await api<{ ok: boolean; errors?: string[] }>("/start", {
-        method: "POST",
-      });
-      if (!result.ok && result.errors?.length) {
-        alert(result.errors.join("\n"));
+    } catch (err) {
+      if (!isCanceledError(err)) {
+        showStatus(`Стоп: ${err}`, "error");
       }
-      await api("/ui-expanded", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expanded: true }),
-      });
-      running = true;
-      setHeroMode("stop");
-      setLogsVisible(true);
-      setLogsCollapsed(false);
-      await pollStatus();
-      await refreshActiveLog();
+    } finally {
+      setHeroBusy(false);
+      resumeStatusPoll();
     }
-  } catch (err) {
-    alert(`Не удалось связаться с radar_control:\n${err}`);
+    return;
   }
+
+  starting = true;
+  running = true;
+  setHeroMode("stop");
+  setLogsCollapsed(false);
+  await setLogsVisible(true);
+  showStatus("Запуск…", "warn");
+  startLogPoll();
+  void refreshActiveLog();
+  void runStart();
 }
 
 function onTabClick(btn: HTMLButtonElement): void {
@@ -218,6 +446,7 @@ function onTabClick(btn: HTMLButtonElement): void {
     b.setAttribute("aria-selected", b === btn ? "true" : "false");
   });
   activeTab = btn.dataset.tab ?? "radar.log";
+  logFollowBottom = true;
   void refreshActiveLog();
 }
 
@@ -225,7 +454,7 @@ async function waitForApi(maxMs = 8000): Promise<boolean> {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
     try {
-      await api<{ ok: boolean }>("/health");
+      await apiGet<{ ok: boolean }>("/health");
       return true;
     } catch {
       await new Promise((r) => setTimeout(r, 400));
@@ -234,29 +463,13 @@ async function waitForApi(maxMs = 8000): Promise<boolean> {
   return false;
 }
 
-heroBtn.addEventListener("click", () => void onHeroClick());
+heroBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  void onHeroClick();
+});
 
 btnCollapse.addEventListener("click", () => {
   setLogsCollapsed(!logsCollapsed);
-  if (!logsCollapsed) {
-    startLogPoll();
-  } else {
-    stopLogPoll();
-  }
-});
-
-btnRefresh.addEventListener("click", () => {
-  activeTab = "status";
-  tabButtons.forEach((b) => {
-    const isStatus = b.dataset.tab === "status";
-    b.classList.toggle("log-tab--active", isStatus);
-    b.setAttribute("aria-selected", isStatus ? "true" : "false");
-  });
-  if (!logsOpen) {
-    setLogsVisible(true);
-    setLogsCollapsed(false);
-  }
-  void refreshActiveLog();
 });
 
 tabButtons.forEach((btn) => {
@@ -264,6 +477,23 @@ tabButtons.forEach((btn) => {
 });
 
 void (async () => {
+  try {
+    await initHttpFetch();
+  } catch (err) {
+    showStatus(`HTTP plugin: ${err}`, "error");
+  }
+  await setupWindowChrome();
+  blockDragOnClick(heroBtn);
+  blockDragOnClick(btnCollapse);
+  tabButtons.forEach((btn) => blockDragOnClick(btn));
+  logView.addEventListener(
+    "scroll",
+    () => {
+      logFollowBottom = isLogNearBottom();
+    },
+    { passive: true },
+  );
+
   renderLamps([
     { key: "exchanges", label: "Биржи", state: "idle", caption: "" },
     { key: "tg", label: "TG", state: "idle", caption: "" },
@@ -274,12 +504,14 @@ void (async () => {
 
   const ok = await waitForApi();
   if (!ok) {
-    lampsEl.insertAdjacentHTML(
-      "afterend",
-      `<p style="color:var(--color-text-muted);font-size:11px;text-align:center;padding:0 12px 8px">API не отвечает — запустите radar_control</p>`,
+    showStatus(
+      "API не отвечает. Запустите start-radar-desktop.vbs",
+      "error",
     );
+  } else {
+    clearStatus();
   }
 
   await pollStatus();
-  setInterval(() => void pollStatus(), POLL_STATUS_MS);
+  resumeStatusPoll();
 })();
