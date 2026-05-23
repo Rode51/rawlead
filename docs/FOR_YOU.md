@@ -65,7 +65,7 @@
 
 **Радар:** пульт ▶, **VPN на ПК выключен** (иначе бот/TG молчат). Проверка: `src/tg_smoke.py`.
 
-**Продукт:** dating × агрегатор — match %, мэтч с заказом → [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md).
+**Продукт v1:** сайт (WP кабинет + подписки) + бот-digest — **без app**. Внутренне «match», наружу «совместимость». [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md) · [`NEON_SCHEMA.md`](team/NEON_SCHEMA.md) · [`TZ_API.md`](team/TZ_API.md).
 
 **WP:** локальный сайт ✅ · [`design/wp/REFERENCE.md`](design/wp/REFERENCE.md) · [`ops/WP_KADENCE_INSTALL.md`](ops/WP_KADENCE_INSTALL.md).
 

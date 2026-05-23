@@ -8,7 +8,7 @@
 
 - **TG unified join** ✅ · **proxy wait-loop** ✅ · **VPN** — выключать при радаре
 - **WP Kadence child** ✅ (владелец + Designer 2026-05-23)
-- **PRODUCT_VISION 0.3** — dating × агрегатор ([`PRODUCT_VISION.md`](PRODUCT_VISION.md))
+- **PRODUCT_VISION 0.4** — SaaS архитектура (Neon, API, rank) — docs 2026-05-23
 - **GitHub** — push 2026-05-23
 - **Волна 3** join — по лимитам
 

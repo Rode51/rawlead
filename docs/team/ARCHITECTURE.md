@@ -2,7 +2,39 @@
 
 Краткая схема для Lead, Coder и владельца. Поведение — **`docs/team/TZ.md`**, TG — **`docs/team/TZ_TG.md`**.
 
-_Актуально: 2026-05-23 (фаза 1 + пульт + multi-session)._
+_Актуально: 2026-05-23 (фаза 1 + пульт + target v1 Neon/API)._
+
+---
+
+## Целевая архитектура v1 (SaaS)
+
+См. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0b · [`NEON_SCHEMA.md`](NEON_SCHEMA.md) · [`TZ_API.md`](TZ_API.md).
+
+```mermaid
+flowchart TB
+  subgraph pc["ПК / VPS"]
+    RADAR["src/main.py + tg_main.py"]
+    API["RawLead API\n(будущий)"]
+  end
+  subgraph neon["Neon Postgres"]
+    RL[("raw_leads\nai_score · lead_tags")]
+    USR[("users · user_tags · subscriptions")]
+  end
+  subgraph front["Front"]
+    WP["WordPress\nмаркетинг + кабинет"]
+    BOT["Telegram bot\ndigest"]
+  end
+
+  RADAR -->|ingest| RL
+  WP -->|REST JWT| API
+  BOT -->|internal| API
+  API --> RL
+  API --> USR
+```
+
+**Rank на чтении:** `final_rank = ai_score×0.6 + keyword_match×0.4` (v0).
+
+**Сейчас в коде:** ingest → SQLite + опционально Neon (`pg_storage.py`); API и multi-user bot — **не реализованы**.
 
 ---
 
@@ -132,9 +164,11 @@ flowchart LR
 
 ## Вне скоупа (пока)
 
-- WordPress пульт — фаза 3, [`TZ_WP.md`](TZ_WP.md)
+- Mobile app (владелец: только сайт + бот)
 - Авто-отклик на FL / спам в ЛС
-- Avito, SaaS-мультитенант
+- Avito
+
+**В работе (docs):** кабинет WP + API + Neon — [`TZ_WP.md`](TZ_WP.md), [`TZ_API.md`](TZ_API.md)
 
 ---
 

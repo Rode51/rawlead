@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-05-23 — Lead: PRODUCT_VISION 0.4 + Neon/API/WP TZ
+
+- Внутренний язык match; наружу «совместимость»
+- Сайт + подписки + бот (без app)
+- [`NEON_SCHEMA.md`](../NEON_SCHEMA.md) · [`TZ_API.md`](../TZ_API.md) · [`TZ_WP.md`](../TZ_WP.md) v0.2
+
+---
+
 ## 2026-05-23 — WP Kadence child + Design REFERENCE E (принято)
 
 - `wordpress/rawlead-kadence-child/` · Manrope + Unbounded · hero / поток / match %

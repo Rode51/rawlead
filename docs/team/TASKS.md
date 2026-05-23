@@ -6,17 +6,21 @@
 
 ## Владелец
 
-- [x] Unified TG join + acc в боте — ✅ (2026-05-23)
-- [ ] Пульт ▶ · волна 3 join (`tg_join.log`) · **VPN выкл** при радаре
-- [x] **WP §3–§5** скелет + Kadence + референс E — ✅ (2026-05-23)
+- [ ] Пульт ▶ · волна 3 join · **VPN выкл** при радаре
+- [x] WP маркетинг (Kadence) — ✅
+- [ ] Neon: проект + `DATABASE_URL` в `.env` (когда Coder возьмёт schema) — [`ops/NEON_CURSOR.md`](../ops/NEON_CURSOR.md)
 
 ---
 
-## Следом (Lead → Coder)
+## Lead → Coder (следом, по приоритету)
 
-- [ ] **Match % в карточке бота** — фаза 2 PRODUCT_VISION
-- [ ] Реорганизация `src/` — [`CODE_STRUCTURE.md`](CODE_STRUCTURE.md)
+1. [ ] **Neon schema v1** — [`NEON_SCHEMA.md`](NEON_SCHEMA.md) · ingest `ai_score` + `lead_tags`
+2. [ ] **RawLead API** — [`TZ_API.md`](TZ_API.md) · `/v1/feed`, rank formula
+3. [ ] **Match % в боте (владелец)** — breakdown в карточке, этап 2 vision
+4. [ ] **WP кабинет** — [`TZ_WP.md`](TZ_WP.md) · теги + лента через API
+5. [ ] **Бот digest multi-user** — подписка + `tg_chat_id`
+6. [ ] Реорганизация `src/` — [`CODE_STRUCTURE.md`](CODE_STRUCTURE.md)
 
 ## Отложено
 
-- Dating app (mobile/web) · SaaS · Kwork пагинация · Avito
+- WooCommerce / оплата · синонимы тегов · Avito

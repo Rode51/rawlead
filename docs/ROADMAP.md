@@ -6,11 +6,13 @@
 | **1** TG-чаты | ✅ | 3 acc · join · пересылка + разбор · пульт v2 ✅ |
 | **1b** Пульт (десктоп) | ✅ | v2 Tauri — [`DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
 | **2** ИИ «первое ЛС» | Потом | |
-| **3** WordPress пульт | После 1b | [`team/TZ_WP.md`](team/TZ_WP.md), [`ops/WP_OWNER_STEPS.md`](ops/WP_OWNER_STEPS.md) |
-| **3b** Сайт (учёба) | ✅ MVP | Kadence child · [`design/wp/REFERENCE.md`](design/wp/REFERENCE.md) |
-| **4** Аналитика / SaaS | Потом | [`team/VISION_SAAS_SITE.md`](team/VISION_SAAS_SITE.md), `TZ.md` §10 |
+| **3** WordPress кабинет | После API | [`team/TZ_WP.md`](team/TZ_WP.md) |
+| **3b** Сайт маркетинг | ✅ MVP | Kadence · [`design/wp/REFERENCE.md`](design/wp/REFERENCE.md) |
+| **3c** Neon + API + rank | → | [`NEON_SCHEMA.md`](team/NEON_SCHEMA.md) · [`TZ_API.md`](team/TZ_API.md) |
+| **4** Подписки + бот SaaS | → | digest per user |
+| **5** Аналитика / SaaS | Потом | [`team/VISION_SAAS_SITE.md`](team/VISION_SAAS_SITE.md) |
 
-Детали фаз 1–4: [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md)
+Детали: [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md) v0.4 — **сайт + подписки + бот**, без mobile app.
 
 ---
 
@@ -40,4 +42,4 @@
 
 | Статус сессий: [`team/STATUS.md`](team/STATUS.md)
 
-**Сейчас:** пульт ✅ · WP локально ✅ · **продукт:** dating × агрегатор — [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md) · волна 3 join.
+**Сейчас:** v1 docs (Neon/API/rank) · волна 3 join · [`PRODUCT_VISION.md`](team/PRODUCT_VISION.md) v0.4.
