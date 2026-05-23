@@ -1,0 +1,173 @@
+<?php
+/**
+ * RawLead Kadence Child — enqueue, patterns, helpers.
+ *
+ * @package RawLead_Kadence_Child
+ */
+
+declare(strict_types=1);
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+define('RAWLEAD_CHILD_VERSION', '1.5.0');
+define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
+define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
+
+require_once RAWLEAD_CHILD_DIR . '/inc/template-tags.php';
+require_once RAWLEAD_CHILD_DIR . '/inc/marketing.php';
+
+/**
+ * Permalink for a skeleton page slug (home, how, pricing, …).
+ */
+function rawlead_page_url(string $slug): string {
+    $page = get_page_by_path($slug, OBJECT, 'page');
+    if ($page instanceof WP_Post) {
+        return (string) get_permalink($page);
+    }
+    return home_url('/' . $slug . '/');
+}
+
+add_action('after_setup_theme', static function (): void {
+    add_theme_support('wp-block-styles');
+    add_theme_support('responsive-embeds');
+});
+
+add_action('wp_enqueue_scripts', static function (): void {
+    wp_enqueue_style(
+        'rawlead-fonts',
+        'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Unbounded:wght@700;800;900&display=swap',
+        [],
+        null
+    );
+
+    wp_enqueue_style(
+        'rawlead-kadence-child',
+        get_stylesheet_uri(),
+        ['rawlead-fonts'],
+        RAWLEAD_CHILD_VERSION
+    );
+
+    wp_enqueue_style(
+        'rawlead-tokens',
+        RAWLEAD_CHILD_URI . '/assets/css/rawlead.css',
+        ['rawlead-kadence-child'],
+        RAWLEAD_CHILD_VERSION
+    );
+
+    if (is_front_page()) {
+        wp_enqueue_script(
+            'lenis',
+            'https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js',
+            [],
+            '1.1.18',
+            true
+        );
+        wp_enqueue_script(
+            'rawlead-scroll',
+            RAWLEAD_CHILD_URI . '/assets/js/rawlead-scroll.js',
+            ['lenis'],
+            RAWLEAD_CHILD_VERSION,
+            true
+        );
+    }
+}, 20);
+
+add_filter('body_class', static function (array $classes): array {
+    $classes[] = 'rawlead-site';
+    if (is_front_page()) {
+        $classes[] = 'rawlead-front';
+    } elseif (rawlead_is_inner_shell_page()) {
+        $classes[] = 'rawlead-inner';
+    }
+    if (is_page()) {
+        $post = get_queried_object();
+        if ($post instanceof WP_Post && $post->post_name !== '') {
+            $classes[] = 'page-' . sanitize_html_class($post->post_name);
+        }
+    }
+    return $classes;
+});
+
+/** Marketing pages: custom header/footer; hide Kadence chrome. */
+add_action('wp_head', static function (): void {
+    if (!rawlead_is_shell_page()) {
+        return;
+    }
+    echo "<style>#masthead,#colophon,.site-footer,.entry-hero{display:none!important}</style>\n";
+}, 99);
+
+add_action('init', static function (): void {
+    register_block_pattern_category('rawlead', [
+        'label' => __('RawLead', 'rawlead-kadence-child'),
+    ]);
+
+    $pattern_files = glob(RAWLEAD_CHILD_DIR . '/patterns/*.php') ?: [];
+    foreach ($pattern_files as $file) {
+        $slug = 'rawlead-kadence-child/' . basename($file, '.php');
+        $content = file_get_contents($file);
+        if ($content === false) {
+            continue;
+        }
+        if (preg_match('/\* Title:\s*(.+)/', $content, $m)) {
+            $title = trim($m[1]);
+        } else {
+            $title = basename($file, '.php');
+        }
+        $markup = preg_replace('/^<\?php.*?\?>\s*/s', '', $content);
+        if (!is_string($markup) || trim($markup) === '') {
+            continue;
+        }
+        register_block_pattern($slug, [
+            'title'       => $title,
+            'categories'  => ['rawlead'],
+            'content'     => trim($markup),
+            'description' => __('RawLead editorial block', 'rawlead-kadence-child'),
+        ]);
+    }
+});
+
+/**
+ * Append CTA on inner pages (plugin HTML has no buttons).
+ */
+add_filter('the_content', static function (string $content): string {
+    if (!is_page() || is_front_page() || !in_the_loop() || !is_main_query()) {
+        return $content;
+    }
+    $post = get_queried_object();
+    if (!$post instanceof WP_Post) {
+        return $content;
+    }
+    $slug = $post->post_name;
+
+    if (rawlead_is_inner_shell_page()) {
+        $content = rawlead_format_inner_content($content, $slug);
+    }
+    $pricing = rawlead_page_url('pricing');
+    $contact = rawlead_page_url('contact');
+    $how = rawlead_page_url('how');
+
+    $cta = match ($slug) {
+        'how' => sprintf(
+            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">Смотреть тарифы</a></p>',
+            esc_url($pricing)
+        ),
+        'pricing' => sprintf(
+            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">Ранний доступ</a></p>',
+            esc_url($contact)
+        ),
+        'faq' => sprintf(
+            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">Контакты</a></p>',
+            esc_url($contact)
+        ),
+        'contact' => sprintf(
+            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="https://t.me/rcnn43" target="_blank" rel="noopener">Telegram @rcnn43</a> '
+            . '<a class="rl-link-arrow" href="%s">Как это работает →</a></p>',
+            esc_url($how)
+        ),
+        default => '',
+    };
+
+    return $content . $cta;
+}, 12);

@@ -99,8 +99,11 @@ def telethon_proxy_tuple(proxy_url: str) -> tuple:
 
 def create_client(account: str | None = None):
     """Клиент Telethon; вызывающий делает connect() / run_until_disconnected()."""
+    from proxy_probe import require_proxy_live
+
     api_id, api_hash = _load_telethon_env()
-    _key, session_path, proxy_url = resolve_telethon_account(account)
+    key, session_path, proxy_url = resolve_telethon_account(account)
+    require_proxy_live(key, proxy_url)
 
     try:
         from telethon import TelegramClient

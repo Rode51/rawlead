@@ -232,7 +232,7 @@ def _format_fail_message(result: TelethonHealthResult) -> str:
     return (
         f"⚠️ Аккаунт {result.account_label} не отвечает\n\n"
         f"Причина: {result.detail}\n\n"
-        "Проверь: прокси TELETHON_PROXY_URL, файл сессии *_telethon, "
+        "Проверь: прокси TELETHON_PROXY_ACC*, TELETHON_PROXY_PROBE, файл сессии, "
         "stop-radar.bat → start-radar.bat."
     )
 

@@ -2,7 +2,7 @@
 
 **Владелец:** Designer · обновляет при каждом утверждённом проекте.
 
-Цель: один язык UI для **FL Radar**, **WordPress-пульт**, будущих SaaS — без пересборки палитры с нуля.
+Цель: один язык UI для **RawLead**, **WordPress-пульт**, будущих SaaS — без пересборки палитры с нуля.
 
 ---
 
@@ -17,7 +17,7 @@
 
 ---
 
-## Токены (FL Radar пульт v2 — 2026-05-23)
+## Токены (RawLead пульт v2 — 2026-05-23)
 
 | Token | HEX | Использование |
 |-------|-----|---------------|
@@ -33,7 +33,7 @@
 | `color/status/success` | `#3dd68c` | лампа **работает** |
 | `color/status/danger` | `#ef6b6b` | лампа **нет** |
 | `color/status/neutral` | `#5c6370` | idle |
-| `font/title` | Bahnschrift SemiBold | FL RADAR |
+| `font/title` | Bahnschrift SemiBold | RAWLEAD |
 | `font/ui` | Segoe UI Variable Text | UI |
 | `font/signature` | Segoe Script | by Rode51 |
 | `hero/size` | 220px | круг play/stop |
@@ -46,10 +46,28 @@
 
 | Компонент | Статусы | Проекты |
 |-----------|---------|---------|
-| Hero play/stop | idle (синий+glow), running (зелёный+glow), pressed | FL Radar пульт v2 |
-| Status lamp | idle, ok, error | FL Radar пульт |
-| Secondary button | default, hover | FL Radar |
-| Log tabs | default, selected | FL Radar |
+| Hero play/stop | idle (синий+glow), running (зелёный+glow), pressed | RawLead пульт v2 |
+| Status lamp | idle, ok, error | RawLead пульт |
+| Secondary button | default, hover | RawLead |
+| Log tabs | default, selected | RawLead |
+
+---
+
+## Токены (WordPress маркетинг v1 — 2026-05-23)
+
+Утверждённый референс: [`../design/wp/REFERENCE.md`](../design/wp/REFERENCE.md) — **editorial light** (не пульт).
+
+| Token | HEX | Использование |
+|-------|-----|---------------|
+| `color/bg/page` | `#FFFFFF` | фон сайта |
+| `color/bg/inverse` | `#0A0A0A` | цитата, footer |
+| `color/text/primary` | `#0A0A0A` | заголовки |
+| `color/cta/primary` | `#0A0A0A` | pill-кнопки |
+| `color/border` | `#E8E8EC` | карточки |
+| `color/accent/match` | `#2563EB` | полоса совпадения |
+| `font/family` | **Manrope** body · **Unbounded** display | child theme (bold editorial) |
+
+Пульт (тёмный `#0c0e13`) и сайт — **разные поверхности**; не смешивать без запроса Lead.
 
 ---
 
@@ -57,5 +75,6 @@
 
 | Дата | Проект | Что |
 |------|--------|-----|
-| 2026-05-20 | FL Radar пульт v1 | Токены ops-dashboard, green/red lamps |
-| 2026-05-23 | FL Radar пульт v2 | ЮБуст-референс, play/stop, glow, логи вниз, палитра v2 |
+| 2026-05-20 | RawLead пульт v1 | Токены ops-dashboard, green/red lamps |
+| 2026-05-23 | RawLead пульт v2 | ЮБуст-референс, play/stop, glow, логи вниз, палитра v2 |
+| 2026-05-23 | WordPress сайт v1 | Editorial light; REFERENCE + Unbounded/Manrope в child theme |

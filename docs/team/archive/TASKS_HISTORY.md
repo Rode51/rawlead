@@ -4,6 +4,21 @@
 
 ---
 
+## 2026-05-23 — WP Kadence child + Design REFERENCE E (принято)
+
+- `wordpress/rawlead-kadence-child/` · Manrope + Unbounded · hero / поток / match %
+- `scripts/wp_install_rawlead_theme.py` · `docs/ops/WP_KADENCE_INSTALL.md`
+- Designer: [`design/wp/REFERENCE.md`](../design/wp/REFERENCE.md)
+
+---
+
+## 2026-05-23 — Proxy fail-closed + wait-loop (Mechanic/Coder)
+
+- `src/proxy_probe.py` — не kill tg_main при мёртвом прокси; бот жив
+- `docs/problems/2026-05-23-proxy-exit-killed-bot.md`
+
+---
+
 ## 2026-05-23 — Coder: unified TG join + acc labels in bot (принято владельцем)
 
 - Join acc1/2/3 в `tg_main`; убран child join из пульта

@@ -192,7 +192,7 @@ def run_smoke() -> int:
         data={
             "chat_id": send_chat,
             "text": (
-                "FL Radar: тестовая отправка (проверка tg_smoke). "
+                "RawLead: тестовая отправка (проверка tg_smoke). "
                 "Если видите это — sendMessage вернулся успешно."
             ),
             "disable_notification": True,

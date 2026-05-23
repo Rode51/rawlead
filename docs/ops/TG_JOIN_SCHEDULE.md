@@ -78,7 +78,7 @@ scripts\start-radar-full.bat
 ## После join
 
 1. Скрипт обновляет `TG_JOIN_QUEUE.csv` (`status`, `chat_id`).
-2. Lead/Coder переносят `done` в [`SOURCES_POOLS.md`](SOURCES_POOLS.md) и [`TELEGRAM_CHATS.json`](TELEGRAM_CHATS.json).
+2. Lead/Coder переносят `done` в [`SOURCES_POOLS.md`](SOURCES_POOLS.md); в CSV уже есть `name`, `link`, `chat_id` — отдельный JSON не нужен.
 3. Когда acc2/acc3 слушают чаты — отдельный `TELETHON_CHAT_IDS` или multi-session монитор (задача Coder, не в MVP).
 
 ---

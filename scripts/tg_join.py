@@ -22,12 +22,12 @@ async def _main() -> None:
         choices=("acc1", "acc2", "acc3"),
         help="Мониторинговый аккаунт из .env",
     )
-    parser.add_argument("links", nargs="*", help="Ссылки t.me (иначе TG_JOIN_LINKS.txt)")
+    parser.add_argument("links", nargs="*", help="Ссылки t.me (иначе TG_JOIN_QUEUE.csv)")
     args = parser.parse_args()
 
-    invites = read_invite_links(args.links)
+    invites = read_invite_links(args.links, account=args.account)
     if not invites:
-        print("Нет ссылок. --account acc2 + ссылки или docs/ops/TG_JOIN_LINKS.txt")
+        print("Нет ссылок. --account acc2 + ссылки или docs/ops/TG_JOIN_QUEUE.csv")
         raise SystemExit(1)
 
     print(f"account: {args.account}")

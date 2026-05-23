@@ -7,7 +7,7 @@
 | **1b** Пульт (десктоп) | ✅ | v2 Tauri — [`DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
 | **2** ИИ «первое ЛС» | Потом | |
 | **3** WordPress пульт | После 1b | [`team/TZ_WP.md`](team/TZ_WP.md), [`ops/WP_OWNER_STEPS.md`](ops/WP_OWNER_STEPS.md) |
-| **3b** Сайт-сервис (учёба) | Параллельно | Local WP: [`ops/WP_LOCAL_SKELETON.md`](ops/WP_LOCAL_SKELETON.md), [`team/VISION_SAAS_SITE.md`](team/VISION_SAAS_SITE.md) |
+| **3b** Сайт (учёба) | ✅ MVP | Kadence child · [`design/wp/REFERENCE.md`](design/wp/REFERENCE.md) |
 | **4** Аналитика / SaaS | Потом | [`team/VISION_SAAS_SITE.md`](team/VISION_SAAS_SITE.md), `TZ.md` §10 |
 
 Детали фаз 1–4: [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md)
@@ -40,4 +40,4 @@
 
 | Статус сессий: [`team/STATUS.md`](team/STATUS.md)
 
-**Сейчас:** пульт ✅ · **WP локально** §3 · потом доказать ценность 2–4 нед → SaaS/монетизация.
+**Сейчас:** пульт ✅ · WP локально ✅ · **продукт:** dating × агрегатор — [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md) · волна 3 join.

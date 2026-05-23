@@ -31,7 +31,7 @@
 
 **Тема:** встроенная **Twenty Twenty-Four** или **Twenty Twenty-Five** — достаточно для скелета. Позже — Kadence / Astra (бесплатные).
 
-**Следующий шаг:** § 3 — пять страниц из [`wp-skeleton/`](wp-skeleton/).
+**Следующий шаг:** [`WP_CURSOR_CONNECT.md`](WP_CURSOR_CONNECT.md) (папка WP в Cursor + плагин) → § 3 — пять страниц из [`wp-skeleton/`](wp-skeleton/).
 
 ---
 
@@ -65,13 +65,18 @@
 
 ---
 
-## 5. Оформление (минимум)
+## 5. Оформление (утверждённый референс)
 
-1. Внешний вид → **Стили** / Customize: логотип-название «FL Radar» (текстом).
-2. Цвета: один акцент (синий/фиолетовый), светлый фон.
-3. На главной — блок **Обложка** (Cover) + кнопка «Тарифы».
+**Источник правды:** [`../design/wp/REFERENCE.md`](../design/wp/REFERENCE.md) · скрин: [`../design/wp/bold-editorial-saas-full-page-landing-page-ui-mock.png`](../design/wp/bold-editorial-saas-full-page-landing-page-ui-mock.png)
 
-Цель: **аккуратно**, не идеальный дизайн. Для заказов WP важнее структура и формы.
+| Шаг | Действие |
+|-----|----------|
+| 1 | Тема **Kadence** или **Astra** (светлая) |
+| 2 | Цвета/шрифт **Inter** из REFERENCE §2 |
+| 3 | Главная по §3 REFERENCE: hero, поток FL/Kwork/TG → лид, тёмная полоса, 01–02–03, тарифы |
+| 4 | Остальные страницы — тот же язык (§4 REFERENCE) |
+
+Не вставлять PNG Recraft как целый сайт — только блоки Gutenberg. Пульт Tauri остаётся **тёмным** (другой продукт).
 
 ---
 

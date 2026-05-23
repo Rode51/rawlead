@@ -52,7 +52,7 @@ Exe: `desktop\src-tauri\target\release\` (имя по `productName` в `tauri.co
 **После сборки exe** (удобнее, без окна npm):
 
 1. `cd desktop` → `npm run tauri build`
-2. Exe: `desktop\src-tauri\target\release\fl-radar.exe` (или `desktop.exe`)
+2. Exe: `desktop\src-tauri\target\release\RawLead.exe` (после `npm run tauri build`; старые `fl-radar*.exe` тоже работают)
 3. ПКМ по exe → **Отправить** → **Рабочий стол**
 4. В свойствах ярлыка **Объект:** полный путь к exe; **Рабочая папка:** `…\uisness` (чтобы находил `.venv` и `data\`)
 
@@ -74,9 +74,9 @@ Exe: `desktop\src-tauri\target\release\` (имя по `productName` в `tauri.co
 
 | Окно | Что делает |
 |------|------------|
-| **FL Radar — birzhi** | FL.ru + Kwork |
-| **FL Radar — TG** | acc1: слушает чаты + **сам вступает** в новые |
-| **FL Radar — join** | acc2/acc3: вступление в чаты по очереди |
+| **RawLead — birzhi** | FL.ru + Kwork |
+| **RawLead — TG** | acc1: слушает чаты + **сам вступает** в новые |
+| **RawLead — join** | acc2/acc3: вступление в чаты по очереди |
 
 **Только 2 окна** — если ярлык на **`start-radar-all.bat`** или **`start-radar.bat`** (биржи + TG, **без** join acc2/acc3). Для волны 2 на acc2/acc3 нужен **full** или отдельно `scripts\start-join-daemons.bat`.
 

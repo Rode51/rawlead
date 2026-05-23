@@ -77,7 +77,7 @@ Lead **не** «помогает быстро» править Python — даж
 | Очередь Coder | `TASKS.md` → **`CODER_PROMPT.md`** | FOR_YOU (только ссылка) |
 | Listen TG | `data/telethon_chat_ids_accN.txt` + CSV done | legacy `telethon_chat_ids.txt` → acc1 |
 | 3 номера TG, прокси (без паролей) | `ops/TELEGRAM_ACCOUNTS.md` | `.env`, SOURCES_POOLS (краткая ссылка) |
-| MVP-5 чатов, chat_id | `ops/SOURCES_POOLS.md` | TELEGRAM_CHATS.json дублирует invite — ок |
+| MVP-5 чатов, chat_id | `ops/SOURCES_POOLS.md` + `TG_JOIN_QUEUE.csv` (`done`) | Реестр имён в коде — из CSV, не JSON |
 | Промпт ИИ v6 | `team/AI.md` | не копировать в TZ целиком |
 | Запуск | `ops/RUN.md` | FOR_YOU (ссылка) |
 | Бэкапы | `ops/BACKUP.md` | FOR_YOU (ссылка) |

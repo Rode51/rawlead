@@ -1,4 +1,4 @@
-# FL Radar
+# RawLead
 
 Мониторинг **FL.ru + Kwork + TG (acc1)** → фильтр → ИИ → бот.  
 Карта: [`docs/ROADMAP.md`](docs/ROADMAP.md).

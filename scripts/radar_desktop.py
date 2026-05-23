@@ -1,4 +1,4 @@
-"""Пульт FL Radar: PyQt6 ops-dashboard — DEPRECATED, см. desktop/ + radar_control.py."""
+"""Пульт RawLead: PyQt6 ops-dashboard — DEPRECATED, см. desktop/ + radar_control.py."""
 
 from __future__ import annotations
 
@@ -380,7 +380,7 @@ class LogTailWorker(QThread):
 class RadarDesktopWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("FL Radar — пульт")
+        self.setWindowTitle("RawLead — пульт")
         self.setStyleSheet(_build_stylesheet())
         self.resize(*_SIZE_COMPACT)
         self.setMinimumSize(440, 280)
@@ -399,9 +399,9 @@ class RadarDesktopWindow(QWidget):
         root.setContentsMargins(16, 14, 16, 10)
         root.setSpacing(10)
 
-        # --- Верх: FL RADAR слева, обновить статус справа ---
+        # --- Верх: RAWLEAD слева, обновить статус справа ---
         top = QHBoxLayout()
-        title = QLabel("FL RADAR")
+        title = QLabel("RAWLEAD")
         title.setObjectName("title")
         top.addWidget(title, alignment=Qt.AlignmentFlag.AlignLeft)
         top.addStretch()
@@ -752,7 +752,7 @@ def main() -> int:
     if not _acquire_single_instance():
         QMessageBox.critical(
             None,
-            "FL Radar — пульт",
+            "RawLead — пульт",
             "Уже открыт другой экземпляр пульта.\n"
             "Закройте его или удалите data\\.radar_desktop.lock после сбоя.",
         )

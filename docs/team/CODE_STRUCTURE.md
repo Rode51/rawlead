@@ -25,6 +25,7 @@
 | `main.py` | Цикл FL/Kwork |
 | `fl_parser.py`, `kwork_parser.py` | Биржи |
 | `tg_client.py` | Telethon connect |
+| `proxy_probe.py` | TCP probe прокси (fail-closed) |
 | `tg_monitor.py` | Слушание чатов + join-циклы |
 | `tg_join_lib.py` | CSV очередь, join_one |
 | `tg_join_runner.py` | Тик join, лимиты |

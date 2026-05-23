@@ -35,7 +35,7 @@
 | ☑ | Удалёнщики | https://t.me/tgjob | 1333124183 |
 | ☑ | Чат 1С | https://t.me/task_1C | 1434631241 |
 
-Ссылки в боте: [`TELEGRAM_CHATS.json`](TELEGRAM_CHATS.json) · join: [`TG_JOIN_LINKS.txt`](TG_JOIN_LINKS.txt)
+Реестр имён/ссылок для бота: строки `done` в [`TG_JOIN_QUEUE.csv`](TG_JOIN_QUEUE.csv) (код: `load_chat_registry_from_queue`).
 
 База каналов: [`TG_CHANNELS_BASE.md`](TG_CHANNELS_BASE.md)
 

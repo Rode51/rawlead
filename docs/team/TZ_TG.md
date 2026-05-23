@@ -10,7 +10,7 @@
 
 Слушать **3–5 (потом больше) чатов** с мониторинговых аккаунтов Session+Json → новые посты → фильтр → [ИИ] → **пересылка оригинала** в личку (Telethon) + **разбор ботом** (Bot API, как биржи). Ссылки `t.me/c/…` / `tg://user` в уведомлении **не используем** — открывается пересланное сообщение.
 
-Вступление в чаты — **скриптом** `tg_join` по [`../ops/TG_JOIN_LINKS.txt`](../ops/TG_JOIN_LINKS.txt) (MVP из [`../ops/TG_CHANNELS_BASE.md`](../ops/TG_CHANNELS_BASE.md)), не платным GUI.
+Вступление в чаты — **очередь** [`../ops/TG_JOIN_QUEUE.csv`](../ops/TG_JOIN_QUEUE.csv) (авто в `tg_main` или вручную `scripts/tg_join.py`), база ссылок — [`../ops/TG_CHANNELS_BASE.md`](../ops/TG_CHANNELS_BASE.md).
 
 ---
 
@@ -31,7 +31,10 @@
 |------------|-------------|--------|
 | `TELEGRAM_API_ID` | да | my.telegram.org |
 | `TELEGRAM_API_HASH` | да | |
-| `TELETHON_PROXY_URL` | да | SOCKS5/HTTP; без прокси — **не старт** |
+| `TELETHON_PROXY_URL` | да (acc1 fallback) | SOCKS5/HTTP; без прокси — **не старт** |
+| `TELETHON_PROXY_ACC1`…`ACC3` | да (multi) | **отдельный** прокси на номер; общий IP = риск связки |
+| `TELETHON_PROXY_PROBE` | да (default `1`) | TCP до host:port **до** connect; мёртвый прокси → exit + алерт боту |
+| `TELETHON_PROXY_PROBE_TIMEOUT` | нет | сек, default 8 |
 | `TELETHON_SESSION_PATH` | да | Путь без `.session`; позже список сессий |
 | `TELETHON_CHAT_IDS` или файл | да | id чатов для listen (из SOURCES_POOLS) |
 | `NIGHT_*` / Irkutsk | да | 02:00–07:00 — длинные паузы |
@@ -45,6 +48,7 @@
 | Модуль | Задача |
 |--------|--------|
 | `src/tg_client.py` | Telethon + прокси, connect, FloodWait |
+| `src/proxy_probe.py` | TCP probe; fail-closed; алерт через `health_check.send_owner_text` |
 | `scripts/tg_join.py` | Вступить по invite-ссылкам из файла/argv |
 | `scripts/tg_list_dialogs.py` | Показать чаты и id (для заполнения SOURCES_POOLS) |
 | `src/tg_monitor.py` | NewMessage → pipeline (filter → ai → notify) |

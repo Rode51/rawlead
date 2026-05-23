@@ -1,4 +1,4 @@
-﻿# Запуск FL Radar на Windows
+﻿# Запуск RawLead на Windows
 
 Работает **Python 3.11+**. Команды ниже — из **PowerShell**. Запускайте из **корня репозитория** (папка, где лежат `src/`, `docs/`, `requirements.txt`), чтобы пути по умолчанию `data/projects.db` и `data/radar.log` совпадали с каталогом `data/` в корне проекта.
 
@@ -141,7 +141,7 @@ python -c "import sys,json; sys.path.insert(0,'src'); from config import load_co
 Сначала в Telegram открой **чат с этим ботом** и отправь **`/start`**.
 
 ```powershell
-python -c "import sys,json; sys.path.insert(0,'src'); from config import load_config; import requests; c=load_config(); r=requests.post('https://api.telegram.org/bot'+c.telegram_bot_token+'/sendMessage', data={'chat_id': c.telegram_chat_id.strip(), 'text': 'Тест FL Radar'}, timeout=25); print('HTTP', r.status_code); print(r.text)"
+python -c "import sys,json; sys.path.insert(0,'src'); from config import load_config; import requests; c=load_config(); r=requests.post('https://api.telegram.org/bot'+c.telegram_bot_token+'/sendMessage', data={'chat_id': c.telegram_chat_id.strip(), 'text': 'Тест RawLead'}, timeout=25); print('HTTP', r.status_code); print(r.text)"
 ```
 
 - **`HTTP 200`** и `"ok":true` — связь **ок**, радар должен уметь слать уведомления; если в радаре всё ещё 400 — пришли Coder **полный вывод этой команды** (там **нет** токена в ответе при ошибке `description`, но если боишься — замажь вручную).
@@ -191,7 +191,9 @@ python -c "import sys,json; sys.path.insert(0,'src'); from config import load_co
 
 ## 10. Telegram-чаты (фаза 1, отдельно от FL/Kwork)
 
-Нужны в `.env`: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELETHON_PROXY_URL`, `TELETHON_SESSION_PATH`, `TELETHON_CHAT_IDS` (и для уведомлений — `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TG_PROXY_URL`).
+Нужны в `.env`: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELETHON_PROXY_ACC*` (отдельно на acc1–3), `TELETHON_SESSION_*`, `TELETHON_CHAT_IDS`, `TELETHON_PROXY_PROBE=1` (TCP до connect; мёртвый прокси → стоп + алерт). Бот: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TG_PROXY_URL`.
+
+**VPN на ПК:** при включённом системном VPN прокси из `.env` часто **недоступны** → бот молчит, TG красная. Держи VPN **выкл.** на время работы радара или проверь `src/tg_smoke.py`.
 
 **Список чатов для монитора (multi-session):** в `.env`:
 

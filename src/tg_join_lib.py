@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,8 +15,9 @@ from telethon.tl.functions.messages import ImportChatInviteRequest
 from config import _PROJECT_ROOT
 
 QUEUE_CSV = _PROJECT_ROOT / "docs" / "ops" / "TG_JOIN_QUEUE.csv"
-JOIN_LINKS = _PROJECT_ROOT / "docs" / "ops" / "TG_JOIN_LINKS.txt"
 INVITES_FALLBACK = _PROJECT_ROOT / "scripts" / "tg_invites.txt"
+
+_PUBLIC_USERNAME_RE = re.compile(r"^https?://t\.me/([A-Za-z0-9_]+)/?$", re.I)
 
 
 @dataclass(frozen=True)
@@ -37,10 +39,74 @@ def read_lines(path: Path) -> list[str]:
     return out
 
 
-def read_invite_links(extra: list[str] | None = None) -> list[str]:
+def username_from_invite(invite: str) -> str:
+    m = _PUBLIC_USERNAME_RE.match((invite or "").strip())
+    return m.group(1) if m else ""
+
+
+def peer_id_from_chat_id(chat_id: int) -> int:
+    cid = int(chat_id)
+    s = str(cid)
+    if s.startswith("-100"):
+        return cid
+    return int(f"-100{cid}")
+
+
+def _registry_keys_for_chat_id(chat_id: int) -> list[int]:
+    cid = int(chat_id)
+    keys = {cid}
+    s = str(cid)
+    if s.startswith("-100"):
+        keys.add(int(s[4:]))
+    else:
+        keys.add(peer_id_from_chat_id(cid))
+    return list(keys)
+
+
+def load_chat_registry_from_queue(path: Path = QUEUE_CSV) -> dict[int, dict[str, str]]:
+    """peer_id / short id → {name, invite, username?} из строк CSV со status=done."""
+    registry: dict[int, dict[str, str]] = {}
+    _, rows = read_queue_csv(path)
+    for row in rows:
+        if row.get("status", "").strip().lower() != "done":
+            continue
+        raw = row.get("chat_id", "").strip()
+        if not raw:
+            continue
+        try:
+            cid = int(raw)
+        except ValueError:
+            continue
+        invite = row.get("link", "").strip()
+        name = row.get("name", "").strip()
+        meta = {
+            "name": name,
+            "invite": invite,
+            "username": username_from_invite(invite),
+        }
+        for key in _registry_keys_for_chat_id(cid):
+            registry[key] = meta
+    return registry
+
+
+def read_invite_links(
+    extra: list[str] | None = None,
+    *,
+    account: str | None = None,
+) -> list[str]:
     if extra:
         return [a.strip() for a in extra if a.strip()]
-    links = read_lines(JOIN_LINKS)
+    _, rows = read_queue_csv()
+    links: list[str] = []
+    seen: set[str] = set()
+    acc_key = (account or "").strip().lower()
+    for row in rows:
+        if acc_key and row.get("account", "").strip().lower() != acc_key:
+            continue
+        link = row.get("link", "").strip()
+        if link and link not in seen:
+            seen.add(link)
+            links.append(link)
     if links:
         return links
     return read_lines(INVITES_FALLBACK)

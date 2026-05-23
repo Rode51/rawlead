@@ -3,9 +3,9 @@ chcp 65001 >nul
 call "%~dp0_radar-env.bat"
 if errorlevel 1 pause & exit /b 1
 
-title FL Radar — TG
+title RawLead — TG
 echo.
-echo  FL Radar — TG-chaty (5 kanalov)
+echo  RawLead — TG-chaty (5 kanalov)
 echo  Log: %CD%\data\radar.log
 echo  Eto okno NE zakryvaj.
 echo.

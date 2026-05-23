@@ -54,7 +54,7 @@ npx neonctl@latest init
 | SQL из Cursor | ✅ `execute_sql` | ✅ через Neon MCP |
 | Радар Python | SDK / URL | `DATABASE_URL` |
 
-Плагин **Supabase** в Cursor можно **не отключать** для старых проектов; для **FL Radar** используем **Neon**.
+Плагин **Supabase** в Cursor можно **не отключать** для старых проектов; для **RawLead** используем **Neon**.
 
 ---
 

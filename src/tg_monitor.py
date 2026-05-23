@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
-import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,10 +35,7 @@ from listing import ListingProject, telegram_source
 from pg_storage import pg_storage_from_config
 from storage import storage_from_config
 from tg_client import connect_client
-
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_TELEGRAM_CHATS_PATH = _PROJECT_ROOT / "docs" / "ops" / "TELEGRAM_CHATS.json"
-_TME_PUBLIC_USERNAME = re.compile(r"^https?://t\.me/([A-Za-z0-9_]+)/?$", re.I)
+from tg_join_lib import load_chat_registry_from_queue
 
 
 @dataclass
@@ -64,6 +59,17 @@ def _message_text(message: Message) -> str:
     return (message.text or message.message or "").strip()
 
 
+async def _message_from_bot(event: events.NewMessage.Event) -> bool:
+    """Системные/верификационные боты чата — не заказы."""
+    try:
+        sender = await event.get_sender()
+    except Exception:
+        return False
+    if sender is None:
+        return False
+    return bool(getattr(sender, "bot", False))
+
+
 def _channel_id_for_link(chat_id: int) -> int | None:
     """id для https://t.me/c/{id}/msg — без префикса -100."""
     cid = int(chat_id)
@@ -73,45 +79,6 @@ def _channel_id_for_link(chat_id: int) -> int | None:
     if cid < 0:
         return abs(cid)
     return cid
-
-
-def _peer_id_from_chat_id(chat_id: int) -> int:
-    """id из TELEGRAM_CHATS.json → peer_id Telethon (-100…)."""
-    return int(f"-100{int(chat_id)}")
-
-
-def _username_from_invite(invite: str) -> str:
-    m = _TME_PUBLIC_USERNAME.match((invite or "").strip())
-    return m.group(1) if m else ""
-
-
-def _load_chat_registry(path: Path = _TELEGRAM_CHATS_PATH) -> dict[int, dict[str, str]]:
-    """peer_id → {name, invite, username?}."""
-    registry: dict[int, dict[str, str]] = {}
-    if not path.is_file():
-        return registry
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return registry
-    if not isinstance(raw, list):
-        return registry
-    for entry in raw:
-        if not isinstance(entry, dict):
-            continue
-        try:
-            chat_id = int(entry["chat_id"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        invite = str(entry.get("invite") or "").strip()
-        name = str(entry.get("name") or "").strip()
-        username = _username_from_invite(invite)
-        registry[_peer_id_from_chat_id(chat_id)] = {
-            "name": name,
-            "invite": invite,
-            "username": username,
-        }
-    return registry
 
 
 def _message_url(message: Message, *, username: str = "") -> str:
@@ -292,6 +259,16 @@ def _register_message_handler(
         if message.chat_id not in chat_ids:
             return
 
+        if await _message_from_bot(event):
+            ts = radar_timestamp()
+            _append_log(
+                log_path,
+                f"{ts} тг:сообщ acc={account} chat={message.chat_id} msg={message.id} "
+                f"новый=0 увед=0 ош=пропуск:бот",
+            )
+            record_tg_skip(storage, account, "пропуск:бот")
+            return
+
         chat_title = ""
         chat_username = ""
         try:
@@ -356,7 +333,7 @@ async def run_monitor() -> None:
     storage = storage_from_config(cfg)
     pg = pg_storage_from_config(cfg)
     word_filter = default_listing_filter()
-    chat_registry = _load_chat_registry()
+    chat_registry = load_chat_registry_from_queue()
     log_path = tg_cfg.radar_log_path
 
     sessions: list[_MonitorSession] = []

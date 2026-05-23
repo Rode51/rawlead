@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "FL Radar",
+  "productName": "RawLead",
   "version": "0.1.0",
-  "identifier": "com.rode51.fl-radar-pult",
+  "identifier": "com.rode51.rawlead-pult",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "FL Radar — пульт",
+        "title": "RawLead — пульт",
         "width": 400,
         "height": 560,
         "minWidth": 400,

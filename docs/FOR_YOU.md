@@ -61,9 +61,13 @@
 
 **Волна 3 TG:** 73 чата в очереди (`pending`) — **пульт ▶** и раз в день `data\tg_join.log`. Как устроено: [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) § «Какой номер в какой чат».
 
-**Git** — код/docs в репо; **push на GitHub только когда попросишь**. **`backup.bat`** — для `.env` и Telethon-сессий (в Git их нет).
+**Git** — push на GitHub ✅ 2026-05-23. **`backup.bat`** — для `.env` и сессий.
 
-**Параллельно:** WP §3 · 2–4 нед пользы радаром. Пульт v2 ✅
+**Радар:** пульт ▶, **VPN на ПК выключен** (иначе бот/TG молчат). Проверка: `src/tg_smoke.py`.
+
+**Продукт:** dating × агрегатор — match %, мэтч с заказом → [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md).
+
+**WP:** локальный сайт ✅ · [`design/wp/REFERENCE.md`](design/wp/REFERENCE.md) · [`ops/WP_KADENCE_INSTALL.md`](ops/WP_KADENCE_INSTALL.md).
 
 ---
 

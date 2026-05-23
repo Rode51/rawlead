@@ -1,4 +1,4 @@
-"""HTTP API пульта FL Radar: subprocess, lock, логи, статус.
+"""HTTP API пульта RawLead: subprocess, lock, логи, статус.
 
 Запуск: .venv\\Scripts\\python.exe scripts\\radar_control.py
 Порт: RADAR_CONTROL_PORT (по умолчанию 18765)

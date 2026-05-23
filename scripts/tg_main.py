@@ -29,6 +29,7 @@ from health_check import (  # noqa: E402
     write_tg_monitor_pulse,
 )
 from radar_status import reset_tg_session_stats  # noqa: E402
+from proxy_probe import wait_active_monitor_proxies_live  # noqa: E402
 from tg_monitor import reconnect_delay_sec, run_monitor  # noqa: E402
 
 _POLL_SEC = 2.0
@@ -71,7 +72,7 @@ def _acquire_single_instance() -> bool:
         except OSError:
             fh.close()
             print(
-                "[!] Второй запуск tg_main — уже работает окно FL Radar — TG",
+                "[!] Второй запуск tg_main — уже работает окно RawLead — TG",
                 flush=True,
             )
             return False
@@ -136,6 +137,19 @@ def _log_start() -> None:
     print("Ctrl+C = стоп. FL/Kwork: окно python src/main.py", flush=True)
 
 
+async def _ensure_proxies_live(log_path: Path, tg_cfg) -> None:
+    delay = float(reconnect_delay_sec(tg_cfg))
+
+    def _log(msg: str) -> None:
+        _append_log(log_path, f"{radar_timestamp()} {msg}")
+
+    await asyncio.to_thread(
+        wait_active_monitor_proxies_live,
+        log_fn=_log,
+        sleep_sec=delay,
+    )
+
+
 async def _loop() -> None:
     cfg = load_config()
     storage = storage_from_config(cfg)
@@ -150,13 +164,13 @@ async def _loop() -> None:
     poll_task = asyncio.create_task(_bot_poll_loop(cfg, storage, log_path))
     beat_task = asyncio.create_task(_heartbeat_loop(cfg, storage, log_path))
 
+    await _ensure_proxies_live(log_path, tg_cfg)
+
     try:
         while True:
             try:
                 await run_monitor()
             except KeyboardInterrupt:
-                raise
-            except SystemExit:
                 raise
             except Exception as exc:
                 ts_err = radar_timestamp()
@@ -165,7 +179,7 @@ async def _loop() -> None:
                     log_path,
                     f"{ts_err} тг:монитор ошибка: {exc!r}; переподключение через {delay}с",
                 )
-                await asyncio.sleep(delay)
+                await _ensure_proxies_live(log_path, tg_cfg)
     finally:
         poll_task.cancel()
         beat_task.cancel()

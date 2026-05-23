@@ -1,0 +1,18 @@
+{
+  "folders": [
+    {
+      "name": "uisness (радар)",
+      "path": "."
+    },
+    {
+      "name": "WP radarzakaz",
+      "path": "C:\\Users\\hramo\\Local Sites\\radarzakaz\\app\\public"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/wp-includes/**": true,
+      "**/wp-admin/**": true
+    }
+  }
+}

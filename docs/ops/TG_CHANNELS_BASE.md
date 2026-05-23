@@ -3,7 +3,7 @@
 **Источник (полный реестр ~104 канала):**  
 [Поиск Telegram-каналов для фриланса](https://docs.google.com/document/d/1KplF0v2eBr_o0ThbON17sRnfDqoMfiIkk_M3HkLtjfE/edit?usp=sharing) — Deep Research, 2024–2026.
 
-**Роль файла:** Lead-курация под FL Radar. Владелец не ищет чаты с нуля — берёт ссылки отсюда → [`SOURCES_POOLS.md`](SOURCES_POOLS.md). Coder вступает по [`TG_JOIN_LINKS.txt`](TG_JOIN_LINKS.txt).
+**Роль файла:** Lead-курация под RawLead. Владелец не ищет чаты с нуля — берёт ссылки отсюда → [`SOURCES_POOLS.md`](SOURCES_POOLS.md) → очередь [`TG_JOIN_QUEUE.csv`](TG_JOIN_QUEUE.csv).
 
 ---
 

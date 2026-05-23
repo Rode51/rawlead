@@ -344,7 +344,7 @@ def main() -> None:
 
     interval_sec = max(1, cfg.poll_interval_minutes * 60)
 
-    _echo(f"=== FL Radar запущен ({radar_timestamp()}, Иркутск) ===")
+    _echo(f"=== RawLead запущен ({radar_timestamp()}, Иркутск) ===")
     _echo(f"Лог: {cfg.radar_log_path.resolve()}")
     _echo(
         f"Интервал: {cfg.poll_interval_minutes} мин | "

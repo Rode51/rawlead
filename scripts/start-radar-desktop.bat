@@ -19,6 +19,10 @@ if not exist "node_modules\" (
   if errorlevel 1 pause & exit /b 1
 )
 
+if exist "src-tauri\target\release\RawLead.exe" (
+  start "" "src-tauri\target\release\RawLead.exe"
+  exit /b 0
+)
 if exist "src-tauri\target\release\fl-radar-pult.exe" (
   start "" "src-tauri\target\release\fl-radar-pult.exe"
   exit /b 0

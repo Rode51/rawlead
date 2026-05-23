@@ -1,4 +1,4 @@
-﻿# Архитектура FL Radar
+﻿# Архитектура RawLead
 
 Краткая схема для Lead, Coder и владельца. Поведение — **`docs/team/TZ.md`**, TG — **`docs/team/TZ_TG.md`**.
 
@@ -75,7 +75,7 @@ flowchart LR
   TC -.->|format_status| RS
 ```
 
-**Сеть:** FL/Kwork — домашний IP. `api.telegram.org` — **только `TG_PROXY_URL`**. Telethon — **прокси per acc** (`TELETHON_PROXY_ACC1`…).
+**Сеть:** FL/Kwork — домашний IP. `api.telegram.org` — **только `TG_PROXY_URL`**. Telethon — **прокси per acc** (`TELETHON_PROXY_ACC1`…); **TCP probe** до connect (`proxy_probe.py`, `TELETHON_PROXY_PROBE=1`).
 
 **Дедуп TG:** `source = tg:{chat_id}` в `listing.telegram_source()`.
 
