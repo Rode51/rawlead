@@ -233,18 +233,40 @@ class RadarController:
             if self._ui_expanded and not workers:
                 self._ui_expanded = False
             lamps = []
+            storage = None
             for spec in self.children:
-                state = self.lamp_state(spec, workers)
+                alive = self._is_alive(spec)
+                if spec.key == "tg":
+                    if alive:
+                        try:
+                            from config import load_config
+                            from radar_status import tg_pult_lamp_state
+                            from storage import storage_from_config
+
+                            if storage is None:
+                                storage = storage_from_config(load_config())
+                            state, caption = tg_pult_lamp_state(
+                                storage, process_alive=True
+                            )
+                        except Exception:
+                            state, caption = "ok", "слушает"
+                    elif self._ever_started and (self._ui_expanded or workers):
+                        state, caption = "error", "нет"
+                    else:
+                        state, caption = "idle", ""
+                else:
+                    state = self.lamp_state(spec, workers)
+                    caption = (
+                        "работает"
+                        if state == "ok"
+                        else ("нет" if state == "error" else "")
+                    )
                 lamps.append(
                     {
                         "key": spec.key,
                         "label": spec.label,
                         "state": state,
-                        "caption": (
-                            "работает"
-                            if state == "ok"
-                            else ("нет" if state == "error" else "")
-                        ),
+                        "caption": caption,
                     }
                 )
             return {

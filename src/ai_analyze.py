@@ -10,6 +10,7 @@ from typing import Any
 
 import requests
 
+from budget import display_budget_text
 from config import DIRECT_REQUESTS_PROXIES, Config
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -162,7 +163,7 @@ def _build_user_message(
     return (
         f"Заголовок: {title.strip()}\n"
         f"Бюджет на бирже (поле «На бирже» в money — как здесь): "
-        f"{budget_text.strip() or 'не указан'}\n"
+        f"{budget_text.strip()}\n"
         f"Ссылка: {url.strip()}\n\n"
         f"Описание заказа:\n---\n{description}\n---{trunc_note}\n\n"
         f"Верни только JSON с полями: {fields}."
@@ -186,7 +187,7 @@ def _validate_money(money: str, budget_text: str) -> str:
     m = money.strip()
     low = m.casefold()
     if "на бирже" not in low:
-        on_site = (budget_text or "").strip() or "не указан"
+        on_site = (budget_text or "").strip()
         m = f"На бирже: {on_site} | {m}"
         low = m.casefold()
     if "рынок" not in low:
@@ -253,7 +254,7 @@ def _parse_analysis(data: dict[str, Any], *, budget_text: str) -> AiAnalysis:
     if money_raw and ("на бирже" in money_raw.casefold() or "рынок" in money_raw.casefold()):
         money = _validate_money(money_raw, budget_text)
     elif skip_like:
-        on_site = (budget_text or "").strip() or "не указан"
+        on_site = (budget_text or "").strip()
         money = f"На бирже: {on_site} | Рынок: — | Старт отклика: —"
     else:
         money = _validate_money(money_raw or f"На бирже: {budget_text}", budget_text)
@@ -392,9 +393,13 @@ def analyze_project(
 
     desc, truncated = _truncate_description(description)
     system = _build_system_prompt(build_profile_excerpt(profile_path))
+    budget_for_prompt = display_budget_text(
+        budget_text,
+        is_telegram="t.me" in (url or "").casefold(),
+    )
     user = _build_user_message(
         title=title,
-        budget_text=budget_text,
+        budget_text=budget_for_prompt,
         url=url,
         description=desc,
         truncated=truncated,
@@ -407,7 +412,7 @@ def analyze_project(
                 cfg,
                 system,
                 user,
-                budget_text=budget_text,
+                budget_text=budget_for_prompt,
                 timeout_sec=timeout_sec,
             )
         except (

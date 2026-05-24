@@ -241,6 +241,12 @@ body {
   box-shadow: 0 0 0 4px var(--color-status-ok-glow);
 }
 
+.lamp__dot--warn {
+  background: var(--color-status-warn);
+  border-color: var(--color-status-warn);
+  box-shadow: 0 0 0 4px var(--color-status-warn-glow);
+}
+
 .lamp__dot--error {
   background: var(--color-status-error);
   border-color: var(--color-status-error);

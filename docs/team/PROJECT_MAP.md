@@ -8,10 +8,13 @@
 
 | Кому | Первый файл |
 |------|-------------|
-| **Lead** | этот файл → `TASKS.md` → `CODER_PROMPT.md` |
-| **Coder** | **`CODER_PROMPT.md`** (разрешённые файлы) → этот файл § «Зоны» |
-| **Mechanic** | тикет `docs/problems/` → этот файл § «Зоны» |
-| **Designer** | `DESIGNER_PROMPT.md` → только `docs/design/` |
+| **Lead Product** | `PRODUCT_VISION.md` → `LEAD_PRODUCT_PROMPT.md` |
+| **Lead Architect** | `ROADMAP.md` (из vision) → `CODER_PROMPT.md` |
+| **Lead Designer** | `LEAD_DESIGN_PROMPT.md` → `DESIGN_SYSTEM.md` |
+| **Lead Architect** | этот файл → `CODER_PROMPT.md` |
+| **Coder** | **`CODER_PROMPT.md`** → § «Зоны» |
+| **Mechanic** | `docs/problems/` → § «Зоны» |
+| **Designer** | `DESIGNER_PROMPT.md` → `docs/design/` |
 | **Владелец** | `FOR_YOU.md` |
 
 **Lead обновляет** эту карту после каждой сдачи Coder/Mechanic, если менялись процессы, файлы или lock-правила.  
@@ -62,8 +65,11 @@ flowchart TB
 | **Guard** | `src/process_guard.py`, `src/health_check.py` | Coder / Mechanic | дубли, lock |
 | **Данные ПК** | `data/*` | **никто из AI** | владелец / runtime |
 | **Секреты** | `.env` | **владелец** | — |
-| **Docs процесс** | `docs/team/*`, `docs/problems/*` | Lead / Mechanic | Lead; Mechanic — тикет |
-| **Docs ops** | `docs/ops/*`, `FOR_YOU.md`, `KAK_ETO_RABOTAET.md` | Lead | после сдачи |
+| **Product docs** | `LEAD_PRODUCT*`, `PRODUCT_VISION`, `ROADMAP` | Lead Product | план с владельцем |
+| **Design docs** | `LEAD_DESIGN*`, `DESIGN_SYSTEM`, `docs/design/` | Lead Designer | план с владельцем |
+| **Инженерия docs** | `CODER_PROMPT`, `TASKS`, `STATUS` | Lead Architect | после сдачи |
+| **Docs ops** | `docs/ops/*`, `FOR_YOU.md` | Lead Architect + владелец | |
+| **Тикеты** | `docs/problems/*` | Mechanic | один инцидент |
 | **WP** | `wordpress/rawlead-kadence-child/` | Coder | `CODER_PROMPT` § WP |
 
 **Coder:** правит **только** файлы из таблицы «Файлы» в активном `CODER_PROMPT.md`. Вне списка — стоп, спросить Lead.

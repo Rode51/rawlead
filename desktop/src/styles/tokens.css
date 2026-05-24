@@ -15,6 +15,8 @@
   --color-hero-on: #ffffff;
   --color-status-ok: #16a34a;
   --color-status-ok-glow: rgba(22, 163, 74, 0.35);
+  --color-status-warn: #ea580c;
+  --color-status-warn-glow: rgba(234, 88, 12, 0.35);
   --color-status-error: #dc2626;
   --color-status-error-glow: rgba(220, 38, 38, 0.3);
   --color-status-idle: #9ca3af;

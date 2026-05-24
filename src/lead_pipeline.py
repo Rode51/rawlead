@@ -11,6 +11,7 @@ from config import Config
 from filters import ListingWordFilter
 from fl_parser import fetch_project_description
 from listing import SOURCE_FL, ListingProject
+from listing_dedup import listing_content_hash
 from pg_storage import NeonLeadStorage
 from storage import ProjectStorage
 from telegram_notify import TelegramNotifyError, send_project_notification_from_config
@@ -94,12 +95,23 @@ def plan_new_listing(
     if not inserted:
         return False, None
 
-    if pg is not None:
-        pg.record_new_lead(project, errors)
-
     if not word_filter.accepts_listing(project, wide=cfg.filter_wide):
         errors.append(f"{project.source}:id={project.project_id} skip:filter")
         return True, None
+
+    fingerprint = listing_content_hash(
+        project.title, project.listing_snippet or project.title
+    )
+    if fingerprint and not storage.try_record_content_fingerprint(
+        fingerprint, source=project.source
+    ):
+        errors.append(f"{project.source}:id={project.project_id} skip:dup_content")
+        return True, None
+
+    if pg is not None:
+        if not pg.record_new_lead(project, errors, content_hash=fingerprint):
+            errors.append(f"{project.source}:id={project.project_id} skip:dup_content")
+            return True, None
 
     analysis = None
     ai_unavailable = False
@@ -200,7 +212,7 @@ async def process_new_listing_from_tg(
     account: str = "",
     chat_title: str = "",
 ) -> tuple[bool, bool]:
-    """TG: пересылка оригинала (Telethon), затем разбор ботом."""
+    """TG: acc→бот (Telethon), карточка ИИ; relay владельцу — sync или poll."""
     from tg_forward import format_tg_acc_label, forward_listing_to_owner
 
     was_new, plan = plan_new_listing(
@@ -210,7 +222,7 @@ async def process_new_listing_from_tg(
         return was_new, False
 
     acc_label = format_tg_acc_label(account, chat_title) if account else ""
-    await forward_listing_to_owner(
+    forwarded_ok = await forward_listing_to_owner(
         client,
         message,
         cfg,
@@ -218,6 +230,8 @@ async def process_new_listing_from_tg(
         account=account,
         chat_title=chat_title,
     )
+    if not forwarded_ok:
+        return was_new, False
     if acc_label:
         plan = ListingNotifyPlan(
             project=plan.project,

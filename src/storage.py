@@ -150,6 +150,24 @@ class ProjectStorage:
 
             )
 
+            conn.execute(
+
+                """
+
+                CREATE TABLE IF NOT EXISTS listing_fingerprints (
+
+                    content_hash TEXT PRIMARY KEY,
+
+                    first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+                    first_source TEXT NOT NULL DEFAULT ''
+
+                )
+
+                """
+
+            )
+
             conn.commit()
 
             self._migrate_legacy_project_id_only(conn)
@@ -281,6 +299,38 @@ class ProjectStorage:
                 "INSERT OR IGNORE INTO projects (source, project_id) VALUES (?, ?)",
 
                 (source, project_id),
+
+            )
+
+            conn.commit()
+
+            return cur.rowcount == 1
+
+
+
+    def try_record_content_fingerprint(self, content_hash: str, *, source: str = "") -> bool:
+
+        """True — новый текст; False — такое объявление уже было."""
+
+        h = (content_hash or "").strip()
+
+        if not h:
+
+            return True
+
+        with self._connect() as conn:
+
+            cur = conn.execute(
+
+                """
+
+                INSERT OR IGNORE INTO listing_fingerprints (content_hash, first_source)
+
+                VALUES (?, ?)
+
+                """,
+
+                (h, (source or "").strip()),
 
             )
 

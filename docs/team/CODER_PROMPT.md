@@ -105,15 +105,23 @@
 | `src/process_guard.py` | **J** — psutil замена |
 | `requirements.txt` | **J** — добавить psutil |
 | `src/telegram_notify.py` | E |
-| `src/tg_forward.py` | F, H |
-| `src/telegram_control.py` | H |
+| `src/tg_forward.py` | F, H, **M** |
+| `src/telegram_control.py` | H, **M** |
+| `src/lead_pipeline.py` | **M** |
 | `src/tg_relay_allowlist.py` | H (новый) |
 | `scripts/tg_bot_start.py` | F, H |
 | `scripts/tg_main.py` | F, H |
 | `src/tg_bot_start.py` | F, H |
 | `docs/ops/RUN.md` | F |
 | `docs/ops/TELEGRAM_ACCOUNTS.md` | H |
-| `src/tg_monitor.py` | E (бюджет из текста TG) |
+| `src/tg_monitor.py` | E, **P** |
+| `src/pg_storage.py` | **O** |
+| `src/listing_dedup.py` | **O** |
+| `sql/001_neon_schema.sql` | **O** |
+| `docs/team/NEON_SCHEMA.md` | **O** |
+| `desktop/src/main.ts` | **R** |
+| `src/radar_status.py` | **P** |
+| `scripts/radar_control.py` | **P** |
 | `wordpress/rawlead-kadence-child/...` | B |
 | `docs/ops/WP_KADENCE_INSTALL.md` | B |
 | `docs/team/STATUS.md` | сдача |
@@ -123,7 +131,7 @@
 
 - `scripts/radar_control.py` — вызывает guard, сигнатуры не меняются
 - `src/main.py` — вызывает guard
-- `desktop/src/main.ts` (§ D закрыт)
+- `desktop/src/main.ts` — только § **R** (логи при старте)
 - `src/filters.py`, `docs/ops/FILTERS.md` (§ E — без согласования Lead)
 - join-очередь, `TASKS.md`, `FOR_YOU.md`
 - `scripts/sync-cursor-proxy.bat`, `scripts/sync_cursor_proxy.py` — proxy Cursor работает, не трогать
@@ -147,6 +155,26 @@
 
 ---
 
+## L. TG + FL: Python-ключи, бюджет «по договоренности» — **Coder, приоритет**
+
+**Контекст (владелец 2026-05-24):** тест-группа `https://t.me/+Z7HcnIAdSw9kY2U6` (`prompt-test`, `chat_id=5177575757`) — acc1 в join **done**; сообщения часто `skip:filter`. Нужно: ослабить отсев по **Python**-ключам; если в объявлении **нет бюджета** — всё равно в ИИ; в карточке бюджет **«по договоренности»**.
+
+**Тикет:** [`2026-05-24-tg-prompt-test-group.md`](../problems/2026-05-24-tg-prompt-test-group.md)
+
+| # | Готово когда |
+|---|--------------|
+| L1 | В `docs/ops/FILTERS.md` в «Берём» добавлены подстроки под Python-стек: `python`, `python3`, `django`, `fastapi`, `flask` (в блок **Парсинг и данные** или отдельная строка **Python:**) |
+| L2 | `src/tg_monitor.py`: для TG, если в тексте нет распознанного бюджета → `budget_text="по договоренности"` (не пустая строка); при наличии суммы в тексте — парсить в `budget_text` как на FL |
+| L3 | `src/telegram_notify.py` + `src/ai_analyze.py`: fallback пустого бюджета для отображения и промпта — **«по договоренности»** (единое с L2) |
+| L4 | Пустой/«по договоренности» бюджет **не** даёт `skip:budget` в `lead_pipeline` (сейчас `meets_min_budget` уже пропускает None — проверить после L2) |
+| L5 | Тест: пост в `prompt-test` без суммы, со словом «Python» → в `radar.log` нет `skip:filter`, есть цепочка до ИИ/бота; в карточке 💰 «по договоренности» |
+
+**Файлы:** `docs/ops/FILTERS.md`, `src/tg_monitor.py`, `src/telegram_notify.py`, `src/ai_analyze.py` (при необходимости `src/budget.py` — только если «по договоренности» начнёт резаться как число)
+
+**Не менять:** `FILTER_WIDE` в `.env` без владельца; join-очередь.
+
+---
+
 ## Не делать
 
 - `TASKS.md`, `FOR_YOU.md`
@@ -155,4 +183,87 @@
 
 ---
 
-_Lead · 2026-05-24 · порядок: **@mechanic § K (radar_control)** → **§ J ✅** → **@coder § H** → **§ B**_
+_Lead · 2026-05-24 · порядок: **§ R (пульт логи)** → **§ P (лампа TG)** → **§ O (Neon dedup)** → § L → § B_
+
+---
+
+## M. TG relay: пересыл есть, карточка ИИ пропала — **Coder, СРОЧНО**
+
+**Контекст (владелец 2026-05-24):** § H принят частично — **пересыл** в @FLPARSINGBOT работает (poll), **разбор ИИ** не приходит.
+
+**Тикет:** [`2026-05-24-tg-forward-not-via-bot.md`](../problems/2026-05-24-tg-forward-not-via-bot.md) § M
+
+**Доказательство в `data/radar.log`:** `увед=0` + `тг:relay:acc1:fail msg=135` → через 2 с poll `msg_id=431` ok — карточки нет.
+
+| # | Готово когда |
+|---|--------------|
+| M1 | Telethon acc→@FLPARSINGBOT ok → **`send_listing_notification` всегда** (карточка с «🤖 Разбор») |
+| M2 | Sync relay: retry с паузой **или** не блокировать карточку при 400 «message to forward not found» (poll догонит) |
+| M3 | Тест prompt-test → в чате @FLPARSINGBOT: **пересыл + карточка**; лог `увед=1` |
+
+**Файлы:** `src/tg_forward.py`, `src/lead_pipeline.py`, `src/telegram_control.py`, `docs/team/STATUS.md`
+
+---
+
+## O. Dedup: Neon — финальная точка (`content_hash` UNIQUE + UPSERT) — **Coder**
+
+**Контекст (владелец 2026-05-24):** локальный SQLite (`listing_fingerprints`) — быстрый фильтр; **истина** — Neon. Одинаковый текст объявления не должен дублироваться в облаке и в уведомлениях.
+
+**Сейчас (факт из repo):**
+
+| Слой | Что есть |
+|------|----------|
+| `listing_dedup.py` | нормализация + SHA-256 → `content_hash` |
+| SQLite `listing_fingerprints` | `INSERT OR IGNORE` → `skip:dup_content` |
+| Neon `pg_storage.py` | только `(source, external_id)` — **без** `content_hash` |
+
+**Цель:**
+
+| # | Готово когда |
+|---|--------------|
+| O1 | В таблице лидов Neon (`leads` сейчас в коде / `raw_leads` в [`NEON_SCHEMA.md`](NEON_SCHEMA.md)) колонка `content_hash TEXT NOT NULL` + **`UNIQUE (content_hash)`** |
+| O2 | Миграция в [`sql/001_neon_schema.sql`](../../sql/001_neon_schema.sql) + строка в `NEON_SCHEMA.md` |
+| O3 | `record_new_lead`: `INSERT … ON CONFLICT (content_hash) DO NOTHING` (или UPSERT без повторного notify); при конфликте — не слать в TG |
+| O4 | Порядок: hash → SQLite (как сейчас) → Neon; если Neon вернул «дубль» → `skip:dup_content` даже если SQLite пропустил гонку |
+| O5 | Пустой hash (нет текста) — не ломать ingest, только `(source, external_id)` |
+
+**Файлы:** `src/pg_storage.py`, `src/lead_pipeline.py`, `src/listing_dedup.py`, `sql/001_neon_schema.sql`, `docs/team/NEON_SCHEMA.md`, `docs/team/STATUS.md`
+
+---
+
+## P. Пульт: лампа TG зелёная только когда acc **реально в работе** — **Coder**
+
+**Контекст:** зелёный загорается сразу, хотя слушать начинают через ~1–2 мин. Сейчас `ok` = все acc имеют `chats_listen > 0` — это выставляется в `record_tg_monitor_start` **сразу после** `_add_monitor_peers`, **до** `run_until_disconnected` и до прогрева прокси.
+
+**Реализация § N (факт):** `tg_pult_lamp_state` в `radar_status.py` + `warn` в `radar_control.py` / `desktop` CSS.
+
+**Новая логика (рекомендация Lead):**
+
+| # | Готово когда |
+|---|--------------|
+| P1 | Флаг `status_tg_accN_ready=1` выставляется **после** регистрации handler и успешного `get_me` (не в `record_tg_monitor_start`) |
+| P2 | Лампа `ok` только если **все** acc из `TELETHON_MONITOR_ACCOUNTS` имеют `ready=1` |
+| P3 | До P2 — `warn` «подключение…» / `подключение 2/3» |
+| P4 | При старте tg_main сбрасывать `ready` (как `chats_listen`) |
+| P5 | Опционально: `ok` только если ещё свежий пульс tg_main (`write_tg_monitor_pulse`) — не зелёный «мёртвый» процесс |
+
+**Стоит ли:** **да** — иначе пульт врёт; стоимость ~10 строк на acc.
+
+**Файлы:** `src/tg_monitor.py`, `src/radar_status.py`, `scripts/radar_control.py`, `docs/team/STATUS.md`
+
+---
+
+## R. Пульт: при ▶ логи **не** открывать — **Coder**
+
+**Контекст (владелец):** при старте логи разворачиваются сами; нужны **свёрнутыми**, разворот — только стрелка.
+
+**Где сейчас открывают (факт):** `desktop/src/main.ts` — `onHeroClick` → `setLogsVisible(true)`; `pollStatus` → `if (running && !logsOpen) setLogsVisible(true)`.
+
+| # | Готово когда |
+|---|--------------|
+| R1 | После ▶ панель логов **скрыта** (`logsOpen=false` или collapsed по умолчанию) |
+| R2 | `pollStatus` **не** вызывает `setLogsVisible(true)` автоматически |
+| R3 | Стрелка collapse/expand работает как раньше |
+| R4 | `rebuild-pult.bat` — владелец пересобирает |
+
+**Файлы:** `desktop/src/main.ts`, `docs/team/STATUS.md`

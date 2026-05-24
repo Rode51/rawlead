@@ -34,32 +34,63 @@ class NeonLeadStorage:
     def enabled(self) -> bool:
         return bool(self._url)
 
-    def record_new_lead(self, project: ListingProject, errors: list[str]) -> None:
-        """После успешного SQLite try_record_new — INSERT ON CONFLICT DO NOTHING."""
+    def record_new_lead(
+        self,
+        project: ListingProject,
+        errors: list[str],
+        *,
+        content_hash: str = "",
+    ) -> bool:
+        """
+        INSERT ON CONFLICT DO NOTHING.
+        True — новая запись; False — дубль (content_hash или source+external_id).
+        Пустой content_hash — только UNIQUE (source, external_id).
+        """
         if not self.enabled:
-            return
+            return True
+        h = (content_hash or "").strip() or None
+        params = (
+            project.source,
+            str(project.project_id),
+            project.title,
+            project.url,
+            project.budget_text,
+        )
         try:
             with psycopg.connect(self._url) as conn:
                 with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        INSERT INTO leads (source, external_id, title, url, budget_text)
-                        VALUES (%s, %s, %s, %s, %s)
-                        ON CONFLICT (source, external_id) DO NOTHING
-                        """,
-                        (
-                            project.source,
-                            str(project.project_id),
-                            project.title,
-                            project.url,
-                            project.budget_text,
-                        ),
-                    )
+                    if h:
+                        cur.execute(
+                            """
+                            INSERT INTO leads (
+                                source, external_id, title, url, budget_text, content_hash
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (content_hash) DO NOTHING
+                            RETURNING id
+                            """,
+                            (*params, h),
+                        )
+                    else:
+                        cur.execute(
+                            """
+                            INSERT INTO leads (
+                                source, external_id, title, url, budget_text, content_hash
+                            )
+                            VALUES (%s, %s, %s, %s, %s, NULL)
+                            ON CONFLICT (source, external_id) DO NOTHING
+                            RETURNING id
+                            """,
+                            params,
+                        )
+                    inserted = cur.fetchone() is not None
                 conn.commit()
+                return inserted
         except Exception as exc:
             msg = f"pg:record:{project.source}:id={project.project_id}:{_short_pg_err(exc)}"
             logger.warning("%s", msg)
             errors.append(msg)
+            return True
 
     def update_on_notify(
         self,

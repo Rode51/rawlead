@@ -10,6 +10,13 @@ import requests
 from config import Config, telegram_requests_proxies
 from radar_status import format_status_message
 from storage import ProjectStorage
+from tg_chain_log import log_relay_api_call
+from tg_relay_allowlist import (
+    account_for_user_id,
+    is_allowlisted_user,
+    mark_message_relayed,
+    was_message_relayed,
+)
 
 _TELEGRAM_BOT_IN_PATH = re.compile(r"(/bot)[^/\s]+(/)")
 _PAUSE_CMDS = frozenset({"/pause", "/стоп"})
@@ -70,6 +77,144 @@ def _resolve_action(text: str) -> str | None:
     if s == BTN_STATUS:
         return _ACTION_STATUS
     return None
+
+
+def _message_from_user_id(message: dict) -> int | None:
+    from_user = message.get("from")
+    if not isinstance(from_user, dict):
+        return None
+    user_id = from_user.get("id")
+    if user_id is None:
+        return None
+    try:
+        return int(user_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def _message_chat_id(message: dict) -> int | None:
+    chat = message.get("chat")
+    if not isinstance(chat, dict):
+        return None
+    chat_id = chat.get("id")
+    if chat_id is None:
+        return None
+    try:
+        return int(chat_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def relay_message_to_owner_chat(
+    cfg: Config,
+    *,
+    from_chat_id: int,
+    message_id: int,
+    account: str = "",
+    errors: list[str] | None = None,
+    timeout_sec: float = 20.0,
+) -> bool:
+    """Bot API forwardMessage: acc→бот inbox → TELEGRAM_CHAT_ID (владелец)."""
+    key_from = int(from_chat_id)
+    key_msg = int(message_id)
+    if was_message_relayed(key_from, key_msg):
+        return True
+
+    proxies = telegram_requests_proxies(cfg)
+    owner_chat_id = cfg.telegram_chat_id.strip()
+    api_url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/forwardMessage"
+
+    try:
+        session = requests.Session()
+        session.trust_env = False
+        resp = session.post(
+            api_url,
+            data={
+                "chat_id": owner_chat_id,
+                "from_chat_id": str(key_from),
+                "message_id": str(key_msg),
+            },
+            timeout=timeout_sec,
+            proxies=proxies,
+        )
+    except requests.RequestException as exc:
+        if errors is not None:
+            errors.append(f"тг:relay:api:{_mask_token(str(exc))[:160]}")
+        return False
+
+    if resp.status_code != 200:
+        detail = ""
+        try:
+            body = resp.json()
+            if isinstance(body, dict):
+                desc = body.get("description")
+                if desc is not None and str(desc).strip():
+                    detail = " " + str(desc).strip()
+        except ValueError:
+            pass
+        if errors is not None:
+            errors.append(f"тг:relay:forwardMessage HTTP {resp.status_code}.{detail}")
+        return False
+
+    try:
+        body = resp.json()
+    except ValueError:
+        if errors is not None:
+            errors.append("тг:relay:forwardMessage не-json")
+        return False
+
+    if not body.get("ok", False):
+        desc = str(body.get("description") or "unknown error")
+        if errors is not None:
+            errors.append(f"тг:relay:forwardMessage {desc[:160]}")
+        return False
+
+    mark_message_relayed(key_from, key_msg)
+    if errors is not None:
+        try:
+            owner_id = int(owner_chat_id)
+        except ValueError:
+            owner_id = 0
+        log_relay_api_call(
+            errors,
+            owner_chat_id=owner_id,
+            from_chat_id=key_from,
+            message_id=key_msg,
+            account=account,
+        )
+    return True
+
+
+def _relay_allowlisted_message(
+    message: dict,
+    cfg: Config,
+    errors: list[str],
+) -> bool:
+    """Переслать сообщение от acc (allowlist) владельцу через Bot API."""
+    user_id = _message_from_user_id(message)
+    if user_id is None or not is_allowlisted_user(user_id):
+        return False
+
+    msg_id = message.get("message_id")
+    from_chat_id = _message_chat_id(message)
+    if msg_id is None or from_chat_id is None:
+        return False
+
+    text = message.get("text")
+    if isinstance(text, str) and text.strip() == "/start":
+        return False
+
+    acc = account_for_user_id(user_id) or ""
+    ok = relay_message_to_owner_chat(
+        cfg,
+        from_chat_id=from_chat_id,
+        message_id=int(msg_id),
+        account=acc,
+        errors=errors,
+    )
+    if ok and acc:
+        errors.append(f"тг:relay:{acc}:msg={msg_id}")
+    return ok
 
 
 def _authorized_chat_id(message: dict, cfg: Config) -> bool:
@@ -232,6 +377,12 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
         message = upd.get("message")
         if not isinstance(message, dict):
             continue
+
+        relay_user_id = _message_from_user_id(message)
+        if relay_user_id is not None and is_allowlisted_user(relay_user_id):
+            _relay_allowlisted_message(message, cfg, errors)
+            continue
+
         if not _authorized_chat_id(message, cfg):
             continue
 

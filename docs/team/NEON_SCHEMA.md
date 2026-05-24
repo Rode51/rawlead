@@ -34,10 +34,13 @@
 | `lead_tags` | JSONB | теги из ИИ: `["python","fastapi","parser"]` |
 | `ai_reasons` | JSONB | 2–3 строки «почему score» (для UI) |
 | `contour` | TEXT | **`owner`** (Дикий Запад) \| **`saas`** (White Label) — см. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0c |
+| `content_hash` | TEXT | SHA-256 нормализованного текста (`listing_dedup`); NULL — дедуп только по `source`+`external_id` |
 | `notified_at` | TIMESTAMPTZ | legacy / owner |
 | `created_at` | TIMESTAMPTZ | |
 
-**UNIQUE** `(source, external_id)` · индекс `created_at DESC` · **GIN** на `lead_tags`.
+**UNIQUE** `(source, external_id)` · **UNIQUE** `(content_hash)` где hash не NULL · индекс `created_at DESC` · **GIN** на `lead_tags`.
+
+Ingest: `INSERT … ON CONFLICT (content_hash) DO NOTHING` — при дубле текста не слать в TG (см. `pg_storage.record_new_lead`).
 
 ### `users`
 

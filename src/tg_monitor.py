@@ -23,17 +23,20 @@ from config import (
     tg_join_in_tg_main,
 )
 from radar_status import (
+    record_tg_acc_ready,
     record_tg_message,
     record_tg_monitor_start,
     record_tg_skip,
 )
 from tg_join_registry import register_monitor_join, unregister_monitor_join
 from tg_join_runner import run_join_tick
+from budget import extract_budget_text_from_post
 from filters import default_listing_filter
 from lead_pipeline import process_new_listing_from_tg, short_err
 from listing import ListingProject, telegram_source
 from pg_storage import pg_storage_from_config
 from storage import storage_from_config
+from tg_bot_start import ensure_bot_started
 from tg_client import connect_client
 from tg_join_lib import load_chat_registry_from_queue
 
@@ -127,7 +130,7 @@ def _listing_from_message(
     return ListingProject(
         project_id=int(message.id),
         title=title,
-        budget_text="",
+        budget_text=extract_budget_text_from_post(text),
         url=url,
         published_at=published,
         listing_snippet=snippet,
@@ -345,6 +348,13 @@ async def run_monitor() -> None:
             )
             continue
         client = await connect_client(acfg.account)
+        await ensure_bot_started(
+            client,
+            acfg.account,
+            log_fn=lambda msg: _append_log(
+                log_path, f"{radar_timestamp()} {msg}"
+            ),
+        )
         chat_ids: set[int] = set()
         await _add_monitor_peers(
             client,
@@ -409,6 +419,22 @@ async def run_monitor() -> None:
             pg=pg,
             log_path=log_path,
         )
+
+    for sess in sessions:
+        try:
+            await sess.client.get_me()  # type: ignore[attr-defined]
+            record_tg_acc_ready(storage, sess.account)
+            _append_log(
+                log_path,
+                f"{radar_timestamp()} тг:монитор:{sess.account}: ready",
+            )
+        except Exception as exc:
+            detail = f"get_me: {short_err(exc)}"
+            record_tg_skip(storage, sess.account, detail)
+            _append_log(
+                log_path,
+                f"{radar_timestamp()} тг:монитор:{sess.account}: {detail}",
+            )
 
     run_tasks = [
         asyncio.create_task(sess.client.run_until_disconnected())  # type: ignore[attr-defined]

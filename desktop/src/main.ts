@@ -8,7 +8,7 @@ const WIDTH = 400;
 const HEIGHT_COMPACT = 560;
 const HEIGHT_EXPANDED = 760;
 
-type LampState = "idle" | "ok" | "error";
+type LampState = "idle" | "ok" | "error" | "warn";
 
 interface LampInfo {
   key: string;
@@ -213,7 +213,7 @@ function setHeroBusy(busy: boolean): void {
 }
 
 function lampCaptionText(caption: string): string {
-  if (caption === "работает") return "";
+  if (caption === "работает" || caption === "слушает") return "";
   return caption;
 }
 
@@ -349,10 +349,6 @@ async function pollStatus(): Promise<void> {
     running = data.running;
     renderLamps(data.lamps);
     setHeroMode(running ? "stop" : "play");
-    if (running && !logsOpen) {
-      void setLogsVisible(true);
-      setLogsCollapsed(false);
-    }
     if (!running && logsOpen && !starting && !heroBusy) {
       void setLogsVisible(false);
       setLogsCollapsed(false);
@@ -383,11 +379,10 @@ async function runStart(): Promise<void> {
     }
     await apiPost(
       "/ui-expanded",
-      JSON.stringify({ expanded: true }),
+      JSON.stringify({ expanded: false }),
       15000,
     );
     clearStatus();
-    startLogPoll();
     await pollStatus();
   } catch (err) {
     if (!isCanceledError(err)) {
@@ -432,11 +427,9 @@ async function onHeroClick(): Promise<void> {
   starting = true;
   running = true;
   setHeroMode("stop");
-  setLogsCollapsed(false);
+  setLogsCollapsed(true);
   await setLogsVisible(true);
   showStatus("Запуск…", "warn");
-  startLogPoll();
-  void refreshActiveLog();
   void runStart();
 }
 
@@ -469,7 +462,20 @@ heroBtn.addEventListener("click", (e) => {
 });
 
 btnCollapse.addEventListener("click", () => {
+  const expanding = logsCollapsed;
+  if (!logsOpen) {
+    void setLogsVisible(true);
+  }
   setLogsCollapsed(!logsCollapsed);
+  if (isTauri()) {
+    void apiPost(
+      "/ui-expanded",
+      JSON.stringify({ expanded: expanding }),
+      15000,
+    ).catch(() => {
+      /* API может быть недоступен до старта */
+    });
+  }
 });
 
 tabButtons.forEach((btn) => {

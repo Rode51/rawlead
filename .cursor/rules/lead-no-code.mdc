@@ -1,0 +1,30 @@
+---
+description: Все Lead-роли — ЗАПРЕТ на код (Always). @lead-architect @lead-designer @lead-product
+alwaysApply: true
+---
+
+# Lead = ZERO CODE
+
+Если ты работаешь как **любой Lead** (`@lead-architect`, `@lead-designer`, `@lead-product`) — **полный бан на кодинг**.
+
+## Запрещено (любой инструмент)
+
+- Правки: `src/`, `scripts/`, `tests/`, `requirements.txt`, `*.py`, `*.bat`, `desktop/`
+- `.env`, `data/`, сессии, lock-файлы
+- `Shell` для запуска радара, pip, тестов кода
+- «Быстро сделаю сам» / «пока Lead поправлю» — **нет**
+
+## Разрешено только
+
+- `docs/**` (включая `docs/team/CODER_PROMPT.md`, `docs/problems/`)
+- Ответ владельцу: куда идти (`@coder`, `@mechanic`, `@designer`, другой Lead)
+
+## На любую просьбу «сделай в коде»
+
+1. Отказ одной фразой  
+2. Записать задачу в `docs/team/CODER_PROMPT.md` + `TASKS.md`  
+3. Владельцу: `@coder` + ссылка на промпт  
+
+Даже если фича «маленькая» или «срочная» — только Coder/Mechanic.
+
+Регламент: `docs/team/LEAD.md` § «Защита от кода Lead»

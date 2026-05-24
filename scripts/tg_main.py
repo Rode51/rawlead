@@ -30,7 +30,9 @@ from health_check import (  # noqa: E402
 )
 from radar_status import reset_tg_session_stats  # noqa: E402
 from proxy_probe import wait_active_monitor_proxies_live  # noqa: E402
+from tg_chain_log import log_config_ids  # noqa: E402
 from tg_monitor import reconnect_delay_sec, run_monitor  # noqa: E402
+from tg_relay_allowlist import refresh_allowlist_from_accounts  # noqa: E402
 
 _POLL_SEC = 2.0
 _HEARTBEAT_SEC = 120.0
@@ -158,6 +160,15 @@ async def _loop() -> None:
 
     ts = radar_timestamp()
     _append_log(log_path, f"{ts} тг:старт")
+    startup_errors: list[str] = []
+    log_config_ids(cfg, startup_errors, version="tg-main")
+    for line in startup_errors:
+        _append_log(log_path, f"{ts} {line}")
+    accounts = telethon_monitor_accounts()
+    await refresh_allowlist_from_accounts(
+        accounts,
+        log_fn=lambda msg: _append_log(log_path, f"{radar_timestamp()} {msg}"),
+    )
     mark_tg_monitor_started(storage)
     reset_tg_session_stats(storage, telethon_monitor_accounts())
 

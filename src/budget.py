@@ -4,7 +4,18 @@ from __future__ import annotations
 
 import re
 
+BUDGET_AGREED = "по договоренности"
+
 _DIGITS = re.compile(r"\d+")
+_BUDGET_PREFIX = re.compile(
+    r"(?:бюджет|цен[аы]|стоимость|оплат[аы])\s*[:\-]?\s*"
+    r"([\d][\d\s.,]*(?:\s*[-–—]\s*[\d][\d\s.,]*)?\s*(?:руб\.?|₽|р\.?|rub)?)",
+    re.IGNORECASE,
+)
+_RUB_AMOUNT = re.compile(
+    r"([\d][\d\s.,]*(?:\s*[-–—]\s*[\d][\d\s.,]*)?\s*(?:руб\.?|₽|р\.?\b|rub\b))",
+    re.IGNORECASE,
+)
 
 
 def parse_budget_rub(budget_text: str) -> int | None:
@@ -40,3 +51,41 @@ def meets_min_budget(budget_text: str, min_rub: int) -> bool:
     if parsed is None:
         return True
     return parsed >= min_rub
+
+
+def _budget_fragment_from_line(line: str) -> str | None:
+    for pattern in (_BUDGET_PREFIX, _RUB_AMOUNT):
+        for match in pattern.finditer(line):
+            fragment = match.group(1).strip()
+            if parse_budget_rub(fragment) is not None:
+                return fragment
+    return None
+
+
+def extract_budget_text_from_post(text: str) -> str:
+    """Сумма из текста TG-поста; иначе BUDGET_AGREED (не пустая строка)."""
+    raw = (text or "").strip()
+    if not raw:
+        return BUDGET_AGREED
+
+    budget_keys = ("бюджет", "руб", "₽", "оплат", "цен", "стоим")
+    for line in raw.splitlines():
+        low = line.casefold()
+        if any(key in low for key in budget_keys):
+            fragment = _budget_fragment_from_line(line)
+            if fragment:
+                return fragment
+
+    fragment = _budget_fragment_from_line(raw)
+    if fragment:
+        return fragment
+
+    return BUDGET_AGREED
+
+
+def display_budget_text(budget_text: str, *, is_telegram: bool) -> str:
+    """Подпись бюджета в карточке и промпте ИИ."""
+    value = (budget_text or "").strip()
+    if value:
+        return value
+    return BUDGET_AGREED if is_telegram else "не указан"

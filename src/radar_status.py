@@ -34,7 +34,16 @@ def _tg_key(account: str, suffix: str) -> str:
 def reset_tg_session_stats(storage: ProjectStorage, accounts: tuple[str, ...]) -> None:
     """Новый запуск окна TG — обнулить счётчики сессии."""
     for acc in accounts:
-        for suffix in ("msgs", "new", "notified", "last_err"):
+        for suffix in (
+            "msgs",
+            "new",
+            "notified",
+            "last_err",
+            "chats_listen",
+            "chats_file",
+            "started_at",
+            "ready",
+        ):
             storage.set_setting(_tg_key(acc, suffix), "0" if suffix != "last_err" else "")
 
 
@@ -46,9 +55,15 @@ def record_tg_monitor_start(
     chats_in_file: int,
 ) -> None:
     acc = account.strip().lower()
+    storage.set_setting(_tg_key(acc, "ready"), "0")
     storage.set_setting(_tg_key(acc, "chats_listen"), str(chats_listen))
     storage.set_setting(_tg_key(acc, "chats_file"), str(chats_in_file))
     storage.set_setting(_tg_key(acc, "started_at"), radar_timestamp())
+
+
+def record_tg_acc_ready(storage: ProjectStorage, account: str) -> None:
+    """Acc готов слушать: handler зарегистрирован, get_me ok."""
+    storage.set_setting(_tg_key(account.strip().lower(), "ready"), "1")
 
 
 def record_tg_message(
@@ -148,6 +163,60 @@ def _tg_monitor_state(storage: ProjectStorage) -> tuple[bool, str]:
     if warmup > 0:
         return True, f"прогрев (~{warmup}с, старый пульс {age}с)"
     return False, f"завис? ({age}с без пульса)"
+
+
+def _tg_pulse_fresh(storage: ProjectStorage) -> bool:
+    raw = storage.get_setting(_TG_MONITOR_PULSE_KEY, "0").strip()
+    try:
+        last_pulse = float(raw)
+    except ValueError:
+        last_pulse = 0.0
+    if last_pulse <= 0:
+        return tg_monitor_warmup_remaining_sec(storage) > 0
+    return (time.time() - last_pulse) <= _TG_MONITOR_PULSE_MAX_AGE_SEC
+
+
+def tg_pult_lamp_state(
+    storage: ProjectStorage,
+    *,
+    process_alive: bool,
+) -> tuple[str, str]:
+    """
+    Лампа TG на пульте: idle | warn (оранж) | ok | error.
+    ok — все acc ready=1 и свежий пульс tg_main.
+    """
+    if not process_alive:
+        return "idle", ""
+
+    if not is_tg_monitor_active():
+        return "warn", "запуск…"
+
+    try:
+        tg_cfg = load_tg_monitor_config()
+        accounts = tuple(ac.account for ac in tg_cfg.accounts if ac.chat_ids)
+    except SystemExit:
+        accounts = ("acc1",)
+
+    if not accounts:
+        return "error", "нет чатов"
+
+    total = len(accounts)
+    ready = sum(
+        1 for acc in accounts if _int_setting(storage, _tg_key(acc, "ready")) > 0
+    )
+
+    if ready >= total:
+        if _tg_pulse_fresh(storage):
+            return "ok", "слушает"
+        warmup = tg_monitor_warmup_remaining_sec(storage)
+        if warmup > 0:
+            return "warn", f"прогрев (~{warmup}с)"
+        return "warn", "подключение…"
+
+    if ready > 0:
+        return "warn", f"подключение {ready}/{total}"
+
+    return "warn", "подключение…"
 
 
 def format_status_message(cfg: Config, storage: ProjectStorage) -> str:

@@ -12,11 +12,14 @@
 | Вопрос / задача | Куда | Первое сообщение |
 |-----------------|------|------------------|
 | Что делать **тебе** | **`docs/FOR_YOU.md`** | без чата |
-| План, docs, ревью | **Lead** `@lead-architect` | роль: `lead-architect.mdc` · страховка: `lead-no-code.mdc` (Always) |
-| **Дизайн UI** (постоянно) | **Designer** (новый чат) | `@designer` + `@docs/team/DESIGNER_PROMPT.md` · роль: [`DESIGNER.md`](DESIGNER.md) |
-| **Фича / код** | **Coder** (новый чат) | `@coder` + `@docs/team/CODER_PROMPT.md` · гард: `code-guard.mdc` при `src/` |
-| **Поломка** | **Mechanic** `@mechanic` | `@docs/problems/…` + `.cursor/rules/mechanic.mdc` |
-| Brainstorm | **Gemini** → итог → Lead | — |
+| **Продукт:** vision, контуры, метрики | **Lead Product** `@lead-product` | **`PRODUCT_VISION.md`** · инициатива: `LEAD_PRODUCT_PROMPT.md` |
+| **Roadmap, TASKS, приоритеты в работу** | **Lead Architect** `@lead-architect` | **`ROADMAP.md`** ← из vision |
+| **Дизайн:** стратегия UI, система, план | **Lead Designer** `@lead-designer` | [`LEAD_DESIGN.md`](team/LEAD_DESIGN.md) · план: `LEAD_DESIGN_PROMPT.md` |
+| **Инженерия:** docs, Coder, приёмка | **Lead Architect** `@lead-architect` | `lead-architect.mdc` · `CODER_PROMPT.md` |
+| **Дизайн UI** (исполнение) | **Designer** (новый чат) | `@designer` + `DESIGNER_PROMPT.md` (от Lead Designer) |
+| **Фича / код** | **Coder** (новый чат) | `@coder` + `CODER_PROMPT.md` (от Lead Architect) |
+| **Поломка** | **Mechanic** `@mechanic` | `docs/problems/…` |
+| Brainstorm | **Gemini** → итог → нужный Lead | — |
 
 ### Правила Cursor — не путать
 
@@ -27,7 +30,7 @@
 | Тип | Файлы |
 |-----|--------|
 | **Always** | `economy.mdc`, `lead-no-code.mdc` |
-| **Роль (@ в чате)** | `lead-architect`, `coder`, `mechanic`, `designer`, `owner` |
+| **Роль (@ в чате)** | `lead-architect`, `lead-product`, `lead-designer`, `coder`, `mechanic`, `designer`, `owner` |
 | **Гард по путям** | `code-guard.mdc` — когда открыт код |
 
 **Apply Intelligently** в UI = Agent сам решает по `description`; для ролей надёжнее **`@coder`** / **`@lead-architect`**, а не полагаться на «умное» подключение.
@@ -40,15 +43,20 @@
 
 ---
 
-## Три роли → три чата
+## Отдельный чат на роль
 
-Стартовые фразы — в **`.cursor/rules/*.mdc`** (не дублировать здесь).
+Стартовые фразы — в **`.cursor/rules/*.mdc`**.
 
-| Роль | Когда писать | Не писать |
-|------|--------------|-----------|
-| **Lead** | план, docs, промпты, ревью | код, `.env`, скрипты |
-| **Coder** | есть **`CODER_PROMPT.md`** | без промпта от Lead |
-| **Mechanic** | есть тикет в **`docs/problems/`** | дебаг MVP в Lead-чате |
+| Роль | Когда | Чат |
+|------|-------|-----|
+| **Lead Product** | стратегия, roadmap | `@lead-product` |
+| **Lead Designer** | план UI, design system | `@lead-designer` |
+| **Lead Architect** | инженерия, Coder-промпт | `@lead-architect` |
+| **Designer** | есть `DESIGNER_PROMPT.md` | `@designer` |
+| **Coder** | есть `CODER_PROMPT.md` | `@coder` |
+| **Mechanic** | тикет `docs/problems/` | `@mechanic` |
+
+**Lead-* не кодят.** Внедрение — ты + Coder/Designer по их PROMPT-файлам.
 
 **После Mechanic:** Lead — «тикет закрыт, обнови FOR_YOU».
 
@@ -92,4 +100,4 @@
 
 1. **Open Folder** → `uisness`
 2. **Settings → Rules** → Project Rules включены
-3. Закладки чатов: **Lead**, **Coder**, **Mechanic** (переименуй в UI)
+3. Закладки чатов: **Lead PM**, **Lead Design**, **Lead Arch**, **Coder**, **Designer**, **Mechanic**

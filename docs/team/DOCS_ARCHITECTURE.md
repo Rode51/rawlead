@@ -33,12 +33,17 @@
 
 | Тема | Файл |
 |------|------|
-| Фазы | `team/ROADMAP.md` |
+| Фазы (из vision) | `team/ROADMAP.md` — **Lead Architect** |
+| Vision продукта | `team/PRODUCT_VISION.md` — **Lead Product** |
 | Шаги владельца | `FOR_YOU.md` |
 | Как устроено | `KAK_ETO_RABOTAET.md` |
 | Очередь | `team/TASKS.md` |
 | Снимок | `team/STATUS.md` |
 | Coder ТЗ | `team/CODER_PROMPT.md` |
+| Product план (Lead PM) | `team/LEAD_PRODUCT_PROMPT.md` |
+| Design план (Lead Design) | `team/LEAD_DESIGN_PROMPT.md` |
+| Product регламент | `team/LEAD_PRODUCT.md` |
+| Design регламент | `team/LEAD_DESIGN.md` |
 | AI карта | `team/PROJECT_MAP.md` |
 | Запуск | `ops/RUN.md` |
 | TG acc | `ops/TELEGRAM_ACCOUNTS.md` |

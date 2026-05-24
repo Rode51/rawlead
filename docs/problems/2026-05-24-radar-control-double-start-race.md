@@ -1,7 +1,7 @@
 # radar_control: race condition при двойном запуске VBS
 
 **Дата:** 2026-05-24  
-**Статус:** открыт — Mechanic  
+**Статус:** решено — Mechanic  
 **Связь:** [`2026-05-24-radar-control-psutil.md`](2026-05-24-radar-control-psutil.md)
 
 ---
@@ -79,3 +79,28 @@ if not _acquire_single_instance():
 2. Кликнуть ярлык **дважды быстро** → подождать 5 с → **ровно один** radar_control.py в процессах.
 3. `curl http://127.0.0.1:18765/health` → `{"ok":true}`.
 4. Закрыть пульт → снова одиночный клик → снова работает.
+
+---
+
+## Решение (Mechanic, 2026-05-24)
+
+| Критерий | Статус |
+|----------|--------|
+| D1 `kill_other_radar_control()` убран из `main()` | уже было (только lock) |
+| D2 `kill_all_radar_control` в bat перед стартом | было |
+| D3 `timeout /t 1` после kill | было |
+| D4/D5 launcher → один system `pythonw` | **сделано** |
+
+**Корень дубля:** `.venv\Scripts\pythonw.exe` на Windows — shim/launcher; поднимает второй `Python311\pythonw.exe` без venv-пакетов → два `radar_control`, гонка kill в bat.
+
+**Правка в `start-radar-desktop.bat`:**
+- `pythonw` берётся из `executable` в `.venv\pyvenv.cfg` (`python.exe` → `pythonw.exe`) — фактически `…\Python311\pythonw.exe`.
+- `PYTHONPATH=%RADAR_ROOT%\.venv\Lib\site-packages` перед `start /B` (psutil и deps; `src` radar_control добавляет сам).
+
+**Изменённые файлы:** `scripts/start-radar-desktop.bat`
+
+**Проверка (Mechanic):**
+1. После старта с `PYTHONPATH` + system `pythonw` → **1** процесс `pythonw.exe` с `radar_control` в CommandLine (не пара `.venv` + system).
+2. `curl http://127.0.0.1:18765/health` → `{"ok": true}`.
+
+**Владельцу:** закрыть пульт → VBS/ярлык → PowerShell: один `radar_control`; двойной быстрый клик → по-прежнему один API (kill в bat + lock в `main()`).
