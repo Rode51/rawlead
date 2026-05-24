@@ -12,13 +12,27 @@
 | Вопрос / задача | Куда | Первое сообщение |
 |-----------------|------|------------------|
 | Что делать **тебе** | **`docs/FOR_YOU.md`** | без чата |
-| План, docs, ревью | **Lead** `@lead-architect` | `.cursor/rules/lead-architect.mdc` · **без кода, ever** |
+| План, docs, ревью | **Lead** `@lead-architect` | роль: `lead-architect.mdc` · страховка: `lead-no-code.mdc` (Always) |
 | **Дизайн UI** (постоянно) | **Designer** (новый чат) | `@designer` + `@docs/team/DESIGNER_PROMPT.md` · роль: [`DESIGNER.md`](DESIGNER.md) |
-| **Фича / код** | **Coder** (новый чат) | `@coder` + `@docs/team/CODER_PROMPT.md` |
+| **Фича / код** | **Coder** (новый чат) | `@coder` + `@docs/team/CODER_PROMPT.md` · гард: `code-guard.mdc` при `src/` |
 | **Поломка** | **Mechanic** `@mechanic` | `@docs/problems/…` + `.cursor/rules/mechanic.mdc` |
 | Brainstorm | **Gemini** → итог → Lead | — |
 
-Роли: **`.cursor/rules/`** (`@lead-architect` · `@designer` · `@coder` · `@mechanic` · `@owner`) · масштаб: **[`SCALE.md`](SCALE.md)** · бэкап: **[`../ops/BACKUP.md`](../ops/BACKUP.md)**
+### Правила Cursor — не путать
+
+Карта всех AI: **[`docs/team/PROJECT_MAP.md`](team/PROJECT_MAP.md)** · детали: `ARCHITECTURE.md`, `CODE_STRUCTURE.md`.
+
+Карта всех `.mdc`: **`.cursor/rules/README.md`**.
+
+| Тип | Файлы |
+|-----|--------|
+| **Always** | `economy.mdc`, `lead-no-code.mdc` |
+| **Роль (@ в чате)** | `lead-architect`, `coder`, `mechanic`, `designer`, `owner` |
+| **Гард по путям** | `code-guard.mdc` — когда открыт код |
+
+**Apply Intelligently** в UI = Agent сам решает по `description`; для ролей надёжнее **`@coder`** / **`@lead-architect`**, а не полагаться на «умное» подключение.
+
+Роли: **`.cursor/rules/`** · масштаб: **[`SCALE.md`](SCALE.md)** · бэкап: **[`../ops/BACKUP.md`](../ops/BACKUP.md)**
 
 **Не пиши Coder** «объясни весь проект» — он читает `CODER_PROMPT.md` / `TZ.md` сам.
 

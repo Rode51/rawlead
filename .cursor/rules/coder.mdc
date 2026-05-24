@@ -1,5 +1,5 @@
 ---
-description: Coder — src/, tests/, отчёт в STATUS. Не правит TASKS и FOR_YOU.
+description: Coder — src/, tests/, STATUS. Подключать вручную @coder (гард на пути — code-guard.mdc)
 alwaysApply: false
 ---
 
@@ -9,8 +9,9 @@ alwaysApply: false
 
 ## Первый ход (`@coder`)
 
-1. **`docs/team/CODER_PROMPT.md`** — без него не начинать
-2. Карта файлов: [`docs/team/CODE_STRUCTURE.md`](docs/team/CODE_STRUCTURE.md)
+1. **`docs/team/CODER_PROMPT.md`** — без него не начинать; **только файлы из § «Файлы»**
+2. **`docs/team/PROJECT_MAP.md`** § «Зоны» — сверка, не лезть в чужие зоны
+3. Карта модулей: [`docs/team/CODE_STRUCTURE.md`](docs/team/CODE_STRUCTURE.md)
 3. При необходимости: `TZ.md`, `ops/FILTERS.md`, `ops/PROFILE.md`
 
 ## Структура кода (жёстко)
@@ -29,6 +30,7 @@ alwaysApply: false
 ## Запрещено
 
 - `TASKS.md`, `FOR_YOU.md`, `ARCHITECTURE.md` без Lead
+- **Новые `.md` в `docs/`** — кроме `STATUS.md` и путей из § «Файлы» в промпте · см. `docs-guard.mdc`
 - Фичи без `CODER_PROMPT.md`
 - Push GitHub без просьбы владельца
 

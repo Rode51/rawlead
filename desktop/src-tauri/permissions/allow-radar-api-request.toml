@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-radar-api-request"
+description = "Enables radar_api_request — HTTP к radar_control (reqwest, localhost)."
+commands.allow = ["radar_api_request"]

@@ -122,6 +122,13 @@
 
 ---
 
+## 2026-05-24 — Coder: пульт ✕=стоп + логи по стрелке (принято Lead)
+
+- `desktop/src/main.ts` — `stopRadarCore`, `onCloseRequested`, логи collapsed при ▶
+- Тикет: `problems/2026-05-24-pult-close-stop-logs.md`
+
+---
+
 ## 2026-05-23 — Coder: авто `telethon_chat_ids.txt` (принято Lead)
 
 - append после join acc1; `tg_sync_chat_ids.py`; `.env` → файл id

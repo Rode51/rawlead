@@ -37,13 +37,13 @@ pip install -r requirements.txt
 1. В корне репозитория скопируйте шаблон:  
    `Copy-Item .env.example .env`
 2. Откройте `.env` в редакторе и подставьте свои значения. **Список переменных и смысл полей** — в `.env.example` и в `src/config.py`.  
-   Примеры URL ленты FL.ru — в `docs/ops/SOURCES.md`; слова «берём / стоп» — в `docs/ops/FILTERS.md`.
+   Примеры URL ленты FL.ru — в `docs/ops/SOURCES_POOLS.md` и `docs/archive/SOURCES.md`; слова «берём / стоп» — в `docs/ops/FILTERS.md`.
 
 Обязательно задайте как минимум: `FL_PROJECTS_URL`, `POLL_INTERVAL_MINUTES` (≥ 10), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, **`TG_PROXY_URL`** (только для Bot API; парсер FL — без прокси).
 
 ### ИИ-разбор (этап 2, опционально)
 
-Подробности: **`docs/team/AI.md`**, UX — **`docs/team/TZ.md` §5**. Ключ: [openrouter.ai/keys](https://openrouter.ai/keys) (**в Git не коммитить**).
+Подробности: **`docs/team/AI.md`**, UX — **`docs/team/archive/TZ.md` §5**. Ключ: [openrouter.ai/keys](https://openrouter.ai/keys) (**в Git не коммитить**).
 
 | Переменная | Значение по умолчанию в example |
 |------------|----------------------------------|
@@ -205,6 +205,15 @@ TELETHON_CHAT_IDS=data/telethon_chat_ids_acc1.txt
 Файлы `data/telethon_chat_ids_acc1.txt`, `_acc2.txt`, `_acc3.txt` (gitignore). При первом запуске `tg_main` пустой файл сидится из `done` в [`TG_JOIN_QUEUE.csv`](TG_JOIN_QUEUE.csv) для своего `account`. После join id дописывается в **свой** файл; все monitor acc подхватывают listen без рестарта (`TG_JOIN_IN_TG_MAIN=1`, join внутри `tg_main`).
 
 Пересобрать все listen-файлы из CSV: `python scripts/tg_sync_chat_ids.py --account all`
+
+**/start у бота с acc (без телефона):** владелец не имеет доступа к номерам acc1/2/3 — только `.session` на ПК. Каждый acc один раз шлёт `/start` боту [@FLPARSINGBOT](https://t.me/FLPARSINGBOT) через Telethon:
+
+```powershell
+cd C:\Users\hramo\uisness
+.venv\Scripts\python.exe scripts/tg_bot_start.py --account all
+```
+
+При старте `tg_main` тот же ensure выполняется автоматически (флаг `data/.tg_bot_started_accN`, без спама при рестарте). Новый acc: после сессии в `.env` → `tg_bot_start.py --account accN` → join. Опционально в `.env`: `TELEGRAM_BOT_USERNAME=FLPARSINGBOT`.
 
 **Запуск «всё само» (рекомендуется):** один раз `scripts\start-radar-full.bat` — биржи + TG (join acc1/2/3 внутри `tg_main`). Остановка: `scripts\stop-radar.bat`.
 

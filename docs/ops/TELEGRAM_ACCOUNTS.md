@@ -71,3 +71,52 @@ cd C:\Users\hramo\uisness
 **acc4** (`234694761`) — бэклог Coder ([`../team/TASKS.md`](../team/TASKS.md)).
 
 Join: [`TG_JOIN_QUEUE.csv`](TG_JOIN_QUEUE.csv) · [`TG_JOIN_SCHEDULE.md`](TG_JOIN_SCHEDULE.md) · [`RUN.md`](RUN.md).
+
+---
+
+## /start у бота (мониторинговые acc) — только код
+
+**Бот:** [@FLPARSINGBOT](https://t.me/FLPARSINGBOT)
+
+Владелец **не имеет доступа к телефонам** acc — только файлы `.session` на ПК. **`/start` у бота для acc1/2/3 делает Telethon**, не руками.
+
+| Acc | Сессия (`.env`) | Как /start |
+|-----|-----------------|------------|
+| acc1 | `TELETHON_SESSION_ACC1` | Coder § F: `tg_bot_start.py --account acc1` |
+| acc2 | `TELETHON_SESSION_ACC2` | то же |
+| acc3 | `TELETHON_SESSION_ACC3` | то же |
+
+После сдачи Coder — одна команда:
+
+```powershell
+.venv\Scripts\python.exe scripts/tg_bot_start.py --account all
+```
+
+Плюс **auto ensure** при каждом старте `tg_main` (новые acc — тот же скрипт с `--account accN` после добавления сессии в `.env`).
+
+Тикет: [`problems/2026-05-24-tg-acc-bot-start.md`](../problems/2026-05-24-tg-acc-bot-start.md)
+
+---
+
+## Relay acc → бот → владелец (§ H)
+
+Цепочка: **группа → acc (Telethon) → @FLPARSINGBOT → бот пересылает тебе в чат с ботом → карточка ИИ.**
+
+| Файл | Назначение |
+|------|------------|
+| `data/tg_relay_allowlist.json` | `{ "acc1": user_id, … }` — **не в Git**, обновляется автоматически |
+| `data/.tg_bot_started_accN` | acc уже отправил `/start` боту |
+
+**Регистрация allowlist:** при `tg_bot_start.py` (`get_me`) и при старте `tg_main` (refresh всех `TELETHON_MONITOR_ACCOUNTS`).
+
+**Проверка:**
+
+```powershell
+.venv\Scripts\python.exe scripts/tg_bot_start.py --account all --force
+# пульт ■ → ▶
+# тестовый пост не с acc1 — смотреть только чат @FLPARSINGBOT
+```
+
+В `data/radar.log`: `тг:relay:accN:msg=…` · нет `PeerUser` на id владельца.
+
+Тикет: [`problems/2026-05-24-tg-forward-not-via-bot.md`](../problems/2026-05-24-tg-forward-not-via-bot.md)

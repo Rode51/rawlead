@@ -46,12 +46,12 @@
 
 ## Биржи
 
-| Источник | `.env` |
-|----------|--------|
-| FL.ru | `FL_PROJECTS_URL` |
-| Kwork | `KWORK_PROJECTS_URL` |
+| Источник | `.env` | URL (старт) |
+|----------|--------|-------------|
+| FL.ru | `FL_PROJECTS_URL` | `https://www.fl.ru/projects/?kind=1` — см. [`../archive/SOURCES.md`](../archive/SOURCES.md) |
+| Kwork | `KWORK_PROJECTS_URL` | `https://kwork.ru/projects` |
 
-См. [`SOURCES.md`](SOURCES.md).
+Пагинация FL: до 3 страниц в `fl_parser.py`. Детали URL — архив [`SOURCES.md`](../archive/SOURCES.md).
 
 ---
 

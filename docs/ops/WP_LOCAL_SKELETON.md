@@ -2,8 +2,8 @@
 
 Для **обучения WP** и черновика будущего SaaS. Радар на ПК **не требует** этого шага.
 
-Видение продукта: [`../team/VISION_SAAS_SITE.md`](../team/VISION_SAAS_SITE.md).  
-Тексты страниц: [`wp-skeleton/`](wp-skeleton/).
+Видение продукта: [`../team/PRODUCT_VISION.md`](../team/PRODUCT_VISION.md).  
+Тексты страниц: [`../archive/wp-skeleton/`](../archive/wp-skeleton/).
 
 ---
 
@@ -31,7 +31,7 @@
 
 **Тема:** встроенная **Twenty Twenty-Four** или **Twenty Twenty-Five** — достаточно для скелета. Позже — Kadence / Astra (бесплатные).
 
-**Следующий шаг:** [`WP_CURSOR_CONNECT.md`](WP_CURSOR_CONNECT.md) (папка WP в Cursor + плагин) → § 3 — пять страниц из [`wp-skeleton/`](wp-skeleton/).
+**Следующий шаг:** [`WP_CURSOR_CONNECT.md`](WP_CURSOR_CONNECT.md) (папка WP в Cursor + плагин) → § 3 — пять страниц из [`../archive/wp-skeleton/`](../archive/wp-skeleton/).
 
 ---
 
@@ -41,11 +41,11 @@
 
 | Slug | Название | Контент |
 |------|----------|---------|
-| `home` | Главная | [`wp-skeleton/home.md`](wp-skeleton/home.md) |
-| `how` | Как работает | [`wp-skeleton/how.md`](wp-skeleton/how.md) |
-| `pricing` | Тарифы | [`wp-skeleton/pricing.md`](wp-skeleton/pricing.md) |
-| `faq` | Вопросы | [`wp-skeleton/faq.md`](wp-skeleton/faq.md) |
-| `contact` | Контакты | [`wp-skeleton/contact.md`](wp-skeleton/contact.md) |
+| `home` | Главная | [`../archive/wp-skeleton/home.md`](../archive/wp-skeleton/home.md) |
+| `how` | Как работает | [`../archive/wp-skeleton/how.md`](../archive/wp-skeleton/how.md) |
+| `pricing` | Тарифы | [`../archive/wp-skeleton/pricing.md`](../archive/wp-skeleton/pricing.md) |
+| `faq` | Вопросы | [`../archive/wp-skeleton/faq.md`](../archive/wp-skeleton/faq.md) |
+| `contact` | Контакты | [`../archive/wp-skeleton/contact.md`](../archive/wp-skeleton/contact.md) |
 
 В редакторе: вставь текст из `.md` (заголовки → блоки «Заголовок», списки → «Маркированный список»).
 
@@ -86,7 +86,7 @@
 - Подключение к Neon / радару.
 - Подписки и оплата.
 
-Это **этап B** в [`VISION_SAAS_SITE.md`](../team/VISION_SAAS_SITE.md).
+Это **этап B** в [`PRODUCT_VISION.md`](../team/PRODUCT_VISION.md).
 
 ---
 

@@ -18,6 +18,7 @@ data/telethon_chat_ids_acc1.txt
 data/telethon_chat_ids_acc2.txt
 data/telethon_chat_ids_acc3.txt
 data/.tg_main.lock
+data/.main.lock
 data/.bot_poll.lock
 data/.radar_desktop.lock
 src/data/

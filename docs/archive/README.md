@@ -1,8 +1,12 @@
 # Архив docs
 
-Справочное и разовые материалы — **не** для ежедневной работы. Актуальные шаги: [`../FOR_YOU.md`](../FOR_YOU.md).
+Устаревшие и справочные материалы — **не для ежедневной работы**.
 
-| Файл | Зачем хранится |
-|------|----------------|
-| [`CURSOR_DEEP_RESEARCH_2026.md`](CURSOR_DEEP_RESEARCH_2026.md) | Аудит Cursor IDE (2026) |
-| [`RESEARCH_PROMPT_TG_CHATS.md`](RESEARCH_PROMPT_TG_CHATS.md) | Промпт для поиска TG-чатов (Gemini/ChatGPT) |
+| Актуально | Куда |
+|-----------|------|
+| Шаги владельца | [`../FOR_YOU.md`](../FOR_YOU.md) |
+| Карта всего | [`../README.md`](../README.md) |
+| FL/Kwork URL (детали) | [`SOURCES.md`](SOURCES.md) · кратко [`../ops/SOURCES_POOLS.md`](../ops/SOURCES_POOLS.md) |
+| WP тексты-скелет | [`wp-skeleton/`](wp-skeleton/) · prod: `wordpress/rawlead-kadence-child/` |
+
+Перенесено сюда Lead 2026-05-24 — см. [`../team/DOCS_ARCHITECTURE.md`](../team/DOCS_ARCHITECTURE.md).

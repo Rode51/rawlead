@@ -4,10 +4,8 @@ call "%~dp0_radar-env.bat"
 if errorlevel 1 pause & exit /b 1
 cd /d "%RADAR_ROOT%"
 
-REM Python API — убить зависший слушатель :18765, поднять заново
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr "127.0.0.1:18765" ^| findstr LISTENING') do (
-  taskkill /F /PID %%P >nul 2>&1
-)
+REM Python API — убить все radar_control (venv + system), потом запустить чистый
+"%RADAR_ROOT%\.venv\Scripts\python.exe" -c "import sys; sys.path.insert(0,r'%RADAR_ROOT%\src'); from process_guard import kill_all_radar_control; kill_all_radar_control()" >nul 2>&1
 timeout /t 1 /nobreak >nul
 start "" /B "%RADAR_ROOT%\.venv\Scripts\pythonw.exe" "%RADAR_ROOT%\scripts\radar_control.py"
 timeout /t 2 /nobreak >nul

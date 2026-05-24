@@ -1,6 +1,6 @@
 ﻿# ИИ для радара (этап 2)
 
-Решение Lead для Coder и владельца. Детали UX — **`docs/team/TZ.md` §5**.
+Решение Lead для Coder и владельца. Детали UX — **`docs/team/archive/TZ.md` §5**.
 
 ---
 

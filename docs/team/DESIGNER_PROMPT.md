@@ -1,7 +1,7 @@
 # Designer — активная задача
 
-**Нет открытой задачи.** Пульт v2 → [`DESIGN_BRIEF.md`](DESIGN_BRIEF.md) (утверждено Lead 2026-05-23).
+**Последняя сдача:** карта владельца ✅ [`design/rawlead/project-map-owner.png`](../design/rawlead/project-map-owner.png) (2026-05-24).
 
-Следующую задачу пишет Lead в этот файл.
+**Нет открытой задачи.** Следующую задачу пишет Lead в этот файл.
 
 **Роль:** [`DESIGNER.md`](DESIGNER.md)

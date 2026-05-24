@@ -104,7 +104,7 @@ cd C:\Users\hramo\uisness
 ## 9. Редактирование
 
 - Главная: правки в `wordpress/rawlead-kadence-child/template-parts/rawlead/` → снова `wp_install_rawlead_theme.py`.
-- Тексты страниц how/pricing/…: `docs/ops/wp-skeleton/*.md` → `wp_skeleton_setup.py` (пересобирает HTML плагина).
+- Тексты страниц how/pricing/…: `docs/archive/wp-skeleton/*.md` → `wp_skeleton_setup.py`
 
 ---
 

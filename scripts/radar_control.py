@@ -33,11 +33,11 @@ _LOG_JOIN = _ROOT / "data" / "tg_join.log"
 _TAIL_LINES = 200
 _DEFAULT_PORT = 18765
 
-_STOP_PS = (
-    "Get-CimInstance Win32_Process -Filter \"name='python.exe'\" | "
-    "Where-Object { $_.CommandLine -match "
-    "'uisness\\\\(src\\\\main|scripts\\\\tg_main|scripts\\\\tg_join_daemon|scripts\\\\tg_join_queue)' } | "
-    "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+from process_guard import (
+    count_radar_workers,
+    kill_duplicate_radar_workers,
+    kill_other_radar_control,
+    wait_radar_workers_stopped,
 )
 
 _lock_fh = None
@@ -89,18 +89,7 @@ def _hidden_popen(args: list[str], cwd: Path) -> subprocess.Popen:
     return subprocess.Popen(args, **kwargs)
 
 
-def stop_radar_processes() -> None:
-    if sys.platform == "win32":
-        try:
-            subprocess.run(
-                ["powershell", "-NoProfile", "-Command", _STOP_PS],
-                cwd=str(_ROOT),
-                creationflags=CREATE_NO_WINDOW,
-                check=False,
-                timeout=12,
-            )
-        except subprocess.TimeoutExpired:
-            pass
+def _release_stale_tg_lock() -> None:
     try:
         from health_check import try_release_stale_tg_main_lock
 
@@ -152,38 +141,18 @@ class RadarController:
                 ChildSpec("tg", "TG", "scripts/tg_main.py"),
             ]
 
-    def _running_needles(self) -> set[str]:
-        if sys.platform != "win32":
-            return set()
-        needles = [str(s.script_path()).replace("/", "\\") for s in self.children]
-        ps = (
-            "Get-CimInstance Win32_Process -Filter \"name='python.exe'\" | "
-            "ForEach-Object { $_.CommandLine }"
-        )
-        try:
-            r = subprocess.run(
-                ["powershell", "-NoProfile", "-Command", ps],
-                cwd=str(_ROOT),
-                capture_output=True,
-                text=True,
-                creationflags=CREATE_NO_WINDOW,
-                timeout=10,
-            )
-        except subprocess.TimeoutExpired:
-            return set()
-        cmdlines = r.stdout or ""
-        return {n for n in needles if n in cmdlines}
-
-    def _is_alive(self, spec: ChildSpec, running: set[str] | None = None) -> bool:
+    def _is_alive(self, spec: ChildSpec) -> bool:
         if spec.popen is not None and spec.popen.poll() is None:
             return True
-        if running is None:
-            running = self._running_needles()
-        needle = str(spec.script_path()).replace("/", "\\")
-        return needle in running
+        mc, tc = count_radar_workers()
+        if spec.key == "exchanges":
+            return mc > 0
+        if spec.key == "tg":
+            return tc > 0
+        return False
 
-    def workers_running(self, running: set[str] | None = None) -> bool:
-        return any(self._is_alive(s, running) for s in self.children)
+    def workers_running(self) -> bool:
+        return any(self._is_alive(s) for s in self.children)
 
     def set_ui_expanded(self, expanded: bool) -> None:
         with self._lock:
@@ -199,12 +168,17 @@ class RadarController:
                     "error": "no_venv",
                     "detail": f"Нет Python: {_PYTHON}",
                 }
+            mc, tc = count_radar_workers()
+            popens_ok = all(
+                s.popen is not None and s.popen.poll() is None for s in self.children
+            )
+            if popens_ok and mc >= 1 and tc >= 1:
+                return {"ok": False, "error": "already_running"}
             self._starting = True
             self._ever_started = True
             errors: list[str] = []
             try:
-                # Без PowerShell-sweep — иначе /start висит 30+ с
-                self._stop_unlocked(sweep_orphans=False)
+                self._stop_unlocked(sweep_orphans=True)
                 for spec in self.children:
                     script = spec.script_path()
                     if not script.is_file():
@@ -233,7 +207,9 @@ class RadarController:
                     pass
             spec.popen = None
         if sweep_orphans:
-            stop_radar_processes()
+            kill_duplicate_radar_workers(log_source="radar_control:stop")
+            wait_radar_workers_stopped()
+            _release_stale_tg_lock()
         self._ui_expanded = False
         return {"ok": True}
 
@@ -241,8 +217,8 @@ class RadarController:
         with self._lock:
             return self._stop_unlocked(sweep_orphans=True)
 
-    def lamp_state(self, spec: ChildSpec, running: set[str], workers_active: bool) -> str:
-        if self._is_alive(spec, running):
+    def lamp_state(self, spec: ChildSpec, workers_active: bool) -> str:
+        if self._is_alive(spec):
             return "ok"
         if self._ever_started and (self._ui_expanded or workers_active):
             return "error"
@@ -250,16 +226,15 @@ class RadarController:
 
     def status_payload(self) -> dict:
         with self._lock:
-            running = self._running_needles()
             for spec in self.children:
                 if spec.popen is not None and spec.popen.poll() is not None:
                     spec.popen = None
-            workers = self.workers_running(running)
+            workers = self.workers_running()
             if self._ui_expanded and not workers:
                 self._ui_expanded = False
             lamps = []
             for spec in self.children:
-                state = self.lamp_state(spec, running, workers)
+                state = self.lamp_state(spec, workers)
                 lamps.append(
                     {
                         "key": spec.key,

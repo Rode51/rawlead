@@ -1,15 +1,16 @@
-﻿# Документация RawLead
+﻿# RawLead — документация
 
-**С чего начать** — по роли:
+**Главный документ проекта.** В корне `docs/` только три файла для ежедневной работы — остальное по папкам ниже.
 
-| Кто | Файл |
-|-----|------|
-| **Владелец (ты)** | **[`FOR_YOU.md`](FOR_YOU.md)** — шаги · **[`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md)** — как устроено |
-| **Куда идём по фазам** | **[`ROADMAP.md`](ROADMAP.md)** |
-| **Lead / Coder / Mechanic** | **[`team/`](team/)** — [`team/LEAD.md`](team/LEAD.md), TASKS, STATUS |
-| **Настройка радара** | **[`ops/`](ops/)** — фильтры, профиль, запуск |
-| **Сломалось** | **[`problems/`](problems/)** — тикеты для Mechanic |
-| **Справочник (редко)** | **[`archive/`](archive/)** — промпты исследований, аудит Cursor |
+---
+
+## Три файла в корне (открывай их)
+
+| Файл | Когда |
+|------|--------|
+| **[`FOR_YOU.md`](FOR_YOU.md)** | **Что делать сейчас** — шаги, TG, пульт |
+| **[`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md)** | **Как устроено** — простым языком |
+| **README.md** | **Карта всего** — ты здесь |
 
 ---
 
@@ -17,34 +18,55 @@
 
 ```
 docs/
-  README.md           ← ты здесь
-  FOR_YOU.md          ← владелец: шаги
-  KAK_ETO_RABOTAET.md ← как работает (простым языком)
-  ROADMAP.md          ← фазы 0–4
-  PORTFOLIO.md        ← текст для резюме (не для запуска)
-  ops/                ← FILTERS, PROFILE, RUN, TG, пульт
-  team/               ← Lead/Coder: TASKS, STATUS, TZ, …
-  problems/           ← инциденты
-  archive/            ← не для ежедневной работы
+  FOR_YOU.md              ← твои шаги
+  KAK_ETO_RABOTAET.md     ← как работает
+  README.md               ← этот файл
+
+  team/                   ← процесс, фазы, AI, промпты
+  ops/                    ← запуск, TG, фильтры, WP
+  problems/               ← поломки (Mechanic)
+  design/                 ← UI, макеты
+  archive/                ← старое, не для каждый день
 ```
+
+| Папка | Зачем | Частое |
+|-------|--------|--------|
+| [`team/`](team/) | Lead, Coder, фазы, vision | [`team/ROADMAP.md`](team/ROADMAP.md) · [`team/STATUS.md`](team/STATUS.md) · [`team/TASKS.md`](team/TASKS.md) |
+| [`ops/`](ops/) | Запуск и настройка | [`RUN.md`](ops/RUN.md) · [`TELEGRAM_ACCOUNTS.md`](ops/TELEGRAM_ACCOUNTS.md) · [`DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
+| [`problems/`](problems/) | Тикеты багов | по дате |
+| [`design/`](design/) | Дизайн | [`design/rawlead/project-map-owner.png`](design/rawlead/project-map-owner.png) |
+| [`archive/`](archive/) | Архив | не открывать без нужды |
+
+Регламент «один канон — один файл»: [`team/DOCS_ARCHITECTURE.md`](team/DOCS_ARCHITECTURE.md) · Cursor: `docs-guard.mdc` при правке docs
 
 ---
 
-## ops/ — работоспособность
+## По роли
+
+| Кто | С чего начать |
+|-----|----------------|
+| **Ты** | [`FOR_YOU.md`](FOR_YOU.md) → [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) |
+| **Lead** | [`team/LEAD.md`](team/LEAD.md) · [`team/TASKS.md`](team/TASKS.md) · [`team/STATUS.md`](team/STATUS.md) |
+| **Coder** | [`team/CODER_PROMPT.md`](team/CODER_PROMPT.md) · [`team/PROJECT_MAP.md`](team/PROJECT_MAP.md) |
+| **Mechanic** | [`problems/`](problems/) |
+| **Designer** | [`team/DESIGNER_PROMPT.md`](team/DESIGNER_PROMPT.md) |
+
+Cursor: `@lead-architect` · `@coder` · `@mechanic` · `@designer` · правила — `.cursor/rules/`
+
+---
+
+## ops/ — быстрые ссылки
 
 | Файл | Зачем |
 |------|--------|
-| [`ops/FILTERS.md`](ops/FILTERS.md) | Слова «берём / стоп» — **читает код** |
-| [`ops/PROFILE.md`](ops/PROFILE.md) | Кто ты для ИИ — **читает код** |
-| [`ops/RUN.md`](ops/RUN.md) | Запуск, `.env`, пауза в TG |
-| [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) | Пульт Tauri, ярлык vbs |
-| [`ops/TELEGRAM_ACCOUNTS.md`](ops/TELEGRAM_ACCOUNTS.md) | 3 номера, прокси |
-| [`ops/BACKUP.md`](ops/BACKUP.md) | Бэкап `.env`, сессий |
-| [`ops/SOURCES_POOLS.md`](ops/SOURCES_POOLS.md) | MVP-чаты, chat_id |
-| [`ops/WP_LOCAL_SKELETON.md`](ops/WP_LOCAL_SKELETON.md) | Локальный WP |
-| [`ops/GIT.md`](ops/GIT.md) | GitHub Rode51/uisness |
-
-Полный список — по мере надобности в папке `ops/`.
+| [`ops/RUN.md`](ops/RUN.md) | `.env`, smoke, пауза бота |
+| [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) | Пульт Tauri, vbs |
+| [`ops/TELEGRAM_ACCOUNTS.md`](ops/TELEGRAM_ACCOUNTS.md) | acc1/2/3, @FLPARSINGBOT /start |
+| [`ops/FILTERS.md`](ops/FILTERS.md) | Слова «берём/стоп» — **читает код** |
+| [`ops/PROFILE.md`](ops/PROFILE.md) | Профиль ИИ — **читает код** |
+| [`ops/SOURCES_POOLS.md`](ops/SOURCES_POOLS.md) | TG-чаты, FL/Kwork URL |
+| [`ops/BACKUP.md`](ops/BACKUP.md) | Бэкап |
+| [`ops/GIT.md`](ops/GIT.md) | GitHub |
 
 ---
 
@@ -52,18 +74,12 @@ docs/
 
 | Файл | Зачем |
 |------|--------|
-| [`team/TASKS.md`](team/TASKS.md) | Очередь (активное) |
-| [`team/STATUS.md`](team/STATUS.md) | Сейчас / следующий шаг |
-| [`team/SCALE.md`](team/SCALE.md) | Цикл задач + чеклисты Lead |
-| [`team/HOW_TO_USE_CURSOR.md`](team/HOW_TO_USE_CURSOR.md) | Роли в Cursor |
-| [`team/DESIGN_BRIEF.md`](team/DESIGN_BRIEF.md) | UI пульта (эталон) |
-| [`team/ARCHITECTURE.md`](team/ARCHITECTURE.md) | Схема модулей |
-| [`team/CODE_STRUCTURE.md`](team/CODE_STRUCTURE.md) | Где какой файл; правила Coder |
-| [`team/TZ.md`](team/TZ.md) | ТЗ фазы 0 |
-| [`team/LEAD.md`](team/LEAD.md) | Регламент Lead |
+| [`team/ROADMAP.md`](team/ROADMAP.md) | Фазы и приоритет «сейчас» |
+| [`team/STATUS.md`](team/STATUS.md) | Снимок + блокеры |
+| [`team/TASKS.md`](team/TASKS.md) | Очередь |
+| [`team/PROJECT_MAP.md`](team/PROJECT_MAP.md) | Карта для AI |
+| [`team/PORTFOLIO.md`](team/PORTFOLIO.md) | Текст для резюме |
 
-Архив сданных задач: [`team/archive/TASKS_HISTORY.md`](team/archive/TASKS_HISTORY.md).
+---
 
-**Роли Cursor:** `.cursor/rules/*.mdc` (`@lead-architect` · `@designer` · `@coder` · `@mechanic` · `@owner`).
-
-**Шаблон для нового проекта:** `C:\Users\hramo\Templates\cursor-universal` (вне этого repo).
+_Индекс · корень docs/ = FOR_YOU + KAK_ETO + README_

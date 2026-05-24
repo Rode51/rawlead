@@ -1,6 +1,9 @@
 ﻿# Архитектура RawLead
 
-Краткая схема для Lead, Coder и владельца. Поведение — **`docs/team/TZ.md`**, TG — **`docs/team/TZ_TG.md`**.
+**Процессы на ПК и зоны кода** — канон: [`PROJECT_MAP.md`](PROJECT_MAP.md).  
+**Регламент docs** — [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md).
+
+Краткая схема для Lead, Coder. Поведение фазы 0 — **`archive/TZ.md`**, TG — **`TZ_TG.md`**.
 
 _Актуально: 2026-05-23 (фаза 1 + пульт + target v1 Neon/API)._
 

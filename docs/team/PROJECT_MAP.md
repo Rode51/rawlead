@@ -1,0 +1,129 @@
+# Карта проекта — для всех AI
+
+**Одна точка входа.** Детали — по ссылкам, не копировать сюда целиком.
+
+**Регламент docs (каноны, без дублей):** [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md)
+
+**Визуально (для тебя):** [`PROJECT_MAP_VISUAL.md`](PROJECT_MAP_VISUAL.md) · PNG: [`../design/rawlead/project-map-owner.png`](../design/rawlead/project-map-owner.png)
+
+| Кому | Первый файл |
+|------|-------------|
+| **Lead** | этот файл → `TASKS.md` → `CODER_PROMPT.md` |
+| **Coder** | **`CODER_PROMPT.md`** (разрешённые файлы) → этот файл § «Зоны» |
+| **Mechanic** | тикет `docs/problems/` → этот файл § «Зоны» |
+| **Designer** | `DESIGNER_PROMPT.md` → только `docs/design/` |
+| **Владелец** | `FOR_YOU.md` |
+
+**Lead обновляет** эту карту после каждой сдачи Coder/Mechanic, если менялись процессы, файлы или lock-правила.  
+**Coder не правит** этот файл.
+
+---
+
+## Процессы на ПК (не плодить)
+
+```mermaid
+flowchart TB
+  VBS["start-radar-desktop.vbs"]
+  RC["radar_control.py :18765"]
+  UI["desktop/ Tauri"]
+  M["src/main.py"]
+  T["scripts/tg_main.py"]
+
+  VBS --> RC
+  VBS --> UI
+  UI -->|HTTP /start /stop| RC
+  RC -->|subprocess .venv only| M
+  RC -->|subprocess .venv only| T
+```
+
+| Правило | Зачем |
+|---------|--------|
+| **Один venv** | `.venv\Scripts\python.exe` — не системный Python |
+| **2 worker'а max** | `main.py` + `tg_main.py` |
+| **Lock** | `data/.tg_main.lock`, `data/.radar_desktop.lock` |
+| **Дубли** | `src/process_guard.py` — убить чужие main/tg_main перед стартом |
+| **Join** | только **внутри** `tg_main` (`TG_JOIN_IN_TG_MAIN=1`) |
+
+Запуск: [`../ops/DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md) · схема: [`ARCHITECTURE.md`](ARCHITECTURE.md)
+
+---
+
+## Зоны — кто что трогает
+
+| Зона | Пути | Кто правит | Когда |
+|------|------|------------|--------|
+| **Пульт UI** | `desktop/src/main.ts`, `desktop/src/styles/` | Coder | только `CODER_PROMPT` § пульт |
+| **Пульт API** | `scripts/radar_control.py` | Coder | старт/стоп, логи, process_guard |
+| **Биржи** | `src/main.py`, `src/fl_parser.py`, `src/kwork_parser.py` | Coder | по промпту |
+| **TG runtime** | `scripts/tg_main.py`, `src/tg_monitor.py` | Coder / Mechanic | промпт / тикет |
+| **TG join** | `src/tg_join_*.py`, `docs/ops/TG_JOIN_QUEUE.csv` | Coder | промпт; CSV — Lead + import |
+| **Pipeline** | `src/lead_pipeline.py`, `src/filters.py`, `src/ai_analyze.py` | Coder | промпт |
+| **Конфиг** | `src/config.py` | Coder | минимальный diff |
+| **Guard** | `src/process_guard.py`, `src/health_check.py` | Coder / Mechanic | дубли, lock |
+| **Данные ПК** | `data/*` | **никто из AI** | владелец / runtime |
+| **Секреты** | `.env` | **владелец** | — |
+| **Docs процесс** | `docs/team/*`, `docs/problems/*` | Lead / Mechanic | Lead; Mechanic — тикет |
+| **Docs ops** | `docs/ops/*`, `FOR_YOU.md`, `KAK_ETO_RABOTAET.md` | Lead | после сдачи |
+| **WP** | `wordpress/rawlead-kadence-child/` | Coder | `CODER_PROMPT` § WP |
+
+**Coder:** правит **только** файлы из таблицы «Файлы» в активном `CODER_PROMPT.md`. Вне списка — стоп, спросить Lead.
+
+**Mechanic:** `src/`, `tests/`, `scripts/` — только файлы из тикета «Решение».
+
+---
+
+## Модули `src/` (куда не лезть без причины)
+
+Полная таблица: [`CODE_STRUCTURE.md`](CODE_STRUCTURE.md).
+
+| Симптом / задача | Смотреть сначала |
+|------------------|------------------|
+| ✕ пульт, ▶/■ | `desktop/src/main.ts`, `radar_control.py` |
+| Дубли python | `process_guard.py`, `radar_control.py` `/start` |
+| TG не читает чат | `telethon_chat_ids_accN.txt`, `tg_monitor.py`, дубли tg_main |
+| Join | `tg_join_runner.py`, `TG_JOIN_QUEUE.csv` |
+| Бот молчит | VPN, proxy, `tg_smoke.py`, `telegram_notify.py` |
+| Фильтр / ИИ | `filters.py`, `lead_pipeline.py`, `docs/ops/FILTERS.md` |
+
+---
+
+## Промпт Coder — обязательный блок
+
+Каждый `CODER_PROMPT.md` **должен** содержать:
+
+```markdown
+## Файлы (можно трогать)
+- path/to/file — зачем
+
+## Файлы (не трогать)
+- всё остальное
+```
+
+Lead проверяет перед выдачей промпта. Coder сверяется **до** первой правки.
+
+---
+
+## Чеклист Lead (после сдачи)
+
+- [ ] `STATUS.md` совпадает с кодом
+- [ ] `PROJECT_MAP.md` — если новый процесс/файл/lock
+- [ ] [`ROADMAP.md`](ROADMAP.md) — если сменилась фаза, блокер или приоритет «сейчас»
+- [ ] `ARCHITECTURE.md` — если изменилась схема процессов
+- [ ] `CODE_STRUCTURE.md` — если новый модуль в `src/`
+- [ ] `KAK_ETO_RABOTAET.md` — если изменилось поведение для владельца
+
+---
+
+## Связанные документы (не дублировать)
+
+| Документ | Содержание |
+|----------|------------|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | mermaid, SaaS target, поток данных |
+| [`CODE_STRUCTURE.md`](CODE_STRUCTURE.md) | файлы `src/` и `scripts/` |
+| [`LEAD.md`](LEAD.md) § «Файлы без пересечений» | один источник правды |
+| [`SCALE.md`](SCALE.md) | цикл Lead → Coder → приёмка |
+| [`PRODUCT_VISION.md`](PRODUCT_VISION.md) | зачем продукт, контуры |
+
+---
+
+_Ведёт Lead · 2026-05-24 · обновлять при смене процессов/зон_

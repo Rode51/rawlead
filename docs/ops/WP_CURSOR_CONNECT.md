@@ -2,7 +2,7 @@
 
 Радар **не** ходит в WP на этом шаге. Цель — чтобы **Cursor видел файлы сайта** и тексты из репо.
 
-Скелет страниц: [`WP_LOCAL_SKELETON.md`](WP_LOCAL_SKELETON.md) §3 · тексты: [`wp-skeleton/`](wp-skeleton/).
+Скелет страниц: [`WP_LOCAL_SKELETON.md`](WP_LOCAL_SKELETON.md) §3 · тексты: [`../archive/wp-skeleton/`](../archive/wp-skeleton/).
 
 ---
 
@@ -21,7 +21,7 @@
    - `C:\Users\<ты>\Local Sites\<имя-сайта>\app\public`
 3. Cursor → **File → Add Folder to Workspace…** → выбери **`app\public`** (корень WordPress, где `wp-config.php`).
 
-В чате можно писать: `@public/wp-content/...` и `@docs/ops/wp-skeleton/home.md`.
+В чате можно писать: `@public/wp-content/...` и `@docs/archive/wp-skeleton/home.md`.
 
 ---
 
@@ -47,11 +47,11 @@ WP Admin → **Плагины** → **RawLead Landing** → Активирова
 
 | Slug | Файл с текстом |
 |------|----------------|
-| `home` | [`wp-skeleton/home.md`](wp-skeleton/home.md) |
-| `how` | [`wp-skeleton/how.md`](wp-skeleton/how.md) |
-| `pricing` | [`wp-skeleton/pricing.md`](wp-skeleton/pricing.md) |
-| `faq` | [`wp-skeleton/faq.md`](wp-skeleton/faq.md) |
-| `contact` | [`wp-skeleton/contact.md`](wp-skeleton/contact.md) |
+| `home` | [`../archive/wp-skeleton/home.md`](../archive/wp-skeleton/home.md) |
+| `how` | [`../archive/wp-skeleton/how.md`](../archive/wp-skeleton/how.md) |
+| `pricing` | [`../archive/wp-skeleton/pricing.md`](../archive/wp-skeleton/pricing.md) |
+| `faq` | [`../archive/wp-skeleton/faq.md`](../archive/wp-skeleton/faq.md) |
+| `contact` | [`../archive/wp-skeleton/contact.md`](../archive/wp-skeleton/contact.md) |
 
 В чате: *«Собери блоки Gutenberg для home из wp-skeleton»* — вставишь в редактор.
 

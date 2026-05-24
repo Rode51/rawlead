@@ -6,7 +6,7 @@
 
 Широкая лента: в `.env` **`FILTER_WIDE=1`** (почти всё в ИИ, режет только **стоп** ниже). Узко: `FILTER_WIDE=0` — нужно слово из **«Берём»**.
 
-URL бирж — [`SOURCES.md`](SOURCES.md). Профиль для ИИ — [`PROFILE.md`](PROFILE.md).
+URL бирж — [`SOURCES_POOLS.md`](SOURCES_POOLS.md) · архив деталей [`../archive/SOURCES.md`](../archive/SOURCES.md). Профиль для ИИ — [`PROFILE.md`](PROFILE.md).
 
 **Deep Research (стоп-списки, таксономия, тесты):** [`FILTERS_DEEP_RESEARCH_2026.md`](FILTERS_DEEP_RESEARCH_2026.md).
 
@@ -20,7 +20,7 @@ URL бирж — [`SOURCES.md`](SOURCES.md). Профиль для ИИ — [`PR
 |------------|------------|
 | `FL_PROJECTS_URL` | Одна страница категории (или «все проекты») |
 
-Примеры URL — в `docs/ops/SOURCES.md`.
+Примеры URL — в `docs/ops/SOURCES_POOLS.md` и `docs/archive/SOURCES.md`.
 
 **Этап 1.5:** несколько URL через запятую (`FL_PROJECTS_URLS`) — Coder, когда скажешь.
 
@@ -92,7 +92,7 @@ URL бирж — [`SOURCES.md`](SOURCES.md). Профиль для ИИ — [`PR
 
 Только проекты, прошедшие уровни 1–3. ИИ читает **полное описание** со страницы проекта + `docs/ops/PROFILE.md`.
 
-См. **`docs/team/TZ.md` §5**.
+См. **`docs/team/archive/TZ.md` §5**.
 
 ---
 

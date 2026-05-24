@@ -2,15 +2,31 @@
 
 **Lead правит только `docs/`.** Код, `.env`, скрипты — **никогда**, даже по просьбе владельца.
 
+**Lead работает строго по этому файлу + [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md).** Без импровизации.
+
+---
+
+## Новый `.md` — только с согласия владельца
+
+| Ситуация | Lead |
+|----------|------|
+| Тема уже в § Канон `DOCS_ARCHITECTURE` | **Правка** существующего файла |
+| Темы нет, нужен новый файл | **Спросить владельца** → ждать «да» / «согласую» |
+| Владелец не согласовал | **Не создавать** — дописать канон или FOR_YOU |
+| Тикет бага | `docs/problems/YYYY-MM-DD-*.md` — **можно без согласия** (один инцидент) |
+
+**Lead не создаёт** новые файлы в `docs/` корне, `team/`, `ops/`, `design/`, `archive/` без явного согласия владельца.
+
 ---
 
 ## Защита от кода Lead (2026-05-23)
 
 | Уровень | Что |
 |---------|-----|
-| **Правило Cursor** | `.cursor/rules/lead-no-code.mdc` — `alwaysApply: true` |
-| **Роль Lead** | `.cursor/rules/lead-architect.mdc` |
-| **Гард на код** | `.cursor/rules/code-guard.mdc` — при открытых `src/`, `scripts/` |
+| **Always** | `economy.mdc`, `lead-no-code.mdc` |
+| **Роль Lead** | `lead-architect.mdc` — только с `@lead-architect` |
+| **Гард на код** | `code-guard.mdc` — при открытых `src/`, `scripts/`, `desktop/` |
+| **Карта правил** | `.cursor/rules/README.md` |
 | **Процесс** | Lead-чат **только** `@lead-architect`; фича/баг → **новый** чат `@coder` / `@mechanic` |
 | **Нарушение** | Владелец: `git checkout -- src/ scripts/` или откат коммита; Lead пишет `CODER_PROMPT.md` |
 
@@ -28,7 +44,7 @@ Lead **не** «помогает быстро» править Python — даж
 
 ## Что делает Lead
 
-1. Приоритеты → `ROADMAP.md`, `FOR_YOU.md`
+1. Приоритеты → `team/ROADMAP.md`, `FOR_YOU.md`
 2. Очередь → `team/TASKS.md`
 3. Сводка → `team/STATUS.md` (коротко, без дублей)
 4. ТЗ для Coder → **`team/CODER_PROMPT.md`** (один файл, см. ниже)
@@ -37,12 +53,16 @@ Lead **не** «помогает быстро» править Python — даж
 6. Ревью сдачи Coder → [`SCALE.md`](SCALE.md) § чеклист Lead, закрытие TASKS
 7. Цикл масштаба → [`SCALE.md`](SCALE.md)
 8. **Новая фича / изменение** → **`KAK_ETO_RABOTAET.md`** (история + простым языком «что изменилось») · FOR_YOU при необходимости · **обязательно после сдачи Coder**
+9. **Карта проекта** → [`PROJECT_MAP.md`](PROJECT_MAP.md) — обновить, если менялись процессы, зоны или lock-правила
+10. **Дорожная карта** → [`ROADMAP.md`](ROADMAP.md) — фазы и «сейчас», если сменился приоритет или блокер
+11. **Регламент docs** → [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md) — правка канона; **новый `.md` только с согласия владельца**; гард `docs-guard.mdc`
 
 ## Один промпт Coder
 
 | Правило | Деталь |
 |---------|--------|
 | Имя файла | **`docs/team/CODER_PROMPT.md`** — всегда одно |
+| **Файлы** | Обязательны § **«Файлы (можно трогать)»** и **«не трогать»** — сверка с [`PROJECT_MAP.md`](PROJECT_MAP.md) |
 | Новая задача | Удалить предыдущий `CODER_PROMPT.md` → написать новый |
 | TASKS.md | Одна строка «Coder: …» → ссылка на `CODER_PROMPT.md` |
 | После сдачи | Удалить промпт; факт — в `STATUS.md` + строка в `archive/TASKS_HISTORY.md` |
@@ -71,6 +91,8 @@ Lead **не** «помогает быстро» править Python — даж
 | Правила ролей | `.cursor/rules/*.mdc` | HOW_TO_USE (ссылка) |
 | Статус в боте (ℹ) | `RUN.md` § кнопки | FOR_YOU (одна строка) |
 | Архитектура / процессы | `team/ARCHITECTURE.md` | KAK_ETO (ссылка) |
+| **Карта для всех AI** | **`team/PROJECT_MAP.md`** | ARCHITECTURE, CODE_STRUCTURE (детали) |
+| **Регламент docs (каноны)** | **`team/DOCS_ARCHITECTURE.md`** | README, HOW_TO_USE (детали) |
 | Карта кода, правила Coder | `team/CODE_STRUCTURE.md` | дубли в TZ |
 | Запуск пульт | `ops/DESKTOP_LAUNCH.md` | FOR_YOU, RUN |
 | Безопасность владельца | `team/SECURITY.md` | FOR_YOU (ссылка) |

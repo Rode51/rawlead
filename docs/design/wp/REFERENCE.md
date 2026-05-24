@@ -6,7 +6,7 @@
 
 Файл-референс: [`bold-editorial-saas-full-page-landing-page-ui-mock.png`](bold-editorial-saas-full-page-landing-page-ui-mock.png) · приёмка владельца 2026-05-23.
 
-Скелет контента: [`../../ops/wp-skeleton/`](../../ops/wp-skeleton/) · установка: [`../../ops/WP_LOCAL_SKELETON.md`](../../ops/WP_LOCAL_SKELETON.md)
+Скелет контента: [`../../archive/wp-skeleton/`](../../archive/wp-skeleton/) · установка: [`../../ops/WP_LOCAL_SKELETON.md`](../../ops/WP_LOCAL_SKELETON.md)
 
 ---
 
@@ -68,7 +68,7 @@
 ### 3.2 Hero
 
 - **H1:** «Лиды без шума»
-- **Подзаголовок** (из [`home.md`](../../ops/wp-skeleton/home.md)): FL.ru, Kwork, Telegram — фильтры, ИИ, без спама
+- **Подзаголовок** (из [`home.md`](../../archive/wp-skeleton/home.md)): FL.ru, Kwork, Telegram — фильтры, ИИ, без спама
 - **Primary:** «Смотреть тарифы»
 - **Secondary:** «Как это работает →» (ссылка, не кнопка-заливка)
 - Справа/ниже на mobile — не обязательно в первом MVP; главный акцент — типографика
@@ -132,7 +132,7 @@
 
 | Страница | Особенности |
 |----------|-------------|
-| **Как работает** | 5 шагов из [`how.md`](../../ops/wp-skeleton/how.md); timeline вертикальный, те же pill-кнопки |
+| **Как работает** | 5 шагов из [`how.md`](../../archive/wp-skeleton/how.md); timeline вертикальный, те же pill-кнопки |
 | **Тарифы** | полная сетка 3 колонок + FAQ-якорь |
 | **FAQ** | аккордеон, светлый фон, без тёмной «админки» |
 | **Контакты** | форма CF7 + кнопка Telegram; одна primary CTA |

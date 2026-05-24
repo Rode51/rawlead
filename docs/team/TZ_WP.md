@@ -68,7 +68,7 @@ REST-клиент к API: Bearer из сессии WP (HMAC plugin ↔ API).
 | v0 | Lead/Coder: поле `plan` в Neon вручную |
 | v1 | WooCommerce Subscriptions или ЮKassa webhook → API `PATCH /v1/me/subscription` |
 
-Тарифы на странице [`pricing`](../ops/wp-skeleton/pricing.md) — тексты уже в скелете.
+Тарифы на странице [`pricing`](../archive/wp-skeleton/pricing.md) — тексты в архиве скелета.
 
 ---
 
