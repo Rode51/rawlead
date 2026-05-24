@@ -6,10 +6,10 @@
 
 | Роль | Чат | Регламент |
 |------|-----|-----------|
-| **Lead Product** | `@lead-product` | [`LEAD_PRODUCT.md`](LEAD_PRODUCT.md) |
+| **Lead Product** | `@lead-product` | [`LEAD_PRODUCT.md`](../product/LEAD_PRODUCT.md) |
 | **Lead Designer** | `@lead-designer` | [`LEAD_DESIGN.md`](LEAD_DESIGN.md) |
 
-**Lead Architect** работает по этому файлу + [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md).
+**Lead Architect** работает по этому файлу + [`DOCS_ARCHITECTURE.md`](../common/DOCS_ARCHITECTURE.md).
 
 ---
 
@@ -74,24 +74,24 @@ Lead **не** «помогает быстро» править Python — даж
 
 ## Что делает Lead Architect
 
-1. **`ROADMAP.md`** — **ответственность Lead Architect**; фазы и «сейчас» **только из** [`PRODUCT_VISION.md`](PRODUCT_VISION.md) (канон Lead Product)
+1. **`ROADMAP.md`** — **ответственность Lead Architect**; фазы и «сейчас» **только из** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) (канон Lead Product)
 2. Приоритеты инженерии → согласовать с **Lead Product** (`PRODUCT_VISION` + `LEAD_PRODUCT_PROMPT.md`)
-3. Очередь → `team/TASKS.md`
-4. Сводка → `team/STATUS.md` (коротко, без дублей)
-5. ТЗ для Coder → **`team/CODER_PROMPT.md`** (один файл, см. ниже)
+3. Очередь → `team/common/TASKS.md`
+4. Сводка → `team/common/STATUS.md` (коротко, без дублей)
+5. ТЗ для Coder → **`team/architect/CODER_PROMPT.md`** (один файл, см. ниже)
 6. UI/UX → план у **Lead Designer** → **`CODER_PROMPT.md`**
 7. Тикеты → `problems/*.md` → Mechanic
-8. Ревью сдачи Coder → [`SCALE.md`](SCALE.md)
+8. Ревью сдачи Coder → [`SCALE.md`](../common/SCALE.md)
 9. **`KAK_ETO_RABOTAET.md`** после сдачи Coder
 10. **`PROJECT_MAP.md`** — зоны и процессы
-11. **Регламент docs** → [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md)
+11. **Регламент docs** → [`DOCS_ARCHITECTURE.md`](../common/DOCS_ARCHITECTURE.md)
 
 ## Один промпт Coder
 
 | Правило | Деталь |
 |---------|--------|
-| Имя файла | **`docs/team/CODER_PROMPT.md`** — всегда одно |
-| **Файлы** | Обязательны § **«Файлы (можно трогать)»** и **«не трогать»** — сверка с [`PROJECT_MAP.md`](PROJECT_MAP.md) |
+| Имя файла | **`docs/team/architect/CODER_PROMPT.md`** — всегда одно |
+| **Файлы** | Обязательны § **«Файлы (можно трогать)»** и **«не трогать»** — сверка с [`PROJECT_MAP.md`](../common/PROJECT_MAP.md) |
 | Новая задача | Удалить предыдущий `CODER_PROMPT.md` → написать новый |
 | TASKS.md | Одна строка «Coder: …» → ссылка на `CODER_PROMPT.md` |
 | После сдачи | Удалить промпт; факт — в `STATUS.md` + строка в `archive/TASKS_HISTORY.md` |
@@ -120,20 +120,20 @@ Lead **не** «помогает быстро» править Python — даж
 | Как устроено (простым языком) | **`KAK_ETO_RABOTAET.md`** | FOR_YOU (ссылка) |
 | Правила ролей | `.cursor/rules/*.mdc` | HOW_TO_USE (ссылка) |
 | Статус в боте (ℹ) | `RUN.md` § кнопки | FOR_YOU (одна строка) |
-| Архитектура / процессы | `team/ARCHITECTURE.md` | KAK_ETO (ссылка) |
-| **Карта для всех AI** | **`team/PROJECT_MAP.md`** | ARCHITECTURE, CODE_STRUCTURE (детали) |
-| **Регламент docs (каноны)** | **`team/DOCS_ARCHITECTURE.md`** | README, HOW_TO_USE (детали) |
-| Карта кода, правила Coder | `team/CODE_STRUCTURE.md` | дубли в TZ |
+| Архитектура / процессы | `team/architect/ARCHITECTURE.md` | KAK_ETO (ссылка) |
+| **Карта для всех AI** | **`team/common/PROJECT_MAP.md`** | ARCHITECTURE, CODE_STRUCTURE (детали) |
+| **Регламент docs (каноны)** | **`team/common/DOCS_ARCHITECTURE.md`** | README, HOW_TO_USE (детали) |
+| Карта кода, правила Coder | `team/architect/CODE_STRUCTURE.md` | дубли в TZ |
 | Запуск пульт | `ops/DESKTOP_LAUNCH.md` | FOR_YOU, RUN |
 | Безопасность владельца | `team/SECURITY.md` | FOR_YOU (ссылка) |
 | Очередь Coder | `TASKS.md` → **`CODER_PROMPT.md`** | FOR_YOU (только ссылка) |
 | Listen TG | `data/telethon_chat_ids_accN.txt` + CSV done | legacy `telethon_chat_ids.txt` → acc1 |
 | 3 номера TG, прокси (без паролей) | `ops/TELEGRAM_ACCOUNTS.md` | `.env`, SOURCES_POOLS (краткая ссылка) |
 | MVP-5 чатов, chat_id | `ops/SOURCES_POOLS.md` + `TG_JOIN_QUEUE.csv` (`done`) | Реестр имён в коде — из CSV, не JSON |
-| Промпт ИИ v6 | `team/AI.md` | не копировать в TZ целиком |
+| Промпт ИИ v6 | `team/architect/AI.md` | не копировать в TZ целиком |
 | Запуск | `ops/RUN.md` | FOR_YOU (ссылка) |
 | Бэкапы | `ops/BACKUP.md` | FOR_YOU (ссылка) |
-| Масштаб / цикл | `team/SCALE.md` | HOW_TO_USE (ссылка) |
+| Масштаб / цикл | `team/common/SCALE.md` | HOW_TO_USE (ссылка) |
 
 ---
 
@@ -141,7 +141,7 @@ Lead **не** «помогает быстро» править Python — даж
 
 Регламент Lead — **`.cursor/rules/lead-architect.mdc`** (включается через `@lead-architect`).
 
-**Первый ход:** [`PROJECT_MAP.md`](PROJECT_MAP.md) → [`docs/README.md`](../README.md) → `LEAD.md`, `TASKS.md`, `STATUS.md`, `FOR_YOU.md` + [`SCALE.md`](SCALE.md) при ревью → коротко «что сейчас» + один шаг владельцу. После сдачи — обновить **PROJECT_MAP** при необходимости, **commit** (push по просьбе), чеклист SCALE + **бэкап**.
+**Первый ход:** [`PROJECT_MAP.md`](../common/PROJECT_MAP.md) → [`docs/README.md`](../README.md) → `LEAD.md`, `TASKS.md`, `STATUS.md`, `FOR_YOU.md` + [`SCALE.md`](../common/SCALE.md) при ревью → коротко «что сейчас» + один шаг владельцу. После сдачи — обновить **PROJECT_MAP** при необходимости, **commit** (push по просьбе), чеклист SCALE + **бэкап**.
 
 ---
 

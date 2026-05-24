@@ -90,4 +90,4 @@ Push — только по просьбе владельца.
 
 ---
 
-_См. [`HOW_TO_USE_CURSOR.md`](HOW_TO_USE_CURSOR.md) · [`PROJECT_MAP.md`](PROJECT_MAP.md) · `.cursor/rules/lead-product.mdc`_
+_См. [`HOW_TO_USE_CURSOR.md`](../common/HOW_TO_USE_CURSOR.md) · [`PROJECT_MAP.md`](../common/PROJECT_MAP.md) · `.cursor/rules/lead-product.mdc`_

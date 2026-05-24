@@ -55,7 +55,7 @@
 
 ## Токены (WordPress маркетинг v1 — 2026-05-23)
 
-Утверждённый референс: [`../design/wp/REFERENCE.md`](../design/wp/REFERENCE.md) — **editorial light** (не пульт).
+Утверждённый референс: [`../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) — **editorial light** (не пульт).
 
 | Token | HEX | Использование |
 |-------|-----|---------------|

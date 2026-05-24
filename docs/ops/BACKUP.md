@@ -40,7 +40,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup.ps1
 | Событие | Действие |
 |---------|----------|
 | **Перед большой правкой** (новый Coder, смена `.env`, join волна чатов) | **бэкап сначала** |
-| После принятой фичи | бэкап (шаг 5b [`SCALE.md`](../team/SCALE.md)) |
+| После принятой фичи | бэкап (шаг 5b [`SCALE.md`](../team/common/SCALE.md)) |
 | **Раз в неделю** | бэкап |
 | Перед обновлением Windows / сменой диска | бэкап |
 

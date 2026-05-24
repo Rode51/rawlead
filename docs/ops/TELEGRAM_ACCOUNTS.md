@@ -68,7 +68,7 @@ cd C:\Users\hramo\uisness
 
 После смены ACC3 на `233333925` команда `--account acc3` должна показать чаты (не «не авторизована»).
 
-**acc4** (`234694761`) — бэклог Coder ([`../team/TASKS.md`](../team/TASKS.md)).
+**acc4** (`234694761`) — бэклог Coder ([`../team/common/TASKS.md`](../team/common/TASKS.md)).
 
 Join: [`TG_JOIN_QUEUE.csv`](TG_JOIN_QUEUE.csv) · [`TG_JOIN_SCHEDULE.md`](TG_JOIN_SCHEDULE.md) · [`RUN.md`](RUN.md).
 

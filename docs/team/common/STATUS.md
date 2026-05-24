@@ -1,6 +1,6 @@
-﻿# STATUS
+# STATUS
 
-**Vision:** [`PRODUCT_VISION.md`](PRODUCT_VISION.md) **v0.9** (ставка B) · roadmap: [`ROADMAP.md`](ROADMAP.md) · владелец: [`../FOR_YOU.md`](../FOR_YOU.md)
+**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.9** (ставка B) · roadmap: [`ROADMAP.md`](../architect/ROADMAP.md) · владелец: [`../FOR_YOU.md`](../FOR_YOU.md)
 
 ---
 
@@ -11,7 +11,7 @@
 | **Product v0.9** | ✅ принято Lead Architect |
 | **Docs / ROADMAP** | ✅ синхронизированы под ставку B |
 | **TG dogfood** | ⏳ relay+card — приёмка владельца · дубли python — Mechanic |
-| **Coder** | → **3b** Neon SaaS-ready · [`CODER_PROMPT.md`](CODER_PROMPT.md) |
+| **Coder** | → **3b** Neon SaaS-ready · [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) |
 | **Design** | → `/feed` + `/cabinet` спека · [`LEAD_DESIGN_PROMPT.md`](LEAD_DESIGN_PROMPT.md) |
 | **WP `/cabinet` demo JSON** | ❌ снято (замена фазой 3d) |
 
@@ -35,7 +35,7 @@
 
 ## MVP acceptance (ставка B)
 
-Сверка с [`LEAD_PRODUCT_PROMPT.md`](LEAD_PRODUCT_PROMPT.md) § «Готово когда» #1–#7 — обновлять после каждой фазы 3b–3f.
+Сверка с [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § «Готово когда» #1–#7 — обновлять после каждой фазы 3b–3f.
 
 ---
 

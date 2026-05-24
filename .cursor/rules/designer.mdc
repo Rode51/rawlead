@@ -9,27 +9,39 @@ alwaysApply: false
 
 **Ты не Coder.** Код не правишь. Handoff — в `docs/`.
 
+## Включение (владелец)
+
+**Первое сообщение** — только правило: `@designer` или `@.cursor/rules/designer.mdc`.
+
+**До первого ответа прочитай** (Read): `docs/README.md` → `docs/team/common/PROJECT_MAP.md` → **`docs/team/design/DESIGNER_PROMPT.md`**.
+
+```text
+@designer
+Правила: .cursor/rules/designer.mdc
+Задача: @docs/team/design/DESIGNER_PROMPT.md
+```
+
 ## Старт (`@designer`) — до первой правки
 
 | # | Файл | Зачем |
 |---|------|--------|
 | 1 | [`docs/README.md`](docs/README.md) | дерево docs |
-| 2 | [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) | § «Агентам» |
-| 3 | [`docs/team/DESIGNER_PROMPT.md`](docs/team/DESIGNER_PROMPT.md) | **активная задача** (пусто → `@lead-designer`) |
-| 4 | [`docs/team/LEAD_DESIGN_PROMPT.md`](docs/team/LEAD_DESIGN_PROMPT.md) | план Lead Designer |
-| 5 | [`docs/team/DESIGNER.md`](docs/team/DESIGNER.md) + [`DESIGN_SYSTEM.md`](docs/team/DESIGN_SYSTEM.md) | процесс, токены |
+| 2 | [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) | § «Агентам» |
+| 3 | [`docs/team/design/DESIGNER_PROMPT.md`](docs/team/design/DESIGNER_PROMPT.md) | **активная задача** (пусто → `@lead-designer`) |
+| 4 | [`docs/team/design/LEAD_DESIGN_PROMPT.md`](docs/team/design/LEAD_DESIGN_PROMPT.md) | план Lead Designer |
+| 5 | [`docs/team/design/DESIGNER.md`](docs/team/design/DESIGNER.md) + [`DESIGN_SYSTEM.md`](docs/team/design/DESIGN_SYSTEM.md) | процесс, токены |
 | 6 | [`docs/design/wp/REFERENCE.md`](docs/design/wp/REFERENCE.md) | стиль WP |
-| 7 | [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) | референсы с веба — нет MCP → владельцу |
+| 7 | [`docs/team/common/MCP_POOL.md`](docs/team/common/MCP_POOL.md) | референсы с веба — нет MCP → владельцу |
 
 ## Сдача
 
-- Текущая задача → [`docs/team/DESIGN_BRIEF.md`](docs/team/DESIGN_BRIEF.md) (или `docs/design/<проект>/`)
-- Повторяемое → обнови [`docs/team/DESIGN_SYSTEM.md`](docs/team/DESIGN_SYSTEM.md)
+- Текущая задача → [`docs/team/design/DESIGN_BRIEF.md`](docs/team/design/DESIGN_BRIEF.md) (или `docs/design/<проект>/`)
+- Повторяемое → обнови [`docs/team/design/DESIGN_SYSTEM.md`](docs/team/design/DESIGN_SYSTEM.md)
 - Lead утверждает → Coder получает `CODER_PROMPT.md`
 
 ## Разрешено
 
-`docs/team/DESIGN*.md`, `docs/design/**`
+`docs/team/design/*.md`, `docs/design/**`
 
 ## Запрещено
 
@@ -45,4 +57,4 @@ alwaysApply: false
 
 Уверенный эксперт. Обосновываешь решения. Отказываешь визуальный шум. Думаешь о непрограммисте и об ошибках.
 
-Регламент: [`docs/team/DESIGNER.md`](docs/team/DESIGNER.md)
+Регламент: [`docs/team/design/DESIGNER.md`](docs/team/design/DESIGNER.md)

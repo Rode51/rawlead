@@ -1,7 +1,7 @@
-﻿# Архитектура RawLead
+# Архитектура RawLead
 
-**Процессы на ПК и зоны кода** — канон: [`PROJECT_MAP.md`](PROJECT_MAP.md).  
-**Регламент docs** — [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md).
+**Процессы на ПК и зоны кода** — канон: [`PROJECT_MAP.md`](../common/PROJECT_MAP.md).  
+**Регламент docs** — [`DOCS_ARCHITECTURE.md`](../common/DOCS_ARCHITECTURE.md).
 
 Краткая схема для Lead, Coder. Поведение фазы 0 — **`archive/TZ.md`**, TG — **`TZ_TG.md`**.
 
@@ -11,7 +11,7 @@ _Актуально: 2026-05-24 (vision v0.9 · фазы 3b–3f MVP)._
 
 ## Целевая архитектура v1 (SaaS)
 
-См. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0b · [`NEON_SCHEMA.md`](NEON_SCHEMA.md) · [`TZ_API.md`](TZ_API.md).
+См. [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §0b · [`NEON_SCHEMA.md`](NEON_SCHEMA.md) · [`TZ_API.md`](TZ_API.md).
 
 ```mermaid
 flowchart TB
@@ -37,7 +37,7 @@ flowchart TB
 
 **Rank на чтении:** `final_rank = ai_score×0.6 + keyword_match×0.4` (v0).
 
-**Сейчас в коде:** ingest → SQLite (+ Neon частично); dogfood → TG-бот владельца. **Цель MVP:** один поток + `is_visible` на ingest → `/feed` (anon) + `/cabinet` (user_id=1) + ИИ-агент. Модель `contour` owner/saas — **отменена** v0.9. См. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0c.
+**Сейчас в коде:** ingest → SQLite (+ Neon частично); dogfood → TG-бот владельца. **Цель MVP:** один поток + `is_visible` на ingest → `/feed` (anon) + `/cabinet` (user_id=1) + ИИ-агент. Модель `contour` owner/saas — **отменена** v0.9. См. [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §0c.
 
 ---
 
@@ -136,7 +136,7 @@ flowchart LR
 | Здоровье | Пульс tg_main, алерт | `src/health_check.py` |
 | Облако лидов | Опционально | `src/pg_storage.py` → Neon |
 
-Очередь: **`docs/team/TASKS.md`**. Сверка с **`docs/team/STATUS.md`**.
+Очередь: **`docs/team/common/TASKS.md`**. Сверка с **`docs/team/common/STATUS.md`**.
 
 ---
 

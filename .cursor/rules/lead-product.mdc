@@ -9,6 +9,18 @@ alwaysApply: false
 
 С владельцем вы **согласуете план действий** → ты **фиксируешь** в docs → внедрение — **@lead-architect** (`CODER_PROMPT`), **@coder**, **@designer** по твоему плану (владелец запускает чаты).
 
+## Включение (владелец)
+
+**Первое сообщение** — только правило: `@lead-product` или `@.cursor/rules/lead-product.mdc`.
+
+**До первого ответа прочитай** (Read): `docs/README.md` → `docs/team/common/PROJECT_MAP.md` → **`docs/team/product/LEAD_PRODUCT_PROMPT.md`** (+ `PRODUCT_VISION.md` v0.9).
+
+```text
+@lead-product
+Правила: .cursor/rules/lead-product.mdc
+План: @docs/team/product/LEAD_PRODUCT_PROMPT.md
+```
+
 ---
 
 ## Первый ход (`@lead-product`) — обязательное чтение
@@ -20,12 +32,12 @@ alwaysApply: false
 | # | Файл | Зачем |
 |---|------|--------|
 | 1 | [`docs/README.md`](docs/README.md) | дерево docs |
-| 2 | [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) | § «Агентам» — **не обходи repo** |
-| 3 | [`docs/team/LEAD_PRODUCT.md`](docs/team/LEAD_PRODUCT.md) | регламент |
-| 4 | [`docs/team/LEAD_PRODUCT_PROMPT.md`](docs/team/LEAD_PRODUCT_PROMPT.md) | активный план |
-| 5 | [`docs/team/PRODUCT_VISION.md`](docs/team/PRODUCT_VISION.md) v0.9 | **главная зона правок** |
-| 6 | [`docs/team/STATUS.md`](docs/team/STATUS.md) | acceptance / что сдано |
-| 7 | [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md) | перед новым `.md` |
+| 2 | [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) | § «Агентам» — **не обходи repo** |
+| 3 | [`docs/team/product/LEAD_PRODUCT.md`](docs/team/product/LEAD_PRODUCT.md) | регламент |
+| 4 | [`docs/team/product/LEAD_PRODUCT_PROMPT.md`](docs/team/product/LEAD_PRODUCT_PROMPT.md) | активный план |
+| 5 | [`docs/team/product/PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md) v0.9 | **главная зона правок** |
+| 6 | [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) | acceptance / что сдано |
+| 7 | [`docs/team/common/DOCS_ARCHITECTURE.md`](docs/team/common/DOCS_ARCHITECTURE.md) | перед новым `.md` |
 
 **Git:** не `commit` / `push` — handoff → **`@lead-architect`**.
 
@@ -34,21 +46,21 @@ alwaysApply: false
 | Файл | Зачем |
 |------|-------|
 | [`docs/KAK_ETO_RABOTAET.md`](docs/KAK_ETO_RABOTAET.md) | как работает продукт сейчас |
-| [`docs/team/ROADMAP.md`](docs/team/ROADMAP.md) | фазы — правит Lead Architect |
-| [`docs/team/TASKS.md`](docs/team/TASKS.md) | очередь |
+| [`docs/team/architect/ROADMAP.md`](docs/team/architect/ROADMAP.md) | фазы — правит Lead Architect |
+| [`docs/team/common/TASKS.md`](docs/team/common/TASKS.md) | очередь |
 | [`docs/FOR_YOU.md`](docs/FOR_YOU.md) | шаги владельца |
 
 ### 3. Что у Coder и Designer (для согласования, **не правишь**)
 
 | Файл | Зачем |
 |------|-------|
-| [`docs/team/CODER_PROMPT.md`](docs/team/CODER_PROMPT.md) | Что Coder делает сейчас — твой vision должен быть совместим |
-| [`docs/team/LEAD_DESIGN_PROMPT.md`](docs/team/LEAD_DESIGN_PROMPT.md) | Активный план Lead Designer |
-| [`docs/team/DESIGNER_PROMPT.md`](docs/team/DESIGNER_PROMPT.md) | Что у Designer на руках |
-| [`docs/team/DESIGN_SYSTEM.md`](docs/team/DESIGN_SYSTEM.md) | Токены и принципы UI — для acceptance страниц портфолио |
+| [`docs/team/architect/CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) | Что Coder делает сейчас — твой vision должен быть совместим |
+| [`docs/team/design/LEAD_DESIGN_PROMPT.md`](docs/team/design/LEAD_DESIGN_PROMPT.md) | Активный план Lead Designer |
+| [`docs/team/design/DESIGNER_PROMPT.md`](docs/team/design/DESIGNER_PROMPT.md) | Что у Designer на руках |
+| [`docs/team/design/DESIGN_SYSTEM.md`](docs/team/design/DESIGN_SYSTEM.md) | Токены и принципы UI — для acceptance страниц портфолио |
 | [`docs/design/README.md`](docs/design/README.md) | Каталог дизайн-проектов |
 | [`docs/design/wp/REFERENCE.md`](docs/design/wp/REFERENCE.md) | Утверждённый стиль WP лендинга |
-| [`docs/team/ARCHITECTURE.md`](docs/team/ARCHITECTURE.md) | Схема процессов — для понимания, что реалистично |
+| [`docs/team/architect/ARCHITECTURE.md`](docs/team/architect/ARCHITECTURE.md) | Схема процессов — для понимания, что реалистично |
 
 ### 4. Источники и контуры
 
@@ -61,9 +73,9 @@ alwaysApply: false
 
 | Файл | Когда |
 |------|-------|
-| [`docs/team/NEON_SCHEMA.md`](docs/team/NEON_SCHEMA.md) | Если речь про SaaS / Контур 2 / API |
-| [`docs/team/TZ_API.md`](docs/team/TZ_API.md) | REST-API спецификация (отложено) |
-| [`docs/team/TZ_WP.md`](docs/team/TZ_WP.md) | WP кабинет SaaS (отложено) |
+| [`docs/team/architect/NEON_SCHEMA.md`](docs/team/architect/NEON_SCHEMA.md) | Если речь про SaaS / Контур 2 / API |
+| [`docs/team/architect/TZ_API.md`](docs/team/architect/TZ_API.md) | REST-API спецификация (отложено) |
+| [`docs/team/architect/TZ_WP.md`](docs/team/architect/TZ_WP.md) | WP кабинет SaaS (отложено) |
 | [`docs/ops/FILTERS.md`](docs/ops/FILTERS.md) | Если правишь порог скоринга в vision |
 
 ---
@@ -122,10 +134,10 @@ alwaysApply: false
 
 ```text
 @lead-architect
-Принять vision: @docs/team/PRODUCT_VISION.md
-План: @docs/team/LEAD_PRODUCT_PROMPT.md
+Принять vision: @docs/team/product/PRODUCT_VISION.md
+План: @docs/team/product/LEAD_PRODUCT_PROMPT.md
 ```
 
-Или для дизайна — `@lead-designer` + `@docs/team/LEAD_DESIGN_PROMPT.md`. Плюс **1 строка** сути.
+Или для дизайна — `@lead-designer` + `@docs/team/design/LEAD_DESIGN_PROMPT.md`. Плюс **1 строка** сути.
 
-Регламент: [`docs/team/LEAD_PRODUCT.md`](docs/team/LEAD_PRODUCT.md)
+Регламент: [`docs/team/product/LEAD_PRODUCT.md`](docs/team/product/LEAD_PRODUCT.md)

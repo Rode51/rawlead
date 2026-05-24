@@ -19,12 +19,12 @@
 
 | Нужно | Единственный канон | Не дублировать в |
 |-------|-------------------|------------------|
-| Vision / ставка B | [`PRODUCT_VISION.md`](PRODUCT_VISION.md) v0.9 | ROADMAP, STATUS, чат |
-| Фазы «сейчас» | [`ROADMAP.md`](ROADMAP.md) | FOR_YOU, TASKS простынёй |
-| Активный план Product | [`LEAD_PRODUCT_PROMPT.md`](LEAD_PRODUCT_PROMPT.md) | новый `TZ_*.md` |
-| Задача Coder | [`CODER_PROMPT.md`](CODER_PROMPT.md) | TASKS, чат (только копипаст) |
-| Задача Designer | [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md) | DESIGN_BRIEF без промпта |
-| План Lead Designer | [`LEAD_DESIGN_PROMPT.md`](LEAD_DESIGN_PROMPT.md) | |
+| Vision / ставка B | [`product/PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 | ROADMAP, STATUS, чат |
+| Фазы «сейчас» | [`architect/ROADMAP.md`](../architect/ROADMAP.md) | FOR_YOU, TASKS простынёй |
+| Активный план Product | [`product/LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) | новый `TZ_*.md` |
+| Задача Coder | [`architect/CODER_PROMPT.md`](../architect/CODER_PROMPT.md) | TASKS, чат (только копипаст) |
+| Задача Designer | [`design/DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) | DESIGN_BRIEF без промпта |
+| План Lead Designer | [`design/LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) | |
 | Снимок / блокеры | [`STATUS.md`](STATUS.md) | не копировать ТЗ |
 | Очередь | [`TASKS.md`](TASKS.md) — одна строка на трек | FOR_YOU |
 | Шаги владельца | [`../FOR_YOU.md`](../FOR_YOU.md) | TASKS, STATUS |
@@ -44,16 +44,26 @@
 
 **Регламент docs (каноны, без дублей):** [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md)
 
-**Визуально (для тебя):** [`PROJECT_MAP_VISUAL.md`](PROJECT_MAP_VISUAL.md) · PNG: [`../design/rawlead/project-map-owner.png`](../design/rawlead/project-map-owner.png)
+**Визуально (для тебя):** [`PROJECT_MAP_VISUAL.md`](PROJECT_MAP_VISUAL.md) · PNG: [`../../design/rawlead/project-map-owner.png`](../../design/rawlead/project-map-owner.png)
+
+## Папки `docs/team/`
+
+| Папка | Кто | Содержание |
+|-------|-----|------------|
+| **`common/`** | все | PROJECT_MAP, STATUS, TASKS, SCALE, DOCS_ARCHITECTURE, MCP |
+| **`architect/`** | Lead Architect, Coder (промпт) | ROADMAP, CODER_PROMPT, ARCHITECTURE, CODE_STRUCTURE, TZ_*, NEON |
+| **`product/`** | Lead Product | PRODUCT_VISION, LEAD_PRODUCT_PROMPT |
+| **`design/`** | Lead Designer, Designer | LEAD_DESIGN*, DESIGN_SYSTEM, DESIGNER_PROMPT |
+| **`archive/`** | — | история, исследования (не обновлять) |
 
 | Кому | Первый файл |
 |------|-------------|
-| **Lead Product** | `PRODUCT_VISION.md` v0.9 → `LEAD_PRODUCT_PROMPT.md` |
-| **Lead Architect** | этот файл → `ROADMAP.md` → `CODER_PROMPT.md` |
-| **Lead Designer** | `LEAD_DESIGN_PROMPT.md` → `DESIGN_SYSTEM.md` |
-| **Coder** | **`CODER_PROMPT.md`** → § «Зоны» |
+| **Lead Product** | `product/PRODUCT_VISION.md` → `product/LEAD_PRODUCT_PROMPT.md` |
+| **Lead Architect** | этот файл → `architect/ROADMAP.md` → `architect/CODER_PROMPT.md` |
+| **Lead Designer** | `design/LEAD_DESIGN_PROMPT.md` → `design/DESIGN_SYSTEM.md` |
+| **Coder** | **`architect/CODER_PROMPT.md`** → § «Зоны» |
 | **Mechanic** | `docs/problems/` → § «Зоны» |
-| **Designer** | `DESIGNER_PROMPT.md` → `docs/design/` |
+| **Designer** | `design/DESIGNER_PROMPT.md` → `docs/design/` (макеты) |
 | **Владелец** | `FOR_YOU.md` |
 
 **Lead обновляет** эту карту после каждой сдачи Coder/Mechanic, если менялись процессы, файлы или lock-правила.  
@@ -95,7 +105,7 @@ flowchart TB
 | **Дубли** | `src/process_guard.py` — убить чужие main/tg_main перед стартом |
 | **Join** | только **внутри** `tg_main` (`TG_JOIN_IN_TG_MAIN=1`) |
 
-Запуск: [`../ops/DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md) · схема: [`ARCHITECTURE.md`](ARCHITECTURE.md)
+Запуск: [`../ops/DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md) · схема: [`ARCHITECTURE.md`](../architect/ARCHITECTURE.md)
 
 ---
 
@@ -128,7 +138,7 @@ flowchart TB
 
 ## Модули `src/` (куда не лезть без причины)
 
-Полная таблица: [`CODE_STRUCTURE.md`](CODE_STRUCTURE.md).
+Полная таблица: [`../architect/CODE_STRUCTURE.md`](../architect/CODE_STRUCTURE.md).
 
 | Симптом / задача | Смотреть сначала |
 |------------------|------------------|
@@ -161,7 +171,7 @@ Lead проверяет перед выдачей промпта. Coder свер
 
 - [ ] `STATUS.md` совпадает с кодом
 - [ ] `PROJECT_MAP.md` — если новый процесс/файл/lock
-- [ ] [`ROADMAP.md`](ROADMAP.md) — если сменилась фаза, блокер или приоритет «сейчас»
+- [ ] [`ROADMAP.md`](../architect/ROADMAP.md) — если сменилась фаза, блокер или приоритет «сейчас»
 - [ ] `ARCHITECTURE.md` — если изменилась схема процессов
 - [ ] `CODE_STRUCTURE.md` — если новый модуль в `src/`
 - [ ] `KAK_ETO_RABOTAET.md` — если изменилось поведение для владельца
@@ -172,11 +182,11 @@ Lead проверяет перед выдачей промпта. Coder свер
 
 | Документ | Содержание |
 |----------|------------|
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | mermaid, SaaS target, поток данных |
-| [`CODE_STRUCTURE.md`](CODE_STRUCTURE.md) | файлы `src/` и `scripts/` |
-| [`LEAD.md`](LEAD.md) § «Файлы без пересечений» | один источник правды |
+| [`ARCHITECTURE.md`](../architect/ARCHITECTURE.md) | mermaid, SaaS target, поток данных |
+| [`CODE_STRUCTURE.md`](../architect/CODE_STRUCTURE.md) | файлы `src/` и `scripts/` |
+| [`LEAD.md`](../architect/LEAD.md) § «Файлы без пересечений» | один источник правды |
 | [`SCALE.md`](SCALE.md) | цикл Lead → Coder → приёмка |
-| [`PRODUCT_VISION.md`](PRODUCT_VISION.md) | зачем продукт, контуры |
+| [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) | зачем продукт, контуры |
 
 ---
 

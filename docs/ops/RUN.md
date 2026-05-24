@@ -1,4 +1,4 @@
-﻿# Запуск RawLead на Windows
+# Запуск RawLead на Windows
 
 Работает **Python 3.11+**. Команды ниже — из **PowerShell**. Запускайте из **корня репозитория** (папка, где лежат `src/`, `docs/`, `requirements.txt`), чтобы пути по умолчанию `data/projects.db` и `data/radar.log` совпадали с каталогом `data/` в корне проекта.
 
@@ -43,7 +43,7 @@ pip install -r requirements.txt
 
 ### ИИ-разбор (этап 2, опционально)
 
-Подробности: **`docs/team/AI.md`**, UX — **`docs/team/archive/TZ.md` §5**. Ключ: [openrouter.ai/keys](https://openrouter.ai/keys) (**в Git не коммитить**).
+Подробности: **`docs/team/architect/AI.md`**, UX — **`docs/team/archive/TZ.md` §5**. Ключ: [openrouter.ai/keys](https://openrouter.ai/keys) (**в Git не коммитить**).
 
 | Переменная | Значение по умолчанию в example |
 |------------|----------------------------------|

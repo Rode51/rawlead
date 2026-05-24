@@ -5,8 +5,8 @@
 **Всё важное — в файлах `docs/`, не в чате.**  
 Чат = короткая команда. Длинные обсуждения — **Gemini в браузере**, итог 5–10 строк → Lead кладёт в `docs/`.
 
-**Навигация для всех AI:** [`docs/README.md`](../README.md) → [`team/PROJECT_MAP.md`](team/PROJECT_MAP.md) → файл роли.  
-**Промпт задачи** — только в `CODER_PROMPT.md` / `DESIGNER_PROMPT.md`; в чат — **копипаст** `@роль` + `.mdc` + промпт (даёт Lead Architect).  
+**Навигация для всех AI:** [`docs/README.md`](../README.md) → [`team/common/PROJECT_MAP.md`](team/common/PROJECT_MAP.md) → файл роли.  
+**Промпт задачи** — только в `CODER_PROMPT.md` / `DESIGNER_PROMPT.md`; в **новый чат** — **один** `@coder` / `@designer` / … (пути в `.cursor/rules/<роль>.mdc` § «Включение»).  
 **Git commit/push** — только **Lead Architect** (по вашей просьбе на push).
 
 ---
@@ -18,16 +18,16 @@
 | Что делать **тебе** | **`docs/FOR_YOU.md`** | без чата |
 | **Продукт:** vision, контуры, метрики | **Lead Product** `@lead-product` | **`PRODUCT_VISION.md`** · инициатива: `LEAD_PRODUCT_PROMPT.md` |
 | **Roadmap, TASKS, приоритеты в работу** | **Lead Architect** `@lead-architect` | **`ROADMAP.md`** ← из vision |
-| **Дизайн:** стратегия UI, система, план | **Lead Designer** `@lead-designer` | [`LEAD_DESIGN.md`](team/LEAD_DESIGN.md) · план: `LEAD_DESIGN_PROMPT.md` |
+| **Дизайн:** стратегия UI, система, план | **Lead Designer** `@lead-designer` | [`LEAD_DESIGN.md`](team/design/LEAD_DESIGN.md) · план: `LEAD_DESIGN_PROMPT.md` |
 | **Инженерия:** docs, Coder, приёмка | **Lead Architect** `@lead-architect` | `lead-architect.mdc` · `CODER_PROMPT.md` |
-| **Дизайн UI** (исполнение) | **Designer** (новый чат) | `@designer` + `DESIGNER_PROMPT.md` (от Lead Designer) |
-| **Фича / код** | **Coder** (новый чат) | `@coder` + `CODER_PROMPT.md` (от Lead Architect) |
-| **Поломка** | **Mechanic** `@mechanic` | `docs/problems/…` |
+| **Дизайн UI** (исполнение) | **Designer** (новый чат) | `@designer` (или `@.cursor/rules/designer.mdc`) |
+| **Фича / код** | **Coder** (новый чат) | `@coder` (или `@.cursor/rules/coder.mdc`) |
+| **Поломка** | **Mechanic** `@mechanic` | `@mechanic` + `@docs/problems/…` |
 | Brainstorm | **Gemini** → итог → нужный Lead | — |
 
 ### Правила Cursor — не путать
 
-Карта всех AI: **[`docs/team/PROJECT_MAP.md`](team/PROJECT_MAP.md)** · детали: `ARCHITECTURE.md`, `CODE_STRUCTURE.md`.
+Карта всех AI: **[`docs/team/common/PROJECT_MAP.md`](team/common/PROJECT_MAP.md)** · детали: `ARCHITECTURE.md`, `CODE_STRUCTURE.md`.
 
 Карта всех `.mdc`: **`.cursor/rules/README.md`**.
 
@@ -37,13 +37,13 @@
 | **Роль (@ в чате)** | `lead-architect`, `lead-product`, `lead-designer`, `coder`, `mechanic`, `designer`, `owner` |
 | **Гард по путям** | `code-guard.mdc` — когда открыт код |
 
-**Apply Intelligently** в UI = Agent сам решает по `description`; для ролей надёжнее **`@coder`** / **`@lead-architect`**, а не полагаться на «умное» подключение.
+**Apply Intelligently** в UI = Agent сам решает по `description`; для ролей надёжнее **`@coder`** / **`@lead-architect`** в первом сообщении, а не полагаться на «умное» подключение.
 
 Роли: **`.cursor/rules/`** · масштаб: **[`SCALE.md`](SCALE.md)** · бэкап: **[`../ops/BACKUP.md`](../ops/BACKUP.md)**
 
 **Не пиши Coder** «объясни весь проект» — он читает `CODER_PROMPT.md` / `TZ.md` сам.
 
-**Lead никогда не кодит** — отдельный чат `@lead-architect`; любая правка `src/` → новый чат `@coder` + `CODER_PROMPT.md`. Правила: `lead-no-code.mdc`.
+**Lead никогда не кодит** — отдельный чат `@lead-architect`; любая правка `src/` → новый чат `@coder`. Правила: `lead-no-code.mdc`.
 
 ---
 
@@ -76,7 +76,7 @@
 
 | Делай | Не делай |
 |-------|----------|
-| `@docs/team/CODER_PROMPT.md` в чат Coder | Копировать весь TZ в чат |
+| Первое сообщение: `@coder` (пути в `coder.mdc`) | Копировать весь TZ в чат |
 | Одна задача = **новый** Coder-чат | Переиспользовать старый Coder-чат |
 | Одна поломка = один чат Mechanic + один файл `docs/problems/` | Дебаг всего MVP в чате Lead |
 | «Смотри CODER_PROMPT.md» | «Сделай всё из TZ» |

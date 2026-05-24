@@ -3,7 +3,7 @@
 Версия: **0.2 (черновик 3b)** · Lead Architect · 2026-05-24  
 Решение владельца: **Neon** как облако; WP **не** ходит в Postgres напрямую.
 
-> **v0.9:** поле **`contour`** (`owner`/`saas`) — **отменено**. Вместо него **`is_visible`** после ИИ-модерации — см. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0c. Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § 3b.
+> **v0.9:** поле **`contour`** (`owner`/`saas`) — **отменено**. Вместо него **`is_visible`** после ИИ-модерации — см. [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §0c. Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § 3b.
 
 Черновик SQL для Coder: [`../../sql/001_neon_schema.sql`](../../sql/001_neon_schema.sql) — расширить по этому документу.
 

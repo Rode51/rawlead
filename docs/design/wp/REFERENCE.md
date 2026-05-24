@@ -170,7 +170,7 @@
 | **Coder** | ✅ `wordpress/rawlead-kadence-child/` · [`WP_KADENCE_INSTALL.md`](../../ops/WP_KADENCE_INSTALL.md) |
 | **Владелец** | Local `radarzakaz.local` · Primary menu RawLead |
 
-Следующий продуктовый шаг: **match %** в боте — [`PRODUCT_VISION.md`](../../team/PRODUCT_VISION.md) §0.
+Следующий продуктовый шаг: **match %** в боте — [`PRODUCT_VISION.md`](../../team/product/PRODUCT_VISION.md) §0.
 
 ---
 

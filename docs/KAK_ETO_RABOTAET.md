@@ -123,7 +123,7 @@
 |------|--------|
 | **Ты** | `.env`, запуск, бэкап, FILTERS/PROFILE |
 | **Lead** | планы, docs, этот файл |
-| **Coder** | код по `team/CODER_PROMPT.md` |
+| **Coder** | код по `team/architect/CODER_PROMPT.md` |
 | **Mechanic** | починка по `problems/` |
 
 ---
@@ -148,8 +148,8 @@
 | 2026-05-23 | Бэкап `backup.bat`, шаблон ролей для других проектов |
 | ранее | FL + Kwork + бот; 5 MVP-чатов TG; health-check без lock сессии |
 
-| 2026-05-24 | **Vision v0.9 (ставка B):** открытая лента `/feed` + ЛК `/cabinet` + ИИ-агент — см. [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md) · [`team/ROADMAP.md`](team/ROADMAP.md) |
+| 2026-05-24 | **Vision v0.9 (ставка B):** открытая лента `/feed` + ЛК `/cabinet` + ИИ-агент — см. [`team/product/PRODUCT_VISION.md`](team/product/PRODUCT_VISION.md) · [`team/architect/ROADMAP.md`](team/architect/ROADMAP.md) |
 
 _Новая фича → Lead Architect дописывает строку в таблицу выше._
 
-**Куда смотреть AI:** [`team/PROJECT_MAP.md`](team/PROJECT_MAP.md) — не обходить весь репо.
+**Куда смотреть AI:** [`team/common/PROJECT_MAP.md`](team/common/PROJECT_MAP.md) — не обходить весь репо.

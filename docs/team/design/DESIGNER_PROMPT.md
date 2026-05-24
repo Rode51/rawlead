@@ -14,7 +14,7 @@
 | `/feed` | карточка лида, фильтры, поиск, сортировки, empty/loading |
 | `/cabinet` | match %, `final_rank`, чипы тегов, CTA «Сгенерировать отклик» (макет) |
 
-**Стиль:** [`docs/design/wp/REFERENCE.md`](../design/wp/REFERENCE.md) E · токены [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md).
+**Стиль:** [`docs/design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) E · токены [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md).
 
 **Не делать:** лендинг, `/uslugi`, правки `wordpress/` кода.
 

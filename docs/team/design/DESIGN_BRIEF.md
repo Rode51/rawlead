@@ -1,6 +1,6 @@
 # DESIGN_BRIEF — пульт RawLead v2
 
-**Статус:** v2 · утверждено Lead 2026-05-23 · canvas `r7` · Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md)  
+**Статус:** v2 · утверждено Lead 2026-05-23 · canvas `r7` · Coder: [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md)  
 **Задача:** [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md)  
 **Live-превью:** `.cursor/projects/c-Users-hramo-uisness/canvases/fl-radar-pult-v2.canvas.tsx`  
 **Стек:** Tauri 2 + HTML/CSS · **без PyQt6** (решение Lead 2026-05-20, ADR в git history)

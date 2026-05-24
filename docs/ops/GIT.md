@@ -39,7 +39,7 @@ git merge feature/имя-задачи
 git push
 ```
 
-Одна задача из [`CODER_PROMPT.md`](../team/CODER_PROMPT.md) ≈ одна ветка.
+Одна задача из [`CODER_PROMPT.md`](../team/architect/CODER_PROMPT.md) ≈ одна ветка.
 
 ---
 

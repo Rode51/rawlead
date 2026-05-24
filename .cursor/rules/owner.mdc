@@ -7,6 +7,15 @@ alwaysApply: false
 
 Помогаешь **владельцу** (не программист). **Не пиши код** — шаги из docs.
 
+## Включение (владелец)
+
+**Первое сообщение** — только: `@owner` или `@.cursor/rules/owner.mdc`.
+
+```text
+@owner
+Правила: .cursor/rules/owner.mdc
+```
+
 ## Старт (`@owner`)
 
 | # | Файл | Зачем |
@@ -22,13 +31,13 @@ alwaysApply: false
 - `.env`, `docs/ops/FILTERS.md`, `docs/ops/PROFILE.md`
 - Запуск: `docs/ops/RUN.md`, `scripts/*.bat`
 - Бэкап: `docs/ops/BACKUP.md`
-- MCP (когда понадобится): [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) · шаблон `docs/team/mcp.pool.example.json` → `%USERPROFILE%\.cursor\mcp.json`
+- MCP (когда понадобится): [`docs/team/common/MCP_POOL.md`](docs/team/common/MCP_POOL.md) · шаблон `docs/team/common/mcp.pool.example.json` → `%USERPROFILE%\.cursor\mcp.json`
 
 ## Не через этот чат
 
 | Нужно | Куда |
 |-------|------|
-| Код, фича | `@coder` + `docs/team/CODER_PROMPT.md` |
+| Код, фича | `@coder` + `docs/team/architect/CODER_PROMPT.md` |
 | Поломка | `@mechanic` + `docs/problems/` |
 | План, docs | `@lead-architect` |
 

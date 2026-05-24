@@ -9,15 +9,15 @@
 
 - **Play / stop** — не реагирует
 - **Свернуть / закрыть** (свои кнопки в шапке) — не работают
-- **Вид** — не как у Designer ([`DESIGN_BRIEF`](../team/DESIGN_BRIEF.md), canvas `fl-radar-pult-v2`)
+- **Вид** — не как у Designer ([`DESIGN_BRIEF`](../team/design/DESIGN_BRIEF.md), canvas `fl-radar-pult-v2`)
 
 ---
 
 ## Эталон для Coder
 
-- [`DESIGN_BRIEF.md`](../team/DESIGN_BRIEF.md)
+- [`DESIGN_BRIEF.md`](../team/design/DESIGN_BRIEF.md)
 - Canvas: `~\.cursor\projects\c-Users-hramo-uisness\canvases\fl-radar-pult-v2.canvas.tsx`
-- [`DESIGN_BRIEF.md`](../team/DESIGN_BRIEF.md) § «Как посмотреть макет»
+- [`DESIGN_BRIEF.md`](../team/design/DESIGN_BRIEF.md) § «Как посмотреть макет»
 
 ---
 

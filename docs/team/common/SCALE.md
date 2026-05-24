@@ -2,7 +2,7 @@
 
 **Один цикл = одна маленькая задача.** Большой продукт = **20–50 сданных циклов**, не один гигантский чат.
 
-Связано: [`HOW_TO_USE_CURSOR.md`](HOW_TO_USE_CURSOR.md) · [`LEAD.md`](LEAD.md) · [`../ops/BACKUP.md`](../ops/BACKUP.md)
+Связано: [`HOW_TO_USE_CURSOR.md`](HOW_TO_USE_CURSOR.md) · [`../architect/LEAD.md`](../architect/LEAD.md) · [`../../ops/BACKUP.md`](../../ops/BACKUP.md)
 
 ---
 
@@ -54,7 +54,7 @@
 | Уровень | Файл | Когда менять |
 |---------|------|--------------|
 | Зачем | `PRODUCT_VISION.md` | редко |
-| Когда | `team/ROADMAP.md` | раз в «спринт» / фазу |
+| Когда | `team/architect/ROADMAP.md` | раз в «спринт» / фазу |
 | Сейчас | `FOR_YOU.md`, `STATUS.md` | каждый цикл |
 | Задача | `CODER_PROMPT.md` | один цикл, потом удалить |
 

@@ -7,7 +7,7 @@
 
 ## Симптомы (владелец)
 
-1. Tauri запустился (`tauri dev` / `desktop.exe`), но **вид не как у Designer** (canvas `fl-radar-pult-v2`, [`DESIGN_BRIEF.md`](../team/DESIGN_BRIEF.md) v2).
+1. Tauri запустился (`tauri dev` / `desktop.exe`), но **вид не как у Designer** (canvas `fl-radar-pult-v2`, [`DESIGN_BRIEF.md`](../team/design/DESIGN_BRIEF.md) v2).
 2. **Кнопки не работают** (play, обновить статус, табы).
 3. **Плашка Windows** — убрать стандартный title bar (decorations).
 4. **Не открывать PowerShell** — запуск как у обычного приложения (vbs / exe).
@@ -34,7 +34,7 @@
 
 ## Задача Coder
 
-См. [`../team/CODER_PROMPT.md`](../team/CODER_PROMPT.md).
+См. [`../team/architect/CODER_PROMPT.md`](../team/architect/CODER_PROMPT.md).
 
 ---
 

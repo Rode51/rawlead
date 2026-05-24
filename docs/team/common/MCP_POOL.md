@@ -117,7 +117,7 @@ Chrome: `claude --chrome` или в сессии `/chrome` → Enabled.
 - [ ] Ключи Perplexity / Firecrawl / Glif (по необходимости)
 - [ ] Playwright: `npx @playwright/mcp@latest` один раз отработал без ошибки
 - [ ] Claude Code: при необходимости `claude --chrome` + расширение
-- [ ] В чате агенту: «смотри `docs/team/MCP_POOL.md`»
+- [ ] В чате агенту: «смотри `docs/team/common/MCP_POOL.md`»
 
 ---
 

@@ -1,4 +1,4 @@
-> **Устарело под vision v0.9 (ставка B).** Актуальный scope — [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0g. Обновление **после MVP** — Lead Architect.
+> **Устарело под vision v0.9 (ставка B).** Актуальный scope — [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §0g. Обновление **после MVP** — Lead Architect.
 
 ## Для портфолио (2026-05)
 

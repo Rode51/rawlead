@@ -4,7 +4,7 @@
 
 Для владельца — **`docs/FOR_YOU.md`**. Код сейчас — **этап 0** (радар + бот). Ниже — **куда идём**.
 
-**Архитектура v1:** [`NEON_SCHEMA.md`](NEON_SCHEMA.md) · [`TZ_API.md`](TZ_API.md) · [`TZ_WP.md`](TZ_WP.md)
+**Архитектура v1:** [`NEON_SCHEMA.md`](../architect/NEON_SCHEMA.md) · [`TZ_API.md`](../architect/TZ_API.md) · [`TZ_WP.md`](../architect/TZ_WP.md)
 
 ---
 
@@ -118,7 +118,7 @@ flowchart TB
 | `keyword_match` | read — `lead_tags` ∩ `user_tags` |
 | **final_rank** | read — `ai_score×0.6 + keyword_match×0.4` |
 
-Детали: [`NEON_SCHEMA.md`](NEON_SCHEMA.md) §3.
+Детали: [`NEON_SCHEMA.md`](../architect/NEON_SCHEMA.md) §3.
 
 ### WP кабинет
 
@@ -323,7 +323,7 @@ flowchart LR
 | WP лендинг editorial | `radarzakaz.local` (Kadence child) | Главная страница продукта (Hero «Лиды без шума») — **остаётся как маркетинг продукта**, не как витрина услуг |
 | Пульт Tauri v2 | `desktop/` | Внутренний инструмент владельца, не публичная витрина |
 | PNG-карта продукта | [`../design/rawlead/project-map-owner.png`](../design/rawlead/project-map-owner.png) | Внутренний документ |
-| Дизайн-система | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) + [`../design/wp/REFERENCE.md`](../design/wp/REFERENCE.md) | Базовые токены для WP `/feed` и `/cabinet` (extends to MVP) |
+| Дизайн-система | [`DESIGN_SYSTEM.md`](../design/DESIGN_SYSTEM.md) + [`../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) | Базовые токены для WP `/feed` и `/cabinet` (extends to MVP) |
 | GitHub `Rode51/uisness` | github.com | Публичный, README устарел; **обновить — после MVP** |
 | Текст pitch | [`../PORTFOLIO.md`](../PORTFOLIO.md) + [`PORTFOLIO.md`](PORTFOLIO.md) | Устарел, **обновить — после MVP** |
 
@@ -428,7 +428,7 @@ TG — главный; FL/Kwork — дополнение. [`SOURCES_POOLS.md`](.
 | Что | Где |
 |-----|-----|
 | Этап 0 | SQLite `data/projects.db` |
-| v1+ | Neon — [`NEON_SCHEMA.md`](NEON_SCHEMA.md) |
+| v1+ | Neon — [`NEON_SCHEMA.md`](../architect/NEON_SCHEMA.md) |
 | WP | MySQL хостера — только users WP, не лиды |
 
 ---
@@ -437,11 +437,11 @@ TG — главный; FL/Kwork — дополнение. [`SOURCES_POOLS.md`](.
 
 | Файл | Роль |
 |------|------|
-| [`NEON_SCHEMA.md`](NEON_SCHEMA.md) | Таблицы, формула |
-| [`TZ_API.md`](TZ_API.md) | REST, бот, ingest |
-| [`TZ_WP.md`](TZ_WP.md) | Кабинет, подписки |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Схемы |
-| [`TASKS.md`](TASKS.md) | Очередь |
+| [`NEON_SCHEMA.md`](../architect/NEON_SCHEMA.md) | Таблицы, формула |
+| [`TZ_API.md`](../architect/TZ_API.md) | REST, бот, ingest |
+| [`TZ_WP.md`](../architect/TZ_WP.md) | Кабинет, подписки |
+| [`ARCHITECTURE.md`](../architect/ARCHITECTURE.md) | Схемы |
+| [`TASKS.md`](../common/TASKS.md) | Очередь |
 
 ---
 

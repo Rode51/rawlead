@@ -82,4 +82,4 @@
 
 - 3 сессии параллельно; WordPress; аналитика.
 
-См. [`PRODUCT_VISION.md`](PRODUCT_VISION.md).
+См. [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md).

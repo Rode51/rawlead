@@ -2,7 +2,7 @@
 
 Для **обучения WP** и черновика будущего SaaS. Радар на ПК **не требует** этого шага.
 
-Видение продукта: [`../team/PRODUCT_VISION.md`](../team/PRODUCT_VISION.md).  
+Видение продукта: [`../team/product/PRODUCT_VISION.md`](../team/product/PRODUCT_VISION.md).  
 Тексты страниц: [`../archive/wp-skeleton/`](../archive/wp-skeleton/).
 
 ---
@@ -86,7 +86,7 @@
 - Подключение к Neon / радару.
 - Подписки и оплата.
 
-Это **этап B** в [`PRODUCT_VISION.md`](../team/PRODUCT_VISION.md).
+Это **этап B** в [`PRODUCT_VISION.md`](../team/product/PRODUCT_VISION.md).
 
 ---
 

@@ -1,4 +1,4 @@
-﻿# ТЗ — RawLead (полное)
+# ТЗ — RawLead (полное)
 
 Версия: **1.2** · Lead
 
@@ -8,7 +8,7 @@
 
 **RawLead** (фаза 0 в коде) — мониторинг **новых проектов на FL.ru и Kwork** по **твоим правилам** → уведомление в **Telegram** → **разбор ИИ** простым языком: сложность **для владельца с Cursor без навыков кода**, срок, деньги, черновик отклика.
 
-**Развитие продукта** (TG-чаты, WP, аналитика): **`docs/team/PRODUCT_VISION.md`**, шаги — **`docs/team/ROADMAP.md`**.
+**Развитие продукта** (TG-чаты, WP, аналитика): **`docs/team/product/PRODUCT_VISION.md`**, шаги — **`docs/team/architect/ROADMAP.md`**.
 
 Ты **сам** жмёшь «откликнуться» на FL. Авто-откликов нет.
 
@@ -34,7 +34,7 @@
 
 ## 3. Архитектура
 
-Краткая схема ниже; **детальная** (слои, модули, Mermaid) — **`docs/team/ARCHITECTURE.md`**.
+Краткая схема ниже; **детальная** (слои, модули, Mermaid) — **`docs/team/architect/ARCHITECTURE.md`**.
 
 ```
 [ПК]
@@ -196,7 +196,7 @@
 - Supabase в MVP
 - Гарантия точной цены (ИИ — **подсказка**, финальное решение за владельцем)
 
-**Telethon, WordPress-пульт, аналитика рынка** — в **`docs/team/PRODUCT_VISION.md`** (фазы 1–4), не в этом MVP.
+**Telethon, WordPress-пульт, аналитика рынка** — в **`docs/team/product/PRODUCT_VISION.md`** (фазы 1–4), не в этом MVP.
 
 ---
 
@@ -204,13 +204,13 @@
 
 | Файл | Назначение |
 |------|------------|
-| `docs/team/TESTING.md` | Кто и как проверяет без отдельного тестера |
+| `docs/team/common/TESTING.md` | Кто и как проверяет без отдельного тестера |
 | `docs/ops/FILTERS.md` | Выбор проектов (слова, логика) |
 | `docs/ops/PROFILE.md` | Кто ты для ИИ |
 | `docs/ops/SOURCES.md` | URL FL |
 | `docs/FOR_YOU.md` | Для владельца |
-| `docs/team/ROADMAP.md` | Фазы — канон (не `docs/ROADMAP.md`) |
-| `docs/team/TASKS.md` | Очередь Coder |
+| `docs/team/architect/ROADMAP.md` | Фазы — канон (не `docs/ROADMAP.md`) |
+| `docs/team/common/TASKS.md` | Очередь Coder |
 | `docs/problems/README.md` | Цикл инцидентов: Lead → Mechanic → Lead |
 
 ---

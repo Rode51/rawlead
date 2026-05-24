@@ -1,7 +1,7 @@
-﻿# TASKS (активное)
+# TASKS (активное)
 
 Архив: [`archive/TASKS_HISTORY.md`](archive/TASKS_HISTORY.md)  
-Vision: [`PRODUCT_VISION.md`](PRODUCT_VISION.md) v0.9 · план Product: [`LEAD_PRODUCT_PROMPT.md`](LEAD_PRODUCT_PROMPT.md)
+Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Product: [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md)
 
 ---
 
@@ -28,7 +28,7 @@ Vision: [`PRODUCT_VISION.md`](PRODUCT_VISION.md) v0.9 · план Product: [`LEA
 
 ## Lead → Coder (одна активная линия)
 
-**Промпт:** [`CODER_PROMPT.md`](CODER_PROMPT.md)
+**Промпт:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md)
 
 | # | Трек | Статус |
 |---|------|--------|

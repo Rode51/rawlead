@@ -1,6 +1,6 @@
 # Дорожная карта
 
-**Канон vision:** [`PRODUCT_VISION.md`](PRODUCT_VISION.md) **v0.9** · активный план Product: [`LEAD_PRODUCT_PROMPT.md`](LEAD_PRODUCT_PROMPT.md)
+**Канон vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.9** · активный план Product: [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md)
 
 **Ставка B (2026-05-24):** открытая лента `/feed` + ЛК `/cabinet` (Neon) + ИИ-агент; dogfood через TG-бот владельца.
 
@@ -40,7 +40,7 @@
 
 **Отменено под v0.9:** демо `/cabinet` на JSON/localStorage (старый Coder § B) · витрина `/uslugi` до MVP · поле `contour` в Neon.
 
-Блокеры: [`STATUS.md`](STATUS.md) · очередь: [`TASKS.md`](TASKS.md)
+Блокеры: [`STATUS.md`](../common/STATUS.md) · очередь: [`TASKS.md`](../common/TASKS.md)
 
 ---
 

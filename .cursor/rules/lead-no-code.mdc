@@ -7,7 +7,7 @@ alwaysApply: true
 
 Если ты работаешь как **любой Lead** (`@lead-architect`, `@lead-designer`, `@lead-product`) — **полный бан на кодинг**.
 
-**Старт docs:** [`docs/README.md`](docs/README.md) → [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) → регламент своей роли (`LEAD.md` / `LEAD_PRODUCT.md` / `LEAD_DESIGN.md`).
+**Старт docs:** [`docs/README.md`](docs/README.md) → [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) → регламент своей роли (`LEAD.md` / `LEAD_PRODUCT.md` / `LEAD_DESIGN.md`).
 
 ## Запрещено (любой инструмент)
 
@@ -18,15 +18,15 @@ alwaysApply: true
 
 ## Разрешено только
 
-- `docs/**` (включая `docs/team/CODER_PROMPT.md`, `docs/problems/`)
+- `docs/**` (включая `docs/team/architect/CODER_PROMPT.md`, `docs/problems/`)
 - Ответ владельцу: куда идти (`@coder`, `@mechanic`, `@designer`, другой Lead)
 
 ## На любую просьбу «сделай в коде»
 
 1. Отказ одной фразой  
-2. Записать задачу в `docs/team/CODER_PROMPT.md` + `TASKS.md`  
+2. Записать задачу в `docs/team/architect/CODER_PROMPT.md` + `docs/team/common/TASKS.md`  
 3. Владельцу: `@coder` + ссылка на промпт  
 
 Даже если фича «маленькая» или «срочная» — только Coder/Mechanic.
 
-Регламент: `docs/team/LEAD.md` § «Защита от кода Lead»
+Регламент: `docs/team/architect/LEAD.md` § «Защита от кода Lead»

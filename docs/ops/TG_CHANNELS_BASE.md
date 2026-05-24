@@ -32,7 +32,7 @@
 | 4 | Удалёнщики: заказчики и исполнители | https://t.me/tgjob | **чат** | Прямые заказы без биржи |
 | 5 | Чат 1С: заказы и фриланс | https://t.me/task_1C | чат | 1С / интеграции — ядро ниши |
 
-После `tg_join` и `tg_list_dialogs.py` — id чатов в таблицу [`SOURCES_POOLS.md`](SOURCES_POOLS.md) и в `.env` → `TELETHON_CHAT_IDS` (Coder, [`TZ_TG.md`](../team/TZ_TG.md)).
+После `tg_join` и `tg_list_dialogs.py` — id чатов в таблицу [`SOURCES_POOLS.md`](SOURCES_POOLS.md) и в `.env` → `TELETHON_CHAT_IDS` (Coder, [`TZ_TG.md`](../team/architect/TZ_TG.md)).
 
 ---
 

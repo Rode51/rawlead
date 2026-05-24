@@ -10,22 +10,23 @@ alwaysApply: true
 | Шаг | Куда |
 |-----|------|
 | 1 | [`docs/README.md`](docs/README.md) |
-| 2 | [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) — § «Агентам», § «Зоны» |
-| 3 | Файл роли: `CODER_PROMPT` · `DESIGNER_PROMPT` · `LEAD_*_PROMPT` · `docs/problems/…` |
+| 2 | [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) — § «Агентам», § «Зоны» |
+| 3 | Файл роли: `architect/CODER_PROMPT` · `design/DESIGNER_PROMPT` · `product/LEAD_PRODUCT_PROMPT` · `docs/problems/…` |
 
 Карта правил: [`.cursor/rules/README.md`](.cursor/rules/README.md)
 
 - Отвечай кратко, по делу; русский язык, если пользователь пишет по-русски
 - Не пересказывай весь репозиторий; один шаг за раз на больших задачах
 - **Не утверждай факты** без файла в repo (STATUS, CSV, код) — иначе галлюцинация
-- **Один источник правды** — `docs/team/LEAD.md` § таблица
-- **Промпт только в файле** (`CODER_PROMPT.md`, `DESIGNER_PROMPT.md`, `docs/problems/…`) — **не дублировать телом в чат**
-- В чат владельцу Lead даёт **копипаст**: `@роль` + путь к `.mdc` + путь к промпту (1 строка «что сделает»)
+- **Один источник правды** — `docs/team/architect/LEAD.md` § таблица
+- **Промпт только в файле** (`CODER_PROMPT.md`, …) — **не дублировать ТЗ в чат**
+- **Владелец в новом чате:** один `@роль` или `@.cursor/rules/<роль>.mdc` — пути задачи **уже в `.mdc`** § «Включение»; агент **читает** файлы (Read)
+- Lead в чат владельцу — только handoff между Lead-ами (напр. vision → `@lead-architect`) + 1 строка сути
 - Роли Cursor: `@lead-architect` · `@designer` · `@coder` · `@mechanic` · `@owner` — `.cursor/rules/`
 - **Lead = 0 кода** (только `docs/`); код — `@coder` / `@mechanic` (см. `lead-no-code.mdc`)
-- Coder: **новый чат на задачу**; цикл — `docs/team/SCALE.md`
+- Coder: **новый чат на задачу**; цикл — `docs/team/common/SCALE.md`
 - **Git commit / push** — **только Lead Architect**; Coder/Mechanic/Designer не коммитят; push — по просьбе владельца
-- **Перед работой** — [`docs/README.md`](docs/README.md) → [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) → файл роли; не «тыкаться» по всему repo
+- **Перед работой** — [`docs/README.md`](docs/README.md) → [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) → файл роли; не «тыкаться» по всему repo
 - **После `CODER_PROMPT.md`** — в чат владельцу: блок **копипаст** для `@coder` (см. `lead-architect.mdc`)
-- **Код:** без простыней; карта — `docs/team/CODE_STRUCTURE.md`; перенос папок — отдельное TZ + правка путей
-- **MCP (внешние tools):** канон [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) — Perplexity, Playwright, Firecrawl, Glif, Chrome (+ Neon = БД). Если tools MCP **нет** в сессии — не выдумывать веб/скрейп; сказать владельцу включить сервер из пула (настройка позже — ок)
+- **Код:** без простыней; карта — `docs/team/architect/CODE_STRUCTURE.md`; перенос папок — отдельное TZ + правка путей
+- **MCP (внешние tools):** канон [`docs/team/common/MCP_POOL.md`](docs/team/common/MCP_POOL.md) — Perplexity, Playwright, Firecrawl, Glif, Chrome (+ Neon = БД). Если tools MCP **нет** в сессии — не выдумывать веб/скрейп; сказать владельцу включить сервер из пула (настройка позже — ок)

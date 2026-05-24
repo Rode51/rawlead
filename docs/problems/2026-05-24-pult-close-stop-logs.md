@@ -2,7 +2,7 @@
 
 **Дата:** 2026-05-24  
 **Статус:** fixed ✅ принято Lead 2026-05-24 · **регрессия:** ✕ зависает → [`2026-05-24-pult-close-hang.md`](2026-05-24-pult-close-hang.md)  
-**Промпт:** [`docs/team/CODER_PROMPT.md`](../team/CODER_PROMPT.md) § C
+**Промпт:** [`docs/team/architect/CODER_PROMPT.md`](../team/architect/CODER_PROMPT.md) § C
 
 ## Симптом
 

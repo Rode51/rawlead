@@ -8,12 +8,12 @@ alwaysApply: false
 
 ## Старт
 
-1. [`docs/README.md`](docs/README.md) → [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) § «Агентам»
-2. Есть ли канон? → **`docs/team/DOCS_ARCHITECTURE.md`** § Канон
+1. [`docs/README.md`](docs/README.md) → [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) § «Агентам»
+2. Есть ли канон? → **`docs/team/common/DOCS_ARCHITECTURE.md`** § Канон
 
 Перед **созданием или переименованием** любого `.md` в `docs/`:
 
-1. Открой **`docs/team/DOCS_ARCHITECTURE.md`** — есть ли тема в § Канон?
+1. Открой **`docs/team/common/DOCS_ARCHITECTURE.md`** — есть ли тема в § Канон?
 2. **Нет строки** → **не создавай файл** — допиши канон или Lead спросит **владельца**
 
 ## Кто что может
@@ -21,7 +21,7 @@ alwaysApply: false
 | Роль | Разрешено писать |
 |------|------------------|
 | **Lead** | правка канона; **новый `.md` — только после «да» от владельца** + строка в DOCS_ARCHITECTURE |
-| **Coder** | только файлы из **`CODER_PROMPT.md` § Файлы** + **`team/STATUS.md`** (сдача) |
+| **Coder** | только файлы из **`CODER_PROMPT.md` § Файлы** + **`team/common/STATUS.md`** (сдача) |
 | **Mechanic** | только **`docs/problems/YYYY-MM-DD-*.md`** (тикет) + § Решение в том же файле |
 | **Designer** | только **`docs/design/**`** + DESIGN_BRIEF по промпту |
 | **Владелец** | не создавать docs — правки через Lead |
@@ -29,7 +29,7 @@ alwaysApply: false
 ## Запрещено без Lead
 
 - Новый файл в **`docs/` корне** (только README, FOR_YOU, KAK_ETO)
-- `docs/team/TZ_*.md`, `CODER_PROMPT_*.md`, копии ROADMAP/STATUS
+- `docs/team/architect/TZ_*.md`, `CODER_PROMPT_*.md`, копии ROADMAP/STATUS
 - Дубли в FOR_YOU / TASKS / STATUS (только ссылка `→ см. …`)
 - «Памятка на всякий случай», `NOTES.md`, `TODO.md` вне TASKS
 
@@ -40,10 +40,14 @@ alwaysApply: false
 | Тикет бага | `docs/problems/` |
 | Старое / исследование | `docs/archive/` или `docs/team/archive/` |
 | Запуск, TG, фильтры | `docs/ops/` (если уже есть канон — **правка**, не новый) |
-| Процесс, vision | `docs/team/` |
+| Общее (STATUS, TASKS, MCP) | `docs/team/common/` |
+| Архитектор, Coder ТЗ | `docs/team/architect/` |
+| Продукт, vision | `docs/team/product/` |
+| Дизайн-канон | `docs/team/design/` |
+| Макеты PNG | `docs/design/` (не `team/design/`) |
 
 ## Исключение
 
 Один новый `docs/problems/…` на **один** инцидент — Mechanic, без Lead.
 
-Регламент: [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md)
+Регламент: [`docs/team/common/DOCS_ARCHITECTURE.md`](docs/team/common/DOCS_ARCHITECTURE.md)

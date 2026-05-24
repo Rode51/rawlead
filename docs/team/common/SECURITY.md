@@ -45,4 +45,4 @@
 
 ## Для Lead (актуальность docs)
 
-При каждой сдаче Coder: сверить STATUS, TASKS, FOR_YOU, CSV — **убрать противоречия**. Одна правда — один файл ([`LEAD.md`](LEAD.md) § таблица).
+При каждой сдаче Coder: сверить STATUS, TASKS, FOR_YOU, CSV — **убрать противоречия**. Одна правда — один файл ([`../architect/LEAD.md`](../architect/LEAD.md) § таблица).

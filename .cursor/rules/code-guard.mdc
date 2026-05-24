@@ -8,15 +8,15 @@ alwaysApply: false
 
 ## Старт (перед правкой кода)
 
-1. [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) § «Зоны»
-2. **Coder:** [`docs/team/CODER_PROMPT.md`](docs/team/CODER_PROMPT.md) § «Файлы» · **Mechanic:** `docs/problems/<тикет>.md`
-3. [`docs/team/STATUS.md`](docs/team/STATUS.md) — блокеры
+1. [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) § «Зоны»
+2. **Coder:** [`docs/team/architect/CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) § «Файлы» · **Mechanic:** `docs/problems/<тикет>.md`
+3. [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) — блокеры
 
 Правки в этих путях — **не для Lead и не для Designer**.
 
 | Роль | Можно |
 |------|--------|
-| **Coder** | `@coder` + активный `docs/team/CODER_PROMPT.md` |
+| **Coder** | `@coder` + активный `docs/team/architect/CODER_PROMPT.md` |
 | **Mechanic** | `@mechanic` + тикет `docs/problems/*.md` |
 | **Lead** | **Нет** → пишет `CODER_PROMPT.md` |
 | **Designer** | **Нет** → только `docs/` |

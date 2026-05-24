@@ -4,7 +4,7 @@
 
 **Решение владельца:** **сайт с подписками** + Telegram-бот; **mobile app нет**.
 
-Связано: [`PRODUCT_VISION.md`](PRODUCT_VISION.md) · [`NEON_SCHEMA.md`](NEON_SCHEMA.md) · [`TZ_API.md`](TZ_API.md)
+Связано: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) · [`NEON_SCHEMA.md`](NEON_SCHEMA.md) · [`TZ_API.md`](TZ_API.md)
 
 ---
 

@@ -7,7 +7,7 @@
 | **Картинка (Designer ✅)** | [`../design/rawlead/project-map-owner.png`](../design/rawlead/project-map-owner.png) — открой в проводнике |
 | **Mermaid в Cursor** | Preview этого файла (`Ctrl+Shift+V`) |
 
-Текстовая карта для AI: [`PROJECT_MAP.md`](PROJECT_MAP.md) · архитектура: [`ARCHITECTURE.md`](ARCHITECTURE.md)
+Текстовая карта для AI: [`PROJECT_MAP.md`](PROJECT_MAP.md) · архитектура: [`ARCHITECTURE.md`](../architect/ARCHITECTURE.md)
 
 ---
 
@@ -78,7 +78,7 @@ flowchart LR
   FWD --> CARD
 ```
 
-**Контур 1 (сейчас):** всё идёт **тебе в бота**. SaaS / сайт-лента — позже ([`PRODUCT_VISION.md`](PRODUCT_VISION.md)).
+**Контур 1 (сейчас):** всё идёт **тебе в бота**. SaaS / сайт-лента — позже ([`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md)).
 
 ---
 

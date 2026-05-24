@@ -5,7 +5,7 @@ _Архив · перенесено из `docs/ops/` · не для ежедне
 **Дата:** 2026-05-23  
 **Контекст:** вебхуки, автоматизация, Vibe Coding, оператор — начинающий в ручном коде, управление через пошаговые инструкции и агентов.  
 **Источники:** [cursor.com/docs](https://cursor.com/docs), блог Cursor (sandbox), практика репозитория `uisness`.  
-**Важно:** Cursor **не** используется в проде радара (`docs/team/AI.md`) — только IDE у владельца. Лимиты ниже относятся к **Agent/Composer в IDE**, не к OpenRouter.
+**Важно:** Cursor **не** используется в проде радара (`docs/team/architect/AI.md`) — только IDE у владельца. Лимиты ниже относятся к **Agent/Composer в IDE**, не к OpenRouter.
 
 ---
 
@@ -123,7 +123,7 @@ _Архив · перенесено из `docs/ops/` · не для ежедне
 | Сигнал | Порог | Действие |
 |--------|-------|----------|
 | Индикатор контекста | **> 60–70%** | Новый чат + `@` только нужные файлы |
-| Сообщений в одном чате | **> 25–40** с правками | Новый чат; перенести вывод в `docs/team/STATUS.md` |
+| Сообщений в одном чате | **> 25–40** с правками | Новый чат; перенести вывод в `docs/team/common/STATUS.md` |
 | Один файл в контексте | **> 400–600 строк** | Дробить модуль или `@` конкретные функции через правило «не трогать» |
 | «Забывание» | Агент предлагает откатить уже согласованное API/имена | **Стоп** → commit → новый чат с `@ARCHITECTURE` / rule |
 
@@ -173,18 +173,18 @@ description: Запреты и границы правок для Agent
 alwaysApply: true
 ---
 
-## Не изменять без явной задачи в docs/team/TASKS.md
+## Не изменять без явной задачи в docs/team/common/TASKS.md
 - src/tg_client.py, src/tg_monitor.py (Telethon)
-- docs/team/TASKS.md, docs/team/TZ.md
+- docs/team/common/TASKS.md, docs/team/architect/TZ_API.md
 - .env (только чтение; правки — в .env.example + инструкция владельцу)
 
 ## Обязательно перед правкой модуля
-- Прочитать docs/team/ARCHITECTURE.md
+- Прочитать docs/team/architect/ARCHITECTURE.md
 - Одна задача = один модуль из списка «В работе» в TASKS
 
 ## Стиль правок
 - Минимальный diff; не рефакторить соседние файлы
-- После сессии: блок в docs/team/STATUS.md (Coder)
+- После сессии: блок в docs/team/common/STATUS.md (Coder)
 ```
 
 **Ошибки, ведущие к «сносу»:**
@@ -262,7 +262,7 @@ src/
 tests/
   test_webhooks_telegram.py
 docs/
-  team/ARCHITECTURE.md # 1 страница — границы модулей
+  team/architect/ARCHITECTURE.md # 1 страница — границы модулей
   ops/integrations/telegram_bot_api.md
 ```
 
@@ -419,4 +419,4 @@ docs/
 
 ---
 
-_Ведёт: исследование для владельца. Связанные файлы: `docs/team/AI.md`, `.cursor/rules/`, `docs/ops/NEON_CURSOR.md`._
+_Ведёт: исследование для владельца. Связанные файлы: `docs/team/architect/AI.md`, `.cursor/rules/`, `docs/ops/NEON_CURSOR.md`._

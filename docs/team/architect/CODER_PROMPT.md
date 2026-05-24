@@ -1,14 +1,14 @@
 # Coder — 3b Neon SaaS-ready (vision v0.9)
 
 **Дата:** 2026-05-24 · Lead Architect  
-**Vision:** [`PRODUCT_VISION.md`](PRODUCT_VISION.md) v0.9 · [`LEAD_PRODUCT_PROMPT.md`](LEAD_PRODUCT_PROMPT.md) acceptance #2  
+**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) acceptance #2  
 **ROADMAP:** фаза **3b** → затем 3c–3f
 
 ---
 
 ## Перед стартом
 
-1. [`docs/README.md`](../README.md) → [`PROJECT_MAP.md`](PROJECT_MAP.md) § «Зоны»
+1. [`docs/README.md`](../README.md) → [`PROJECT_MAP.md`](../common/PROJECT_MAP.md) § «Зоны»
 2. **Не начинать 3c–3f** в этом промпте — одна фаза за сдачу
 
 ### Блокеры (не 3b, если не закрыты)
@@ -54,11 +54,11 @@ Neon-схема **SaaS-ready с дня 1** (`PRODUCT_VISION` §0a, §0c):
 | Путь | Зачем |
 |------|--------|
 | `sql/001_neon_schema.sql` | 3b |
-| `docs/team/NEON_SCHEMA.md` | 3b |
+| `docs/team/architect/NEON_SCHEMA.md` | 3b |
 | `src/pg_storage.py` | ingest Neon |
 | `src/lead_pipeline.py` | `is_visible` при записи |
 | `src/listing_dedup.py` | hash |
-| `docs/team/STATUS.md` | сдача |
+| `docs/team/common/STATUS.md` | сдача |
 | `src/tg_forward.py`, `src/telegram_control.py` | только § M |
 
 ## Файлы (не трогать)

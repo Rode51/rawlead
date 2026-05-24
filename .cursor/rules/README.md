@@ -2,17 +2,19 @@
 
 ## Старт по роли (одинаковая схема)
 
-**Всегда:** `docs/README.md` → `docs/team/PROJECT_MAP.md` (§ «Агентам») → **файл задачи**.
+**Всегда:** `docs/README.md` → `docs/team/common/PROJECT_MAP.md` (§ «Агентам») → **файл задачи**.
 
 | Роль в чате | Правило `.mdc` | Файл задачи (шаг 3) |
 |-------------|----------------|----------------------|
-| `@lead-architect` | `lead-architect.mdc` | `TASKS` · `STATUS` · пишешь `CODER_PROMPT` |
-| `@lead-product` | `lead-product.mdc` | `PRODUCT_VISION.md` · `LEAD_PRODUCT_PROMPT.md` |
-| `@lead-designer` | `lead-designer.mdc` | `LEAD_DESIGN_PROMPT.md` → `DESIGNER_PROMPT.md` |
-| `@coder` | `coder.mdc` | **`CODER_PROMPT.md`** |
-| `@designer` | `designer.mdc` | **`DESIGNER_PROMPT.md`** |
+| `@lead-architect` | `lead-architect.mdc` | `team/common/TASKS` · `STATUS` · `team/architect/CODER_PROMPT` |
+| `@lead-product` | `lead-product.mdc` | `team/product/PRODUCT_VISION` · `LEAD_PRODUCT_PROMPT` |
+| `@lead-designer` | `lead-designer.mdc` | `team/design/LEAD_DESIGN_PROMPT` → `DESIGNER_PROMPT` |
+| `@coder` | `coder.mdc` | **`team/architect/CODER_PROMPT.md`** |
+| `@designer` | `designer.mdc` | **`team/design/DESIGNER_PROMPT.md`** |
 | `@mechanic` | `mechanic.mdc` | **`docs/problems/<тикет>.md`** |
-| `@owner` | `owner.mdc` | **`FOR_YOU.md`** |
+| `@owner` | `owner.mdc` | **`docs/FOR_YOU.md`** |
+
+Папки: `docs/team/common/` · `architect/` · `product/` · `design/`
 
 **Always (в каждом чате):** `economy.mdc` · `lead-no-code.mdc` (Lead не кодят)
 
@@ -27,7 +29,9 @@
 | **Apply Manually** | то же + вызываешь **`@имя-файла`** в чате | Только когда ты @-упомянул правило |
 | **Apply to Specific Files** | `globs: src/**,…` | Когда открыт/трогаешь файл под маской |
 
-**Рекомендация:** роли — **`@coder`**, **`@lead-architect`**, … в начале чата, не полагаться на «умное» подключение.
+**Рекомендация:** в **новом чате** владелец пишет **только** `@coder` / `@designer` / … (или `@.cursor/rules/coder.mdc`). Пути к задаче — в § «Включение» внутри правила; **копипаст из 3 строк в чат не нужен**.
+
+**Важно:** `.mdc` даёт роль и **куда читать**; файлы `CODER_PROMPT.md` и т.д. агент **открывает сам** (Read) — они не подгружаются автоматически, если не `@`-упомянуть.
 
 ---
 
@@ -70,5 +74,7 @@
 
 1. **Settings → Rules** — Project Rules включены.
 2. Закладки чатов: Lead PM · Lead Design · Lead Arch · Coder · Designer · Mechanic.
-3. [`docs/team/HOW_TO_USE_CURSOR.md`](../../docs/team/HOW_TO_USE_CURSOR.md)
-4. MCP: [`docs/team/MCP_POOL.md`](../../docs/team/MCP_POOL.md)
+3. **Первое сообщение в чате** — одна строка, например: `@coder` или `@.cursor/rules/coder.mdc`
+4. Исключение: **Mechanic** — ещё `@docs/problems/<тикет>.md`
+5. [`docs/team/common/HOW_TO_USE_CURSOR.md`](../../docs/team/common/HOW_TO_USE_CURSOR.md)
+6. MCP: [`docs/team/common/MCP_POOL.md`](../../docs/team/common/MCP_POOL.md)

@@ -1,6 +1,6 @@
 # WordPress-пульт — шаги для тебя
 
-ТЗ для Coder: [`../team/TZ_WP.md`](../team/TZ_WP.md)
+ТЗ для Coder: [`../team/architect/TZ_WP.md`](../team/architect/TZ_WP.md)
 
 ---
 

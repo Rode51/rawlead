@@ -1,7 +1,7 @@
 # Lead Designer — активный план
 
 **Дата:** 2026-05-24 · принято Lead Architect из [`LEAD_PRODUCT_PROMPT.md`](LEAD_PRODUCT_PROMPT.md)  
-**Vision:** [`PRODUCT_VISION.md`](PRODUCT_VISION.md) **v0.9** (ставка B)  
+**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.9** (ставка B)  
 **Статус:** активно — UX для `/feed` и `/cabinet`
 
 ---
@@ -46,8 +46,8 @@
 
 ## Референсы (из Product)
 
-- [`docs/design/wp/REFERENCE.md`](../design/wp/REFERENCE.md) — стиль E (Unbounded/Manrope, светлый)
-- [`docs/team/DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) — токены v1
+- [`docs/design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) — стиль E (Unbounded/Manrope, светлый)
+- [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) — токены v1
 - Уже есть: лендинг ✅, пульт (внутренний) ✅, PNG-карта ✅
 
 ---

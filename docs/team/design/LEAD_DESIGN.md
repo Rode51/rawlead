@@ -59,8 +59,8 @@ flowchart LR
 
 ## Что можно править
 
-- `docs/team/LEAD_DESIGN.md`, `LEAD_DESIGN_PROMPT.md`
-- `docs/team/DESIGN*.md` (`DESIGN_SYSTEM`, `DESIGNER`, `DESIGNER_PROMPT`, `DESIGN_BRIEF`)
+- `docs/team/design/LEAD_DESIGN.md`, `LEAD_DESIGN_PROMPT.md`
+- `docs/team/design/*.md` (`DESIGN_SYSTEM`, `DESIGNER`, `DESIGNER_PROMPT`, `DESIGN_BRIEF`)
 - `docs/design/**`
 
 ## Что нельзя
@@ -80,4 +80,4 @@ Push — только по просьбе владельца.
 
 ---
 
-_См. также: [`HOW_TO_USE_CURSOR.md`](HOW_TO_USE_CURSOR.md) · [`PROJECT_MAP.md`](PROJECT_MAP.md) · `.cursor/rules/lead-designer.mdc`_
+_См. также: [`HOW_TO_USE_CURSOR.md`](../common/HOW_TO_USE_CURSOR.md) · [`PROJECT_MAP.md`](../common/PROJECT_MAP.md) · `.cursor/rules/lead-designer.mdc`_

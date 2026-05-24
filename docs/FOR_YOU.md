@@ -1,4 +1,4 @@
-﻿# Для тебя
+# Для тебя
 
 **Полная карта docs:** [`README.md`](README.md)
 
@@ -6,8 +6,8 @@
 |--------|------|
 | **Что делать сейчас?** | Ниже «Твои шаги» |
 | **Как это работает?** | [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) |
-| **Фазы / приоритет** | [`team/ROADMAP.md`](team/ROADMAP.md) · vision v0.9 |
-| **План Product** | [`team/LEAD_PRODUCT_PROMPT.md`](team/LEAD_PRODUCT_PROMPT.md) |
+| **Фазы / приоритет** | [`team/architect/ROADMAP.md`](team/architect/ROADMAP.md) · vision v0.9 |
+| **План Product** | [`team/product/LEAD_PRODUCT_PROMPT.md`](team/product/LEAD_PRODUCT_PROMPT.md) |
 | **Запуск** | [`ops/RUN.md`](ops/RUN.md) |
 | **Пульт** | [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
 | **TG acc + @FLPARSINGBOT** | [`ops/TELEGRAM_ACCOUNTS.md`](ops/TELEGRAM_ACCOUNTS.md) |
@@ -63,7 +63,7 @@
 
 | Блокер | Кто |
 |--------|-----|
-| pythonw.exe = launcher (2 процесса) | **@mechanic** → [`../team/ROADMAP.md`](team/ROADMAP.md) приоритет 0 |
+| pythonw.exe = launcher (2 процесса) | **@mechanic** → [`../team/architect/ROADMAP.md`](team/architect/ROADMAP.md) приоритет 0 |
 | Relay + карточка ИИ в боте | приёмка · [`problems/2026-05-24-tg-forward-not-via-bot.md`](problems/2026-05-24-tg-forward-not-via-bot.md) |
 
 ---
@@ -73,7 +73,7 @@
 | Нужно | Куда |
 |-------|------|
 | План, docs | **Lead** — не проси код |
-| Фича | **Coder** — если есть `team/CODER_PROMPT.md` |
+| Фича | **Coder** — если есть `team/architect/CODER_PROMPT.md` |
 | Поломка | **Mechanic** + `problems/` |
 
 Проверка бота: `.venv\Scripts\python.exe src/tg_smoke.py` — [`ops/RUN.md`](ops/RUN.md) §7.

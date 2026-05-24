@@ -65,10 +65,10 @@ wave,account,status,name,link,chat_id,notes
 3,acc1,done,remote_w0rk,https://t.me/remote_w0rk,1431442938,волна3
 3,acc2,done,remotejun,https://t.me/remotejun,1164672298,волна3
 3,acc3,done,resume_1c,https://t.me/resume_1c,1488323887,волна3
-3,acc1,pending,ru_wp,https://t.me/ru_wp,,волна3
+3,acc1,fail,ru_wp,https://t.me/ru_wp,,волна3
 3,acc2,done,ru_wp_org,https://t.me/ru_wp_org,1886865602,волна3
 3,acc3,done,runello_rus_webdevelopment,https://t.me/runello_rus_webdevelopment,1697683423,волна3
-3,acc1,pending,seohr,https://t.me/seohr,,волна3
+3,acc1,done,seohr,https://t.me/seohr,1017371671,волна3
 3,acc2,done,smm_leads,https://t.me/smm_leads,1455189774,волна3
 3,acc3,done,smmlancer,https://t.me/smmlancer,1199102856,волна3
 3,acc1,pending,smoke1c,https://t.me/smoke1c,,волна3

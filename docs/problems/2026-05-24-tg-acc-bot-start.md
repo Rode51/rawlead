@@ -81,4 +81,4 @@ cd C:\Users\hramo\uisness
 - `src/tg_bot_start.py` или логика в `src/tg_forward.py` / shared helper
 - `scripts/tg_main.py`, `src/tg_monitor.py`
 - `docs/ops/RUN.md`, `TELEGRAM_ACCOUNTS.md`, `TELEGRAM_LOGIN.md`
-- `docs/team/STATUS.md`
+- `docs/team/common/STATUS.md`
