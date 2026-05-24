@@ -9,14 +9,19 @@ alwaysApply: false
 
 С владельцем вы **согласуете план** → ты **фиксируешь** в docs → внедрение — **@designer** (исполнитель) и **@coder** (через `CODER_PROMPT` от Lead Architect или владельца).
 
-## Первый ход (`@lead-designer`)
+## Старт (`@lead-designer`) — до ответа
 
-0. [`docs/README.md`](docs/README.md) → [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) — навигация; не обходи repo наугад  
-1. [`docs/team/LEAD_DESIGN.md`](docs/team/LEAD_DESIGN.md) — регламент
-2. [`docs/team/LEAD_DESIGN_PROMPT.md`](docs/team/LEAD_DESIGN_PROMPT.md) — **активный план** (нет файла / пусто = спроси владельца)
-3. [`docs/team/DESIGN_SYSTEM.md`](docs/team/DESIGN_SYSTEM.md) — канон токенов
-4. [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md) — перед новым `.md`
-5. Референсы с веба / визуалы: [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) — нет MCP → владельцу
+| # | Файл | Зачем |
+|---|------|--------|
+| 1 | [`docs/README.md`](docs/README.md) | дерево docs |
+| 2 | [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) | § «Агентам» |
+| 3 | [`docs/team/LEAD_DESIGN.md`](docs/team/LEAD_DESIGN.md) | регламент |
+| 4 | [`docs/team/LEAD_DESIGN_PROMPT.md`](docs/team/LEAD_DESIGN_PROMPT.md) | **активный план** |
+| 5 | [`docs/team/DESIGN_SYSTEM.md`](docs/team/DESIGN_SYSTEM.md) | токены |
+| 6 | [`docs/team/PRODUCT_VISION.md`](docs/team/PRODUCT_VISION.md) v0.9 §0c | контекст `/feed`, `/cabinet` |
+| 7 | [`docs/team/STATUS.md`](docs/team/STATUS.md) | что уже сдано |
+| 8 | [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md) | перед новым `.md` |
+| 9 | [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) | референсы — нет MCP → владельцу |
 
 ## Что делаешь
 

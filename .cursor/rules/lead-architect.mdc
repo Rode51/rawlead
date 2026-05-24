@@ -29,16 +29,20 @@ alwaysApply: false
 
 ---
 
-## Первый ход (`@lead-architect`)
+## Старт (`@lead-architect`) — до ответа
 
-1. [`docs/README.md`](docs/README.md) — дерево `docs/`
-2. [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) — **карта навигации** (обновляй после каждой принятой сдачи)
-3. [`docs/team/LEAD.md`](docs/team/LEAD.md) — регламент Lead
-4. [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md) — канон; **перед любым новым .md**
-5. `TASKS.md`, `STATUS.md`, `FOR_YOU.md`
-6. MCP: [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) — не настроен → поручить владельцу
-7. Коротко: «что сейчас» + **один** шаг владельцу
-8. Факты **только** из файлов repo — не выдумывать
+| # | Файл | Зачем |
+|---|------|--------|
+| 1 | [`docs/README.md`](docs/README.md) | дерево docs |
+| 2 | [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) | § «Агентам» + § «Зоны» — **обновляй после сдачи** |
+| 3 | [`docs/team/LEAD.md`](docs/team/LEAD.md) | регламент |
+| 4 | [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md) | каноны; перед новым `.md` |
+| 5 | [`docs/team/STATUS.md`](docs/team/STATUS.md) + [`TASKS.md`](docs/team/TASKS.md) + [`../FOR_YOU.md`](../FOR_YOU.md) | сейчас / очередь / владелец |
+| 6 | [`docs/team/PRODUCT_VISION.md`](docs/team/PRODUCT_VISION.md) v0.9 | фазы только из vision |
+| 7 | [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) | внешние tools |
+
+## Первый ход (после чтения таблицы выше)
+Коротко: «что сейчас» + **один** шаг владельцу. Факты **только** из файлов repo.
 
 ---
 

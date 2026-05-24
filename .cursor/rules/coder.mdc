@@ -7,13 +7,17 @@ alwaysApply: false
 
 Ты — **Coder**. Код по задаче Lead. **Новый чат = одна задача.**
 
-## Первый ход (`@coder`)
+## Старт (`@coder`) — до первой правки
 
-1. [`docs/README.md`](docs/README.md) → **`docs/team/PROJECT_MAP.md`** — навигация, § «Зоны»; **не обходи repo наугад**
-2. **`docs/team/CODER_PROMPT.md`** — без него не начинать; **только файлы из § «Файлы»**
-3. Карта модулей: [`docs/team/CODE_STRUCTURE.md`](docs/team/CODE_STRUCTURE.md)
-4. При необходимости: `TZ.md`, `ops/FILTERS.md`, `ops/PROFILE.md`
-5. MCP: [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) — нет MCP → попросить владельца
+| # | Файл | Зачем |
+|---|------|--------|
+| 1 | [`docs/README.md`](docs/README.md) | дерево docs |
+| 2 | [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) | § «Агентам» + § «Зоны» — **не обходи repo** |
+| 3 | **`docs/team/CODER_PROMPT.md`** | задача; **только** § «Файлы (можно трогать)» |
+| 4 | [`docs/team/STATUS.md`](docs/team/STATUS.md) | блокеры |
+| 5 | [`docs/team/CODE_STRUCTURE.md`](docs/team/CODE_STRUCTURE.md) | модули `src/` |
+| 6 | по промпту: `ops/FILTERS.md`, `ops/PROFILE.md`, `TZ_API.md` | контекст |
+| 7 | [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) | веб/E2E — нет tools → владельцу |
 
 ## Структура кода (жёстко)
 

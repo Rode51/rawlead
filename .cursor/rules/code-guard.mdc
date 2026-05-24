@@ -1,0 +1,24 @@
+---
+description: Гард — код в src/scripts/desktop только @coder или @mechanic (не роль Coder)
+globs: src/**,scripts/**,tests/**,requirements.txt,desktop/**
+alwaysApply: false
+---
+
+# Код — только Coder / Mechanic
+
+## Старт (перед правкой кода)
+
+1. [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) § «Зоны»
+2. **Coder:** [`docs/team/CODER_PROMPT.md`](docs/team/CODER_PROMPT.md) § «Файлы» · **Mechanic:** `docs/problems/<тикет>.md`
+3. [`docs/team/STATUS.md`](docs/team/STATUS.md) — блокеры
+
+Правки в этих путях — **не для Lead и не для Designer**.
+
+| Роль | Можно |
+|------|--------|
+| **Coder** | `@coder` + активный `docs/team/CODER_PROMPT.md` |
+| **Mechanic** | `@mechanic` + тикет `docs/problems/*.md` |
+| **Lead** | **Нет** → пишет `CODER_PROMPT.md` |
+| **Designer** | **Нет** → только `docs/` |
+
+Перед правкой: есть ли промпт/тикет? Если нет — остановись, направь к Lead.

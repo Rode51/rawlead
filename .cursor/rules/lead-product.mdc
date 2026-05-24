@@ -15,35 +15,28 @@ alwaysApply: false
 
 **Ничего не отвечай и не планируй, пока не прочитал карту и канон — иначе галлюцинации.**
 
-### 0. Навигация (все AI)
-
-1. [`docs/README.md`](docs/README.md) — дерево папок  
-2. [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) — зоны; **не обходи repo наугад**  
-3. Дальше — таблица «Канон» ниже  
-
-**Git:** не `commit` / `push` — после сессии владелец передаёт **`@lead-architect`**; он коммитит и чистит дубли.
-
-### 1. Канон Lead Product (твоя зона — правишь)
+### 0. Старт (до ответа)
 
 | # | Файл | Зачем |
-|---|------|-------|
-| 1 | [`docs/team/LEAD_PRODUCT.md`](docs/team/LEAD_PRODUCT.md) | Регламент роли |
-| 2 | [`docs/team/LEAD_PRODUCT_PROMPT.md`](docs/team/LEAD_PRODUCT_PROMPT.md) | **Активный план** — ставка, scope, acceptance |
-| 3 | [`docs/team/PRODUCT_VISION.md`](docs/team/PRODUCT_VISION.md) | **Главная зона** — vision, контуры, каналы, ICP, метрики, каталог услуг, портфолио |
-| 4 | [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md) | Перед любым новым `.md` |
+|---|------|--------|
+| 1 | [`docs/README.md`](docs/README.md) | дерево docs |
+| 2 | [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) | § «Агентам» — **не обходи repo** |
+| 3 | [`docs/team/LEAD_PRODUCT.md`](docs/team/LEAD_PRODUCT.md) | регламент |
+| 4 | [`docs/team/LEAD_PRODUCT_PROMPT.md`](docs/team/LEAD_PRODUCT_PROMPT.md) | активный план |
+| 5 | [`docs/team/PRODUCT_VISION.md`](docs/team/PRODUCT_VISION.md) v0.9 | **главная зона правок** |
+| 6 | [`docs/team/STATUS.md`](docs/team/STATUS.md) | acceptance / что сдано |
+| 7 | [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md) | перед новым `.md` |
 
-### 2. Контекст «что уже сделано» (читать, **не править**)
+**Git:** не `commit` / `push` — handoff → **`@lead-architect`**.
+
+### 2. Контекст (читать, **не править**)
 
 | Файл | Зачем |
 |------|-------|
-| [`docs/README.md`](docs/README.md) | Карта всего docs-репо |
-| [`docs/KAK_ETO_RABOTAET.md`](docs/KAK_ETO_RABOTAET.md) | Как работает простыми словами + история фич |
-| [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) | Зоны команды, кто что трогает |
-| [`docs/team/ROADMAP.md`](docs/team/ROADMAP.md) | Фазы — **только чтение**, правит Lead Architect под твой vision |
-| [`docs/team/STATUS.md`](docs/team/STATUS.md) | Что сдано на сегодня — критично для acceptance |
-| [`docs/team/TASKS.md`](docs/team/TASKS.md) | Очередь Coder + владельца |
-| [`docs/PORTFOLIO.md`](docs/PORTFOLIO.md) + [`docs/team/PORTFOLIO.md`](docs/team/PORTFOLIO.md) | Текст для резюме (есть pitch и стек — апдейтит Lead Architect) |
-| [`docs/FOR_YOU.md`](docs/FOR_YOU.md) | Что владелец делает руками (для понимания контекста, не правишь) |
+| [`docs/KAK_ETO_RABOTAET.md`](docs/KAK_ETO_RABOTAET.md) | как работает продукт сейчас |
+| [`docs/team/ROADMAP.md`](docs/team/ROADMAP.md) | фазы — правит Lead Architect |
+| [`docs/team/TASKS.md`](docs/team/TASKS.md) | очередь |
+| [`docs/FOR_YOU.md`](docs/FOR_YOU.md) | шаги владельца |
 
 ### 3. Что у Coder и Designer (для согласования, **не правишь**)
 

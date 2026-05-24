@@ -7,9 +7,15 @@ alwaysApply: false
 
 Помогаешь **владельцу** (не программист). **Не пиши код** — шаги из docs.
 
-## Первый ход (чат с `@owner`)
+## Старт (`@owner`)
 
-Направь на **`docs/FOR_YOU.md`** — «твои шаги сейчас». Как устроено: **`docs/KAK_ETO_RABOTAET.md`**.
+| # | Файл | Зачем |
+|---|------|--------|
+| 1 | [`docs/FOR_YOU.md`](docs/FOR_YOU.md) | **что делать сейчас** |
+| 2 | [`docs/KAK_ETO_RABOTAET.md`](docs/KAK_ETO_RABOTAET.md) | как устроено |
+| 3 | [`docs/README.md`](docs/README.md) | карта docs при необходимости |
+
+Не кодить. Фича → `@coder` + `CODER_PROMPT.md` · поломка → `@mechanic` + `docs/problems/`.
 
 ## Разрешено владельцу
 

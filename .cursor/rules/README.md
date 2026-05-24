@@ -1,5 +1,23 @@
 # Правила Cursor (`.cursor/rules/`)
 
+## Старт по роли (одинаковая схема)
+
+**Всегда:** `docs/README.md` → `docs/team/PROJECT_MAP.md` (§ «Агентам») → **файл задачи**.
+
+| Роль в чате | Правило `.mdc` | Файл задачи (шаг 3) |
+|-------------|----------------|----------------------|
+| `@lead-architect` | `lead-architect.mdc` | `TASKS` · `STATUS` · пишешь `CODER_PROMPT` |
+| `@lead-product` | `lead-product.mdc` | `PRODUCT_VISION.md` · `LEAD_PRODUCT_PROMPT.md` |
+| `@lead-designer` | `lead-designer.mdc` | `LEAD_DESIGN_PROMPT.md` → `DESIGNER_PROMPT.md` |
+| `@coder` | `coder.mdc` | **`CODER_PROMPT.md`** |
+| `@designer` | `designer.mdc` | **`DESIGNER_PROMPT.md`** |
+| `@mechanic` | `mechanic.mdc` | **`docs/problems/<тикет>.md`** |
+| `@owner` | `owner.mdc` | **`FOR_YOU.md`** |
+
+**Always (в каждом чате):** `economy.mdc` · `lead-no-code.mdc` (Lead не кодят)
+
+---
+
 ## Что значит выпадашка в UI
 
 | Режим в Cursor | Поле в `.mdc` | Когда подключается |
@@ -9,60 +27,48 @@
 | **Apply Manually** | то же + вызываешь **`@имя-файла`** в чате | Только когда ты @-упомянул правило |
 | **Apply to Specific Files** | `globs: src/**,…` | Когда открыт/трогаешь файл под маской |
 
-**Рекомендация для ролей:** `alwaysApply: false` → в чате пиши **`@lead-architect`**, **`@lead-product`**, **`@lead-designer`**, **`@coder`**, **`@mechanic`**, **`@designer`**, **`@owner`**.
+**Рекомендация:** роли — **`@coder`**, **`@lead-architect`**, … в начале чата, не полагаться на «умное» подключение.
 
 ---
 
-## Карта файлов (11 штук — не дубли)
+## Карта файлов
 
 ### Всегда (2)
 
 | Файл | Зачем |
 |------|--------|
-| `economy.mdc` | Кратко; **навигация** `docs/README` → `PROJECT_MAP`; промпт только в файле; **git** — Lead Architect |
-| `lead-no-code.mdc` | **Все Lead не кодят** — страховка |
+| `economy.mdc` | Старт 1–2–3 · кратко · git Lead · MCP |
+| `lead-no-code.mdc` | Все Lead — запрет кода |
 
-### Lead (стратегия, только docs) — `@…`
+### Lead — `@…`
 
 | Файл | В чате |
 |------|--------|
-| `lead-architect.mdc` | `@lead-architect` — инженерия, `CODER_PROMPT` |
-| `lead-product.mdc` | `@lead-product` — vision, roadmap, `LEAD_PRODUCT_PROMPT` |
-| `lead-designer.mdc` | `@lead-designer` — design system, `LEAD_DESIGN_PROMPT` |
+| `lead-architect.mdc` | `@lead-architect` |
+| `lead-product.mdc` | `@lead-product` |
+| `lead-designer.mdc` | `@lead-designer` |
 
 ### Исполнители — `@…`
 
 | Файл | В чате |
 |------|--------|
-| `coder.mdc` | `@coder` — код по `CODER_PROMPT.md` |
-| `mechanic.mdc` | `@mechanic` — тикет `docs/problems/` |
-| `designer.mdc` | `@designer` — UI/UX по `DESIGNER_PROMPT.md` |
-| `owner.mdc` | `@owner` — FOR_YOU, .env, запуск |
+| `coder.mdc` | `@coder` |
+| `mechanic.mdc` | `@mechanic` |
+| `designer.mdc` | `@designer` |
+| `owner.mdc` | `@owner` |
 
-### Гард по путям (2)
+### Гарды (globs)
 
-| Файл | Зачем |
+| Файл | Когда |
 |------|--------|
-| `code-guard.mdc` | Открыт `src/` / `scripts/` / `desktop/` → код только `@coder` / `@mechanic` |
-| `docs-guard.mdc` | Открыт `docs/**` → не плодить `.md` · [`DOCS_ARCHITECTURE.md`](../../docs/team/DOCS_ARCHITECTURE.md) |
+| `code-guard.mdc` | открыт `src/` · `scripts/` · `desktop/` |
+| `docs-guard.mdc` | открыт `docs/**` |
 
 ---
 
-## Почему «по 2» у Lead и Coder (+ guards)
-
-| Роль | Файл 1 | Файл 2 |
-|------|--------|--------|
-| **Lead** | `lead-architect.mdc` — *как* работать (docs, промпты) | `lead-no-code.mdc` — *запрет* кода **всегда** |
-| **Coder** | `coder.mdc` — *как* кодить (промпт, STATUS) | `code-guard.mdc` — при правке `src/` |
-| **docs/** | — | `docs-guard.mdc` — не плодить `.md` |
-
-Это **не два Lead и не два Coder** — разные триггеры: роль вручную vs страховка always / globs.
-
----
-
-## Быстрый старт
+## Быстрый старт владельца
 
 1. **Settings → Rules** — Project Rules включены.
-2. Закладки: Lead PM · Lead Design · Lead Arch · Coder · Designer · Mechanic.
-3. Подробнее: [`docs/team/HOW_TO_USE_CURSOR.md`](../../docs/team/HOW_TO_USE_CURSOR.md)
-4. **MCP (Perplexity, Playwright, …):** [`docs/team/MCP_POOL.md`](../../docs/team/MCP_POOL.md) — ключи только в `~/.cursor/mcp.json`
+2. Закладки чатов: Lead PM · Lead Design · Lead Arch · Coder · Designer · Mechanic.
+3. [`docs/team/HOW_TO_USE_CURSOR.md`](../../docs/team/HOW_TO_USE_CURSOR.md)
+4. MCP: [`docs/team/MCP_POOL.md`](../../docs/team/MCP_POOL.md)

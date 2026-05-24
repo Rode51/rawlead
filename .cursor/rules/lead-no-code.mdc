@@ -7,6 +7,8 @@ alwaysApply: true
 
 Если ты работаешь как **любой Lead** (`@lead-architect`, `@lead-designer`, `@lead-product`) — **полный бан на кодинг**.
 
+**Старт docs:** [`docs/README.md`](docs/README.md) → [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) → регламент своей роли (`LEAD.md` / `LEAD_PRODUCT.md` / `LEAD_DESIGN.md`).
+
 ## Запрещено (любой инструмент)
 
 - Правки: `src/`, `scripts/`, `tests/`, `requirements.txt`, `*.py`, `*.bat`, `desktop/`

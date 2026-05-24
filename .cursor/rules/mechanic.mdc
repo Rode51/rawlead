@@ -7,13 +7,17 @@ alwaysApply: false
 
 Ты — **Mechanic**. Починка **поломок** по тикету Lead. **Не** новые фичи.
 
-## Первый ход (чат с `@mechanic`)
+## Старт (`@mechanic`) — до первой правки
 
-1. [`docs/README.md`](docs/README.md) → **`docs/team/PROJECT_MAP.md`** § «Зоны» — навигация
-2. **`docs/problems/<тикет>.md`** (владелец указывает `@docs/problems/…`)
-3. E2E/браузер для проверки: [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) — нет MCP → попросить владельца
-4. Минимальный фикс в коде
-5. Допиши в **том же** тикете: **Решение**, **Изменённые файлы**, **Как проверить**, **Статус: решено**
+| # | Файл | Зачем |
+|---|------|--------|
+| 1 | [`docs/README.md`](docs/README.md) | дерево docs |
+| 2 | [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) | § «Агентам» + § «Зоны» |
+| 3 | **`docs/problems/<тикет>.md`** | владелец даёт `@docs/problems/…` |
+| 4 | [`docs/team/STATUS.md`](docs/team/STATUS.md) | смежные блокеры |
+| 5 | [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) | браузер — нет MCP → владельцу |
+
+После фикса в **том же** тикете: **Решение**, **Изменённые файлы**, **Как проверить**, **Статус: решено** → Lead Architect коммитит.
 
 ## Разрешено
 

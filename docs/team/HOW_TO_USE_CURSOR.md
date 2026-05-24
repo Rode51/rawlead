@@ -109,6 +109,18 @@
 
 ---
 
+## Старт агента (все роли)
+
+| Шаг | Файл |
+|-----|------|
+| 1 | [`README.md`](../README.md) |
+| 2 | [`PROJECT_MAP.md`](PROJECT_MAP.md) — § «Агентам» |
+| 3 | Промпт роли — см. [`.cursor/rules/README.md`](../../.cursor/rules/README.md) § «Старт по роли» |
+
+Правила Cursor: **всегда** `economy.mdc` + `lead-no-code.mdc`; роль — **`@coder`** / **`@lead-architect`** и т.д. в первом сообщении.
+
+---
+
 ## MCP — когда агенту нужен интернет / браузер
 
 | Задача | Сервер (см. `MCP_POOL.md`) |

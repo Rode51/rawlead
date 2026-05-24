@@ -5,6 +5,16 @@ alwaysApply: true
 
 # Economy
 
+## Старт (любая роль)
+
+| Шаг | Куда |
+|-----|------|
+| 1 | [`docs/README.md`](docs/README.md) |
+| 2 | [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) — § «Агентам», § «Зоны» |
+| 3 | Файл роли: `CODER_PROMPT` · `DESIGNER_PROMPT` · `LEAD_*_PROMPT` · `docs/problems/…` |
+
+Карта правил: [`.cursor/rules/README.md`](.cursor/rules/README.md)
+
 - Отвечай кратко, по делу; русский язык, если пользователь пишет по-русски
 - Не пересказывай весь репозиторий; один шаг за раз на больших задачах
 - **Не утверждай факты** без файла в repo (STATUS, CSV, код) — иначе галлюцинация
