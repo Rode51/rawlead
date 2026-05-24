@@ -1,7 +1,7 @@
 ﻿# Пулы источников
 
 **Контур 1 (Дикий Запад, только владелец):** этот файл.  
-**Контур 2 (SaaS, подписка):** [`SOURCES_SAAS.md`](SOURCES_SAAS.md) — отдельный whitelist.
+**Модерация v0.9:** один поток источников; отбор в ленту — `is_visible` на ingest ([`../team/PRODUCT_VISION.md`](../team/PRODUCT_VISION.md) §0c). Старый «Контур 2»: [`../archive/SOURCES_SAAS.md`](../archive/SOURCES_SAAS.md).
 
 **Секреты** — только в **`.env`** на ПК владельца.
 

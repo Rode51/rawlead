@@ -148,4 +148,8 @@
 | 2026-05-23 | Бэкап `backup.bat`, шаблон ролей для других проектов |
 | ранее | FL + Kwork + бот; 5 MVP-чатов TG; health-check без lock сессии |
 
-_Новая фича → Lead дописывает строку в таблицу выше._
+| 2026-05-24 | **Vision v0.9 (ставка B):** открытая лента `/feed` + ЛК `/cabinet` + ИИ-агент — см. [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md) · [`team/ROADMAP.md`](team/ROADMAP.md) |
+
+_Новая фича → Lead Architect дописывает строку в таблицу выше._
+
+**Куда смотреть AI:** [`team/PROJECT_MAP.md`](team/PROJECT_MAP.md) — не обходить весь репо.

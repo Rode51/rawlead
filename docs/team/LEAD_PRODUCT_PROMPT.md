@@ -101,7 +101,7 @@
 > 4. `CODER_PROMPT.md` сейчас содержит § B (WP `/cabinet` MVP с JSON-фикстурой) — **переписать** под `/cabinet` через REST к Neon (single-user `user_id=1`).
 > 5. Добавить новый трек: **Habr Career парсер** в `src/`. Только web-парсинг открытых URL, без API-переговоров.
 > 6. **Не делать в этой инициативе**: TG Login Widget / биллинг ЮKassa / multi-user / SOURCES_SAAS.md / каталог услуг `/uslugi` / контент-маркетинг — всё после MVP. Файл `docs/ops/SOURCES_SAAS.md` можно архивировать.
-> 7. PORTFOLIO.md (`docs/PORTFOLIO.md` + `docs/team/PORTFOLIO.md`) — устарели под v0.9: апдейт **после MVP** (твоя зона).
+> 7. [`PORTFOLIO.md`](PORTFOLIO.md) — устарел под v0.9: апдейт **после MVP** (зона Lead Architect).
 > 8. STATUS.md — после каждой фазы синхронизировать с acceptance #1–#7 этого файла.
 
 ## Резюме для `@lead-designer` (передать в чате)

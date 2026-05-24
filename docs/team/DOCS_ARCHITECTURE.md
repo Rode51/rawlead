@@ -120,4 +120,16 @@ Pre-commit: **reject** если добавлен `.md` в `docs/` корень (
 
 ---
 
+## Проверка чистоты (Lead Architect)
+
+| Проверено | Результат |
+|-----------|-----------|
+| Корень `docs/` | Только README, FOR_YOU, KAK_ETO |
+| Дубли ROADMAP/PORTFOLIO в корне | Нет |
+| `team/TZ.md`, `team/RESEARCH_*` вне archive | Нет (только `team/archive/`) |
+| `contour` в активных канонах | Только пометки «отменено» + TZ_API исправлен |
+| `data/` тесты в git | В `.gitignore` |
+
+---
+
 _Lead · 2026-05-24_

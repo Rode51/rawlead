@@ -13,6 +13,35 @@
 
 **Lead Architect** ведёт чистоту repo: дедуп docs, `git commit` / `git push` (по просьбе владельца). Coder/Mechanic/Designer **не коммитят** без явной просьбы Lead.
 
+---
+
+## Агентам: куда смотреть и куда **не** писать
+
+| Нужно | Единственный канон | Не дублировать в |
+|-------|-------------------|------------------|
+| Vision / ставка B | [`PRODUCT_VISION.md`](PRODUCT_VISION.md) v0.9 | ROADMAP, STATUS, чат |
+| Фазы «сейчас» | [`ROADMAP.md`](ROADMAP.md) | FOR_YOU, TASKS простынёй |
+| Активный план Product | [`LEAD_PRODUCT_PROMPT.md`](LEAD_PRODUCT_PROMPT.md) | новый `TZ_*.md` |
+| Задача Coder | [`CODER_PROMPT.md`](CODER_PROMPT.md) | TASKS, чат (только копипаст) |
+| Задача Designer | [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md) | DESIGN_BRIEF без промпта |
+| План Lead Designer | [`LEAD_DESIGN_PROMPT.md`](LEAD_DESIGN_PROMPT.md) | |
+| Снимок / блокеры | [`STATUS.md`](STATUS.md) | не копировать ТЗ |
+| Очередь | [`TASKS.md`](TASKS.md) — одна строка на трек | FOR_YOU |
+| Шаги владельца | [`../FOR_YOU.md`](../FOR_YOU.md) | TASKS, STATUS |
+| Поломка | [`../problems/`](../problems/) один файл | новый md в `team/` |
+| Устаревшее | [`archive/`](../archive/), [`team/archive/`](archive/) | не обновлять |
+
+| Роль | Пишет | Не пишет |
+|------|-------|----------|
+| **Lead Product** | `PRODUCT_VISION`, `LEAD_PRODUCT_PROMPT` | `ROADMAP`, `CODER_PROMPT`, `FOR_YOU` |
+| **Lead Designer** | `LEAD_DESIGN*`, `DESIGN_SYSTEM`, `docs/design/` | `wordpress/`, `CODER_PROMPT` |
+| **Lead Architect** | `ROADMAP`, `TASKS`, `STATUS`, `CODER_PROMPT`, карты | `src/`, commit чужих без сдачи |
+| **Coder** | файлы из § «Файлы» в `CODER_PROMPT` + `STATUS` | любой другой `docs/team/*.md` |
+| **Designer** | `docs/design/`, `DESIGN_BRIEF` по промпту | `src/`, `wordpress/` |
+| **Mechanic** | `docs/problems/*` + код из тикета | `TASKS`, `FOR_YOU`, vision |
+
+**Отменено v0.9 (не возвращать в код/docs):** `contour` owner/saas · демо `/cabinet` на JSON · [`../archive/SOURCES_SAAS.md`](../archive/SOURCES_SAAS.md)
+
 **Регламент docs (каноны, без дублей):** [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md)
 
 **Визуально (для тебя):** [`PROJECT_MAP_VISUAL.md`](PROJECT_MAP_VISUAL.md) · PNG: [`../design/rawlead/project-map-owner.png`](../design/rawlead/project-map-owner.png)

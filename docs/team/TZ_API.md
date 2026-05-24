@@ -41,7 +41,7 @@
 | `POST` | `/v1/internal/leads` | radar (API key) | upsert lead + ai_score + lead_tags |
 | `GET` | `/v1/internal/digest` | bot (API key) | top-K leads per user where rank ≥ threshold |
 
-**Логика read:** `/v1/feed` — только `contour = 'saas'` + `ai_score ≥ порог`. Owner bot — `contour = 'owner'`.
+**Логика read (v0.9):** `/v1/feed` — только `is_visible = true` + `ai_score ≥ порог` (открытая лента). Dogfood-бот владельца — все лиды (включая `is_visible=false` для проверки модерации). _Устарело: `contour` owner/saas — не использовать._
 
 ---
 

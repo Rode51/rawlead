@@ -1,6 +1,16 @@
 ﻿# RawLead — документация
 
-**Главный документ проекта.** В корне `docs/` только три файла для ежедневной работы — остальное по папкам ниже.
+**Главный документ проекта.** В корне `docs/` только **три** файла — остальное в подпапках.
+
+---
+
+## AI: с чего начать (все роли)
+
+1. [`team/PROJECT_MAP.md`](team/PROJECT_MAP.md) — **навигация**, зоны, «куда не лезть»
+2. Файл роли: `CODER_PROMPT` · `DESIGNER_PROMPT` · `LEAD_*_PROMPT` · `docs/problems/…`
+3. Vision v0.9: [`team/PRODUCT_VISION.md`](team/PRODUCT_VISION.md) · фазы: [`team/ROADMAP.md`](team/ROADMAP.md)
+
+Промпт задачи — **только в файле**; в чат владельцу — копипаст `@роль` + `.mdc` + путь к промпту ([`team/LEAD.md`](team/LEAD.md)).
 
 ---
 

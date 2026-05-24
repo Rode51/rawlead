@@ -21,6 +21,9 @@ data/.tg_main.lock
 data/.main.lock
 data/.bot_poll.lock
 data/.radar_desktop.lock
+data/.tg_bot_started_acc*
+data/_*
+data/tg_relay_allowlist.json
 src/data/
 
 scripts/backup.config.json

@@ -20,7 +20,8 @@ Vision: [`PRODUCT_VISION.md`](PRODUCT_VISION.md) v0.9 · план Product: [`LEA
 ## Lead Architect
 
 - [x] Принять vision v0.9 · `ROADMAP` · `LEAD_DESIGN_PROMPT` · ревизия docs 2026-05-24
-- [ ] После **3b** — обновить `NEON_SCHEMA.md` (убрать `contour`, `is_visible`)
+- [x] Уборка docs: `PROJECT_MAP` § агентам, `ARCHITECTURE`/`TZ_API`/`SOURCES_POOLS`, архив SOURCES_SAAS, без дублей в корне `docs/`
+- [ ] После **3b** — дочистить `NEON_SCHEMA.md` (полная схема users/tags)
 - [ ] После MVP — `PORTFOLIO.md` под ставку B
 
 ---

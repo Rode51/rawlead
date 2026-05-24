@@ -5,7 +5,7 @@
 
 Краткая схема для Lead, Coder. Поведение фазы 0 — **`archive/TZ.md`**, TG — **`TZ_TG.md`**.
 
-_Актуально: 2026-05-23 (фаза 1 + пульт + target v1 Neon/API)._
+_Актуально: 2026-05-24 (vision v0.9 · фазы 3b–3f MVP)._
 
 ---
 
@@ -37,7 +37,7 @@ flowchart TB
 
 **Rank на чтении:** `final_rank = ai_score×0.6 + keyword_match×0.4` (v0).
 
-**Сейчас в коде:** ingest → SQLite; весь поток = **Контур 1 (owner)**. SaaS-лента и `contour=saas` — **не реализованы**. См. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0c.
+**Сейчас в коде:** ingest → SQLite (+ Neon частично); dogfood → TG-бот владельца. **Цель MVP:** один поток + `is_visible` на ingest → `/feed` (anon) + `/cabinet` (user_id=1) + ИИ-агент. Модель `contour` owner/saas — **отменена** v0.9. См. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0c.
 
 ---
 

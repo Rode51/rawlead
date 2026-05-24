@@ -8,7 +8,7 @@
 
 **RawLead** (фаза 0 в коде) — мониторинг **новых проектов на FL.ru и Kwork** по **твоим правилам** → уведомление в **Telegram** → **разбор ИИ** простым языком: сложность **для владельца с Cursor без навыков кода**, срок, деньги, черновик отклика.
 
-**Развитие продукта** (TG-чаты, WP, аналитика): **`docs/team/PRODUCT_VISION.md`**, шаги — **`docs/ROADMAP.md`**.
+**Развитие продукта** (TG-чаты, WP, аналитика): **`docs/team/PRODUCT_VISION.md`**, шаги — **`docs/team/ROADMAP.md`**.
 
 Ты **сам** жмёшь «откликнуться» на FL. Авто-откликов нет.
 
@@ -209,7 +209,7 @@
 | `docs/ops/PROFILE.md` | Кто ты для ИИ |
 | `docs/ops/SOURCES.md` | URL FL |
 | `docs/FOR_YOU.md` | Для владельца |
-| `docs/ROADMAP.md` | Фазы 0–4, что готово, что дальше |
+| `docs/team/ROADMAP.md` | Фазы — канон (не `docs/ROADMAP.md`) |
 | `docs/team/TASKS.md` | Очередь Coder |
 | `docs/problems/README.md` | Цикл инцидентов: Lead → Mechanic → Lead |
 

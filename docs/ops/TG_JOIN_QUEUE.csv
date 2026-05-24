@@ -59,10 +59,10 @@ wave,account,status,name,link,chat_id,notes
 3,acc1,done,Koteyka_Freelancer,https://t.me/Koteyka_Freelancer,1451211985,волна3
 3,acc2,done,mobile_jobs,https://t.me/mobile_jobs,1054966032,волна3
 3,acc3,done,normrabota,https://t.me/normrabota,1113237926,волна3
-3,acc1,pending,onlinevakansii,https://t.me/onlinevakansii,,волна3
+3,acc1,done,onlinevakansii,https://t.me/onlinevakansii,1069841224,волна3
 3,acc2,done,profiwork,https://t.me/profiwork,1286840620,волна3
 3,acc3,done,rabotka_zdes,https://t.me/rabotka_zdes,1659504190,волна3
-3,acc1,pending,remote_w0rk,https://t.me/remote_w0rk,,волна3
+3,acc1,done,remote_w0rk,https://t.me/remote_w0rk,1431442938,волна3
 3,acc2,done,remotejun,https://t.me/remotejun,1164672298,волна3
 3,acc3,done,resume_1c,https://t.me/resume_1c,1488323887,волна3
 3,acc1,pending,ru_wp,https://t.me/ru_wp,,волна3
@@ -85,5 +85,5 @@ wave,account,status,name,link,chat_id,notes
 3,acc3,done,wp_acf,https://t.me/wp_acf,1166506361,волна3
 3,acc1,pending,wp_gutenberg,https://t.me/wp_gutenberg,,волна3
 3,acc2,fail,wp_spb,https://t.me/wp_spb,,волна3
-3,acc3,pending,WPRUSeRu,https://t.me/WPRUSeRu,,волна3
+3,acc3,done,WPRUSeRu,https://t.me/WPRUSeRu,1191592720,волна3
 3,acc1,pending,zapwork,https://t.me/zapwork,,волна3
