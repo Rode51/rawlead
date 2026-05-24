@@ -7,7 +7,17 @@ cd /d "%RADAR_ROOT%"
 REM Python API — убить все radar_control (venv + system), потом запустить чистый
 "%RADAR_ROOT%\.venv\Scripts\python.exe" -c "import sys; sys.path.insert(0,r'%RADAR_ROOT%\src'); from process_guard import kill_all_radar_control; kill_all_radar_control()" >nul 2>&1
 timeout /t 1 /nobreak >nul
-start "" /B "%RADAR_ROOT%\.venv\Scripts\pythonw.exe" "%RADAR_ROOT%\scripts\radar_control.py"
+REM Читаем путь к Python из pyvenv.cfg (home = C:\...\Python311)
+for /f "tokens=2 delims==" %%a in ('findstr /b "home" "%RADAR_ROOT%\.venv\pyvenv.cfg"') do set "RADAR_PYHOME=%%a"
+REM "home = path" даёт пробел перед путём — срезаем его через ~1
+set "RADAR_PYHOME=%RADAR_PYHOME:~1%"
+set "RADAR_PYW=%RADAR_PYHOME%\pythonw.exe"
+if not exist "%RADAR_PYW%" (
+  echo Oshibka: net pythonw: %RADAR_PYW%
+  pause & exit /b 1
+)
+set "PYTHONPATH=%RADAR_ROOT%\.venv\Lib\site-packages"
+start "" /B "%RADAR_PYW%" "%RADAR_ROOT%\scripts\radar_control.py"
 timeout /t 2 /nobreak >nul
 
 cd /d "%RADAR_ROOT%\desktop"
