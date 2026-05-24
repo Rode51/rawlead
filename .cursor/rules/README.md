@@ -19,7 +19,7 @@
 
 | Файл | Зачем |
 |------|--------|
-| `economy.mdc` | Кратко, факты из repo, русский |
+| `economy.mdc` | Кратко; **навигация** `docs/README` → `PROJECT_MAP`; промпт только в файле; **git** — Lead Architect |
 | `lead-no-code.mdc` | **Все Lead не кодят** — страховка |
 
 ### Lead (стратегия, только docs) — `@…`
@@ -65,3 +65,4 @@
 1. **Settings → Rules** — Project Rules включены.
 2. Закладки: Lead PM · Lead Design · Lead Arch · Coder · Designer · Mechanic.
 3. Подробнее: [`docs/team/HOW_TO_USE_CURSOR.md`](../../docs/team/HOW_TO_USE_CURSOR.md)
+4. **MCP (Perplexity, Playwright, …):** [`docs/team/MCP_POOL.md`](../../docs/team/MCP_POOL.md) — ключи только в `~/.cursor/mcp.json`

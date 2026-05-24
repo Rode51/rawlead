@@ -1,7 +1,9 @@
 # Neon Postgres — схема v1 (лиды + персональный rank)
 
-Версия: **0.1** · Lead · 2026-05-23  
+Версия: **0.2 (черновик 3b)** · Lead Architect · 2026-05-24  
 Решение владельца: **Neon** как облако; WP **не** ходит в Postgres напрямую.
+
+> **v0.9:** поле **`contour`** (`owner`/`saas`) — **отменено**. Вместо него **`is_visible`** после ИИ-модерации — см. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0c. Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § 3b.
 
 Черновик SQL для Coder: [`../../sql/001_neon_schema.sql`](../../sql/001_neon_schema.sql) — расширить по этому документу.
 
@@ -33,7 +35,7 @@
 | `ai_verdict` | TEXT | Брать / Сомнительно / Нет |
 | `lead_tags` | JSONB | теги из ИИ: `["python","fastapi","parser"]` |
 | `ai_reasons` | JSONB | 2–3 строки «почему score» (для UI) |
-| `contour` | TEXT | **`owner`** (Дикий Запад) \| **`saas`** (White Label) — см. [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0c |
+| `is_visible` | BOOLEAN | `true` — в `/feed` и match; `false` — только dogfood-бот владельца |
 | `content_hash` | TEXT | SHA-256 нормализованного текста (`listing_dedup`); NULL — дедуп только по `source`+`external_id` |
 | `notified_at` | TIMESTAMPTZ | legacy / owner |
 | `created_at` | TIMESTAMPTZ | |

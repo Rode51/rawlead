@@ -41,11 +41,34 @@ Lead **не** «помогает быстро» править Python — даж
 
 ---
 
-## Git (Lead)
+## Git и чистота repo (Lead Architect)
 
-- **`git push`** на GitHub — **только** по просьбе владельца или явному согласию.
-- Без просьбы: допустим локальный `commit`; push **не делать**.
-- После `CODER_PROMPT.md` — в чат владельцу **копипаст** для `@coder` (см. `lead-architect.mdc`).
+| Правило | Деталь |
+|---------|--------|
+| **Commit / push** | **Только Lead Architect** (по просьбе владельца на push) |
+| Coder / Mechanic / Designer | Правят файлы по задаче; **`git commit` / `git push` не делают** — сдача в `STATUS.md` / тикете → Lead коммитит |
+| Lead Product / Lead Designer | Правят **свою** зону docs в сессии; интеграция в общие каноны и **коммит** — Lead Architect после ревью |
+| **`git push`** | Только когда владелец явно просит или согласовал |
+| **`PROJECT_MAP.md`** | Обновлять **после каждой принятой сдачи**, если менялись зоны/процессы/файлы |
+
+### Промпты — только в файле
+
+| Запрещено | Нужно |
+|-----------|--------|
+| Дублировать ТЗ/промпт **телом** в чат | Весь промпт — в `CODER_PROMPT.md`, `DESIGNER_PROMPT.md`, тикете |
+| Два источника (чат + файл) | В чат владельцу — **копипаст** (см. `lead-architect.mdc`): `@роль` + ссылка на `.mdc` + ссылка на промпт |
+
+### Ревизия docs (после vision с Lead Product)
+
+Когда владелец и `@lead-product` зафиксируют **`PRODUCT_VISION.md`**:
+
+1. Lead Architect — пройти каноны (`DOCS_ARCHITECTURE`), убрать дубли FOR_YOU / STATUS / TASKS
+2. Обновить `PROJECT_MAP.md`, `ROADMAP.md`, `KAK_ETO_RABOTAET.md`
+3. Удалить/архивировать `NOTES.md`, лишние `TODO_*.md`, дубли промптов
+4. `.gitignore` / не коммитить `data/*` тесты и lock-флаги
+5. Один `commit` (и `push` по просьбе владельца)
+
+До завершения vision — **не раздувать** новые каноны; правки точечно.
 
 ---
 
@@ -118,7 +141,7 @@ Lead **не** «помогает быстро» править Python — даж
 
 Регламент Lead — **`.cursor/rules/lead-architect.mdc`** (включается через `@lead-architect`).
 
-**Первый ход:** `LEAD.md`, `TASKS.md`, `STATUS.md`, `FOR_YOU.md` + [`SCALE.md`](SCALE.md) при ревью → коротко «что сейчас» + один шаг владельцу. После сдачи Coder — чеклист SCALE § Lead + напомнить **бэкап**.
+**Первый ход:** [`PROJECT_MAP.md`](PROJECT_MAP.md) → [`docs/README.md`](../README.md) → `LEAD.md`, `TASKS.md`, `STATUS.md`, `FOR_YOU.md` + [`SCALE.md`](SCALE.md) при ревью → коротко «что сейчас» + один шаг владельцу. После сдачи — обновить **PROJECT_MAP** при необходимости, **commit** (push по просьбе), чеклист SCALE + **бэкап**.
 
 ---
 

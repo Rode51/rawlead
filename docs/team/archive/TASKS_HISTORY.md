@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-05-24 — Lead Architect: vision v0.9 принят, docs cleanup
+
+- Product: ставка **A → B** · [`PRODUCT_VISION.md`](../PRODUCT_VISION.md) v0.9 · [`LEAD_PRODUCT_PROMPT.md`](../LEAD_PRODUCT_PROMPT.md)
+- `ROADMAP.md` фазы 3b–3h · `LEAD_DESIGN_PROMPT` (/feed, /cabinet) · `CODER_PROMPT` → **3b Neon**
+- `STATUS`/`TASKS`/`FOR_YOU` без дублей · `SOURCES_SAAS` → [`archive/SOURCES_SAAS.md`](../../archive/SOURCES_SAAS.md)
+- Снято: Coder § B demo `/cabinet`, `contour` в NEON_SCHEMA (→ `is_visible`)
+
+---
+
 ## 2026-05-23 — Lead: два контура owner / saas + монетизация
 
 - [`PRODUCT_VISION.md`](../PRODUCT_VISION.md) §0c–0d · [`SOURCES_SAAS.md`](../../ops/SOURCES_SAAS.md)

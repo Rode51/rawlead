@@ -2,16 +2,26 @@
 
 **Одна точка входа.** Детали — по ссылкам, не копировать сюда целиком.
 
+## Навигация — перед любой работой
+
+| Шаг | Кто | Действие |
+|-----|-----|----------|
+| 0 | **Все AI** | [`docs/README.md`](../README.md) — дерево папок `docs/` |
+| 1 | **Все AI** | **Этот файл** (`PROJECT_MAP.md`) — зоны, процессы, «куда идти» |
+| 2 | **Все AI** | Файл роли из таблицы «Кому» ниже — **не** обходить repo наугад |
+| 3 | **Lead Architect** | После приёмки Coder/Mechanic/Product/Design — **обновить эту карту**, если сменились пути, зоны или lock |
+
+**Lead Architect** ведёт чистоту repo: дедуп docs, `git commit` / `git push` (по просьбе владельца). Coder/Mechanic/Designer **не коммитят** без явной просьбы Lead.
+
 **Регламент docs (каноны, без дублей):** [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md)
 
 **Визуально (для тебя):** [`PROJECT_MAP_VISUAL.md`](PROJECT_MAP_VISUAL.md) · PNG: [`../design/rawlead/project-map-owner.png`](../design/rawlead/project-map-owner.png)
 
 | Кому | Первый файл |
 |------|-------------|
-| **Lead Product** | `PRODUCT_VISION.md` → `LEAD_PRODUCT_PROMPT.md` |
-| **Lead Architect** | `ROADMAP.md` (из vision) → `CODER_PROMPT.md` |
+| **Lead Product** | `PRODUCT_VISION.md` v0.9 → `LEAD_PRODUCT_PROMPT.md` |
+| **Lead Architect** | этот файл → `ROADMAP.md` → `CODER_PROMPT.md` |
 | **Lead Designer** | `LEAD_DESIGN_PROMPT.md` → `DESIGN_SYSTEM.md` |
-| **Lead Architect** | этот файл → `CODER_PROMPT.md` |
 | **Coder** | **`CODER_PROMPT.md`** → § «Зоны» |
 | **Mechanic** | `docs/problems/` → § «Зоны» |
 | **Designer** | `DESIGNER_PROMPT.md` → `docs/design/` |
@@ -19,6 +29,15 @@
 
 **Lead обновляет** эту карту после каждой сдачи Coder/Mechanic, если менялись процессы, файлы или lock-правила.  
 **Coder не правит** этот файл.
+
+---
+
+## MCP (внешние tools)
+
+Канон: **[`MCP_POOL.md`](MCP_POOL.md)** — Perplexity, Playwright, Firecrawl, Glif, Chrome; когда использовать; установка в `~/.cursor/mcp.json`.
+
+| Если в сессии нет MCP, а нужен веб/скрейп/медиа | Сказать владельцу: включить сервер из `MCP_POOL.md` |
+| Ключи API | Только у владельца, не в repo |
 
 ---
 

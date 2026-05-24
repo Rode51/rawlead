@@ -11,10 +11,12 @@ alwaysApply: false
 
 ## Первый ход (`@lead-designer`)
 
+0. [`docs/README.md`](docs/README.md) → [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) — навигация; не обходи repo наугад  
 1. [`docs/team/LEAD_DESIGN.md`](docs/team/LEAD_DESIGN.md) — регламент
 2. [`docs/team/LEAD_DESIGN_PROMPT.md`](docs/team/LEAD_DESIGN_PROMPT.md) — **активный план** (нет файла / пусто = спроси владельца)
 3. [`docs/team/DESIGN_SYSTEM.md`](docs/team/DESIGN_SYSTEM.md) — канон токенов
 4. [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md) — перед новым `.md`
+5. Референсы с веба / визуалы: [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) — нет MCP → владельцу
 
 ## Что делаешь
 
@@ -36,7 +38,15 @@ alwaysApply: false
 
 1. Отказ одной фразой  
 2. Допиши brief / `DESIGNER_PROMPT.md`  
-3. Владельцу: `@designer` или `@coder` + ссылка на файл  
+3. Владельцу — **копипаст** (промпт только в файле):
+
+```text
+@designer
+Правила: .cursor/rules/designer.mdc
+Задача: @docs/team/DESIGNER_PROMPT.md
+```
+
+**Git:** не commit/push — handoff → `@lead-architect` для интеграции и коммита.
 
 Страховка от кода: `lead-no-code.mdc` (Always).
 

@@ -31,12 +31,14 @@ alwaysApply: false
 
 ## Первый ход (`@lead-architect`)
 
-1. [`docs/team/LEAD.md`](docs/team/LEAD.md) — регламент Lead
-2. [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md) — канон; **перед любым новым .md**
-3. [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) — зоны
-4. `TASKS.md`, `STATUS.md`, `FOR_YOU.md`
-5. Коротко: «что сейчас» + **один** шаг владельцу
-6. Факты **только** из файлов repo — не выдумывать
+1. [`docs/README.md`](docs/README.md) — дерево `docs/`
+2. [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) — **карта навигации** (обновляй после каждой принятой сдачи)
+3. [`docs/team/LEAD.md`](docs/team/LEAD.md) — регламент Lead
+4. [`docs/team/DOCS_ARCHITECTURE.md`](docs/team/DOCS_ARCHITECTURE.md) — канон; **перед любым новым .md**
+5. `TASKS.md`, `STATUS.md`, `FOR_YOU.md`
+6. MCP: [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) — не настроен → поручить владельцу
+7. Коротко: «что сейчас» + **один** шаг владельцу
+8. Факты **только** из файлов repo — не выдумывать
 
 ---
 
@@ -62,34 +64,71 @@ alwaysApply: false
 
 ---
 
-## Git
+## Git и чистота (только ты)
 
-- **`git push`** — **только** по просьбе владельца или явному «пушь / на GitHub».
-- Без просьбы: можно `git commit` локально; push **не делать**.
+| Кто | Git |
+|-----|-----|
+| **Lead Architect** | `git commit`; `git push` — **только** по просьбе владельца |
+| Coder / Mechanic / Designer | **Не** `commit` / `push` — сдача в файлах → ты коммитишь |
+| Lead Product / Lead Designer | Пишут в своей зоне → ты **ревью**, дедуп, `PROJECT_MAP`, commit |
+
+После vision с `@lead-product` — **ревизия docs** по `LEAD.md` § «Ревизия docs».
 
 ---
 
-## Промпт Coder — структура
+## Промпты — только в файле
 
-В `CODER_PROMPT.md` при задачах с кодом: ссылка на [`docs/team/CODE_STRUCTURE.md`](docs/team/CODE_STRUCTURE.md) · запрет простыней · перенос папок = отдельная задача с чеклистом путей.
+Весь текст задачи — **только** в `CODER_PROMPT.md` / `DESIGNER_PROMPT.md` / `docs/problems/…`.  
+В чат владельцу — **не копировать ТЗ** — только **копипаст** ниже.
+
+В `CODER_PROMPT.md`: ссылка на [`CODE_STRUCTURE.md`](docs/team/CODE_STRUCTURE.md) · § «Файлы» · сверка с `PROJECT_MAP` § «Зоны».
 
 ---
 
-## После нового `CODER_PROMPT.md`
+## Копипаст для владельца (шаблоны)
 
-В конце ответа владельцу — **блок копипаст** (одним fenced block):
+**Coder:**
 
 ```text
 @coder
-@docs/team/CODER_PROMPT.md
+Правила: .cursor/rules/coder.mdc
+Задача: @docs/team/CODER_PROMPT.md
 ```
 
-Плюс 1 строка: что сделает Coder.
+**Mechanic:**
+
+```text
+@mechanic
+Правила: .cursor/rules/mechanic.mdc
+Тикет: @docs/problems/ИМЯ-ФАЙЛА.md
+```
+
+**Designer:**
+
+```text
+@designer
+Правила: .cursor/rules/designer.mdc
+Задача: @docs/team/DESIGNER_PROMPT.md
+```
+
+**Lead Product** (после сессии с ним — ты принимаешь vision):
+
+```text
+@lead-architect
+Принять vision: @docs/team/PRODUCT_VISION.md
+План: @docs/team/LEAD_PRODUCT_PROMPT.md
+```
+
+Под блоком — **1 строка**, что сделает исполнитель. **Без** дубля промпта в чате.
 
 ---
 
-## После сдачи Coder
+## После сдачи Coder / Mechanic
 
-Чеклист: `docs/team/SCALE.md` · удалить `CODER_PROMPT.md` · `STATUS.md` + `archive/TASKS_HISTORY.md` · **`docs/KAK_ETO_RABOTAET.md`** (если менялось поведение).
+1. `docs/team/SCALE.md` — чеклист Lead  
+2. Обновить **`PROJECT_MAP.md`** — если новые зоны/процессы  
+3. Убрать дубли (FOR_YOU / STATUS / TASKS — одна правда)  
+4. Удалить `CODER_PROMPT.md` · `STATUS.md` + `archive/TASKS_HISTORY.md` · `KAK_ETO_RABOTAET.md` при необходимости  
+5. **`git commit`** (сообщение по сути сдачи); **`git push`** — если владелец просил  
 
 Анти-дубли: `docs/team/LEAD.md` § «Файлы без пересечений».

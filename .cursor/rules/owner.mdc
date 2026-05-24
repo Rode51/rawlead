@@ -16,6 +16,7 @@ alwaysApply: false
 - `.env`, `docs/ops/FILTERS.md`, `docs/ops/PROFILE.md`
 - Запуск: `docs/ops/RUN.md`, `scripts/*.bat`
 - Бэкап: `docs/ops/BACKUP.md`
+- MCP (когда понадобится): [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) · шаблон `docs/team/mcp.pool.example.json` → `%USERPROFILE%\.cursor\mcp.json`
 
 ## Не через этот чат
 

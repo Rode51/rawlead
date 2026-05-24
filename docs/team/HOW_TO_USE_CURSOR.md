@@ -5,6 +5,10 @@
 **Всё важное — в файлах `docs/`, не в чате.**  
 Чат = короткая команда. Длинные обсуждения — **Gemini в браузере**, итог 5–10 строк → Lead кладёт в `docs/`.
 
+**Навигация для всех AI:** [`docs/README.md`](../README.md) → [`team/PROJECT_MAP.md`](team/PROJECT_MAP.md) → файл роли.  
+**Промпт задачи** — только в `CODER_PROMPT.md` / `DESIGNER_PROMPT.md`; в чат — **копипаст** `@роль` + `.mdc` + промпт (даёт Lead Architect).  
+**Git commit/push** — только **Lead Architect** (по вашей просьбе на push).
+
 ---
 
 ## Кому писать
@@ -101,3 +105,18 @@
 1. **Open Folder** → `uisness`
 2. **Settings → Rules** → Project Rules включены
 3. Закладки чатов: **Lead PM**, **Lead Design**, **Lead Arch**, **Coder**, **Designer**, **Mechanic**
+4. **MCP (опционально):** [`MCP_POOL.md`](MCP_POOL.md) — скопировать [`mcp.pool.example.json`](mcp.pool.example.json) в `%USERPROFILE%\.cursor\mcp.json`, подставить API-ключи
+
+---
+
+## MCP — когда агенту нужен интернет / браузер
+
+| Задача | Сервер (см. `MCP_POOL.md`) |
+|--------|----------------------------|
+| Поиск в сети, свежие факты | Perplexity |
+| Скрап страницы в markdown | Firecrawl |
+| Автотест UI, клики | Playwright |
+| Картинка / видео workflow | Glif |
+| Ваш открытый Chrome + логин | Chrome (`claude --chrome` в Claude Code) |
+
+Если tools MCP в чате **нет** — агент должен попросить владельца включить сервер, а не «притворяться», что сходил на сайт.

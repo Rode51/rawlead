@@ -6,7 +6,8 @@
 |--------|------|
 | **Что делать сейчас?** | Ниже «Твои шаги» |
 | **Как это работает?** | [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) |
-| **Фазы / приоритет** | [`team/ROADMAP.md`](team/ROADMAP.md) |
+| **Фазы / приоритет** | [`team/ROADMAP.md`](team/ROADMAP.md) · vision v0.9 |
+| **План Product** | [`team/LEAD_PRODUCT_PROMPT.md`](team/LEAD_PRODUCT_PROMPT.md) |
 | **Запуск** | [`ops/RUN.md`](ops/RUN.md) |
 | **Пульт** | [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
 | **TG acc + @FLPARSINGBOT** | [`ops/TELEGRAM_ACCOUNTS.md`](ops/TELEGRAM_ACCOUNTS.md) |
@@ -63,7 +64,7 @@
 | Блокер | Кто |
 |--------|-----|
 | pythonw.exe = launcher (2 процесса) | **@mechanic** → [`../team/ROADMAP.md`](team/ROADMAP.md) приоритет 0 |
-| Пересылка в ЛС | **@coder** § H → [`problems/2026-05-24-tg-forward-not-via-bot.md`](problems/2026-05-24-tg-forward-not-via-bot.md) |
+| Relay + карточка ИИ в боте | приёмка · [`problems/2026-05-24-tg-forward-not-via-bot.md`](problems/2026-05-24-tg-forward-not-via-bot.md) |
 
 ---
 

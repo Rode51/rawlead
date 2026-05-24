@@ -44,7 +44,9 @@
 | Design план (Lead Design) | `team/LEAD_DESIGN_PROMPT.md` |
 | Product регламент | `team/LEAD_PRODUCT.md` |
 | Design регламент | `team/LEAD_DESIGN.md` |
-| AI карта | `team/PROJECT_MAP.md` |
+| AI карта / навигация | `team/PROJECT_MAP.md` (+ `docs/README.md`) — **первый ход всех AI** |
+| Git / чистота repo | `team/LEAD.md` § Git — commit/push **Lead Architect** |
+| MCP (веб, браузер, картинки) | `team/MCP_POOL.md` · шаблон `team/mcp.pool.example.json` |
 | Запуск | `ops/RUN.md` |
 | TG acc | `ops/TELEGRAM_ACCOUNTS.md` |
 | Фильтр (код) | `ops/FILTERS.md` |

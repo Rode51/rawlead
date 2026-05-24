@@ -1,3 +1,5 @@
+> **Устарело под vision v0.9 (ставка B).** Актуальный scope — [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §0g. Обновление **после MVP** — Lead Architect.
+
 ## Для портфолио (2026-05)
 
 **Pitch:** «RawLead — радар заказов + личный кабинет с match-лентой» (pet-project, solo + AI).

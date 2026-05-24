@@ -9,10 +9,13 @@ alwaysApply: true
 - Не пересказывай весь репозиторий; один шаг за раз на больших задачах
 - **Не утверждай факты** без файла в repo (STATUS, CSV, код) — иначе галлюцинация
 - **Один источник правды** — `docs/team/LEAD.md` § таблица
-- Промпт для роли: **либо** в `docs/` + ссылка, **либо** в чат — не оба
+- **Промпт только в файле** (`CODER_PROMPT.md`, `DESIGNER_PROMPT.md`, `docs/problems/…`) — **не дублировать телом в чат**
+- В чат владельцу Lead даёт **копипаст**: `@роль` + путь к `.mdc` + путь к промпту (1 строка «что сделает»)
 - Роли Cursor: `@lead-architect` · `@designer` · `@coder` · `@mechanic` · `@owner` — `.cursor/rules/`
 - **Lead = 0 кода** (только `docs/`); код — `@coder` / `@mechanic` (см. `lead-no-code.mdc`)
 - Coder: **новый чат на задачу**; цикл — `docs/team/SCALE.md`
-- **Git push** — только если владелец попросил или явно согласовал; иначе commit локально или только docs
+- **Git commit / push** — **только Lead Architect**; Coder/Mechanic/Designer не коммитят; push — по просьбе владельца
+- **Перед работой** — [`docs/README.md`](docs/README.md) → [`docs/team/PROJECT_MAP.md`](docs/team/PROJECT_MAP.md) → файл роли; не «тыкаться» по всему repo
 - **После `CODER_PROMPT.md`** — в чат владельцу: блок **копипаст** для `@coder` (см. `lead-architect.mdc`)
 - **Код:** без простыней; карта — `docs/team/CODE_STRUCTURE.md`; перенос папок — отдельное TZ + правка путей
+- **MCP (внешние tools):** канон [`docs/team/MCP_POOL.md`](docs/team/MCP_POOL.md) — Perplexity, Playwright, Firecrawl, Glif, Chrome (+ Neon = БД). Если tools MCP **нет** в сессии — не выдумывать веб/скрейп; сказать владельцу включить сервер из пула (настройка позже — ок)

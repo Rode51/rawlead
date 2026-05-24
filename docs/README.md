@@ -31,7 +31,7 @@ docs/
 
 | Папка | Зачем | Частое |
 |-------|--------|--------|
-| [`team/`](team/) | Lead, Coder, фазы, vision | [`team/ROADMAP.md`](team/ROADMAP.md) · [`team/STATUS.md`](team/STATUS.md) · [`team/TASKS.md`](team/TASKS.md) |
+| [`team/`](team/) | Lead, Coder, фазы, vision | [`team/ROADMAP.md`](team/ROADMAP.md) · [`team/STATUS.md`](team/STATUS.md) · [`team/TASKS.md`](team/TASKS.md) · [`team/MCP_POOL.md`](team/MCP_POOL.md) (MCP) |
 | [`ops/`](ops/) | Запуск и настройка | [`RUN.md`](ops/RUN.md) · [`TELEGRAM_ACCOUNTS.md`](ops/TELEGRAM_ACCOUNTS.md) · [`DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
 | [`problems/`](problems/) | Тикеты багов | по дате |
 | [`design/`](design/) | Дизайн | [`design/rawlead/project-map-owner.png`](design/rawlead/project-map-owner.png) |
