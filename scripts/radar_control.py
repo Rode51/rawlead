@@ -178,6 +178,17 @@ class RadarController:
             self._ever_started = True
             errors: list[str] = []
             try:
+                try:
+                    from config import load_config, telethon_monitor_accounts
+                    from radar_status import reset_tg_session_stats
+                    from storage import storage_from_config
+
+                    reset_tg_session_stats(
+                        storage_from_config(load_config()),
+                        telethon_monitor_accounts(),
+                    )
+                except Exception:
+                    pass
                 self._stop_unlocked(sweep_orphans=True)
                 for spec in self.children:
                     script = spec.script_path()
@@ -192,7 +203,7 @@ class RadarController:
                     except OSError as exc:
                         errors.append(f"{spec.label}: {exc}")
                         spec.popen = None
-                self._ui_expanded = True
+                self._ui_expanded = False
                 return {"ok": len(errors) == 0, "errors": errors}
             finally:
                 self._starting = False
@@ -213,9 +224,23 @@ class RadarController:
         self._ui_expanded = False
         return {"ok": True}
 
+    def _notify_goodbye(self) -> None:
+        try:
+            from config import load_config
+            from health_check import send_owner_text
+
+            cfg = load_config()
+            send_owner_text(cfg, "до связи")
+        except Exception:
+            pass
+
     def stop(self, silent: bool = False) -> dict:
         with self._lock:
-            return self._stop_unlocked(sweep_orphans=True)
+            was_running = self.workers_running()
+            result = self._stop_unlocked(sweep_orphans=True)
+            if was_running and not silent:
+                self._notify_goodbye()
+            return result
 
     def lamp_state(self, spec: ChildSpec, workers_active: bool) -> str:
         if self._is_alive(spec):
@@ -249,7 +274,7 @@ class RadarController:
                                 storage, process_alive=True
                             )
                         except Exception:
-                            state, caption = "ok", "слушает"
+                            state, caption = "warn", "статус…"
                     elif self._ever_started and (self._ui_expanded or workers):
                         state, caption = "error", "нет"
                     else:

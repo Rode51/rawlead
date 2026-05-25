@@ -66,7 +66,69 @@ pip install -r requirements.txt
 
 ---
 
-## 5. Запуск радара
+## 5. Запуск API-сервера (фаза 3c)
+
+В `.env` должны быть заданы `DATABASE_URL` и `RAWLEAD_API_KEY`.
+
+```powershell
+# из корня репозитория
+uvicorn src.api_server:app --host 0.0.0.0 --port 18766
+```
+
+Проверка:
+
+```powershell
+# health
+Invoke-WebRequest http://localhost:18766/health | Select-Object -ExpandProperty Content
+
+# лента (первые 5 видимых лидов)
+Invoke-WebRequest "http://localhost:18766/v1/feed?limit=5" | Select-Object -ExpandProperty Content
+
+# ingest тестового лида
+$body = '{"source":"test","external_id":"t1","title":"Test","is_visible":true,"ai_score":80}'
+Invoke-WebRequest -Method POST -Uri http://localhost:18766/v1/internal/leads `
+  -Headers @{"X-API-Key"=$env:RAWLEAD_API_KEY;"Content-Type"="application/json"} `
+  -Body $body | Select-Object -ExpandProperty Content
+```
+
+Swagger: [http://localhost:18766/docs](http://localhost:18766/docs)
+
+### WordPress `/feed` → API
+
+Тема `rawlead-kadence-child` ходит в бэкенд **с сервера WP** (REST-прокси `wp-json/rawlead/v1/feed`), не из браузера напрямую.
+
+| Что | Значение по умолчанию |
+|-----|------------------------|
+| URL FastAPI | `http://127.0.0.1:18766` |
+| Переопределение | в `wp-config.php`: `define('RAWLEAD_API_URL', 'http://127.0.0.1:18766');` |
+
+Перед открытием **`/lenta`** или **`/cabinet`** в Local: запустить uvicorn (§5 выше). Страницы WP: slug **`lenta`** (`page-lenta.php`) и **`cabinet`** (`page-cabinet.php`). Slug `feed` в WordPress занят RSS — не использовать.
+
+**Кабинет (`/cabinet/`):** WP REST `wp-json/rawlead/v1/me/feed` и `…/me/tags` → FastAPI `/v1/me/*` с заголовком `X-RawLead-User-Id: 00000000-0000-0000-0000-000000000001` (owner #1). Теги: `PUT` с телом `{"tags":["wordpress","python"]}` — затем персональная лента с `final_rank` (совместимость), сортировка иначе, чем на `/lenta/`.
+
+Проверка API кабинета (PowerShell):
+
+```powershell
+$h = @{"X-RawLead-User-Id"="00000000-0000-0000-0000-000000000001"}
+Invoke-WebRequest -Method PUT -Uri http://localhost:18766/v1/me/tags -Headers $h -ContentType "application/json" -Body '{"tags":["wordpress","python","парсер"]}'
+Invoke-WebRequest "http://localhost:18766/v1/me/feed?limit=5" -Headers $h | Select-Object -ExpandProperty Content
+
+# каталог навыков (только лиды из бота)
+Invoke-WebRequest http://localhost:18766/v1/skills/catalog | Select-Object -ExpandProperty Content
+
+# лента: только notified_at; sort=match + skills
+Invoke-WebRequest "http://localhost:18766/v1/feed?limit=5&sort=match&skills=python" | Select-Object -ExpandProperty Content
+```
+
+**Разовая чистка «мусора» в Neon** (лиды в БД, но не уходили в TG):
+
+```sql
+UPDATE leads SET is_visible = false WHERE notified_at IS NULL;
+```
+
+---
+
+## 6. Запуск радара
 
 ```powershell
 python src/main.py
@@ -82,7 +144,7 @@ python src/main.py
 
 ---
 
-## 6. Где смотреть лог и базу
+## 7. Где смотреть лог и базу
 
 | Что | По умолчанию | Если задали в `.env` |
 |-----|----------------|----------------------|
@@ -95,7 +157,7 @@ python src/main.py
 
 ---
 
-## 7. Проверка связи с Telegram (если в логе **HTTP 400**)
+## 8. Проверка связи с Telegram (если в логе **HTTP 400**)
 
 Команды из **корня репозитория**. Токен из `.env` подставится сам, **не копируйте** его в чаты.
 
@@ -149,13 +211,13 @@ python -c "import sys,json; sys.path.insert(0,'src'); from config import load_co
 
 ---
 
-## 8. Если что-то не стартует
+## 9. Если что-то не стартует
 
 Сообщения об отсутствующих переменных или неверном URL — из `load_config()` в `src/config.py`. Проверьте `.env` и что вы в корне проекта.
 
 ---
 
-## 9. Пауза из Telegram
+## 10. Пауза из Telegram
 
 Радар **не закрываешь** (`Ctrl+C`), но на ночь выключаешь FL/Kwork и ИИ.
 
@@ -189,7 +251,7 @@ python -c "import sys,json; sys.path.insert(0,'src'); from config import load_co
 
 ---
 
-## 10. Telegram-чаты (фаза 1, отдельно от FL/Kwork)
+## 11. Telegram-чаты (фаза 1, отдельно от FL/Kwork)
 
 Нужны в `.env`: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELETHON_PROXY_ACC*` (отдельно на acc1–3), `TELETHON_SESSION_*`, `TELETHON_CHAT_IDS`, `TELETHON_PROXY_PROBE=1` (TCP до connect; мёртвый прокси → стоп + алерт). Бот: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TG_PROXY_URL`.
 

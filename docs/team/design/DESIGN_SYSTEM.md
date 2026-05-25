@@ -53,19 +53,57 @@
 
 ---
 
-## Токены (WordPress маркетинг v1 — 2026-05-23)
+## Токены (WordPress v2 — 2026-05-25)
 
-Утверждённый референс: [`../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) — **editorial light** (не пульт).
+Утверждённый референс: [`../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) — **editorial light** (не пульт).  
+Спека страниц `/feed` и `/cabinet`: [`../design/wp/feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md)
+
+### Цвет
 
 | Token | HEX | Использование |
 |-------|-----|---------------|
 | `color/bg/page` | `#FFFFFF` | фон сайта |
-| `color/bg/inverse` | `#0A0A0A` | цитата, footer |
+| `color/bg/section` | `#F5F5F7` | чередующие секции |
+| `color/bg/inverse` | `#0A0A0A` | манифест-полоса, footer |
 | `color/text/primary` | `#0A0A0A` | заголовки |
-| `color/cta/primary` | `#0A0A0A` | pill-кнопки |
+| `color/text/body` | `#3D3D3D` | body |
+| `color/text/muted` | `#6B6B6B` | подписи, вторичный |
+| `color/text/inverse` | `#FFFFFF` | на тёмном фоне |
 | `color/border` | `#E8E8EC` | карточки |
-| `color/accent/match` | `#2563EB` | полоса совпадения |
-| `font/family` | **Manrope** body · **Unbounded** display | child theme (bold editorial) |
+| `color/cta/primary` | `#0A0A0A` | pill-кнопки |
+| `color/cta/primary-text` | `#FFFFFF` | текст primary CTA |
+| `color/accent/match` | `#2563EB` | полоса совпадения % |
+| `color/source/fl` | `#00A65A` | рамка/акцент FL.ru (бренд-зелёный) |
+| `color/source/kwork` | `#EA580C` | рамка/акцент Kwork |
+| `color/source/tg` | `#0088CC` | рамка/акцент Telegram |
+| `color/chip/take` | `#16A34A` | чип «Брать» |
+| `color/chip/maybe` | `#6B7280` | чип «Сомнительно» |
+
+### Шрифты
+
+| Token | Значение | Применение |
+|-------|----------|------------|
+| `font/display` | **Unbounded** 700–900 | H1, H2, логотип |
+| `font/body` | **Manrope** 400–700 | body, UI, подписи |
+| `font/hero` | 56–72px / 900 / −0.02em | H1 «Лиды без шума» |
+| `font/h2` | 32–40px / 700 | секции |
+| `font/body-size` | 16–18px / 400 / 1.5 | абзацы |
+| `font/label` | 12px / 600 | чипы, badge, время |
+
+### Анимации (motion tokens)
+
+| Token | Значение | Применение |
+|-------|----------|------------|
+| `motion/duration/appear` | `240ms` | fade+translate при скролле |
+| `motion/duration/expand` | `300ms` | раскрытие карточки лида |
+| `motion/duration/bar` | `600ms` | fill match-bar |
+| `motion/duration/cube` | `400ms` | сборка кубиков источников |
+| `motion/duration/press` | `80ms` | micro-press кнопок |
+| `motion/duration/hover` | `150ms` | hover карточки |
+| `motion/easing/default` | `ease-out` | всё движение |
+| `motion/stagger/card` | `40ms` | задержка между карточками в ленте |
+| `motion/scale/press` | `0.97` | scale при клике на кнопку |
+| `motion/lift/hover` | `translateY(-2px)` | подъём карточки при hover |
 
 Пульт (тёмный `#0c0e13`) и сайт — **разные поверхности**; не смешивать без запроса Lead.
 
@@ -78,3 +116,4 @@
 | 2026-05-20 | RawLead пульт v1 | Токены ops-dashboard, green/red lamps |
 | 2026-05-23 | RawLead пульт v2 | ЮБуст-референс, play/stop, glow, логи вниз, палитра v2 |
 | 2026-05-23 | WordPress сайт v1 | Editorial light; REFERENCE + Unbounded/Manrope в child theme |
+| 2026-05-25 | WordPress сайт v2 | Исправлен цвет FL.ru (#00A65A), TG (#0088CC); добавлены motion-токены; /feed + /cabinet токены; шрифтовые токены |

@@ -9,7 +9,7 @@
 | `@lead-architect` | `lead-architect.mdc` | `team/common/TASKS` · `STATUS` · `team/architect/CODER_PROMPT` |
 | `@lead-product` | `lead-product.mdc` | `team/product/PRODUCT_VISION` · `LEAD_PRODUCT_PROMPT` |
 | `@lead-designer` | `lead-designer.mdc` | `team/design/LEAD_DESIGN_PROMPT` → `DESIGNER_PROMPT` |
-| `@coder` | `coder.mdc` | **`team/architect/CODER_PROMPT.md`** |
+| `@coder` | `coder.mdc` | **`CODER_PROMPT.md`** только (без vision) |
 | `@designer` | `designer.mdc` | **`team/design/DESIGNER_PROMPT.md`** |
 | `@mechanic` | `mechanic.mdc` | **`docs/problems/<тикет>.md`** |
 | `@owner` | `owner.mdc` | **`docs/FOR_YOU.md`** |
@@ -29,7 +29,7 @@
 | **Apply Manually** | то же + вызываешь **`@имя-файла`** в чате | Только когда ты @-упомянул правило |
 | **Apply to Specific Files** | `globs: src/**,…` | Когда открыт/трогаешь файл под маской |
 
-**Рекомендация:** в **новом чате** владелец пишет **только** `@coder` / `@designer` / … (или `@.cursor/rules/coder.mdc`). Пути к задаче — в § «Включение» внутри правила; **копипаст из 3 строк в чат не нужен**.
+**Рекомендация:** в **новом чате** — один `@coder` / `@lead-product` / … Пути и **обязательное чтение** — в § «Включение» + `economy.mdc` § «Обязательное чтение». Агент **не отвечает по сути**, пока не прочитал канон (первая строка: `Прочитал: …`).
 
 **Важно:** `.mdc` даёт роль и **куда читать**; файлы `CODER_PROMPT.md` и т.д. агент **открывает сам** (Read) — они не подгружаются автоматически, если не `@`-упомянуть.
 

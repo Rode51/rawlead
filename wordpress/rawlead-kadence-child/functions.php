@@ -11,12 +11,13 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.5.0');
+define('RAWLEAD_CHILD_VERSION', '1.7.0');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
 require_once RAWLEAD_CHILD_DIR . '/inc/template-tags.php';
 require_once RAWLEAD_CHILD_DIR . '/inc/marketing.php';
+require_once RAWLEAD_CHILD_DIR . '/inc/rawlead-api.php';
 
 /**
  * Permalink for a skeleton page slug (home, how, pricing, …).
@@ -72,12 +73,48 @@ add_action('wp_enqueue_scripts', static function (): void {
             true
         );
     }
+
+    if (is_page('lenta')) {
+        wp_enqueue_script(
+            'rawlead-feed',
+            RAWLEAD_CHILD_URI . '/assets/js/rawlead-feed.js',
+            [],
+            RAWLEAD_CHILD_VERSION,
+            true
+        );
+        wp_localize_script('rawlead-feed', 'rawleadFeed', [
+            'restFeed'   => esc_url_raw(rest_url('rawlead/v1/feed')),
+            'restTags'   => esc_url_raw(rest_url('rawlead/v1/me/tags')),
+            'restSkills' => esc_url_raw(rest_url('rawlead/v1/skills/catalog')),
+            'nonce'      => wp_create_nonce('wp_rest'),
+            'apiBase'    => rawlead_api_base_url(),
+        ]);
+    }
+
+    if (is_page('cabinet')) {
+        wp_enqueue_script(
+            'rawlead-cabinet',
+            RAWLEAD_CHILD_URI . '/assets/js/rawlead-cabinet.js',
+            [],
+            RAWLEAD_CHILD_VERSION,
+            true
+        );
+        wp_localize_script('rawlead-cabinet', 'rawleadCabinet', [
+            'restFeed' => esc_url_raw(rest_url('rawlead/v1/me/feed')),
+            'restTags' => esc_url_raw(rest_url('rawlead/v1/me/tags')),
+            'nonce'    => wp_create_nonce('wp_rest'),
+            'apiBase'  => rawlead_api_base_url(),
+        ]);
+    }
 }, 20);
 
 add_filter('body_class', static function (array $classes): array {
     $classes[] = 'rawlead-site';
     if (is_front_page()) {
         $classes[] = 'rawlead-front';
+    } elseif (rawlead_is_app_page()) {
+        $classes[] = 'rawlead-inner';
+        $classes[] = 'rawlead-app-page';
     } elseif (rawlead_is_inner_shell_page()) {
         $classes[] = 'rawlead-inner';
     }

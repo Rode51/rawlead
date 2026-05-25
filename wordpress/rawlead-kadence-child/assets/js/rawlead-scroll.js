@@ -32,8 +32,8 @@
     progress.style.width = (max > 0 ? (y / max) * 100 : 0) + "%";
   }
 
-  /* Reveal on scroll */
-  var revealEls = main.querySelectorAll(".rl-reveal");
+  /* Reveal on scroll + flow source cubes */
+  var motionTargets = main.querySelectorAll(".rl-reveal, .rl-flow__sources");
   if (!prefersReduced && "IntersectionObserver" in window) {
     var revealIo = new IntersectionObserver(
       function (entries) {
@@ -46,11 +46,26 @@
       },
       { root: null, rootMargin: "0px 0px -10% 0px", threshold: 0.1 }
     );
-    revealEls.forEach(function (el) {
-      revealIo.observe(el);
+    var sourcesIo = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            sourcesIo.unobserve(entry.target);
+          }
+        });
+      },
+      { root: null, rootMargin: "0px 0px -8% 0px", threshold: 0.15 }
+    );
+    motionTargets.forEach(function (el) {
+      if (el.classList.contains("rl-flow__sources")) {
+        sourcesIo.observe(el);
+      } else {
+        revealIo.observe(el);
+      }
     });
   } else {
-    revealEls.forEach(function (el) {
+    motionTargets.forEach(function (el) {
       el.classList.add("is-visible");
     });
   }

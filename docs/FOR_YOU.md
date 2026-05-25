@@ -55,16 +55,19 @@
 
 ## Твои шаги сейчас
 
-1. Запуск через ярлык → **▶ один раз**.
-2. `.venv\Scripts\python.exe scripts\tg_bot_start.py --account all --force`
-3. Тест в prompt-test → смотри **только чат @FLPARSINGBOT**.
+1. ~~MVP скелет WP (`/lenta/` + `/cabinet/`)~~ ✅ принято 2026-05-25
+2. **Dogfood:** отклики по TG-боту (вердикт «Брать»), 1–2 в день
+3. **Проверка § 3g:** перезапусти `uvicorn` (старый процесс не знает `/skills/catalog`) · разово SQL в `RUN.md` §5 · `/lenta/` Ctrl+F5
+4. Ок → **3f** (отклик в кабинете) — скажи Lead
+
+Концепция UI уже в [`design/wp/feed-cabinet-mvp.md`](design/wp/feed-cabinet-mvp.md) — Lead Design ✅
 
 С понедельника: отклики **по боту** (вердикт «Брать»), 1–2 сильных в день.
 
 | Блокер | Кто |
 |--------|-----|
-| pythonw.exe = launcher (2 процесса) | **@mechanic** → [`../team/architect/ROADMAP.md`](team/architect/ROADMAP.md) приоритет 0 |
-| Relay + карточка ИИ в боте | приёмка · [`problems/2026-05-24-tg-forward-not-via-bot.md`](problems/2026-05-24-tg-forward-not-via-bot.md) |
+| pythonw.exe = launcher (2 процесса) | **@mechanic** |
+| TG relay+card | ✅ acc шлют в бот; при сбое — prompt-test · [`problems/2026-05-24-tg-forward-not-via-bot.md`](problems/2026-05-24-tg-forward-not-via-bot.md) |
 
 ---
 

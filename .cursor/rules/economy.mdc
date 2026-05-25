@@ -5,13 +5,23 @@ alwaysApply: true
 
 # Economy
 
+**Проект:** **RawLead** — фриланс-заказы (FL/Kwork/TG) + ИИ; этап 0 = радар+бот, v0.9 = WP лента/кабинет. Канон: `docs/team/product/PRODUCT_VISION.md`.
+
+## Обязательное чтение
+
+**Lead Product / Lead Designer / Lead Architect** — Read по таблице § «Включение» в своём `.mdc` (vision, ниша). Первый ответ: `Прочитал: …` → дело.
+
+**Coder / Mechanic / Designer-исполнитель** — **только** промпт задачи + `STATUS` (и тикет для Mechanic). Vision и `KAK_ETO` **не читать**, если не указано в промпте.
+
+**Не выдумывай** факты — только из прочитанных файлов и кода по § «Файлы».
+
 ## Старт (любая роль)
 
 | Шаг | Куда |
 |-----|------|
 | 1 | [`docs/README.md`](docs/README.md) |
 | 2 | [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) — § «Агентам», § «Зоны» |
-| 3 | Файл роли: `architect/CODER_PROMPT` · `design/DESIGNER_PROMPT` · `product/LEAD_PRODUCT_PROMPT` · `docs/problems/…` |
+| 3 | Задача: `CODER_PROMPT` / `DESIGNER_PROMPT` / `LEAD_*_PROMPT` / `docs/problems/…` (Coder — **без** обхода всего docs) |
 
 Карта правил: [`.cursor/rules/README.md`](.cursor/rules/README.md)
 

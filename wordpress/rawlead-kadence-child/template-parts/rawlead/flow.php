@@ -36,7 +36,7 @@ declare(strict_types=1);
 						<span><strong>88%</strong></span>
 					</div>
 					<div class="rl-match__bar" role="progressbar" aria-valuenow="88" aria-valuemin="0" aria-valuemax="100" aria-label="<?php esc_attr_e('Совпадение 88%', 'rawlead-kadence-child'); ?>">
-						<span class="rl-match__fill" style="width:88%"></span>
+						<span class="rl-match__fill" style="--match-value: 88%"></span>
 					</div>
 				</div>
 				<div class="rl-chips">

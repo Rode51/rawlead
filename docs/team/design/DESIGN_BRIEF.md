@@ -192,6 +192,322 @@
 
 ---
 
+## WP лендинг + пульт — handoff (DESIGNER_PROMPT 2026-05-25)
+
+**Статус:** ✅ в коде 2026-05-25 (Coder § W по этому handoff)  
+**Источник:** [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md) · [`REFERENCE.md`](../../design/wp/REFERENCE.md) §6 · [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) §6.1
+
+### Приёмка (владелец / Local)
+
+| # | Проверка |
+|---|----------|
+| 1 | Скролл главной: секции `.rl-reveal` появляются; кубики FL/Kwork/TG «собираются»; match-bar 0→88% |
+| 2 | Hover карточки лида и тарифа — лёгкий lift + тень |
+| 3 | FL зелёный `#00A65A`, TG `#0088CC` на кубиках и рамках |
+| 4 | Тарифы: **одна** карточка «ИИ-агент», badge «Скоро» справа сверху |
+| 5 | Header: **Лента** → `/feed`, CTA **Попробовать →** → `/feed` |
+| 6 | Пульт: лампа ok — медленный пульс glow (`prefers-reduced-motion` — без анимации) |
+
+---
+
+### 1. `rawlead.css` — токены (задача 2)
+
+В `:root` заменить:
+
+```css
+--rl-source-fl: #00a65a;
+--rl-source-tg: #0088cc;
+```
+
+В `.rl-source-cube--tg` gradient — убрать хардкод `#0284c7`, использовать:
+
+```css
+background: linear-gradient(145deg, #006699, var(--rl-source-tg));
+```
+
+---
+
+### 2. `rawlead.css` — motion (задача 1)
+
+**2.1 Reveal** — привести к REFERENCE §6.1 (сейчас 0.85s — слишком медленно):
+
+```css
+.rl-reveal {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+  transition: opacity 240ms ease-out, transform 240ms ease-out;
+}
+.rl-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+```
+
+**2.2 Stagger** — реальные классы в теме:
+
+```css
+.rl-reveal.is-visible .rl-audience-card,
+.rl-reveal.is-visible .rl-feature,
+.rl-reveal.is-visible .rl-price-card {
+  opacity: 1;
+  transform: none;
+}
+.rl-audience-card,
+.rl-feature,
+.rl-price-card {
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  transition: opacity 240ms ease-out, transform 240ms ease-out;
+}
+.rl-reveal.is-visible .rl-audience-card:nth-child(1),
+.rl-reveal.is-visible .rl-feature:nth-child(1),
+.rl-reveal.is-visible .rl-price-card:nth-child(1) { transition-delay: 0ms; }
+.rl-reveal.is-visible .rl-audience-card:nth-child(2),
+.rl-reveal.is-visible .rl-feature:nth-child(2) { transition-delay: 40ms; }
+.rl-reveal.is-visible .rl-audience-card:nth-child(3),
+.rl-reveal.is-visible .rl-feature:nth-child(3) { transition-delay: 80ms; }
+```
+
+**2.3 Hover** — REFERENCE §6.3 (добавить в конец блока motion):
+
+```css
+.rl-lead-card,
+.rl-price-card {
+  transition: transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out;
+}
+.rl-lead-card:hover,
+.rl-price-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-color: #c8c8d0;
+}
+```
+
+**2.4 Match-bar** — REFERENCE §6.4:
+
+```css
+.rl-match__fill {
+  width: 0;
+  transition: width 600ms ease-out;
+}
+.rl-reveal.is-visible .rl-match__fill,
+.rl-match.is-visible .rl-match__fill {
+  width: var(--match-value, 0%);
+}
+```
+
+**2.5 Micro-press** — §6.5:
+
+```css
+.rl-btn:active {
+  transform: scale(0.97);
+  transition: transform 80ms ease-out;
+}
+```
+
+**2.6 Кубики** — §6.6 (до `is-visible` на `.rl-flow__sources`):
+
+```css
+.rl-flow__sources .rl-source-cube {
+  opacity: 0;
+  transition: transform 400ms ease-out, opacity 400ms ease-out;
+}
+.rl-flow__sources .rl-source-cube:nth-child(1) {
+  transform: translateX(-80px) translateY(40px) rotate(-8deg);
+}
+.rl-flow__sources .rl-source-cube:nth-child(2) {
+  transform: translateX(0) translateY(60px) rotate(4deg);
+}
+.rl-flow__sources .rl-source-cube:nth-child(3) {
+  transform: translateX(80px) translateY(40px) rotate(-6deg);
+}
+.rl-flow__sources.is-visible .rl-source-cube:nth-child(1) {
+  transform: rotate(-7deg) translateX(-6px);
+  opacity: 1;
+  transition-delay: 0ms;
+}
+.rl-flow__sources.is-visible .rl-source-cube:nth-child(2) {
+  transform: rotate(5deg) translateX(10px);
+  opacity: 1;
+  transition-delay: 80ms;
+}
+.rl-flow__sources.is-visible .rl-source-cube:nth-child(3) {
+  transform: rotate(-4deg) translateX(-4px);
+  opacity: 1;
+  transition-delay: 160ms;
+}
+```
+
+Убрать дублирующие `transform` из базовых `.rl-source-cube--fl` … `--tg` **или** оставить только в блоке `is-visible` выше.
+
+**2.7 Pricing single + badge** (задача 3):
+
+```css
+.rl-pricing--single {
+  display: grid;
+  grid-template-columns: minmax(280px, 400px);
+  justify-content: center;
+}
+.rl-price-card__badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  margin: 0;
+}
+```
+
+**2.8 `prefers-reduced-motion`** — расширить существующий `@media`:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  .rl-audience-card,
+  .rl-feature,
+  .rl-price-card,
+  .rl-flow__sources .rl-source-cube {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .rl-match__fill {
+    width: var(--match-value, 88%);
+    transition: none;
+  }
+  .rl-btn:active {
+    transform: none;
+  }
+}
+```
+
+---
+
+### 3. `flow.php` — match-bar (задача 1)
+
+Заменить span fill:
+
+```html
+<span class="rl-match__fill" style="--match-value: 88%"></span>
+```
+
+(убрать `width:88%` из inline)
+
+---
+
+### 4. `rawlead-scroll.js` — IO (задача 1 / §6.7)
+
+Добавить к селектору наблюдения:
+
+```js
+var motionTargets = main.querySelectorAll(".rl-reveal, .rl-flow__sources");
+```
+
+Порог для sources: `threshold: 0.15` (как REFERENCE). Остальная логика — без изменений (unobserve после срабатывания).
+
+---
+
+### 5. `pricing-preview.php` (задача 3)
+
+Один план, без цикла `foreach` по трём тарифам:
+
+```php
+$contact = rawlead_page_url('contact');
+$plan = [
+    'name'  => __('ИИ-агент', 'rawlead-kadence-child'),
+    'price' => __('от 300 ₽/мес', 'rawlead-kadence-child'),
+    'items' => [
+        __('Match по тегам', 'rawlead-kadence-child'),
+        __('Рыночная цена', 'rawlead-kadence-child'),
+        __('Черновик отклика', 'rawlead-kadence-child'),
+        __('Push в TG', 'rawlead-kadence-child'),
+    ],
+    'badge' => __('Скоро', 'rawlead-kadence-child'),
+    'cta'   => __('Ранний доступ', 'rawlead-kadence-child'),
+];
+```
+
+Разметка: `<div class="rl-pricing rl-pricing--single">` · одна `<article class="rl-price-card">` · badge · CTA → `$contact` · убрать ссылку «Все тарифы» внизу (или заменить на «Связаться →» → contact).
+
+Заголовок секции: **«Тариф»** или оставить «Тарифы» — на усмотрение Lead; в промпте — блок про один продукт.
+
+---
+
+### 6. `header.php` (задача 4)
+
+```php
+$feed = rawlead_page_url('feed');
+
+$nav = [
+    'home'    => [__('Главная', 'rawlead-kadence-child'), $home],
+    'feed'    => [__('Лента', 'rawlead-kadence-child'), $feed],
+    'how'     => [__('Как работает', 'rawlead-kadence-child'), rawlead_page_url('how')],
+    'pricing' => [__('Тарифы', 'rawlead-kadence-child'), $pricing],
+    'faq'     => [__('FAQ', 'rawlead-kadence-child'), rawlead_page_url('faq')],
+    'contact' => [__('Контакты', 'rawlead-kadence-child'), rawlead_page_url('contact')],
+];
+```
+
+CTA:
+
+```php
+<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($feed); ?>">
+  <?php esc_html_e('Попробовать →', 'rawlead-kadence-child'); ?>
+</a>
+```
+
+Active state: если `is_page('feed')` или path `feed` — класс `is-active` на пункте «Лента».
+
+---
+
+### 7. `desktop/src/styles/pult.css` (задача 5)
+
+После блока `.lamp__dot--ok { … }`:
+
+```css
+@keyframes lamp-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 1px 0 rgba(255, 255, 255, 0.5) inset,
+      0 0 3px 1px var(--color-status-ok-glow),
+      0 0 12px 5px var(--color-status-ok-glow),
+      0 0 26px 12px var(--color-status-ok-bloom);
+  }
+  50% {
+    box-shadow:
+      0 0 1px 0 rgba(255, 255, 255, 0.5) inset,
+      0 0 6px 3px var(--color-status-ok-glow),
+      0 0 22px 10px var(--color-status-ok-bloom),
+      0 0 36px 16px rgba(22, 163, 74, 0.08);
+  }
+}
+
+.lamp__dot--ok {
+  animation: lamp-pulse 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lamp__dot--ok {
+    animation: none;
+  }
+}
+```
+
+---
+
+### Файлы (итого для Coder)
+
+| Файл | Задачи |
+|------|--------|
+| `wordpress/.../assets/css/rawlead.css` | 1, 2 |
+| `wordpress/.../assets/js/rawlead-scroll.js` | 1 |
+| `wordpress/.../template-parts/rawlead/flow.php` | 1 |
+| `wordpress/.../template-parts/rawlead/pricing-preview.php` | 3 |
+| `wordpress/.../template-parts/rawlead/header.php` | 4 |
+| `desktop/src/styles/pult.css` | 5 |
+
+**Не трогать:** `src/`, API, шаблоны `/feed` `/cabinet` (фаза 3d).
+
+---
+
 ## Ссылка на v1
 
 Старая спека (PyQt/QSS): git history `DESIGN_BRIEF.md` до 2026-05-23. Логика процессов и вкладок **без изменений**.

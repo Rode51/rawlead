@@ -12,10 +12,11 @@
 |------|--------|------|
 | **0** FL + Kwork | ✅ | Парсеры, фильтр, ИИ, бот |
 | **1** TG acc1/2/3 | ⏳ | join, relay acc→@FLPARSINGBOT, стабильность |
-| **1b** Пульт Tauri | ✅ | [`../ops/DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md) |
+| **1b** Пульт Tauri | ✅ принято владельцем 2026-05-25 | [`../ops/DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md) |
 | **2** ИИ «первое ЛС» | Потом | после MVP |
-| **3b** Neon SaaS-ready | **→ сейчас** | `users`, `user_tags`, `is_visible`, без `contour` |
-| **3c** REST API + WP `/feed` | → | `/v1/feed`, anon |
+| **3b** Neon SaaS-ready | ✅ 2026-05-25 | `users`, `user_tags`, `is_visible`, без `contour` |
+| **3c** REST API | ✅ 2026-05-25 | `api_server.py` :18766 |
+| **3d** WP `/feed` + `/cabinet` | **→ сейчас** | страницы из API |
 | **3d** WP `/cabinet` | → | `user_id=1`, REST к Neon |
 | **3e** Habr Career | → | парсер в `src/` |
 | **3f** ИИ-агент | → | цена + отклик + push TG |
@@ -32,9 +33,10 @@
 |-----------|-----|-----|
 | **0** | Docs + vision v0.9 синхронизированы | Lead Architect ✅ |
 | **1** | TG стабилен: relay + карточка, без дублей python | `@mechanic` § I/K · `@coder` приёмка § M |
-| **2** | **3b** Neon SaaS-ready схема | `@coder` → [`CODER_PROMPT.md`](CODER_PROMPT.md) |
-| **3** | UX `/feed` + `/cabinet` (спека) | `@lead-designer` → [`LEAD_DESIGN_PROMPT.md`](LEAD_DESIGN_PROMPT.md) |
-| **4** | **3c** API + `/feed` | Coder после 3b |
+| **2** | **3b** Neon | ✅ |
+| **3** | UX спека `/feed` + `/cabinet` | ✅ Lead Design · [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) |
+| **4** | **3c** API + `/feed` | `@coder` → [`CODER_PROMPT.md`](CODER_PROMPT.md) |
+| **4b** | CSS лендинг + пульт | `@designer` → [`DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) |
 | **5** | **3d** `/cabinet` через API | Coder + Design handoff |
 | **6** | Dogfood: отклики по боту | владелец |
 

@@ -8,6 +8,7 @@
 declare(strict_types=1);
 
 $home = home_url('/');
+$feed = rawlead_page_url('lenta');
 $pricing = rawlead_page_url('pricing');
 
 $current = '';
@@ -22,6 +23,8 @@ if (is_front_page()) {
 
 $nav = [
     'home'    => [__('Главная', 'rawlead-kadence-child'), $home],
+    'lenta'   => [__('Лента', 'rawlead-kadence-child'), $feed],
+    'cabinet' => [__('Кабинет', 'rawlead-kadence-child'), rawlead_page_url('cabinet')],
     'how'     => [__('Как работает', 'rawlead-kadence-child'), rawlead_page_url('how')],
     'pricing' => [__('Тарифы', 'rawlead-kadence-child'), $pricing],
     'faq'     => [__('FAQ', 'rawlead-kadence-child'), rawlead_page_url('faq')],
@@ -46,7 +49,9 @@ $nav = [
 			</ul>
 		</nav>
 		<div class="rl-header__cta">
-			<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($pricing); ?>"><?php esc_html_e('Тарифы', 'rawlead-kadence-child'); ?></a>
+			<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($feed); ?>">
+				<?php esc_html_e('Попробовать →', 'rawlead-kadence-child'); ?>
+			</a>
 		</div>
 	</div>
 </header>

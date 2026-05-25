@@ -1,6 +1,6 @@
 # Neon Postgres — схема v1 (лиды + персональный rank)
 
-Версия: **0.2 (черновик 3b)** · Lead Architect · 2026-05-24  
+Версия: **0.3 (3b)** · Lead Architect · 2026-05-25  
 Решение владельца: **Neon** как облако; WP **не** ходит в Postgres напрямую.
 
 > **v0.9:** поле **`contour`** (`owner`/`saas`) — **отменено**. Вместо него **`is_visible`** после ИИ-модерации — см. [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §0c. Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § 3b.
@@ -20,7 +20,7 @@
 
 ## 2. Таблицы
 
-### `raw_leads` (или эволюция `leads`)
+### `leads` (канон в SQL; = `raw_leads` в vision)
 
 | Колонка | Тип | Смысл |
 |---------|-----|--------|
@@ -48,7 +48,7 @@ Ingest: `INSERT … ON CONFLICT (content_hash) DO NOTHING` — при дубле
 
 | Колонка | Тип | Смысл |
 |---------|-----|--------|
-| `id` | UUID PK | |
+| `id` | UUID PK | seed `00000000-0000-0000-0000-000000000001` = владелец (#1) |
 | `wp_user_id` | BIGINT UNIQUE | связь с WP |
 | `email` | TEXT | |
 | `tg_chat_id` | BIGINT | для персональной рассылки бота |
@@ -110,7 +110,7 @@ final_rank    = round(ai_score * 0.6 + keyword_match * 0.4)
 
 | Актор | Доступ |
 |-------|--------|
-| **Рadar Python** | INSERT/UPDATE `raw_leads` |
+| **Рadar Python** | INSERT/UPDATE `leads` |
 | **API (Python)** | SELECT + rank; CRUD `user_tags` по токену |
 | **WordPress** | только HTTP → API (Bearer / HMAC) |
 | **Бот** | через API: top-K per `user_id` + `tg_chat_id` |

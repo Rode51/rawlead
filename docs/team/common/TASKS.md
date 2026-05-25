@@ -10,7 +10,7 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 | # | Задача | Статус |
 |---|--------|--------|
 | 1 | Пульт ▶ стабильно, VPN выкл, `tg_smoke` ok | ⏳ |
-| 2 | Приёмка TG: пересыл + **карточка ИИ** в @FLPARSINGBOT | ⏳ [`2026-05-24-tg-forward-not-via-bot.md`](../problems/2026-05-24-tg-forward-not-via-bot.md) |
+| 2 | TG: acc → бот, /start авто | ✅ владелец 2026-05-25 |
 | 3 | С **пн 2026-05-26:** отклики по вердикту «Брать», 1–2/день | ⏳ |
 
 → детали запуска: [`../FOR_YOU.md`](../FOR_YOU.md)
@@ -33,10 +33,11 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 | # | Трек | Статус |
 |---|------|--------|
 | 0 | Mechanic: дубли python, radar_control+psutil | ⏳ тикеты § I/K |
-| 1 | TG § M — приёмка relay+card | ⏳ |
-| 2 | **3b** Neon SaaS-ready | **→ сейчас** |
-| 3 | 3c REST + `/feed` | очередь |
-| 4 | 3d `/cabinet` REST | очередь |
+| 1 | TG § M — только если сбой relay+card | по тикету |
+| 1b | **§ P** пульт: логи / лампа TG / статус acc | ✅ принято владельцем 2026-05-25 |
+| 2 | **3b** Neon SaaS-ready | ✅ Lead 2026-05-25 |
+| 3 | **3c** REST API | ✅ Lead 2026-05-25 |
+| 4 | **3d** WP `/feed` + `/cabinet` | внутри активного `CODER_PROMPT` (после § W) |
 | 5 | 3e Habr Career | очередь |
 | 6 | 3f ИИ-агент | очередь |
 
@@ -50,7 +51,13 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 
 | # | Трек | Статус |
 |---|------|--------|
-| 1 | UX `/feed` + `/cabinet` (спека) | **→ сейчас** |
+| 1 | Концепция `/feed` + `/cabinet` | ✅ Lead Designer 2026-05-25 |
+| 2 | Handoff лендинг + пульт | ✅ Designer → [`DESIGN_BRIEF.md`](design/DESIGN_BRIEF.md) §195 |
+| 3 | § W в коде | ✅ Lead 2026-05-25 |
+| 4 | **3d** `/lenta` + каркас `/cabinet` | ✅ |
+| 5 | **3e** ЛК | ✅ принято владельцем 2026-05-25 |
+| 6 | **§ 3g** лента: бот-only + навыки + sort | **→ @coder** · [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) |
+| 7 | 3f ИИ-агент (отклик, цена) | после 3g |
 
 ---
 

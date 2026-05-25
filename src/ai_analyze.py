@@ -12,6 +12,7 @@ import requests
 
 from budget import display_budget_text
 from config import DIRECT_REQUESTS_PROXIES, Config
+from rank import normalize_tags
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _PROFILE_PATH = _PROJECT_ROOT / "docs" / "ops" / "PROFILE.md"
@@ -26,6 +27,7 @@ _AI_FIELDS = (
     "money",
     "reply_draft",
     "risks",
+    "lead_tags",
 )
 
 _VALID_VERDICTS = frozenset({"брать", "брат", "сомнительно", "пропустить", "мимо"})
@@ -86,6 +88,7 @@ time_for_client — срок заказчику с запасом
 money — «На бирже: … | Рынок: … | Старт отклика: …»
 reply_draft — только «Брать»: 4–8 предложений, начало «Здравствуйте. Готов реализовать…», цена «от …»; иначе пустая строка ""
 risks — лимиты Cursor, расходники не оплатит заказчик, бан Telethon, scope creep
+lead_tags — массив 3–8 навыков lowercase без # (python, fastapi, wordpress, парсер, telegram bot, excel); при МИМО — []
 
 reply_draft ЗАПРЕЩЕНО: Cursor, ИИ, нейросеть, ChatGPT, Gemini, AI, агент, промпт.
 
@@ -107,6 +110,7 @@ class AiAnalysis:
     money: str
     reply_draft: str
     risks: str
+    lead_tags: tuple[str, ...] = ()
 
     def is_skip_verdict(self) -> bool:
         return self.verdict.strip().casefold() in _SKIP_VERDICTS
@@ -269,6 +273,14 @@ def _parse_analysis(data: dict[str, Any], *, budget_text: str) -> AiAnalysis:
     else:
         reply_draft = reply_raw
 
+    raw_tags = data.get("lead_tags", [])
+    if isinstance(raw_tags, list):
+        lead_tags = tuple(normalize_tags([str(t) for t in raw_tags]))
+    else:
+        lead_tags = ()
+    if not skip_like and lead_tags and (len(lead_tags) < 3 or len(lead_tags) > 8):
+        lead_tags = lead_tags[:8]
+
     return AiAnalysis(
         verdict=verdict,
         work_summary=str(data["work_summary"]).strip(),
@@ -278,6 +290,7 @@ def _parse_analysis(data: dict[str, Any], *, budget_text: str) -> AiAnalysis:
         money=money,
         reply_draft=reply_draft,
         risks=str(data["risks"]).strip(),
+        lead_tags=lead_tags,
     )
 
 

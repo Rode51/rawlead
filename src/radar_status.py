@@ -7,7 +7,13 @@ import json
 import time
 from pathlib import Path
 
-from config import Config, load_tg_join_config, load_tg_monitor_config, radar_timestamp
+from config import (
+    Config,
+    TgMonitorAccountConfig,
+    load_tg_join_config,
+    load_tg_monitor_config,
+    radar_timestamp,
+)
 from health_check import (
     _TG_MONITOR_PULSE_KEY,
     _TG_MONITOR_PULSE_MAX_AGE_SEC,
@@ -15,6 +21,7 @@ from health_check import (
     tg_monitor_warmup_remaining_sec,
 )
 from storage import ProjectStorage
+from tg_bot_start import is_bot_started
 from tg_client import resolve_telethon_account
 
 _STATUS_FL_CYCLE_AT = "status_fl_cycle_at"
@@ -43,6 +50,8 @@ def reset_tg_session_stats(storage: ProjectStorage, accounts: tuple[str, ...]) -
             "chats_file",
             "started_at",
             "ready",
+            "phase",
+            "last_action",
         ):
             storage.set_setting(_tg_key(acc, suffix), "0" if suffix != "last_err" else "")
 
@@ -59,11 +68,19 @@ def record_tg_monitor_start(
     storage.set_setting(_tg_key(acc, "chats_listen"), str(chats_listen))
     storage.set_setting(_tg_key(acc, "chats_file"), str(chats_in_file))
     storage.set_setting(_tg_key(acc, "started_at"), radar_timestamp())
+    record_tg_phase(
+        storage,
+        acc,
+        "старт",
+        f"слушаем {chats_listen}/{chats_in_file} чатов",
+    )
 
 
 def record_tg_acc_ready(storage: ProjectStorage, account: str) -> None:
     """Acc готов слушать: handler зарегистрирован, get_me ok."""
-    storage.set_setting(_tg_key(account.strip().lower(), "ready"), "1")
+    acc = account.strip().lower()
+    storage.set_setting(_tg_key(acc, "ready"), "1")
+    record_tg_phase(storage, acc, "слушает")
 
 
 def record_tg_message(
@@ -82,6 +99,10 @@ def record_tg_message(
         storage.incr_setting(_tg_key(acc, "notified"), 1)
     if error:
         storage.set_setting(_tg_key(acc, "last_err"), error[:400])
+    if notified:
+        record_tg_phase(storage, acc, "пересыл", f"новый={int(was_new)}")
+    elif was_new:
+        record_tg_phase(storage, acc, "новый пост")
 
 
 def record_tg_skip(
@@ -89,7 +110,24 @@ def record_tg_skip(
     account: str,
     detail: str,
 ) -> None:
-    storage.set_setting(_tg_key(account.strip().lower(), "last_err"), detail[:400])
+    acc = account.strip().lower()
+    storage.set_setting(_tg_key(acc, "last_err"), detail[:400])
+    record_tg_phase(storage, acc, "пропуск", detail)
+
+
+def record_tg_phase(
+    storage: ProjectStorage,
+    account: str,
+    phase: str,
+    detail: str = "",
+) -> None:
+    acc = account.strip().lower()
+    storage.set_setting(_tg_key(acc, "phase"), phase[:80])
+    ts = radar_timestamp()
+    line = f"{ts} {phase}"
+    if detail:
+        line += f" — {detail[:200]}"
+    storage.set_setting(_tg_key(acc, "last_action"), line[:400])
 
 
 def record_fl_kwork_cycle(
@@ -128,6 +166,53 @@ def _account_label(account: str) -> str:
         return f"{account} ({name})"
     except SystemExit:
         return account
+
+
+def _account_role_line(
+    acfg: TgMonitorAccountConfig,
+    *,
+    listen: int,
+    in_file: int,
+    ready: bool,
+    join_pending: int,
+) -> str:
+    if not acfg.chat_ids:
+        if join_pending:
+            return f"  Роль: только join-очередь ({join_pending} pending)"
+        return "  Роль: нет chat_ids в конфиге — ждёт join или сид чатов"
+    if listen > 0 and ready:
+        return f"  Роль: слушает {listen} чат(ов)"
+    if listen > 0:
+        return f"  Роль: подключает {listen}/{len(acfg.chat_ids)} чат(ов) из файла"
+    if in_file > 0:
+        hint = f", join pending {join_pending}" if join_pending else ""
+        return f"  Роль: {in_file} чат(ов) в файле, сессия не нашла{hint}"
+    if join_pending:
+        return f"  Роль: join-очередь ({join_pending}), чаты пока не в сессии"
+    return "  Роль: чаты в конфиге, ожидание подключения"
+
+
+def _msgs_zero_hint(
+    *,
+    listen: int,
+    in_file: int,
+    join_pending: int,
+    ready: bool,
+    bot_ok: bool,
+) -> str | None:
+    if listen == 0 and in_file == 0 and join_pending == 0:
+        return "  Входящих ещё не было — нет чатов в конфиге; добавьте ids или join"
+    if listen == 0 and join_pending > 0:
+        return (
+            "  Входящих ещё не было — join в очереди; после вступления появятся чаты"
+        )
+    if listen > 0 and not ready:
+        return "  Входящих ещё не было — acc ещё не ready (подключение)"
+    if listen > 0 and not bot_ok:
+        return "  Входящих ещё не было — бот /start не отправлен; forward заблокирован"
+    if listen > 0:
+        return "  Входящих ещё не было — слушает; ждём пост в группах"
+    return None
 
 
 def _pending_join_by_account(queue_csv: Path) -> dict[str, int]:
@@ -193,29 +278,28 @@ def tg_pult_lamp_state(
 
     try:
         tg_cfg = load_tg_monitor_config()
-        accounts = tuple(ac.account for ac in tg_cfg.accounts if ac.chat_ids)
+        listening = tuple(ac for ac in tg_cfg.accounts if ac.chat_ids)
     except SystemExit:
-        accounts = ("acc1",)
+        listening = ()
 
-    if not accounts:
+    if not listening:
         return "error", "нет чатов"
 
-    total = len(accounts)
+    total = len(listening)
     ready = sum(
-        1 for acc in accounts if _int_setting(storage, _tg_key(acc, "ready")) > 0
+        1
+        for ac in listening
+        if _int_setting(storage, _tg_key(ac.account, "ready")) > 0
     )
 
-    if ready >= total:
-        if _tg_pulse_fresh(storage):
-            return "ok", "слушает"
-        warmup = tg_monitor_warmup_remaining_sec(storage)
-        if warmup > 0:
-            return "warn", f"прогрев (~{warmup}с)"
-        return "warn", "подключение…"
+    if ready >= total and _tg_pulse_fresh(storage):
+        return "ok", "слушает"
 
+    warmup = tg_monitor_warmup_remaining_sec(storage)
+    if warmup > 0:
+        return "warn", f"прогрев (~{warmup}с)"
     if ready > 0:
         return "warn", f"подключение {ready}/{total}"
-
     return "warn", "подключение…"
 
 
@@ -259,8 +343,10 @@ def format_status_message(cfg: Config, storage: ProjectStorage) -> str:
 
     try:
         tg_cfg = load_tg_monitor_config()
+        account_rows = {ac.account: ac for ac in tg_cfg.accounts}
         accounts = tuple(ac.account for ac in tg_cfg.accounts)
     except SystemExit:
+        account_rows = {}
         accounts = ("acc1",)
 
     join_pending = _pending_join_by_account(load_tg_join_config().queue_csv)
@@ -268,21 +354,54 @@ def format_status_message(cfg: Config, storage: ProjectStorage) -> str:
     for acc in accounts:
         lines.append("")
         lines.append(_account_label(acc))
+        acfg = account_rows.get(acc)
         listen = _int_setting(storage, _tg_key(acc, "chats_listen"))
         in_file = _int_setting(storage, _tg_key(acc, "chats_file"))
-        if listen or in_file:
-            lines.append(f"  Чатов: слушаем {listen} / в файле {in_file}")
+        ready = _int_setting(storage, _tg_key(acc, "ready")) > 0
+        pending = join_pending.get(acc, 0)
+        cfg_ids = len(acfg.chat_ids) if acfg else in_file
+        if acfg:
+            lines.append(
+                _account_role_line(
+                    acfg,
+                    listen=listen,
+                    in_file=in_file or cfg_ids,
+                    ready=ready,
+                    join_pending=pending,
+                )
+            )
+        lines.append(f"  ready: {'да' if ready else 'нет'}")
+        bot_ok = is_bot_started(acc)
+        lines.append(f"  Бот /start: {'да' if bot_ok else 'нет'}")
+        if listen or in_file or cfg_ids:
+            lines.append(f"  Чатов: слушаем {listen} / в файле {in_file or cfg_ids}")
         started = storage.get_setting(_tg_key(acc, "started_at"), "").strip()
         if started:
             lines.append(f"  Сессия с: {started}")
+        msgs = _int_setting(storage, _tg_key(acc, "msgs"))
         lines.append(
-            f"  Сообщений: {_int_setting(storage, _tg_key(acc, 'msgs'))} · "
+            f"  Сообщений: {msgs} · "
             f"новых: {_int_setting(storage, _tg_key(acc, 'new'))} · "
             f"в бот: {_int_setting(storage, _tg_key(acc, 'notified'))}"
         )
-        pending = join_pending.get(acc, 0)
+        if msgs == 0:
+            hint = _msgs_zero_hint(
+                listen=listen,
+                in_file=in_file or cfg_ids,
+                join_pending=pending,
+                ready=ready,
+                bot_ok=bot_ok,
+            )
+            if hint:
+                lines.append(hint)
         if pending:
             lines.append(f"  Join в очереди: {pending}")
+        phase = storage.get_setting(_tg_key(acc, "phase"), "").strip()
+        last_action = storage.get_setting(_tg_key(acc, "last_action"), "").strip()
+        if phase:
+            lines.append(f"  phase: {phase}")
+        if last_action:
+            lines.append(f"  last: {last_action[:220]}")
         last_err = storage.get_setting(_tg_key(acc, "last_err"), "").strip()
         if last_err:
             lines.append(f"  ⚠ {last_err[:200]}")

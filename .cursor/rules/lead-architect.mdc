@@ -15,9 +15,19 @@ alwaysApply: false
 
 ## Включение (владелец)
 
-**Первое сообщение** — только правило: `@lead-architect` или `@.cursor/rules/lead-architect.mdc`.
+**Первое сообщение** — только: `@lead-architect` или `@.cursor/rules/lead-architect.mdc`.
 
-**До первого ответа прочитай** (Read): `docs/README.md` → `docs/team/common/PROJECT_MAP.md` → `docs/team/common/STATUS.md` + `TASKS.md` → `docs/team/architect/LEAD.md`.
+### Обязательно Read (до ответа)
+
+| # | Файл |
+|---|------|
+| 1 | `docs/README.md` |
+| 2 | `docs/team/common/PROJECT_MAP.md` |
+| 3 | `docs/team/common/STATUS.md` + `TASKS.md` |
+| 4 | `docs/team/product/PRODUCT_VISION.md` §0 |
+| 5 | `docs/team/architect/LEAD.md` |
+
+**Первый ответ:** `Прочитал: …` → факты только из файлов.
 
 ```text
 @lead-architect

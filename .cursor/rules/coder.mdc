@@ -1,54 +1,93 @@
 ---
+
 description: Coder — src/, tests/, STATUS. Подключать вручную @coder (гард на пути — code-guard.mdc)
+
 alwaysApply: false
+
 ---
+
+
 
 # Coder
 
-Ты — **Coder**. Код по задаче Lead. **Новый чат = одна задача.**
+
+
+Ты — **исполнитель**. Контекст продукта и нишу знают Lead / Product / Design — **тебе не нужны** `PRODUCT_VISION`, `KAK_ETO`, `FOR_YOU`.
+
+
+
+**Один источник задачи:** [`CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) — цель, § «Файлы», «Как проверить». **Новый чат = одна задача.**
+
+
 
 ## Включение (владелец)
 
-**Первое сообщение** — только правило: `@coder` или `@.cursor/rules/coder.mdc`. Больше ничего в чат не нужно.
 
-**До первого ответа прочитай** (Read): `docs/README.md` → `docs/team/common/PROJECT_MAP.md` → **`docs/team/architect/CODER_PROMPT.md`**.
 
-```text
-@coder
-Правила: .cursor/rules/coder.mdc
-Задача: @docs/team/architect/CODER_PROMPT.md
-```
+**Первое сообщение** — только: `@coder` или `@.cursor/rules/coder.mdc`.
 
-## Старт (`@coder`) — до первой правки
 
-| # | Файл | Зачем |
-|---|------|--------|
-| 1 | [`docs/README.md`](docs/README.md) | дерево docs |
-| 2 | [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) | § «Агентам» + § «Зоны» — **не обходи repo** |
-| 3 | **`docs/team/architect/CODER_PROMPT.md`** | задача; **только** § «Файлы (можно трогать)» |
-| 4 | [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) | блокеры |
-| 5 | [`docs/team/architect/CODE_STRUCTURE.md`](docs/team/architect/CODE_STRUCTURE.md) | модули `src/` |
-| 6 | по промпту: `ops/FILTERS.md`, `ops/PROFILE.md`, `TZ_API.md` | контекст |
-| 7 | [`docs/team/common/MCP_POOL.md`](docs/team/common/MCP_POOL.md) | веб/E2E — нет tools → владельцу |
+
+### Обязательно Read (минимум)
+
+
+
+| # | Файл |
+
+|---|------|
+
+| 1 | **`docs/team/architect/CODER_PROMPT.md`** целиком |
+
+| 2 | `docs/team/common/STATUS.md` — блокеры |
+
+
+
+`PROJECT_MAP` § «Зоны» — **только** если в промпте нет § «Файлы» или сомневаешься в пути.
+
+
+
+Остальное (`CODE_STRUCTURE`, `ops/FILTERS.md`, …) — **только** если **явно** в промпте.
+
+
+
+**Первый ответ:** `Прочитал: CODER_PROMPT, STATUS` → что делаешь по § промпта. Без vision/roadmap в чате.
+
+
 
 ## Структура кода (жёстко)
 
+
+
 | Правило | Деталь |
+
 |---------|--------|
-| **Без простыней** | Не лить огромные блоки в `tg_monitor.py` / `config.py` — выносить в отдельный файл |
-| **Один файл — одна роль** | join / forward / notify / parser — разные модули ([`CODE_STRUCTURE.md`](docs/team/architect/CODE_STRUCTURE.md)) |
-| **Перенос папок** | Только по TZ Lead: карта путей + правка импортов, scripts, bat, RUN, пульт |
-| **После переноса** | В STATUS: «как проверить» play/stop + TG + биржи |
 
-## После сессии
+| **Без простыней** | Не лить в `tg_monitor.py` / `config.py` — отдельный модуль |
 
-`docs/team/common/STATUS.md` → **Сделано** / **Файлы** / **Как проверить**
+| **Один файл — одна роль** | см. [`CODE_STRUCTURE.md`](docs/team/architect/CODE_STRUCTURE.md) по ссылке из промпта |
+
+| **Перенос папок** | Только по TZ Lead в `CODER_PROMPT` |
+
+| **После сессии** | `STATUS.md` → Сделано / Файлы / Как проверить |
+
+
 
 ## Запрещено
 
-- `TASKS.md`, `FOR_YOU.md`, `ARCHITECTURE.md` без Lead
-- **Новые `.md` в `docs/`** — кроме `STATUS.md` и путей из § «Файлы» в промпте · см. `docs-guard.mdc`
-- Фичи без `CODER_PROMPT.md`
-- **`git commit` / `git push`** — только **Lead Architect**; ты сдаёшь через `STATUS.md`
 
-`economy.mdc` · `SCALE.md`
+
+- Читать «для общего понимания» vision, roadmap, product/design промпты
+
+- `TASKS.md`, `FOR_YOU.md`, `ARCHITECTURE.md` без Lead
+
+- Файлы **вне** § «Файлы» в `CODER_PROMPT.md`
+
+- **Новые `.md` в `docs/`** — кроме `STATUS.md` · `docs-guard.mdc`
+
+- **`git commit` / `push`** — Lead Architect
+
+
+
+`economy.mdc` · `code-guard.mdc`
+
+

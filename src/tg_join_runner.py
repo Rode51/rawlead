@@ -86,6 +86,7 @@ async def run_join_tick(
     client=None,
     max_per_hour: int | None = None,
     cfg=None,
+    storage=None,
 ) -> JoinTickResult:
     """Один тик join. Если client передан — не disconnect (acc1 в tg_main)."""
     result = JoinTickResult()
@@ -140,6 +141,10 @@ async def run_join_tick(
                 continue
 
             log_join(cfg, f"join:wait account={account} link={link} name={name!r}")
+            if storage is not None:
+                from radar_status import record_tg_phase
+
+                record_tg_phase(storage, account, "join", name[:120] or link[:80])
             join_result = await join_one(client, link)
             ts = radar_timestamp(now=now)
 
@@ -174,6 +179,12 @@ async def run_join_tick(
                     cfg,
                     f"join:ok account={account} link={link} chat_id={cid}{already}",
                 )
+                if storage is not None:
+                    from radar_status import record_tg_phase
+
+                    record_tg_phase(
+                        storage, account, "join ok", f"chat_id={cid}{already}"
+                    )
                 if join_result.chat_id is not None:
                     monitor_accounts = telethon_monitor_accounts()
                     if account in monitor_accounts:

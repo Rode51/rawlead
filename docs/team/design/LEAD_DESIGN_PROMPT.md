@@ -1,55 +1,64 @@
 # Lead Designer — активный план
 
-**Дата:** 2026-05-24 · принято Lead Architect из [`LEAD_PRODUCT_PROMPT.md`](LEAD_PRODUCT_PROMPT.md)  
+**Дата:** 2026-05-25 · согласовано с владельцем (сессия Lead Designer)  
 **Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.9** (ставка B)  
-**Статус:** активно — UX для `/feed` и `/cabinet`
+**Статус:** ✅ согласование завершено → передано Designer + ожидает Coder (после 3b/3c API)
 
 ---
 
-## Цель
+## Что согласовано (2026-05-25)
 
-Спецификация UI для **двух новых страниц WP** под MVP: открытая лента и персональный кабинет (single-user). Стиль — REFERENCE E, канон токенов — `DESIGN_SYSTEM.md`. Лендинг и `/uslugi` **не трогаем**.
+Полный диалог: [Lead Designer UI/UX Vision Session](../../../.cursor/projects/c-Users-hramo-uisness)
 
----
-
-## Scope
-
-| В scope | Вне scope |
-|---------|-----------|
-| WP **`/feed`** — anon, фильтры, поиск, сортировки, карточка лида | `/uslugi`, FL.ru тексты, Habr-статья, GitHub README |
-| WP **`/cabinet`** — `user_id=1`, match %, теги, `final_rank` | Лендинг главная (тарифы — после MVP) |
-| Visual feedback ИИ-агента (кнопка, модалка, «push в TG») — **макет**; код кнопки после фазы 3f | Отдельный сайт-визитка, mobile app |
-| Handoff → `DESIGNER_PROMPT.md` + `DESIGN_BRIEF.md` | Правки child theme кодом (это Coder) |
-
----
-
-## Готово когда
-
-| # | Критерий |
-|---|----------|
-| 1 | Wireframe/описание **`/feed`**: карточка (заголовок, источник, бюджет, теги, ai_score), фильтры, сортировки, поиск, пагинация или infinite scroll |
-| 2 | Wireframe/описание **`/cabinet`**: match % (синяя полоса REFERENCE), `final_rank`, «Мои теги» 8–12 chip, кнопка «Сгенерировать отклик» (disabled до 3f — ок) |
-| 3 | Состояния: empty, loading, error — для обеих страниц |
-| 4 | `DESIGNER_PROMPT.md` заполнен; Coder-§ в `DESIGN_BRIEF.md` (блоки, не код) |
-| 5 | Lead Architect принял handoff → очередь Coder **после** 3b/3c API (см. `ROADMAP.md`) |
+| Решение | Зафиксировано |
+|---------|--------------|
+| Карточка лида: раскрывающаяся плашка (вариант C) | ✅ |
+| Анимации: «Живой» стиль (stagger, lift, bar, press, cubes) | ✅ |
+| Кубики источников: собираются из горизонтали в вертикаль при скролле | ✅ |
+| FL.ru цвет: `#00A65A` зелёный | ✅ |
+| TG цвет: `#0088CC` официальный | ✅ |
+| Навигация: добавить «Лента» → `/feed` | ✅ |
+| `/feed` фильтры: sticky sidebar desktop + bottom sheet mobile | ✅ |
+| `/feed` scroll: infinite scroll | ✅ |
+| `/cabinet` теги: редактируемые чипы прямо на странице | ✅ |
+| `/cabinet` ощущение: отдельная «продуктовая» страница (не копия feed) | ✅ |
+| Лендинг тарифы: 1 карточка ИИ-агент 300–990 ₽/мес | ✅ |
+| Пульт: пульсация лампы ok в running-режиме | ✅ |
+| Пульт: структурированный статус в вкладке «Статус» (задача Coder) | ✅ |
 
 ---
 
-## Handoff
+## Документы (все готовы)
 
-| Кому | Файл | Что передать |
-|------|------|--------------|
-| Designer | `DESIGNER_PROMPT.md` | исполнение макетов/текстов в `docs/design/` |
-| Lead Architect | `DESIGN_BRIEF.md` § Coder | блоки WP для фаз 3c–3d |
-
----
-
-## Референсы (из Product)
-
-- [`docs/design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) — стиль E (Unbounded/Manrope, светлый)
-- [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) — токены v1
-- Уже есть: лендинг ✅, пульт (внутренний) ✅, PNG-карта ✅
+| Файл | Что |
+|------|-----|
+| [`docs/design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) v2 | Лендинг + анимации (§6) + обновлённые токены |
+| [`docs/design/wp/feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) | **Полная спека** `/feed` + `/cabinet` + пульт |
+| [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) | Токены v2 (источники + motion-токены) |
+| [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md) | Задача для Designer (CSS + pricing + nav + лампа) |
 
 ---
 
-_После сдачи — архив в `team/archive/TASKS_HISTORY.md`; очистить или заменить этот файл._
+## Следующие шаги
+
+| Кто | Что | Когда |
+|-----|-----|-------|
+| **@designer** | Handoff → `DESIGN_BRIEF` §195 | ✅ 2026-05-25 |
+| **@coder** | Внедрение § W + 3d | → `CODER_PROMPT` |
+| **@lead-architect** | CODER_PROMPT на PHP-шаблоны `/feed` + `/cabinet` + JS | после готовности 3b/3c API |
+| **@coder** | Структурированный статус в вкладке пульта | в рамках CODER_PROMPT |
+
+---
+
+## Scope (итог)
+
+| В scope ✅ | Вне scope ❌ |
+|-----------|------------|
+| WP лендинг: анимации, цвета, pricing 1-тариф, nav «Лента» | `/uslugi`, FL.ru тексты, Habr-статья |
+| WP `/feed`: карточка, фильтры, sidebar, infinite scroll, состояния | Mobile app, отдельный сайт |
+| WP `/cabinet`: теги-чипы, match, AI-агент кнопка (disabled до 3f) | Coder-часть PHP (это CODER_PROMPT) |
+| Пульт: пульс лампы ok | Новый функционал пульта |
+
+---
+
+_Lead Designer · 2026-05-25 · после сдачи Designer — архив в `team/archive/TASKS_HISTORY.md`_

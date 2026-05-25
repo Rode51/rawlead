@@ -219,6 +219,7 @@ async def _join_loop(
                     account,
                     client=client,
                     cfg=join_cfg,
+                    storage=storage,
                 )
                 if tick.new_listen_chat_ids:
                     added = await _reload_listen_chats(

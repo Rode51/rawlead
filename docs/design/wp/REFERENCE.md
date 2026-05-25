@@ -1,10 +1,13 @@
 # RawLead — WordPress сайт · утверждённый референс
 
-**Статус:** утверждено владельцем · 2026-05-23  
+**Статус:** v2 · согласовано Lead Designer + владелец · 2026-05-25  
 **Направление:** E — editorial / Pitch / Framer (светлый, типографика, сетка)  
+**Поверхности:** лендинг (главная) · `/feed` (открытая лента) · `/cabinet` (кабинет)  
 **Не использовать:** тёмный вариант A (Linear-dark), пульт Tauri, play/stop, терминал логов
 
 Файл-референс: [`bold-editorial-saas-full-page-landing-page-ui-mock.png`](bold-editorial-saas-full-page-landing-page-ui-mock.png) · приёмка владельца 2026-05-23.
+
+Спека `/feed` и `/cabinet`: [`feed-cabinet-mvp.md`](feed-cabinet-mvp.md)
 
 Скелет контента: [`../../archive/wp-skeleton/`](../../archive/wp-skeleton/) · установка: [`../../ops/WP_LOCAL_SKELETON.md`](../../ops/WP_LOCAL_SKELETON.md)
 
@@ -37,16 +40,17 @@
 | `color/cta/primary` | `#0A0A0A` | кнопки «Смотреть тарифы», «Начать» |
 | `color/cta/primary-text` | `#FFFFFF` | текст на primary |
 | `color/cta/secondary` | transparent | «Как это работает» — текст + стрелка |
-| `color/source/fl` | `#2563EB` | рамка/акцент FL.ru |
+| `color/source/fl` | `#00A65A` | рамка/акцент FL.ru (бренд-зелёный) |
 | `color/source/kwork` | `#EA580C` | рамка/акцент Kwork |
-| `color/source/tg` | `#0EA5E9` | рамка/акцент Telegram |
+| `color/source/tg` | `#0088CC` | рамка/акцент Telegram (официальный) |
 | `color/match/bar` | `#2563EB` | прогресс «совпадение %» |
 | `color/status/success` | `#16A34A` | только чипы «Брать» (не вся палитра) |
 | `radius/card` | `16px` | карточки источников, лид, тарифы |
 | `radius/button` | `999px` | pill-кнопки |
 | `space/unit` | `8px` | baseline grid |
 | `space/section-y` | `96px` desktop / `64px` mobile | между секциями |
-| `font/family` | **Inter** (fallback: system-ui) | весь UI |
+| `font/display` | **Unbounded** 700–900 | заголовки H1–H3 |
+| `font/body` | **Manrope** 400–700 | body, UI, подписи |
 | `font/hero` | 56–72px / 700 / −0.02em | H1 «Лиды без шума» |
 | `font/h2` | 32–40px / 700 | секции |
 | `font/body` | 16–18px / 400 / 1.5 | абзацы |
@@ -62,8 +66,9 @@
 ### 3.1 Header (sticky, светлый)
 
 - Слева: **RawLead** (wordmark, без иконки на MVP)
-- Справа: **Главная** · **Как работает** · **Тарифы** · **FAQ** · **Контакты**
-- CTA в шапке: pill **«Тарифы»** или **«Ранний доступ»** → `/pricing` или `/contact`
+- Справа: **Главная** · **Лента** · **Как работает** · **Тарифы** · **FAQ** · **Контакты**
+- «Лента» → `/feed` (открытая лента заказов без регистрации)
+- CTA в шапке: pill **«Попробовать»** → `/feed`
 
 ### 3.2 Hero
 
@@ -112,15 +117,19 @@
 
 ### 3.7 Тарифы (превью на главной или только `/pricing`)
 
-Три колонки **одинаковой ширины**:
+**Одна карточка** — ИИ-агент (Product Vision v0.9, один тариф):
 
-| Старт | Про (выделен) | Команда |
-|-------|---------------|---------|
-| 0 ₽ | ~990 ₽/мес | по запросу |
-| лимиты | полный набор | несколько исполнителей |
-| CTA outline | CTA заливка + ribbon **«Популярный»** | «Написать» |
+| Поле | Значение |
+|------|----------|
+| Название | **ИИ-агент** |
+| Цена | **от 300 ₽/мес** (точная — после MVP) |
+| Что включено | Match по тегам · рыночная цена · черновик отклика · push в TG при новом матче |
+| CTA | pill «Ранний доступ» → `/contact` |
+| Badge | «Скоро» (серый, правый верхний угол карточки) |
 
-Подпись «Скоро» на оплате — как на референсе.
+Под карточкой: ссылка «Узнать первым →` → `/contact` или форма email-листа.
+
+**Не делать:** 3 колонки Старт/Про/Команда — устарело (v0.8), отменено.
 
 ### 3.8 Footer
 
@@ -153,7 +162,91 @@
 
 ---
 
-## 6. Что не переносить с референса буквально
+## 6. Анимации (согласовано 2026-05-25)
+
+**Принцип:** «Живой» стиль (Framer/Raycast). Только CSS transform + opacity — нулевая нагрузка на GPU, без layout reflow. IntersectionObserver для scroll-триггеров.
+
+### 6.1 Появление элементов при скролле
+
+```css
+/* Базовое состояние — невидим, смещён вниз */
+.rl-reveal { opacity: 0; transform: translateY(20px); }
+/* После входа в viewport */
+.rl-reveal.is-visible { opacity: 1; transform: none; transition: opacity 240ms ease-out, transform 240ms ease-out; }
+```
+
+### 6.2 Stagger карточек (feed / features / audience)
+
+Карточки появляются по очереди: задержка `40ms` между каждой через `transition-delay`.
+
+```css
+.rl-card:nth-child(1) { transition-delay: 0ms; }
+.rl-card:nth-child(2) { transition-delay: 40ms; }
+.rl-card:nth-child(3) { transition-delay: 80ms; }
+/* и т.д. */
+```
+
+### 6.3 Hover карточки
+
+```css
+.rl-lead-card, .rl-price-card {
+  transition: transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out;
+}
+.rl-lead-card:hover, .rl-price-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+  border-color: #C8C8D0;
+}
+```
+
+### 6.4 Match-bar (fill on viewport entry)
+
+Полоса совпадения начинает анимироваться от 0% до реального значения при первом появлении в viewport:
+
+```css
+.rl-match__fill { width: 0; transition: width 600ms ease-out; }
+.is-visible .rl-match__fill { width: var(--match-value); /* задаётся inline */ }
+```
+
+### 6.5 Micro-press на кнопках
+
+```css
+.rl-btn:active { transform: scale(0.97); transition: transform 80ms ease-out; }
+```
+
+### 6.6 Кубики источников — сборка при скролле
+
+На главной: кубики FL.ru / Kwork / Telegram при входе в viewport анимируются из горизонтального ряда в вертикальную стопку.
+
+**Начальное состояние (inline style на каждом кубике):**
+```css
+/* Все три — в строку (translateX разные) */
+.rl-source-cube:nth-child(1) { transform: translateX(-80px) translateY(40px) rotate(-8deg); opacity: 0; }
+.rl-source-cube:nth-child(2) { transform: translateX(0px)   translateY(60px) rotate(4deg);  opacity: 0; }
+.rl-source-cube:nth-child(3) { transform: translateX(80px)  translateY(40px) rotate(-6deg); opacity: 0; }
+```
+
+**Финальное состояние (is-visible на родителе):**
+```css
+.rl-flow__sources.is-visible .rl-source-cube:nth-child(1) { transform: none; opacity: 1; transition: all 400ms ease-out 0ms; }
+.rl-flow__sources.is-visible .rl-source-cube:nth-child(2) { transform: none; opacity: 1; transition: all 400ms ease-out 80ms; }
+.rl-flow__sources.is-visible .rl-source-cube:nth-child(3) { transform: none; opacity: 1; transition: all 400ms ease-out 160ms; }
+```
+
+### 6.7 IntersectionObserver — один скрипт
+
+```js
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+}, { threshold: 0.15 });
+document.querySelectorAll('.rl-reveal, .rl-flow__sources').forEach(el => io.observe(el));
+```
+
+**Производительность:** только transform + opacity (GPU), unobserve после первого срабатывания. Не влияет на FCP/LCP.
+
+---
+
+## 7. Что не переносить с референса буквально
 
 - Искажённый/английский мелкий текст с картинки — брать тексты из **wp-skeleton**
 - Кнопка «Apply» → **«Откликнуться сами»** или убрать (мы не биржа)
@@ -162,7 +255,7 @@
 
 ---
 
-## 7. Статус
+## 8. Статус
 
 | Кто | Действие |
 |-----|----------|

@@ -20,6 +20,8 @@ final class RawLead_Landing {
         'pricing' => 'Тарифы',
         'faq'     => 'Вопросы',
         'contact' => 'Контакты',
+        'lenta'   => 'Лента',
+        'cabinet' => 'Кабинет',
     ];
 
     public static function init(): void {

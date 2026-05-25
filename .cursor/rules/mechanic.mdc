@@ -9,9 +9,18 @@ alwaysApply: false
 
 ## Включение (владелец)
 
-**Первое сообщение:** `@mechanic` или `@.cursor/rules/mechanic.mdc` **+** тикет (второй `@` или строка ниже).
+**Первое сообщение:** `@mechanic` + `@docs/problems/<тикет>.md`.
 
-**До первого ответа прочитай** (Read): `docs/README.md` → `docs/team/common/PROJECT_MAP.md` → **`docs/problems/<тикет>.md`**.
+### Обязательно Read (минимум)
+
+| # | Файл |
+|---|------|
+| 1 | **`docs/problems/<тикет>.md`** |
+| 2 | `docs/team/common/STATUS.md` |
+
+`PROJECT_MAP` — только если тикет ссылается на зоны вне очевидного пути.
+
+**Первый ответ:** `Прочитал: <тикет>, STATUS` → фикс.
 
 ```text
 @mechanic

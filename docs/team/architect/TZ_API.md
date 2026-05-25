@@ -1,6 +1,6 @@
 # ТЗ — HTTP API (RawLead backend)
 
-Версия: **0.1** · Lead · 2026-05-23
+Версия: **0.3g** · Lead · 2026-05-23 · Coder 2026-05-25
 
 Связано: [`NEON_SCHEMA.md`](NEON_SCHEMA.md) · [`TZ_WP.md`](TZ_WP.md) · [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
@@ -30,47 +30,62 @@
 
 ## 2. MVP эндпоинты
 
-| Method | Path | Кто | Действие |
-|--------|------|-----|----------|
-| `GET` | `/health` | мониторинг | ok + версия |
-| `GET` | `/v1/feed` | WP (user JWT) | лиды, sorted by `final_rank`, limit, offset |
-| `GET` | `/v1/leads/{id}` | WP | одна карточка + breakdown score |
-| `PUT` | `/v1/me/tags` | WP | сохранить `user_tags[]` |
-| `GET` | `/v1/me/tags` | WP | текущие теги |
-| `GET` | `/v1/me/subscription` | WP | plan, active_until |
-| `POST` | `/v1/internal/leads` | radar (API key) | upsert lead + ai_score + lead_tags |
-| `GET` | `/v1/internal/digest` | bot (API key) | top-K leads per user where rank ≥ threshold |
+| Method | Path | Кто | Действие | Статус |
+|--------|------|-----|----------|--------|
+| `GET` | `/health` | мониторинг | ok + версия | ✅ 3c |
+| `GET` | `/v1/skills/catalog` | WP | топ-50 `lead_tags` из лидов с `notified_at` | ✅ 3g |
+| `GET` | `/v1/feed` | WP | лиды из бота + `skills` + `sort=time\|match` | ✅ 3g |
+| `GET` | `/v1/leads/{id}` | WP | одна карточка + breakdown score | ✅ 3c |
+| `GET` | `/v1/me/feed` | WP кабинет | персональная лента, sort `final_rank` DESC, `min_score` по `final_rank` | ✅ 3e |
+| `PUT` | `/v1/me/tags` | WP | сохранить `user_tags[]` (replace, lowercase) | ✅ 3e |
+| `GET` | `/v1/me/tags` | WP | текущие теги owner | ✅ 3e |
+| `GET` | `/v1/me/subscription` | WP | заглушка `free` | ✅ 3e |
+| `POST` | `/v1/internal/leads` | radar (API key) | upsert lead + ai_score + lead_tags | ✅ 3c |
+| `GET` | `/v1/internal/digest` | bot (API key) | top-K leads per user where rank ≥ threshold | ⏳ 3e |
 
-**Логика read (v0.9):** `/v1/feed` — только `is_visible = true` + `ai_score ≥ порог` (открытая лента). Dogfood-бот владельца — все лиды (включая `is_visible=false` для проверки модерации). _Устарело: `contour` owner/saas — не использовать._
+**3c–3e — файл:** `src/api_server.py`, `src/rank.py` · порт `18766` · `/internal/*` → `X-API-Key` · кабинет MVP → `X-RawLead-User-Id: 00000000-0000-0000-0000-000000000001` (без JWT).
+
+**Логика read (v0.9 / 3g):** Read-ленты (`/v1/feed`, `/v1/me/feed`) — только `is_visible = true` **и** `notified_at IS NOT NULL` (заказ уже был в TG-боте). Ingest/радар до notify: `is_visible = false`. `/v1/feed`: `sort=time` → `created_at DESC`, `min_score` по **`ai_score`**; `sort=match` → `final_rank DESC`, `min_score` по **`final_rank`**; query `skills=python,fastapi` — фильтр `lead_tags ∩ skills ≠ ∅`, rank по skills. `/v1/me/feed` — rank по `user_tags` (или `skills` в query), те же `sort`/`skills`. Dogfood-бот — все лиды (включая `is_visible=false`, без notify). _Устарело: `contour` — не использовать._
 
 ---
 
-## 3. `GET /v1/feed`
+## 3. `GET /v1/feed` (открытая, §3g)
 
-**Query:** `limit` (default 20), `min_rank` (default 50), `since` (ISO datetime).
+**Query:** `limit`, `offset`, `min_score`, `skills` (comma-separated), `sort` (`time` | `match`, default `time`).
 
-**Auth:** Bearer token (WP plugin выдаёт после login).
+| `sort` | ORDER BY | `min_score` применяется к |
+|--------|----------|---------------------------|
+| `time` | `created_at DESC` | `ai_score` |
+| `match` | `final_rank DESC` (в памяти, scan ≤500) | `final_rank` |
 
-**Response (фрагмент):**
+**`skills`:** если задан — только лиды с пересечением `lead_tags`; `keyword_match` и `final_rank` по весам skills (1.0 каждый). Без skills — все bot-лиды; `keyword_match=0`, `final_rank ≈ ai_score×0.6`.
 
-```json
-{
-  "items": [
-    {
-      "id": 123,
-      "source": "tg:1204578088",
-      "title": "...",
-      "final_rank": 88,
-      "ai_score": 92,
-      "keyword_match": 82,
-      "reasons": ["бюджет ок", "Python в тексте"],
-      "url": "..."
-    }
-  ]
-}
-```
+**Response:** `items[]` с `final_rank`, `keyword_match`, `lead_tags`, … + `sort`, `skills[]`.
 
-**Логика:** см. [`NEON_SCHEMA.md`](NEON_SCHEMA.md) §3.
+---
+
+## 3a. `GET /v1/skills/catalog` (§3g)
+
+**Response:** `{"skills":[{"tag":"python","count":12},…]}` — топ 50 тегов из `lead_tags` лидов с `notified_at IS NOT NULL`, по частоте.
+
+---
+
+## 3b. `GET /v1/me/feed` (кабинет)
+
+**Headers:** `X-RawLead-User-Id` (MVP — owner UUID).
+
+**Query:** как `/v1/feed` + `sort` (default `match`). **`min_score`:** при `sort=match` — `final_rank`; при `sort=time` — `ai_score`. Без query `skills` — rank по `user_tags` из БД.
+
+**Response:** `items[]` с `final_rank`, `keyword_match`, `ai_score`, `lead_tags`, …
+
+**Rank:** `keyword_match` = weighted overlap `lead_tags` ∩ `user_tags`; `final_rank = round(ai_score×0.6 + keyword_match×0.4)` — env `RANK_WEIGHT_*`.
+
+---
+
+## 3c. `GET` / `PUT /v1/me/tags`
+
+- `GET` → `{"tags":["wordpress",…]}`
+- `PUT` body `{"tags":[…]}` — replace всех тегов user, нормализация lowercase
 
 ---
 

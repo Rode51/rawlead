@@ -26,17 +26,44 @@ body {
   height: 100vh;
   max-height: 100vh;
   margin: 0 auto;
-  background: var(--color-bg-app);
+  position: relative;
+  background-color: var(--color-bg-app);
   background-image: var(--bg-app);
   background-clip: padding-box;
-  border: 1px solid var(--color-border);
+  border: 1px solid rgba(180, 186, 198, 0.55);
   box-shadow:
-    0 24px 48px rgba(10, 10, 10, 0.12),
-    0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+    0 24px 48px rgba(10, 10, 10, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -1px 0 rgba(160, 168, 180, 0.12) inset;
   border-radius: var(--radius-window);
   overflow: hidden;
   isolation: isolate;
   clip-path: inset(0 round var(--radius-window));
+}
+
+.app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--metal-shine);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--metal-edge);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app > * {
+  position: relative;
+  z-index: 1;
 }
 
 .app__header {
@@ -46,7 +73,8 @@ body {
   align-items: flex-start;
   gap: 8px 12px;
   padding: 16px 12px 8px 20px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid rgba(200, 206, 216, 0.65);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
@@ -222,35 +250,121 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 72px;
 }
 
 .lamp__dot {
+  position: relative;
   width: 14px;
   height: 14px;
   border-radius: 50%;
   border: 2px solid var(--color-border);
   background: var(--color-status-idle);
-  box-shadow: 0 0 0 3px var(--color-status-idle-glow);
+  box-shadow:
+    0 0 2px 1px var(--color-status-idle-glow),
+    0 0 10px 4px rgba(156, 163, 175, 0.12);
+}
+
+.lamp__dot::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+}
+
+@keyframes lamp-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 1px 0 rgba(255, 255, 255, 0.5) inset,
+      0 0 3px 1px var(--color-status-ok-glow),
+      0 0 12px 5px var(--color-status-ok-glow),
+      0 0 26px 12px var(--color-status-ok-bloom);
+  }
+  50% {
+    box-shadow:
+      0 0 1px 0 rgba(255, 255, 255, 0.5) inset,
+      0 0 6px 3px var(--color-status-ok-glow),
+      0 0 22px 10px var(--color-status-ok-bloom),
+      0 0 36px 16px rgba(22, 163, 74, 0.08);
+  }
 }
 
 .lamp__dot--ok {
-  background: var(--color-status-ok);
-  border-color: var(--color-status-ok);
-  box-shadow: 0 0 0 4px var(--color-status-ok-glow);
+  background: radial-gradient(
+    circle at 32% 28%,
+    #4ade80 0%,
+    var(--color-status-ok) 55%,
+    #15803d 100%
+  );
+  border-color: rgba(22, 163, 74, 0.65);
+  box-shadow:
+    0 0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 0 3px 1px var(--color-status-ok-glow),
+    0 0 12px 5px var(--color-status-ok-glow),
+    0 0 26px 12px var(--color-status-ok-bloom),
+    0 0 42px 20px rgba(22, 163, 74, 0.04);
+  animation: lamp-pulse 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lamp__dot--ok {
+    animation: none;
+  }
+}
+
+.lamp__dot--ok::after {
+  opacity: 1;
+  background: radial-gradient(
+    circle,
+    rgba(74, 222, 128, 0.45) 0%,
+    rgba(22, 163, 74, 0.15) 38%,
+    transparent 72%
+  );
 }
 
 .lamp__dot--warn {
-  background: var(--color-status-warn);
-  border-color: var(--color-status-warn);
-  box-shadow: 0 0 0 4px var(--color-status-warn-glow);
+  background: radial-gradient(
+    circle at 32% 28%,
+    #fdba74 0%,
+    var(--color-status-warn) 55%,
+    #c2410c 100%
+  );
+  border-color: rgba(234, 88, 12, 0.6);
+  box-shadow:
+    0 0 1px 0 rgba(255, 255, 255, 0.45) inset,
+    0 0 3px 1px var(--color-status-warn-glow),
+    0 0 12px 5px var(--color-status-warn-glow),
+    0 0 26px 12px var(--color-status-warn-bloom),
+    0 0 42px 20px rgba(234, 88, 12, 0.04);
+}
+
+.lamp__dot--warn::after {
+  opacity: 1;
+  background: radial-gradient(
+    circle,
+    rgba(251, 191, 36, 0.4) 0%,
+    rgba(234, 88, 12, 0.14) 38%,
+    transparent 72%
+  );
 }
 
 .lamp__dot--error {
-  background: var(--color-status-error);
-  border-color: var(--color-status-error);
-  box-shadow: 0 0 0 4px var(--color-status-error-glow);
+  background: radial-gradient(
+    circle at 32% 28%,
+    #f87171 0%,
+    var(--color-status-error) 55%,
+    #b91c1c 100%
+  );
+  border-color: rgba(220, 38, 38, 0.6);
+  box-shadow:
+    0 0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 0 3px 1px var(--color-status-error-glow),
+    0 0 12px 5px var(--color-status-error-glow),
+    0 0 24px 11px rgba(220, 38, 38, 0.1);
 }
 
 .lamp__label {
@@ -259,16 +373,6 @@ body {
   font-family: var(--font-display);
   letter-spacing: -0.02em;
   color: var(--color-text);
-}
-
-.lamp__caption {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  min-height: 14px;
-}
-
-.lamp__caption:empty {
-  display: none;
 }
 
 .log-panel {
@@ -283,14 +387,6 @@ body {
 
 .log-panel[hidden] {
   display: none !important;
-}
-
-.log-panel__head {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 4px;
-  padding: 2px 0 0;
 }
 
 .btn-collapse {
@@ -405,6 +501,10 @@ body {
   margin-top: auto;
   padding: 0 20px 12px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 .signature {

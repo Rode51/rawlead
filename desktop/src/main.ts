@@ -4,6 +4,8 @@ const API_BASE =
 
 const POLL_STATUS_MS = 2500;
 const POLL_LOGS_MS = 1500;
+const CLOSE_STOP_MS = 8000;
+const CLOSE_FORCE_DESTROY_MS = 12000;
 const WIDTH = 400;
 const HEIGHT_COMPACT = 560;
 const HEIGHT_EXPANDED = 760;
@@ -44,10 +46,14 @@ let heroBusy = false;
 let starting = false;
 let pollPaused = false;
 let logsOpen = false;
-let logsCollapsed = false;
+let logsCollapsed = true;
+/** true только после клика по стрелке — pollStatus не разворачивает логи сам */
+let logsOpenedByUser = false;
 let activeTab = "radar.log";
 let logPollTimer: ReturnType<typeof setInterval> | null = null;
 let statusPollTimer: ReturnType<typeof setInterval> | null = null;
+let closingInProgress = false;
+let closeDestroyTimer: ReturnType<typeof setTimeout> | null = null;
 /** Автоскролл вниз только пока пользователь не прокрутил вверх */
 let logFollowBottom = true;
 
@@ -91,6 +97,70 @@ async function initHttpFetch(): Promise<void> {
   httpFetch = tauriFetch as typeof fetch;
 }
 
+function setCloseEnabled(enabled: boolean): void {
+  if (btnClose instanceof HTMLButtonElement) {
+    btnClose.disabled = !enabled;
+  }
+}
+
+async function forceDestroyWindow(): Promise<void> {
+  if (!isTauri()) return;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().destroy();
+  } catch {
+    /* fallback */
+    try {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow().close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+async function stopRadarForClose(): Promise<void> {
+  pauseStatusPoll();
+  stopLogPoll();
+  try {
+    await apiPost("/stop", "{}", CLOSE_STOP_MS);
+  } catch {
+    /* таймаут / API недоступен — окно всё равно закрываем */
+  }
+  running = false;
+  starting = false;
+  setHeroMode("play");
+}
+
+async function requestAppClose(): Promise<void> {
+  if (closingInProgress) {
+    await forceDestroyWindow();
+    return;
+  }
+  closingInProgress = true;
+  setCloseEnabled(false);
+  showStatus("Остановка…", "warn");
+
+  if (closeDestroyTimer !== null) {
+    clearTimeout(closeDestroyTimer);
+  }
+  closeDestroyTimer = setTimeout(() => {
+    void forceDestroyWindow();
+  }, CLOSE_FORCE_DESTROY_MS);
+
+  try {
+    await stopRadarForClose();
+  } finally {
+    if (closeDestroyTimer !== null) {
+      clearTimeout(closeDestroyTimer);
+      closeDestroyTimer = null;
+    }
+    await forceDestroyWindow();
+    closingInProgress = false;
+    setCloseEnabled(true);
+  }
+}
+
 async function setupWindowChrome(): Promise<void> {
   if (!isTauri()) return;
   try {
@@ -101,6 +171,14 @@ async function setupWindowChrome(): Promise<void> {
     } catch {
       /* config shadow:false is primary */
     }
+    await win.onCloseRequested((event) => {
+      event.preventDefault();
+      if (closingInProgress) {
+        void forceDestroyWindow();
+        return;
+      }
+      void requestAppClose();
+    });
     btnMinimize?.addEventListener("click", (e) => {
       e.preventDefault();
       void win.minimize().catch((err) =>
@@ -109,7 +187,7 @@ async function setupWindowChrome(): Promise<void> {
     });
     btnClose?.addEventListener("click", (e) => {
       e.preventDefault();
-      void win.close().catch((err) => showStatus(`Закрыть: ${err}`, "error"));
+      void requestAppClose();
     });
     blockDragOnClick(btnMinimize);
     blockDragOnClick(btnClose);
@@ -212,11 +290,6 @@ function setHeroBusy(busy: boolean): void {
   heroBtn.setAttribute("aria-busy", busy ? "true" : "false");
 }
 
-function lampCaptionText(caption: string): string {
-  if (caption === "работает" || caption === "слушает") return "";
-  return caption;
-}
-
 function renderLamps(lamps: LampInfo[]): void {
   lampsEl.innerHTML = lamps
     .map(
@@ -224,7 +297,6 @@ function renderLamps(lamps: LampInfo[]): void {
     <div class="lamp" data-key="${l.key}">
       <span class="lamp__dot lamp__dot--${l.state}"></span>
       <span class="lamp__label">${l.label}</span>
-      <span class="lamp__caption">${lampCaptionText(l.caption)}</span>
     </div>`,
     )
     .join("");
@@ -246,7 +318,13 @@ function scrollLogToBottom(force = false): void {
   });
 }
 
-async function setLogsVisible(visible: boolean): Promise<void> {
+async function setLogsVisible(
+  visible: boolean,
+  opts?: { user?: boolean },
+): Promise<void> {
+  if (opts?.user) {
+    logsOpenedByUser = visible;
+  }
   logsOpen = visible;
   logPanel.hidden = !visible;
   if (visible) {
@@ -349,9 +427,25 @@ async function pollStatus(): Promise<void> {
     running = data.running;
     renderLamps(data.lamps);
     setHeroMode(running ? "stop" : "play");
+    if (running && logsOpen && !logsOpenedByUser) {
+      void setLogsVisible(false);
+    }
+    if (
+      running &&
+      data.ui_expanded &&
+      !logsOpenedByUser &&
+      isTauri()
+    ) {
+      void apiPost(
+        "/ui-expanded",
+        JSON.stringify({ expanded: false }),
+        15000,
+      ).catch(() => {});
+    }
     if (!running && logsOpen && !starting && !heroBusy) {
       void setLogsVisible(false);
-      setLogsCollapsed(false);
+      logsOpenedByUser = false;
+      setLogsCollapsed(true);
     }
     if (logsOpen && !logsCollapsed) {
       void refreshActiveLog();
@@ -383,12 +477,15 @@ async function runStart(): Promise<void> {
       15000,
     );
     clearStatus();
+    logsOpenedByUser = false;
+    await setLogsVisible(false);
     await pollStatus();
   } catch (err) {
     if (!isCanceledError(err)) {
       running = false;
       setHeroMode("play");
       showStatus(`Радар: ${err}`, "error");
+      logsOpenedByUser = false;
       await setLogsVisible(false);
     }
   } finally {
@@ -409,6 +506,7 @@ async function onHeroClick(): Promise<void> {
       await apiPost("/stop", "{}", 60000);
       running = false;
       setHeroMode("play");
+      logsOpenedByUser = false;
       await setLogsVisible(false);
       await apiPost("/ui-expanded", JSON.stringify({ expanded: false }), 15000);
       clearStatus();
@@ -427,8 +525,9 @@ async function onHeroClick(): Promise<void> {
   starting = true;
   running = true;
   setHeroMode("stop");
+  logsOpenedByUser = false;
   setLogsCollapsed(true);
-  await setLogsVisible(true);
+  await setLogsVisible(false);
   showStatus("Запуск…", "warn");
   void runStart();
 }
@@ -462,19 +561,28 @@ heroBtn.addEventListener("click", (e) => {
 });
 
 btnCollapse.addEventListener("click", () => {
-  const expanding = logsCollapsed;
   if (!logsOpen) {
-    void setLogsVisible(true);
+    logsOpenedByUser = true;
+    setLogsCollapsed(false);
+    void setLogsVisible(true, { user: true });
+    if (isTauri()) {
+      void apiPost(
+        "/ui-expanded",
+        JSON.stringify({ expanded: true }),
+        15000,
+      ).catch(() => {});
+    }
+    return;
   }
-  setLogsCollapsed(!logsCollapsed);
+  logsOpenedByUser = false;
+  setLogsCollapsed(true);
+  void setLogsVisible(false);
   if (isTauri()) {
     void apiPost(
       "/ui-expanded",
-      JSON.stringify({ expanded: expanding }),
+      JSON.stringify({ expanded: false }),
       15000,
-    ).catch(() => {
-      /* API может быть недоступен до старта */
-    });
+    ).catch(() => {});
   }
 });
 

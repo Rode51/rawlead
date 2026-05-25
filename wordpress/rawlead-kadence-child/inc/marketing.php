@@ -13,7 +13,17 @@ if (!defined('ABSPATH')) {
 
 /** @return list<string> */
 function rawlead_shell_slugs(): array {
-    return ['home', 'how', 'pricing', 'faq', 'contact'];
+    return ['home', 'how', 'pricing', 'faq', 'contact', 'lenta', 'cabinet'];
+}
+
+/** Продуктовые страницы ленты / кабинета (без inner-hero из page.php). */
+function rawlead_is_app_page(): bool {
+    if (!is_page()) {
+        return false;
+    }
+    $post = get_queried_object();
+    return $post instanceof WP_Post
+        && in_array($post->post_name, ['lenta', 'cabinet'], true);
 }
 
 function rawlead_is_shell_page(): bool {
@@ -38,6 +48,8 @@ function rawlead_inner_page_lead(string $slug): string {
         'pricing' => __('Тарифы для соло и команды — оплата скоро', 'rawlead-kadence-child'),
         'faq'     => __('Коротко о том, как устроен RawLead', 'rawlead-kadence-child'),
         'contact' => __('Ранний доступ и вопросы — в Telegram', 'rawlead-kadence-child'),
+        'lenta'   => __('Открытый рынок заказов с бирж и Telegram', 'rawlead-kadence-child'),
+        'cabinet' => __('Персональная лента по вашим тегам — скоро', 'rawlead-kadence-child'),
         default   => '',
     };
 }

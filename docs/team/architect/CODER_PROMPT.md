@@ -1,81 +1,116 @@
-# Coder — 3b Neon SaaS-ready (vision v0.9)
+# Coder — ✅ § 3g сдано (приёмка владельца)
 
-**Дата:** 2026-05-24 · Lead Architect  
-**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) acceptance #2  
-**ROADMAP:** фаза **3b** → затем 3c–3f
+**Дата:** 2026-05-25 · Lead Architect  
+**Следующий:** **3f** (ИИ-отклик в кабинете) — после OK владельца
+
+**Не в scope:** JWT, оплата, кнопка «Сгенерировать отклик» (3f), Habr.
+
+---
+
+## Цель (простыми словами)
+
+1. **`/lenta/`** показывает **только заказы, которые уже пришли в TG-бот** — не весь Neon.
+2. **Навыки** — не ввод руками: каталог из реальных заказов; пользователь **выбирает чипы** → «совместимость» = пересечение с `lead_tags` лида.
+3. **Сортировка:** по времени **или** по совместимости (`final_rank`).
+
+Кабинет `/cabinet/` — тот же пул «из бота» + те же теги (единый `user_tags`), логика rank уже есть.
 
 ---
 
 ## Перед стартом
 
-1. [`docs/README.md`](../README.md) → [`PROJECT_MAP.md`](../common/PROJECT_MAP.md) § «Зоны»
-2. **Не начинать 3c–3f** в этом промпте — одна фаза за сдачу
-
-### Блокеры (не 3b, если не закрыты)
-
-| Что | Кто | Тикет |
-|-----|-----|--------|
-| Дубли `main.py` / radar_control | **Mechanic** | [`2026-05-24-duplicate-python-processes.md`](../problems/2026-05-24-duplicate-python-processes.md) |
-| Приёмка relay + карточка ИИ | владелец + § M ниже | [`2026-05-24-tg-forward-not-via-bot.md`](../problems/2026-05-24-tg-forward-not-via-bot.md) |
-
-§ **B** (демо `/cabinet` на JSON) — **отменён** v0.9; кабинет = фаза **3d** через REST.
+| # | Файл |
+|---|------|
+| 1 | [`NEON_SCHEMA.md`](NEON_SCHEMA.md) §3 — `notified_at`, `lead_tags` |
+| 2 | [`TZ_API.md`](TZ_API.md) — допишешь §3g |
+| 3 | [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) §2.2 — сортировка |
+| 4 | `src/pg_storage.py` — `update_on_notify` / `record_new_lead` |
 
 ---
 
-## Цель 3b
-
-Neon-схема **SaaS-ready с дня 1** (`PRODUCT_VISION` §0a, §0c):
+## § 3g1 — Пайплайн Neon (только «как в боте»)
 
 | # | Готово когда |
 |---|----------------|
-| 3b1 | Таблицы: `users`, `user_tags`, `subscriptions` (минимум для MVP); лиды — `raw_leads` или эволюция `leads` с полями из [`NEON_SCHEMA.md`](NEON_SCHEMA.md) |
-| 3b2 | Колонка **`is_visible`** (bool) после ИИ-модерации; **`contour` не добавлять** (модель отменена) |
-| 3b3 | `user_id` во всех user-scoped таблицах; seed `users.id=1` для владельца |
-| 3b4 | `content_hash` UNIQUE + ingest ON CONFLICT — согласовано с § O (допилить если не в схеме) |
-| 3b5 | `sql/001_neon_schema.sql` + [`NEON_SCHEMA.md`](NEON_SCHEMA.md) синхронны |
-| 3b6 | `pg_storage.py` / ingest: пишет `is_visible`, `ai_score`, `lead_tags` (заглушки ok, если ИИ-модерация в 3f) |
+| g1 | `record_new_lead`: **`is_visible = false`** при INSERT (лид в БД есть, в ленту не попадает) |
+| g2 | `update_on_notify`: после отправки в TG — `notified_at = now()`, `is_visible` по вердикту (как сейчас), **`lead_tags`** заполнены (см. g3) |
+| g3 | ИИ возвращает **`lead_tags`**: массив 3–8 навыков lowercase (`python`, `wordpress`, `telegram bot`, …) — поле в JSON ответа + `AiAnalysis` + запись в Neon |
+| g4 | `GET /v1/feed` и `GET /v1/me/feed`: **`WHERE notified_at IS NOT NULL`** (и `is_visible = true`) |
+| g5 | Разовая чистка: SQL в комментарии в `RUN.md` или скрипт: `UPDATE leads SET is_visible=false WHERE notified_at IS NULL` |
 
-**Не в 3b:** REST `/v1/feed`, WP страницы, Habr парсер, ИИ-агент UI, биллинг, multi-user auth.
+**Критерий владельца:** в `/lenta/` нет заказов, которых не было в боте.
 
 ---
 
-## § M — приёмка TG (если владелец ещё не закрыл)
+## § 3g2 — API: каталог навыков + фильтр + сортировка
+
+| # | Endpoint / параметр | Поведение |
+|---|---------------------|-----------|
+| g6 | `GET /v1/skills/catalog` | Топ N (50) тегов из `lead_tags` лидов с `notified_at IS NOT NULL`, сортировка по частоте; ответ `{"skills":[{"tag":"python","count":12},…]}` |
+| g7 | `GET /v1/feed?skills=python,fastapi` | Только лиды, у которых `lead_tags` ∩ skills ≠ ∅; в ответе **`keyword_match`** + **`final_rank`** (формула NEON §3, веса env) |
+| g8 | `GET /v1/feed?sort=time` | `ORDER BY created_at DESC` (default) |
+| g9 | `GET /v1/feed?sort=match` | `ORDER BY final_rank DESC` (при пустых skills — match=0, ≈ ai_score×0.6) |
+| g10 | `GET /v1/me/feed` | те же `skills`, `sort`; rank по `user_tags` из БД (как сейчас) |
+
+`min_score` на `/v1/feed` при `sort=match` — по **`final_rank`**, при `sort=time` — по **`ai_score`** (зафиксировать в `TZ_API.md`).
+
+---
+
+## § 3g3 — WordPress `/lenta/`
 
 | # | Готово когда |
 |---|----------------|
-| M1 | prompt-test → @FLPARSINGBOT: **пересыл + карточка**; лог `увед=1` |
+| w1 | Sidebar: блок **«Навыки»** — чипы из `GET /v1/skills/catalog` (не text input) |
+| w2 | Выбор навыков → `PUT /v1/me/tags` (owner UUID через REST-прокси, как кабинет) **или** query `skills=` в feed — **один источник правды: `user_tags`** |
+| w3 | Сортировка: radio **«Новые»** / **«По совместимости»** → `sort=time` / `sort=match` |
+| w4 | Подпись полоски: **«Совместимость»** + % = `final_rank` (если навыки выбраны) |
+| w5 | Пустой каталог навыков — текст «Пока нет навыков в ленте — дождитесь заказов из бота» |
+| w6 | `/cabinet/` — без регрессии; теги в шапке и в ленте **синхронны** (`user_tags`) |
 
-**Файлы:** `src/tg_forward.py`, `src/lead_pipeline.py` — только если при приёмке найден баг.
+**Файлы:** `rawlead-feed.js`, `page-lenta.php`, `inc/rawlead-api.php`, `rawlead.css` при необходимости.
+
+---
+
+## § 3g4 — ИИ-промпт
+
+| # | Действие |
+|---|----------|
+| p1 | `docs/team/architect/AI.md` + парсер `ai_analyze.py`: поле `lead_tags` в JSON-схеме |
+| p2 | Примеры тегов: `python`, `fastapi`, `wordpress`, `парсер`, `telegram bot`, `excel` — **без** `#`, lowercase |
+
+---
+
+## Как проверить (владелец)
+
+1. Радар + бот: дождаться 1–2 карточек в TG.
+2. `uvicorn` :18766 → `/lenta/`: **только** эти заказы (не старый мусор).
+3. Блок «Навыки» — список из каталога; выбрал `python` → лента сузилась, % совместимости меняется.
+4. Сортировка «Новые» / «По совместимости» — порядок карточек меняется.
+5. `/cabinet/` — те же теги, что выбрал на ленте.
 
 ---
 
 ## Файлы (можно трогать)
 
-| Путь | Зачем |
-|------|--------|
-| `sql/001_neon_schema.sql` | 3b |
-| `docs/team/architect/NEON_SCHEMA.md` | 3b |
-| `src/pg_storage.py` | ingest Neon |
-| `src/lead_pipeline.py` | `is_visible` при записи |
-| `src/listing_dedup.py` | hash |
-| `docs/team/common/STATUS.md` | сдача |
-| `src/tg_forward.py`, `src/telegram_control.py` | только § M |
+| Путь |
+|------|
+| `src/pg_storage.py`, `src/ai_analyze.py`, `src/api_server.py`, `src/rank.py` |
+| `wordpress/rawlead-kadence-child/` |
+| `docs/team/architect/TZ_API.md`, `docs/team/architect/AI.md` |
+| `docs/ops/RUN.md` |
+| `docs/team/common/STATUS.md` |
 
-## Файлы (не трогать)
+## Не трогать
 
-- `wordpress/` (3c–3d)
-- `TASKS.md`, `FOR_YOU.md`, `ROADMAP.md`, `PRODUCT_VISION.md`
-- `scripts/radar_control.py` — Mechanic
-- `git commit` / `push` — Lead Architect
+- `docs/ops/FILTERS.md` (расширение стоп-списка — отдельно, если понадобится)
+- `git push` без владельца
 
 ---
 
-## Как проверить
+## Закрыто
 
-1. SQL в Neon Console — таблицы созданы, `users` id=1 есть  
-2. Ingest тестового лида → строка с `is_visible`, без `contour`  
-3. § M: один пост в prompt-test → карточка в боте  
+§ P · § 3b · § 3c · § W · § 3d · § 3e · **§ 3g**
 
 ---
 
-_Lead Architect · 2026-05-24 · следующий промпт после сдачи: **3c REST + `/feed`**_
+_Lead Architect · 2026-05-25 · владелец: только бот в ленте + навыки из каталога + sort_

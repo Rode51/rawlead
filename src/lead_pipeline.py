@@ -109,7 +109,13 @@ def plan_new_listing(
         return True, None
 
     if pg is not None:
-        if not pg.record_new_lead(project, errors, content_hash=fingerprint):
+        ingest_body = (project.listing_snippet or project.title or "").strip()
+        if not pg.record_new_lead(
+            project,
+            errors,
+            content_hash=fingerprint,
+            body=ingest_body,
+        ):
             errors.append(f"{project.source}:id={project.project_id} skip:dup_content")
             return True, None
 
@@ -168,7 +174,12 @@ def send_listing_notification(
             tg_acc_label=plan.tg_acc_label,
         )
         if pg is not None:
-            pg.update_on_notify(project, analysis=plan.analysis, errors=errors)
+            pg.update_on_notify(
+                project,
+                analysis=plan.analysis,
+                errors=errors,
+                body=plan.task_fallback_text.strip(),
+            )
         return True
     except TelegramNotifyError as exc:
         errors.append(
