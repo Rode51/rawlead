@@ -9,12 +9,9 @@ declare(strict_types=1);
 
 $home = home_url('/');
 $feed = rawlead_page_url('lenta');
-$pricing = rawlead_page_url('pricing');
 
 $current = '';
-if (is_front_page()) {
-    $current = 'home';
-} elseif (is_page()) {
+if (!is_front_page() && is_page()) {
     $post = get_queried_object();
     if ($post instanceof WP_Post) {
         $current = $post->post_name;
@@ -22,13 +19,12 @@ if (is_front_page()) {
 }
 
 $nav = [
-    'home'    => [__('Главная', 'rawlead-kadence-child'), $home],
     'lenta'   => [__('Лента', 'rawlead-kadence-child'), $feed],
-    'cabinet' => [__('Кабинет', 'rawlead-kadence-child'), rawlead_page_url('cabinet')],
     'how'     => [__('Как работает', 'rawlead-kadence-child'), rawlead_page_url('how')],
-    'pricing' => [__('Тарифы', 'rawlead-kadence-child'), $pricing],
+    'pricing' => [__('Тарифы', 'rawlead-kadence-child'), rawlead_page_url('pricing')],
     'faq'     => [__('FAQ', 'rawlead-kadence-child'), rawlead_page_url('faq')],
     'contact' => [__('Контакты', 'rawlead-kadence-child'), rawlead_page_url('contact')],
+    'cabinet' => [__('Кабинет', 'rawlead-kadence-child'), rawlead_page_url('cabinet')],
 ];
 ?>
 <header class="rl-header" role="banner">
@@ -50,7 +46,7 @@ $nav = [
 		</nav>
 		<div class="rl-header__cta">
 			<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($feed); ?>">
-				<?php esc_html_e('Попробовать →', 'rawlead-kadence-child'); ?>
+				<?php esc_html_e('Попробовать', 'rawlead-kadence-child'); ?>
 			</a>
 		</div>
 	</div>

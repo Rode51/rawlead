@@ -19,6 +19,11 @@
   var resetBtn = sidebar ? sidebar.querySelector(".rl-feed-reset") : null;
 
   var skillsEl = document.getElementById("rl-feed-skills");
+  var skillsBadgeEl = document.getElementById("rl-feed-skills-badge");
+  var skillsHintEl = document.getElementById("rl-feed-skills-hint");
+  var skillsApplyBtn = document.getElementById("rl-feed-skills-apply");
+  var skillsPanelEl = document.getElementById("rl-feed-skills-panel");
+  var sidebarScroll = document.getElementById("rl-feed-sidebar-scroll");
 
   var state = {
     offset: 0,
@@ -26,7 +31,8 @@
     minScore: 0,
     source: "",
     sort: "time",
-    tags: [],
+    draftTags: [],
+    appliedTags: [],
     catalog: [],
     tagsLoading: false,
     loading: false,
@@ -99,23 +105,32 @@
       .replace(/"/g, "&quot;");
   }
 
+  function renderTagChips(leadTags) {
+    var tags = leadTags || [];
+    var max = 4;
+    var html = [];
+    var i;
+    for (i = 0; i < tags.length && i < max; i++) {
+      html.push('<span class="rl-chip">' + escapeHtml(tags[i]) + "</span>");
+    }
+    if (tags.length > max) {
+      html.push('<span class="rl-chip rl-chip--more">+' + (tags.length - max) + "</span>");
+    }
+    return html.join("");
+  }
+
   function renderCard(item) {
     var src = sourceLabel(item.source);
-    var hasSkills = state.tags.length > 0;
+    var hasSkills = state.appliedTags.length > 0;
     var rank = item.final_rank != null ? item.final_rank : item.ai_score || 0;
     var matchLabel = hasSkills ? "Совместимость" : "Оценка ИИ";
     var chip = verdictChip(item.ai_score, item.ai_verdict);
-    var tags = (item.lead_tags || [])
-      .map(function (t) {
-        return '<span class="rl-feed-card__tag">#' + escapeHtml(t) + "</span>";
-      })
-      .join("");
     var reasons = (item.ai_reasons || []).join(". ");
     var budget = item.budget_text || "—";
     var expanded = state.expandedId === item.id;
 
     return (
-      '<article class="rl-feed-card' +
+      '<article class="rl-lead-card' +
       (expanded ? " is-expanded" : "") +
       '" data-id="' +
       item.id +
@@ -130,34 +145,36 @@
       formatTime(item.created_at) +
       "</span>" +
       "</div>" +
-      '<h3 class="rl-feed-card__title">' +
+      '<h3 class="rl-lead-card__title">' +
       escapeHtml(item.title || "Без названия") +
       "</h3>" +
-      '<p class="rl-feed-card__budget">Бюджет: ' +
+      '<p class="rl-lead-card__budget">Бюджет: ' +
       escapeHtml(budget) +
       "</p>" +
-      '<div class="rl-feed-card__match">' +
+      '<div class="rl-match">' +
+      '<div class="rl-match__label">' +
+      "<span>" +
+      escapeHtml(matchLabel) +
+      "</span>" +
+      "<span><strong>" +
+      rank +
+      "%</strong></span>" +
+      "</div>" +
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
       rank +
-      '">' +
+      '" aria-valuemin="0" aria-valuemax="100">' +
       '<span class="rl-match__fill" style="--match-value:' +
       rank +
       '%"></span>' +
       "</div>" +
-      '<span class="rl-feed-card__pct">' +
-      rank +
-      "%</span>" +
-      '<span class="rl-feed-card__match-label">' +
-      escapeHtml(matchLabel) +
-      "</span>" +
-      '<span class="rl-feed-card__ai rl-feed-card__ai--' +
+      "</div>" +
+      '<div class="rl-chips">' +
+      '<span class="rl-chip rl-chip--' +
       chip.cls +
       '">' +
       escapeHtml(chip.text) +
       "</span>" +
-      "</div>" +
-      '<div class="rl-feed-card__tags">' +
-      tags +
+      renderTagChips(item.lead_tags) +
       "</div>" +
       '<div class="rl-feed-card__body">' +
       '<p class="rl-feed-card__text">' +
@@ -219,25 +236,126 @@
     state.minScore = score ? parseInt(score.value, 10) || 0 : 0;
     state.sort = sortInp ? sortInp.value : "time";
     var dirty =
-      state.source !== "" || state.minScore !== 0 || state.tags.length > 0 || state.sort !== "time";
+      state.source !== "" ||
+      state.minScore !== 0 ||
+      state.appliedTags.length > 0 ||
+      state.sort !== "time";
     if (resetBtn) {
       resetBtn.hidden = !dirty;
     }
   }
 
-  function renderSkillsCatalog() {
-    if (!skillsEl) {
+  function tagsEqual(a, b) {
+    var left = (a || []).slice().sort();
+    var right = (b || []).slice().sort();
+    if (left.length !== right.length) {
+      return false;
+    }
+    for (var i = 0; i < left.length; i++) {
+      if (left[i] !== right[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function cloneTags(tags) {
+    return (tags || []).slice();
+  }
+
+  function updateSkillsBadge() {
+    var badges = [skillsBadgeEl];
+    var sheet = document.getElementById("rl-feed-sheet");
+    var sheetBody = document.getElementById("rl-feed-sheet-body");
+    if (sheet && !sheet.hidden && sheetBody) {
+      var sheetBadge = sheetBody.querySelector("#rl-feed-skills-badge");
+      if (sheetBadge) {
+        badges.push(sheetBadge);
+      }
+    }
+    badges.forEach(function (el) {
+      if (!el) {
+        return;
+      }
+      if (state.appliedTags.length) {
+        el.hidden = false;
+        el.textContent = String(state.appliedTags.length);
+      } else {
+        el.hidden = true;
+        el.textContent = "";
+      }
+    });
+  }
+
+  function updateSkillsDraftUi() {
+    var dirty = !tagsEqual(state.draftTags, state.appliedTags);
+    var hints = [skillsHintEl];
+    var applyBtns = [skillsApplyBtn];
+    var sheet = document.getElementById("rl-feed-sheet");
+    var sheetBody = document.getElementById("rl-feed-sheet-body");
+    if (sheet && !sheet.hidden && sheetBody) {
+      var sheetHint = sheetBody.querySelector(".rl-feed-skills__hint");
+      var sheetApply = sheetBody.querySelector(".rl-feed-skills-apply");
+      if (sheetHint) {
+        hints.push(sheetHint);
+      }
+      if (sheetApply) {
+        applyBtns.push(sheetApply);
+      }
+    }
+    hints.forEach(function (el) {
+      if (!el) {
+        return;
+      }
+      el.hidden = !dirty;
+    });
+    applyBtns.forEach(function (btn) {
+      if (!btn) {
+        return;
+      }
+      btn.disabled = state.tagsLoading || !dirty;
+    });
+  }
+
+  function toggleDraftTag(tag) {
+    if (!tag) {
+      return;
+    }
+    var idx = state.draftTags.indexOf(tag);
+    state.draftTags =
+      idx >= 0
+        ? state.draftTags.filter(function (t) {
+            return t !== tag;
+          })
+        : state.draftTags.concat([tag]);
+    renderSkillsCatalog();
+    updateSkillsDraftUi();
+  }
+
+  function bindSkillButtons(container) {
+    if (!container) {
+      return;
+    }
+    container.querySelectorAll(".rl-feed-skill").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        toggleDraftTag(btn.getAttribute("data-tag"));
+      });
+    });
+  }
+
+  function renderSkillsInto(container) {
+    if (!container) {
       return;
     }
     if (!state.catalog.length) {
-      skillsEl.innerHTML =
+      container.innerHTML =
         '<p class="rl-feed-skills__empty">Пока нет навыков в ленте — дождитесь заказов из бота</p>';
       return;
     }
-    skillsEl.innerHTML = state.catalog
+    container.innerHTML = state.catalog
       .map(function (row) {
         var tag = row.tag || "";
-        var active = state.tags.indexOf(tag) >= 0;
+        var active = state.draftTags.indexOf(tag) >= 0;
         return (
           '<button type="button" class="rl-feed-chip rl-feed-skill' +
           (active ? " is-active" : "") +
@@ -250,28 +368,43 @@
         );
       })
       .join("");
-    skillsEl.querySelectorAll(".rl-feed-skill").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var tag = btn.getAttribute("data-tag");
-        if (!tag) {
-          return;
-        }
-        var next = state.tags.indexOf(tag) >= 0
-          ? state.tags.filter(function (t) {
-              return t !== tag;
-            })
-          : state.tags.concat([tag]);
-        saveTags(next);
-      });
-    });
+    bindSkillButtons(container);
   }
 
-  function saveTags(tags) {
-    if (!cfg.restTags || state.tagsLoading) {
+  function renderSkillsCatalog() {
+    updateSkillsBadge();
+    updateSkillsDraftUi();
+    renderSkillsInto(skillsEl);
+    var sheet = document.getElementById("rl-feed-sheet");
+    var sheetBody = document.getElementById("rl-feed-sheet-body");
+    if (sheet && !sheet.hidden && sheetBody) {
+      var sheetSkills = sheetBody.querySelector(".rl-feed-skills");
+      if (sheetSkills) {
+        renderSkillsInto(sheetSkills);
+      }
+    }
+  }
+
+  function setSortMatch() {
+    if (!sidebar || !state.appliedTags.length) {
       return;
     }
+    var sortInp = sidebar.querySelector('input[name="sort"][value="match"]');
+    if (sortInp) {
+      sortInp.checked = true;
+      state.sort = "match";
+      syncChips();
+    }
+  }
+
+  function persistTags(tags, options) {
+    options = options || {};
+    if (!cfg.restTags || state.tagsLoading) {
+      return Promise.resolve();
+    }
     state.tagsLoading = true;
-    fetch(cfg.restTags, {
+    updateSkillsDraftUi();
+    return fetch(cfg.restTags, {
       method: "PUT",
       credentials: "same-origin",
       headers: {
@@ -287,17 +420,31 @@
         return res.json();
       })
       .then(function (data) {
-        state.tags = data.tags || tags;
+        state.appliedTags = data.tags || tags;
+        state.draftTags = cloneTags(state.appliedTags);
+        if (options.setSortMatch) {
+          setSortMatch();
+        }
         renderSkillsCatalog();
         readFilters();
-        resetAndLoad();
+        if (options.reload !== false) {
+          resetAndLoad();
+        }
       })
       .catch(function () {
         showError("Не удалось сохранить навыки.");
       })
       .finally(function () {
         state.tagsLoading = false;
+        updateSkillsDraftUi();
       });
+  }
+
+  function applyDraftTags() {
+    if (tagsEqual(state.draftTags, state.appliedTags)) {
+      return;
+    }
+    persistTags(cloneTags(state.draftTags), { setSortMatch: true, reload: true });
   }
 
   function loadTags() {
@@ -309,10 +456,12 @@
         return res.ok ? res.json() : { tags: [] };
       })
       .then(function (data) {
-        state.tags = data.tags || [];
+        state.appliedTags = data.tags || [];
+        state.draftTags = cloneTags(state.appliedTags);
       })
       .catch(function () {
-        state.tags = [];
+        state.appliedTags = [];
+        state.draftTags = [];
       });
   }
 
@@ -369,8 +518,8 @@
       min_score: state.minScore,
       sort: state.sort,
     };
-    if (state.tags.length) {
-      params.skills = state.tags.join(",");
+    if (state.appliedTags.length) {
+      params.skills = state.appliedTags.join(",");
     }
     var url = apiUrl(params);
 
@@ -410,9 +559,8 @@
         updateCount();
         bindCards();
         requestAnimationFrame(function () {
-          document.querySelectorAll(".rl-feed-card .rl-match__fill").forEach(function (el) {
-            el.closest(".rl-match__bar");
-            var card = el.closest(".rl-feed-card");
+          document.querySelectorAll(".rl-feed-list .rl-lead-card .rl-match__fill").forEach(function (el) {
+            var card = el.closest(".rl-lead-card");
             if (card) {
               card.classList.add("rl-match-ready");
             }
@@ -431,7 +579,7 @@
   }
 
   function bindCards() {
-    listEl.querySelectorAll(".rl-feed-card").forEach(function (card) {
+    listEl.querySelectorAll(".rl-lead-card").forEach(function (card) {
       if (card.dataset.bound) {
         return;
       }
@@ -442,7 +590,7 @@
           state.expandedId = null;
           card.classList.remove("is-expanded");
         } else {
-          listEl.querySelectorAll(".rl-feed-card.is-expanded").forEach(function (c) {
+          listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
             c.classList.remove("is-expanded");
           });
           state.expandedId = id;
@@ -458,6 +606,42 @@
     });
   }
 
+  function bindWheelScroll(el) {
+    if (!el || el.dataset.wheelBound === "1") {
+      return;
+    }
+    el.dataset.wheelBound = "1";
+    el.addEventListener(
+      "wheel",
+      function (e) {
+        if (el.scrollHeight <= el.clientHeight) {
+          return;
+        }
+        e.preventDefault();
+        el.scrollTop += e.deltaY;
+      },
+      { passive: false }
+    );
+  }
+
+  function bindSkillsPanels(root) {
+    if (!root) {
+      return;
+    }
+    var panel = root.querySelector("#rl-feed-skills-panel");
+    if (panel) {
+      bindWheelScroll(panel);
+    }
+    root.querySelectorAll(".rl-feed-skills-dd__panel").forEach(bindWheelScroll);
+  }
+
+  bindWheelScroll(sidebarScroll || sidebar);
+  bindSkillsPanels(sidebar || document);
+
+  if (skillsApplyBtn) {
+    skillsApplyBtn.addEventListener("click", applyDraftTags);
+  }
+
   if (sidebar) {
     sidebar.addEventListener("change", function () {
       syncChips();
@@ -469,7 +653,9 @@
         sidebar.querySelector('input[name="source"][value=""]').checked = true;
         sidebar.querySelector('input[name="min_score"][value="0"]').checked = true;
         sidebar.querySelector('input[name="sort"][value="time"]').checked = true;
-        saveTags([]);
+        state.draftTags = [];
+        syncChips();
+        persistTags([], { reload: true });
       });
     }
   }
@@ -480,7 +666,8 @@
   var openBtn = document.getElementById("rl-feed-filters-open");
   if (sheet && sheetBody && sidebar && openBtn) {
     openBtn.addEventListener("click", function () {
-      sheetBody.innerHTML = sidebar.innerHTML;
+      var scrollBox = sidebar.querySelector(".rl-feed-sidebar__scroll");
+      sheetBody.innerHTML = scrollBox ? scrollBox.innerHTML : sidebar.innerHTML;
       sheet.hidden = false;
       openBtn.setAttribute("aria-expanded", "true");
       sheetBody.querySelectorAll("input").forEach(function (inp) {
@@ -505,6 +692,13 @@
           label.classList.add("is-active");
         });
       });
+      bindSkillButtons(sheetBody.querySelector(".rl-feed-skills"));
+      sheetBody.querySelectorAll(".rl-feed-skills-apply").forEach(function (btn) {
+        btn.addEventListener("click", applyDraftTags);
+      });
+      bindSkillsPanels(sheetBody);
+      updateSkillsBadge();
+      updateSkillsDraftUi();
     });
     document.getElementById("rl-feed-sheet-overlay").addEventListener("click", closeSheet);
     document.getElementById("rl-feed-sheet-apply").addEventListener("click", function () {

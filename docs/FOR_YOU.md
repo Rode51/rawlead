@@ -56,16 +56,19 @@
 ## Твои шаги сейчас
 
 1. ~~MVP скелет WP (`/lenta/` + `/cabinet/`)~~ ✅ принято 2026-05-25
-2. **Dogfood:** отклики по TG-боту (вердикт «Брать»), 1–2 в день
-3. **Проверка § 3g:** перезапусти `uvicorn` (старый процесс не знает `/skills/catalog`) · разово SQL в `RUN.md` §5 · `/lenta/` Ctrl+F5
-4. Ок → **3f** (отклик в кабинете) — скажи Lead
-
-Концепция UI уже в [`design/wp/feed-cabinet-mvp.md`](design/wp/feed-cabinet-mvp.md) — Lead Design ✅
+2. **Приёмка волны 2 (~5 мин):** `scripts/wp_install_rawlead_theme.py` → открыть `http://radarzakaz.local/`
+   - nav без «Главная»; hero «Смотреть ленту» + «Смотреть тарифы ↓» → скролл к тарифу
+   - «Для кого» — 3 ниши (не только IT); `/how/`, `/faq/` — новые тексты (если старые: WP → Плагины → выкл/вкл **RawLead Landing** или `python scripts/wp_skeleton_setup.py`)
+   - ок → напиши Lead **«W2 принято»**
+3. **Dogfood:** отклики по боту, 1–2 в день
+4. **§ 3j** у `@coder`: 2 карточки в ряд, wheel в раскрытых «Навыки», пульт (вкладка Статус)
+5. После 3j → **3f** ИИ-агент
 
 С понедельника: отклики **по боту** (вердикт «Брать»), 1–2 сильных в день.
 
 | Блокер | Кто |
 |--------|-----|
+| **`/lenta/` не грузится** | **@mechanic** · [`problems/2026-05-25-wp-lenta-feed-not-loading.md`](problems/2026-05-25-wp-lenta-feed-not-loading.md) |
 | pythonw.exe = launcher (2 процесса) | **@mechanic** |
 | TG relay+card | ✅ acc шлют в бот; при сбое — prompt-test · [`problems/2026-05-24-tg-forward-not-via-bot.md`](problems/2026-05-24-tg-forward-not-via-bot.md) |
 

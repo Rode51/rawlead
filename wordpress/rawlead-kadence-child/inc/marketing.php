@@ -44,10 +44,10 @@ function rawlead_is_inner_shell_page(): bool {
 
 function rawlead_inner_page_lead(string $slug): string {
     return match ($slug) {
-        'how'     => __('Пять шагов: от источников до вашего отклика', 'rawlead-kadence-child'),
+        'how'     => __('Пять шагов: от навыков до вашего отклика', 'rawlead-kadence-child'),
         'pricing' => __('Тарифы для соло и команды — оплата скоро', 'rawlead-kadence-child'),
-        'faq'     => __('Коротко о том, как устроен RawLead', 'rawlead-kadence-child'),
-        'contact' => __('Ранний доступ и вопросы — в Telegram', 'rawlead-kadence-child'),
+        'faq'     => __('Коротко о RawLead для любой ниши фриланса', 'rawlead-kadence-child'),
+        'contact' => __('Ранний доступ — Telegram или форма', 'rawlead-kadence-child'),
         'lenta'   => __('Открытый рынок заказов с бирж и Telegram', 'rawlead-kadence-child'),
         'cabinet' => __('Персональная лента по вашим тегам — скоро', 'rawlead-kadence-child'),
         default   => '',

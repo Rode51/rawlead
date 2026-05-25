@@ -21,27 +21,46 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 
 - [x] Принять vision v0.9 · `ROADMAP` · `LEAD_DESIGN_PROMPT` · ревизия docs 2026-05-24
 - [x] Уборка docs: `PROJECT_MAP` § агентам, `ARCHITECTURE`/`TZ_API`/`SOURCES_POOLS`, архив SOURCES_SAAS, без дублей в корне `docs/`
+- [x] Волна 2: приёмка Lead Design → очередь Product
+- [ ] После копирайта Product — `CODER_PROMPT` § волна 2
 - [ ] После **3b** — дочистить `NEON_SCHEMA.md` (полная схема users/tags)
 - [ ] После MVP — `PORTFOLIO.md` под ставку B
 
 ---
 
-## Lead → Coder (одна активная линия)
+## Волна 2 — лендинг UX + тексты (**→ @coder**)
 
-**Промпт:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md)
+**Порядок:** Design ✅ · Product ✅ · Architect ✅ · **Coder**
+
+| Шаг | Кто | Статус |
+|-----|-----|--------|
+| 0–2 | Владелец · Lead Design · Lead Product | ✅ 2026-05-25 |
+| 3 | **@lead-architect** → `CODER_PROMPT` § W2 | ✅ |
+| 4 | **@coder** § W2 | ✅ Coder 2026-05-25 · приёмка владельцем ⏳ |
+| 4b | **@coder** § 3h | ✅ |
+| 4c | **@coder** § 3i | ✅ |
+| 4d | **@coder** § 3j | ✅ Lead задеплоил тему 2026-05-25 |
+| 5 | Ingest 25 источников (PDF) | 📋 [`docs/archive/INGEST_SOURCES_SNG_25.json`](../archive/INGEST_SOURCES_SNG_25.json) · очередь P1 сайты → Coder 3i |
+
+### Бриф владельца (2026-05-25)
+
+- **«Смотреть тарифы»** — не на `/pricing`, а **автоскролл** к блоку тарифов внизу главной (`#тариф` / `pricing-preview`).
+- **Навигация:** возможно убрать пункт **«Главная»** (логотип RawLead → home).
+- **Главная:** возможно явная кнопка **«Лента»** → `/lenta/` — решение Design.
+- **§ 3h** (карточки ленты = как на главной, multi-навыки) — **после** волны 2 или параллельно после Design OK.
+
+---
+
+## Lead → Coder
+
+**Промпт:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) — **§ W2** (старт) · **§ 3h** после W2
 
 | # | Трек | Статус |
 |---|------|--------|
-| 0 | Mechanic: дубли python, radar_control+psutil | ⏳ тикеты § I/K |
-| 1 | TG § M — только если сбой relay+card | по тикету |
-| 1b | **§ P** пульт: логи / лампа TG / статус acc | ✅ принято владельцем 2026-05-25 |
-| 2 | **3b** Neon SaaS-ready | ✅ Lead 2026-05-25 |
-| 3 | **3c** REST API | ✅ Lead 2026-05-25 |
-| 4 | **3d** WP `/feed` + `/cabinet` | внутри активного `CODER_PROMPT` (после § W) |
-| 5 | 3e Habr Career | очередь |
-| 6 | 3f ИИ-агент | очередь |
-
-**Снято с очереди:** `contour` owner/saas · демо `/cabinet` JSON (§ B старый) · [`SOURCES_SAAS.md`](../archive/SOURCES_SAAS.md) → архив
+| … | § 3g | ✅ `54ba7d5` |
+| … | **§ W2** лендинг | ✅ Coder · ⏳ владелец |
+| … | **§ 3j** 2 колонки + wheel + пульт | **→ @coder** |
+| … | 3f ИИ-агент | после W2+3h |
 
 ---
 
@@ -56,8 +75,12 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 | 3 | § W в коде | ✅ Lead 2026-05-25 |
 | 4 | **3d** `/lenta` + каркас `/cabinet` | ✅ |
 | 5 | **3e** ЛК | ✅ принято владельцем 2026-05-25 |
-| 6 | **§ 3g** лента: бот-only + навыки + sort | **→ @coder** · [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) |
-| 7 | 3f ИИ-агент (отклик, цена) | после 3g |
+| 6 | **§ 3g** лента | ✅ commit `54ba7d5` |
+| 7 | Лента WP load | ✅ отбой |
+| 8 | **Волна 2** UX | ✅ Lead Designer · `REFERENCE` §3 |
+| 9 | **Волна 2** копирайт | ✅ Lead Product |
+| 10 | **§ W2** в коде | ✅ |
+| 11 | **§ 3h** в коде | ✅ |
 
 ---
 
@@ -65,3 +88,4 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 
 - `/uslugi`, FL витрина, Habr-кейс, биллинг, multi-user, TG Login
 - WooCommerce · VK/Avito ingest
+- **3i** парсеры сайтов-агрегаторов · **3j** площадки напрямую · **3k** скрыть TG raw из `/lenta/` — `PRODUCT_VISION.md` §0h v2

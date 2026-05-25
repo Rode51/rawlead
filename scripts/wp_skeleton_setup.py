@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PLUGIN_SRC = ROOT / "wordpress" / "rawlead-landing"
-SKELETON = ROOT / "docs" / "ops" / "wp-skeleton"
+SKELETON = ROOT / "docs" / "archive" / "wp-skeleton"
 CONTENT_OUT = PLUGIN_SRC / "content"
 
 LOCAL_SITE = Path.home() / "Local Sites" / "radarzakaz" / "app" / "public"

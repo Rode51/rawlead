@@ -438,6 +438,34 @@
 
 
 
+  function renderTagChips(leadTags) {
+
+    var tags = leadTags || [];
+
+    var max = 4;
+
+    var html = [];
+
+    var i;
+
+    for (i = 0; i < tags.length && i < max; i++) {
+
+      html.push('<span class="rl-chip">' + escapeHtml(tags[i]) + "</span>");
+
+    }
+
+    if (tags.length > max) {
+
+      html.push('<span class="rl-chip rl-chip--more">+' + (tags.length - max) + "</span>");
+
+    }
+
+    return html.join("");
+
+  }
+
+
+
   function renderCard(item) {
 
     var src = sourceLabel(item.source);
@@ -446,35 +474,17 @@
 
     var chip = verdictChip(item.ai_score, item.ai_verdict);
 
-    var tags = (item.lead_tags || [])
-
-      .map(function (t) {
-
-        return '<span class="rl-feed-card__tag">#' + escapeHtml(t) + "</span>";
-
-      })
-
-      .join("");
-
     var reasons = (item.ai_reasons || []).join(". ");
 
     var budget = item.budget_text || "—";
 
     var expanded = state.expandedId === item.id;
 
-    var km =
-
-      item.keyword_match != null
-
-        ? '<span class="rl-feed-card__km">Теги: ' + item.keyword_match + "%</span>"
-
-        : "";
-
 
 
     return (
 
-      '<article class="rl-feed-card' +
+      '<article class="rl-lead-card' +
 
       (expanded ? " is-expanded" : "") +
 
@@ -504,25 +514,37 @@
 
       "</div>" +
 
-      '<h3 class="rl-feed-card__title">' +
+      '<h3 class="rl-lead-card__title">' +
 
       escapeHtml(item.title || "Без названия") +
 
       "</h3>" +
 
-      '<p class="rl-feed-card__budget">Бюджет: ' +
+      '<p class="rl-lead-card__budget">Бюджет: ' +
 
       escapeHtml(budget) +
 
       "</p>" +
 
-      '<div class="rl-feed-card__match">' +
+      '<div class="rl-match">' +
+
+      '<div class="rl-match__label">' +
+
+      "<span>Совместимость</span>" +
+
+      "<span><strong>" +
+
+      rank +
+
+      "%</strong></span>" +
+
+      "</div>" +
 
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
 
       rank +
 
-      '">' +
+      '" aria-valuemin="0" aria-valuemax="100">' +
 
       '<span class="rl-match__fill" style="--match-value:' +
 
@@ -532,17 +554,11 @@
 
       "</div>" +
 
-      '<span class="rl-feed-card__pct">' +
+      "</div>" +
 
-      rank +
+      '<div class="rl-chips">' +
 
-      "%</span>" +
-
-      '<span class="rl-feed-card__match-label">Совместимость</span>' +
-
-      km +
-
-      '<span class="rl-feed-card__ai rl-feed-card__ai--' +
+      '<span class="rl-chip rl-chip--' +
 
       chip.cls +
 
@@ -552,11 +568,7 @@
 
       "</span>" +
 
-      "</div>" +
-
-      '<div class="rl-feed-card__tags">' +
-
-      tags +
+      renderTagChips(item.lead_tags) +
 
       "</div>" +
 
@@ -864,9 +876,9 @@
 
         requestAnimationFrame(function () {
 
-          document.querySelectorAll(".rl-feed-card .rl-match__fill").forEach(function (el) {
+          document.querySelectorAll("#rl-cabinet-list .rl-lead-card .rl-match__fill").forEach(function (el) {
 
-            var card = el.closest(".rl-feed-card");
+            var card = el.closest(".rl-lead-card");
 
             if (card) {
 
@@ -910,7 +922,7 @@
 
     }
 
-    listEl.querySelectorAll(".rl-feed-card").forEach(function (card) {
+    listEl.querySelectorAll(".rl-lead-card").forEach(function (card) {
 
       if (card.dataset.bound) {
 
@@ -938,7 +950,7 @@
 
         } else {
 
-          listEl.querySelectorAll(".rl-feed-card.is-expanded").forEach(function (c) {
+          listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
 
             c.classList.remove("is-expanded");
 

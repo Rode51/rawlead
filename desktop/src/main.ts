@@ -384,6 +384,39 @@ function trimLogText(text: string): string {
   return `… (последние ${MAX_LOG_CHARS} символов)\n${text.slice(-MAX_LOG_CHARS)}`;
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderStatusHtml(text: string): string {
+  return text.split(/\r?\n/).map((line) => {
+    if (!line.trim()) {
+      return '<div class="status-line status-line--blank"></div>';
+    }
+    const colon = line.indexOf(":");
+    if (colon > 0 && colon < 56) {
+      const key = line.slice(0, colon).trim();
+      const value = line.slice(colon + 1).trimStart();
+      const indent = line.startsWith("  ") ? " status-line--indent" : "";
+      return (
+        `<div class="status-line${indent}">` +
+        `<span class="status-line__key">${escapeHtml(key)}</span>` +
+        `<span class="status-line__value">${escapeHtml(value)}</span>` +
+        `</div>`
+      );
+    }
+    return (
+      `<div class="status-line status-line--full">` +
+      `<span class="status-line__value">${escapeHtml(line)}</span>` +
+      `</div>`
+    );
+  }).join("");
+}
+
 async function refreshActiveLog(): Promise<void> {
   if (!logsOpen || logsCollapsed || pollPaused) return;
   const follow = logFollowBottom;
@@ -391,7 +424,7 @@ async function refreshActiveLog(): Promise<void> {
   try {
     if (activeTab === "status") {
       const text = trimLogText(await apiGet<string>("/status-text"));
-      logView.textContent = text;
+      logView.innerHTML = renderStatusHtml(text);
       logView.classList.add("log-view--status");
     } else {
       const text = trimLogText(await apiGet<string>(`/logs/${activeTab}`));

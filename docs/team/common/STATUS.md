@@ -1,6 +1,6 @@
 # STATUS
 
-**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.9** (ставка B) · roadmap: [`ROADMAP.md`](../architect/ROADMAP.md) · владелец: [`../FOR_YOU.md`](../FOR_YOU.md)
+**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.9.3** (все фрилансеры, не только IT) · [`ROADMAP.md`](../architect/ROADMAP.md)
 
 ---
 
@@ -8,15 +8,88 @@
 
 | Трек | Статус |
 |------|--------|
-| **Product v0.9** | ✅ принято Lead Architect |
+| **Product v0.9.2** | ✅ §0h v2: агрегаторы + большая база; TG raw не в ленту |
 | **Docs / ROADMAP** | ✅ синхронизированы под ставку B |
 | **TG dogfood** | ✅ /start acc авто при подключении · acc шлют в бот (владелец 2026-05-25) · дубли python — Mechanic |
 | **Lead Design** | ✅ концепция + спека · [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) |
 | **Designer** | ✅ § W в коде (Lead 2026-05-25) — лендинг + пульт CSS |
 | **Coder** | ✅ § W · 3d · **3e** — **принято владельцем 2026-05-25** |
 | **MVP скелет WP** | ✅ `/lenta/` + `/cabinet/` + меню «Кабинет» |
-| **Coder § 3g** | ✅ Lead 2026-05-25 · лента = бот-only + навыки + sort · **→ приёмка владельца** |
+| **Coder § 3g** | ✅ commit `54ba7d5` |
+| **WP `/lenta/`** | ✅ грузится |
+| **Волна 2** Product | ✅ канон в `LEAD_PRODUCT_PROMPT` + `wp-skeleton` |
+| **Coder § W2** | ✅ в репо · **приёмка владельцем** ⏳ (~5 мин) |
+| **Coder § 3h** | ✅ чипы как главная |
+| **Coder § 3i** | ✅ |
+| **Coder § 3j** | ✅ |
 | **WP `/cabinet` demo JSON** | ❌ снято (3e — живой API) |
+
+### Сделано (Coder § 3j, 2026-05-25)
+
+| § | Что |
+|---|-----|
+| 3j1 | `/lenta/`: `#rl-feed-list` — grid 2×420px, центр, max ~880px; &lt;768px — 1 колонка; empty/end на всю ширину |
+| 3j2 | `bindWheelScroll`: `scrollTop += deltaY`; `bindSkillsPanels` — desktop + mobile sheet после открытия |
+| 3j3 | Пульт вкладка «Статус»: строки `/status-text` → `.status-line` key/value; `lamp-pulse` без изменений |
+
+**Файлы:** `rawlead.css`, `rawlead-feed.js`, `desktop/src/main.ts`, `desktop/src/styles/pult.css`
+
+**Как проверить:**
+1. ~~`wp_install_rawlead_theme.py`~~ ✅ Lead 2026-05-25
+2. `uvicorn src.api_server:app --port 18766` + Ctrl+F5 `http://radarzakaz.local/lenta/` — desktop 2 карточки в ряд
+3. Раскрыть «Навыки», колесо над списком — скролл внутри панели (mobile sheet — то же)
+4. Пульт: `npm run tauri dev` в `desktop/` — running → pulse лампы; вкладка «Статус» — строки с ключом слева
+
+### Сделано (Coder § 3i, 2026-05-25)
+
+| § | Что |
+|---|-----|
+| 3i1 | `.rl-feed-list` — колонка по центру; карточки/skeleton `max-width: 420px` как flow.php |
+| 3i2 | `draftTags` / `appliedTags`; клик — только черновик; «Применить» → `PUT /v1/me/tags` → `sort=match` → перезагрузка ленты; badge = applied |
+| 3i3 | Панель навыков: wheel-scroll + тонкий scrollbar при hover |
+
+**Файлы:** `wordpress/rawlead-kadence-child/page-lenta.php`, `assets/js/rawlead-feed.js`, `assets/css/rawlead.css`
+
+**Как проверить:**
+1. ~~`wp_install_rawlead_theme.py`~~ ✅ Lead 2026-05-25
+2. `uvicorn src.api_server:app --port 18766`
+3. `http://radarzakaz.local/lenta/` — Ctrl+F5: карточки узкие по центру (~420px)
+4. Выбрать 2–3 навыка без перезагрузки → «Применить» → лента «Совместимость», порядок меняется
+5. Навести на список навыков, колесо — скролл внутри блока
+
+### Сделано (Coder § 3h, 2026-05-25)
+
+| § | Что |
+|---|-----|
+| 3h1 | `/lenta/` + `/cabinet/`: карточки `.rl-lead-card` как на главной (flow.php); `.rl-match` 10px; `.rl-chips` — вердикт + до 4 тегов + «+N» |
+| 3h2 | CSS: чипы `flex: 0 0 auto`, без растягивания; лента/кабинет — полная ширина карточки с жирной рамкой |
+
+**Файлы:** `wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js`, `rawlead-cabinet.js`, `assets/css/rawlead.css`
+
+**Как проверить:**
+1. ~~`wp_install_rawlead_theme.py`~~ ✅ Lead 2026-05-25
+2. `uvicorn src.api_server:app --port 18766`
+3. `http://radarzakaz.local/lenta/` — Ctrl+F5: карточки как блок лида на главной; теги — маленькие pills в ряд, не на всю ширину
+4. 2–3 навыка в sidebar → подпись «Совместимость», % и порядок меняются
+5. `http://radarzakaz.local/cabinet/` — те же чипы на карточках
+
+### Сделано (Coder § W2, 2026-05-25)
+
+| § | Что |
+|---|-----|
+| W2.1 | Nav без «Главная»; hero: лента + `#pricing-preview`; CTA «Попробовать» → `/lenta/` |
+| W2.2 | flow/manifest/features/audience — канон Product (все ниши, не IT-only) |
+| W2.3 | `#pricing-preview`: ИИ-агент, 5 пунктов, «Узнать первым →» |
+| W2.4 | Inner HTML how/faq/contact/pricing из `docs/archive/wp-skeleton/`; `wp_skeleton_setup.py` путь |
+| W2.5 | inner hero leads в `marketing.php` |
+
+**Файлы:** `wordpress/rawlead-kadence-child/template-parts/rawlead/` (header, hero, flow, manifest, features, audience, pricing-preview), `inc/marketing.php`, `assets/css/rawlead.css`, `wordpress/rawlead-landing/content/*.html`, `scripts/wp_skeleton_setup.py`
+
+**Как проверить:**
+1. `http://radarzakaz.local/` — nav: Лента…Кабинет, без «Главная»; hero «Смотреть ленту» + «Смотреть тарифы ↓» → скролл к тарифу
+2. Манифест, 01–03, «Для кого» — новые тексты; тариф «ИИ-агент», «Узнать первым →»
+3. `/how/`, `/faq/`, `/contact/` — навыки, облако, нетехнические ниши (если старый контент — деактивировать/активировать плагин RawLead Landing или `python scripts/wp_skeleton_setup.py`)
+4. `scripts/wp_install_rawlead_theme.py` или refresh темы — child на месте
 
 ### Сделано (Coder § 3g, 2026-05-25)
 

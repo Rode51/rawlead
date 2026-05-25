@@ -493,7 +493,51 @@ body {
 .log-view--status {
   color: var(--color-text-body);
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.status-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 2px 0;
+  min-height: 1.25em;
+}
+
+.status-line--blank {
+  min-height: 0.35rem;
+  padding: 0;
+}
+
+.status-line--full .status-line__value {
+  flex: 1;
+  font-weight: 600;
+}
+
+.status-line--indent .status-line__key {
+  min-width: 5.5rem;
+}
+
+.status-line__key {
+  flex: 0 0 auto;
+  min-width: 7rem;
+  max-width: 42%;
+  text-align: right;
+  padding-right: 0.35rem;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.status-line__value {
+  flex: 1;
+  min-width: 0;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .app__footer {

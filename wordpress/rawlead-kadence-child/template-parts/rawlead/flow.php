@@ -46,6 +46,6 @@ declare(strict_types=1);
 				<a class="rl-btn rl-btn--ghost" href="<?php echo esc_url(rawlead_page_url('how')); ?>"><?php esc_html_e('Откликнуться сами', 'rawlead-kadence-child'); ?></a>
 			</article>
 		</div>
-		<p class="rl-flow__caption"><?php esc_html_e('Биржи и чаты в одном потоке', 'rawlead-kadence-child'); ?></p>
+		<p class="rl-flow__caption"><?php esc_html_e('Биржи и чаты — в одном потоке.', 'rawlead-kadence-child'); ?></p>
 	</div>
 </section>
