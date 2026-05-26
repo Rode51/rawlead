@@ -15,10 +15,12 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 | V0.4 | § V10.5 + P7 + backfill | ✅ 2026-05-26 |
 | — | Хостинг / allowlist TG | ⏳ после V10 |
 
-## Lead → Coder (активно)
+## Lead → Design / Coder (активно)
 
 | # | § | Статус |
 |---|-----|--------|
+| 0 | **P1.3d / D1 / P4** | ✅ принято 2026-05-26 |
+| 0b | **P5** деплой | ⏸ до «едем на прод» · владелец: `.env` 3 биржи + Neon SQL P4 |
 | 1 | **V10.1–V10.4** | **→ @coder** |
 | 2 | P7 category Neon | после V10 |
 | 3 | P5 деплой | потом |

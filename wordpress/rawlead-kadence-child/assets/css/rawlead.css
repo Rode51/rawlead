@@ -1542,6 +1542,96 @@ body.page-contact .rl-prose > h2:first-of-type + p strong {
   margin-bottom: 0.5rem;
 }
 
+/* Кабинет: до входа — только плашка, без фильтров/ленты (Kadence ломает [hidden]) */
+.rl-app--cabinet.rl-cabinet--gate #rl-cabinet-app,
+.rl-app--cabinet.rl-cabinet--gate .rl-cabinet-app {
+  display: none !important;
+}
+
+.rl-app--cabinet.rl-cabinet--logged-in #rl-cabinet-login {
+  display: none !important;
+}
+
+.rl-app--cabinet.rl-cabinet--logged-in.rl-cabinet--gate #rl-cabinet-app,
+.rl-app--cabinet.rl-cabinet--logged-in.rl-cabinet--gate .rl-cabinet-app {
+  display: flex !important;
+}
+
+.rl-cabinet-login {
+  display: flex;
+  justify-content: center;
+  padding: 3rem 1rem 4rem;
+}
+
+.rl-cabinet-login__direct {
+  margin: 1.25rem 0 0;
+}
+
+.rl-cabinet-login__card {
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  border: 2px solid var(--rl-border);
+  border-radius: var(--rl-radius-card, 16px);
+}
+
+.rl-cabinet-login__title {
+  margin: 0 0 0.75rem;
+  font-family: var(--rl-font-display, inherit);
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.rl-cabinet-login__lead {
+  margin: 0 0 1.5rem;
+  color: var(--rl-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.rl-cabinet-login__widget {
+  display: flex;
+  justify-content: center;
+  min-height: 48px;
+}
+
+.rl-cabinet-login__hint {
+  margin: 1rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--rl-text-muted);
+}
+
+.rl-feed-filter--category {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.rl-feed-filter--category legend {
+  flex: 0 0 100%;
+}
+
+.rl-feed-filter--category .rl-feed-chip {
+  display: inline-flex;
+  margin: 0;
+}
+
+.rl-feed-chip__label--short {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .rl-feed-filter--category .rl-feed-chip__label--full {
+    display: none;
+  }
+
+  .rl-feed-filter--category .rl-feed-chip__label--short {
+    display: inline;
+  }
+}
+
 .rl-feed-chip {
   display: block;
   margin: 0.35rem 0;

@@ -22,6 +22,218 @@
 
   var cfg = window.rawleadCabinet;
 
+  var TOKEN_KEY = "rawlead_access_token";
+
+  var loginEl = document.getElementById("rl-cabinet-login");
+
+  var appEl = document.getElementById("rl-cabinet-app");
+
+  var loginHintEl = document.getElementById("rl-cabinet-login-hint");
+
+  function getToken() {
+
+    return localStorage.getItem(TOKEN_KEY) || "";
+
+  }
+
+  function setToken(token) {
+
+    if (token) {
+
+      localStorage.setItem(TOKEN_KEY, token);
+
+    } else {
+
+      localStorage.removeItem(TOKEN_KEY);
+
+    }
+
+  }
+
+  function authHeaders() {
+
+    var h = { "X-WP-Nonce": cfg.nonce || "" };
+
+    var t = getToken();
+
+    if (t) {
+
+      h.Authorization = "Bearer " + t;
+
+    }
+
+    return h;
+
+  }
+
+  function setGate(loggedIn) {
+
+    if (root) {
+
+      root.classList.toggle("rl-cabinet--logged-in", loggedIn);
+
+      root.classList.toggle("rl-cabinet--gate", !loggedIn);
+
+    }
+
+  }
+
+  function showLogin() {
+
+    setGate(false);
+
+    if (appEl) {
+
+      appEl.hidden = true;
+
+    }
+
+    if (loginEl) {
+
+      loginEl.hidden = false;
+
+    }
+
+  }
+
+  function showApp() {
+
+    setGate(true);
+
+    if (loginEl) {
+
+      loginEl.hidden = true;
+
+    }
+
+    if (appEl) {
+
+      appEl.hidden = false;
+
+    }
+
+  }
+
+  function mountTelegramWidget() {
+
+    var box = document.getElementById("rl-telegram-login-widget");
+
+    if (!box) {
+
+      return;
+
+    }
+
+    box.innerHTML = "";
+
+    if (location.hostname !== "127.0.0.1") {
+
+      if (loginHintEl) {
+
+        loginHintEl.hidden = false;
+
+        loginHintEl.textContent =
+
+          "Кнопка Telegram только на http://127.0.0.1:" +
+
+          (cfg.localPort || "10007") +
+
+          "/cabinet/ — нажмите ссылку ниже.";
+
+      }
+
+    }
+
+    if (!cfg.tgBotUsername) {
+
+      if (loginHintEl) {
+
+        loginHintEl.hidden = false;
+
+        loginHintEl.textContent =
+
+          "Добавьте в wp-config.php: define('RAWLEAD_TG_BOT_USERNAME', 'FLPARSINGBOT');";
+
+      }
+
+      return;
+
+    }
+
+    var script = document.createElement("script");
+
+    script.async = true;
+
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+
+    script.setAttribute("data-telegram-login", cfg.tgBotUsername);
+
+    script.setAttribute("data-size", "large");
+
+    script.setAttribute("data-onauth", "onTelegramAuth(user)");
+
+    script.setAttribute("data-request-access", "write");
+
+    box.appendChild(script);
+
+  }
+
+  window.onTelegramAuth = function (user) {
+
+    fetch(cfg.restAuth, {
+
+      method: "POST",
+
+      credentials: "same-origin",
+
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+
+      body: JSON.stringify(user),
+
+    })
+
+      .then(function (res) {
+
+        if (!res.ok) {
+
+          throw new Error("HTTP " + res.status);
+
+        }
+
+        return res.json();
+
+      })
+
+      .then(function (data) {
+
+        if (!data.access_token) {
+
+          throw new Error("no token");
+
+        }
+
+        setToken(data.access_token);
+
+        showApp();
+
+        bootCabinet();
+
+      })
+
+      .catch(function () {
+
+        if (loginHintEl) {
+
+          loginHintEl.hidden = false;
+
+          loginHintEl.textContent = "Не удалось войти. Попробуйте снова.";
+
+        }
+
+      });
+
+  };
+
   var tagsEl = document.getElementById("rl-cabinet-tags");
 
   var tagsHint = document.getElementById("rl-cabinet-tags-hint");
@@ -57,6 +269,8 @@
     minScore: 0,
 
     source: "",
+
+    category: "",
 
     loading: false,
 
@@ -538,13 +752,13 @@
 
       credentials: "same-origin",
 
-      headers: {
+      headers: Object.assign(
 
-        "Content-Type": "application/json",
+        { "Content-Type": "application/json" },
 
-        "X-WP-Nonce": cfg.nonce || "",
+        authHeaders()
 
-      },
+      ),
 
       body: JSON.stringify({ tags: tags }),
 
@@ -596,7 +810,7 @@
 
   function loadTags() {
 
-    return fetch(cfg.restTags, { credentials: "same-origin" })
+    return fetch(cfg.restTags, { credentials: "same-origin", headers: authHeaders() })
 
       .then(function (res) {
 
@@ -834,13 +1048,17 @@
 
     var src = sidebar.querySelector('input[name="source"]:checked');
 
+    var cat = sidebar.querySelector('input[name="category"]:checked');
+
     var score = sidebar.querySelector('input[name="min_score"]:checked');
 
     state.source = src ? src.value : "";
 
+    state.category = cat ? cat.value : "";
+
     state.minScore = score ? parseInt(score.value, 10) || 0 : 0;
 
-    var dirty = state.source !== "" || state.minScore !== 0;
+    var dirty = state.source !== "" || state.category !== "" || state.minScore !== 0;
 
     if (resetBtn) {
 
@@ -938,7 +1156,7 @@
 
     state.loading = true;
 
-    var url = apiUrl(cfg.restFeed, {
+    var params = {
 
       limit: state.limit,
 
@@ -946,11 +1164,19 @@
 
       min_score: state.minScore,
 
-    });
+    };
+
+    if (state.category) {
+
+      params.category = state.category;
+
+    }
+
+    var url = apiUrl(cfg.restFeed, params);
 
 
 
-    fetch(url, { credentials: "same-origin" })
+    fetch(url, { credentials: "same-origin", headers: authHeaders() })
 
       .then(function (res) {
 
@@ -1162,6 +1388,8 @@
 
         sidebar.querySelector('input[name="source"][value=""]').checked = true;
 
+        sidebar.querySelector('input[name="category"][value=""]').checked = true;
+
         sidebar.querySelector('input[name="min_score"][value="0"]').checked = true;
 
         syncChips();
@@ -1290,21 +1518,73 @@
 
 
 
-  syncChips();
+  function bootCabinet() {
 
-  readFilters();
+    syncChips();
 
-  loadTags()
+    readFilters();
 
-    .then(function () {
+    loadTags()
 
-      resetAndLoad();
+      .then(function () {
+
+        resetAndLoad();
+
+      })
+
+      .catch(function () {
+
+        showError("Не удалось загрузить теги.");
+
+      });
+
+  }
+
+  function startLoggedOut() {
+
+    setToken("");
+
+    showLogin();
+
+    mountTelegramWidget();
+
+  }
+
+  function startLoggedIn() {
+
+    showApp();
+
+    bootCabinet();
+
+  }
+
+  if (!getToken()) {
+
+    startLoggedOut();
+
+    return;
+
+  }
+
+  fetch(cfg.restTags, { credentials: "same-origin", headers: authHeaders() })
+
+    .then(function (res) {
+
+      if (res.ok) {
+
+        startLoggedIn();
+
+        return;
+
+      }
+
+      startLoggedOut();
 
     })
 
     .catch(function () {
 
-      showError("Не удалось загрузить теги.");
+      startLoggedOut();
 
     });
 

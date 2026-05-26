@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_SOURCES = ("fl", "kwork")
+_DEFAULT_SOURCES = ("fl", "kwork", "freelancehunt")
 _PUBLIC_FEED_SOURCES_ENV = "PUBLIC_FEED_SOURCES"
 _ALLOWLIST_PATH = _PROJECT_ROOT / "docs" / "ops" / "TG_PUBLIC_FEED_ALLOWLIST.txt"
 _INGEST_TG_A_JSON = _PROJECT_ROOT / "docs" / "archive" / "INGEST_SOURCES_SNG_25.json"
@@ -33,7 +33,7 @@ def _read_nonempty_lines(path: Path) -> list[str]:
 
 @lru_cache(maxsize=1)
 def public_feed_sources() -> frozenset[str]:
-    """Источники в GET /v1/feed и /v1/skills/catalog. Пустой env → fl,kwork."""
+    """Источники в GET /v1/feed и /v1/skills/catalog. Пустой env → fl,kwork,freelancehunt."""
     raw = os.getenv(_PUBLIC_FEED_SOURCES_ENV, "").strip()
     if not raw:
         return frozenset(_DEFAULT_SOURCES)

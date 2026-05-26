@@ -7,6 +7,9 @@
 **Порядок (жёстко):** **P1** → **D1** (после Design) → **P4** → **P5** только после «едем на прод».  
 **⏸ P5** пока ворота не закрыты. **⏸** 25 источников / §3f без ТЗ.
 
+**→ Сейчас @coder:** § **P5** деплой — **только** после фразы владельца «едем на прод».  
+**Архив:** P1.3d · D1 · P4 ✅ принято 2026-05-26.
+
 ---
 
 # § P1 — Чистая публичная лента (**→ старт**)
@@ -17,7 +20,28 @@
 
 Тикет: [`docs/problems/2026-05-26-duplicate-workers-regression.md`](../../problems/2026-05-26-duplicate-workers-regression.md) · факты: [`STATUS.md`](../common/STATUS.md) § P1.H
 
-**Следующий Coder:** § **D1** (после Design), не P1.H.
+**Следующий Coder:** § **P1.3d** (env биржи) → § **D1** (после Design). Не P1.H.
+
+---
+
+# § P1.3d — Только фриланс-биржи в ленте (✅ принято 2026-05-26, архив)
+
+**Решение:** в публичку — **только биржи**; вакансии позже, **код парсеров не удалять**.
+
+| source | Лента | Код |
+|--------|-------|-----|
+| `fl`, `kwork`, `freelancehunt` | ✅ | как сейчас |
+| `vc_ru`, `habr_career` | ⏸ | парсеры в `src/` оставить; **не** вызывать в цикле, если нет в `PUBLIC_FEED_SOURCES` |
+| `habr_freelance` | ❌ | 410, как было |
+
+| # | Готово когда |
+|---|----------------|
+| b1 | Дефолт / пример env: `PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt` |
+| b2 | `run_cycle` / P1.4 лог — строки только для источников из env (3 биржи + итого, не 5) |
+| b3 | Канон: [`PUBLIC_FEED_WEB_SOURCES.txt`](../../ops/PUBLIC_FEED_WEB_SOURCES.txt) |
+| b4 | **Не** удалять модули `vc_ru` / `habr_career` |
+
+**Владелец:** поправить `.env` (Lead не трогает).
 
 ---
 
@@ -147,11 +171,11 @@ CSS: сетка 4 карточки desktop (2×2), mobile 1 col — соглас
 | `freelancehunt` | HTTP 403 антибот | Playwright или прокси домашний IP; ≥1 лид/цикл |
 | `habr_freelance` | HTTP **410** сайт закрыт | **убрать** из `PUBLIC_FEED_WEB_SOURCES.txt` + не вызывать в `main.py` до нового URL |
 
-**Владелец `.env` (строка одна):**  
-`PUBLIC_FEED_SOURCES=fl,kwork,vc_ru,freelancehunt,habr_career`  
-(без `habr_freelance` пока 410)
+**Владелец `.env` (актуально):**  
+`PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt`  
+(см. § **P1.3d** — `vc_ru` / `habr_career` отложены, парсеры в коде)
 
-**Лог:** после цикла в `radar.log` в `ош=` должны быть префиксы `vc_ru:`, `freelancehunt:`, `habr_career:` — не только fl/kwork.
+**Лог P1.4:** строки только для источников из env (см. P1.3d).
 
 ---
 
@@ -244,18 +268,18 @@ CSS: сетка 4 карточки desktop (2×2), mobile 1 col — соглас
 
 ---
 
-# § D1 — Чипы категорий в `/lenta/` (**после Design**)
+# § D1 — Чипы категорий в `/lenta/` (✅ принято 2026-05-26, архив)
 
-**Design:** Lead Design → `feed-cabinet-mvp.md` §2.2 дополнение · 4 чипа: Код / Дизайн / Маркетинг / Тексты (+ «Все»).
+**Спека (принята):** [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) §2.1–2.3 — порядок Источник → **Категория** → Бюджет; Handoff: id `filter-category-*`, `name="category"`, query `?category=`.
 
 | # | Готово когда |
 |---|----------------|
-| d1 | Sidebar + mobile sheet: `fieldset` «Категория» — radio/chips `dev|design|marketing|text` + пусто = все |
-| d2 | JS: `GET /v1/feed?category=…` при смене; сброс offset |
-| d3 | Подписи = `CATEGORY_TITLES` из vision (короткие на mobile) |
-| d4 | «Сбросить фильтры» учитывает category |
+| d1 | Sidebar + mobile sheet по спеке §2.2–2.3 (5 chips, active `#0A0A0A`) |
+| d2 | JS: `GET /v1/feed?category=…`; смена категории → **offset=0**, лента с нуля |
+| d3 | Подписи: desktop полные / mobile короткие (Код · Дизайн · SMM · Тексты) — таблица §2.2 |
+| d4 | «Сбросить фильтры» снимает category; `/cabinet` — те же чипы (спека Handoff) |
 
-**Не в D1:** регистрация (P4).
+**Не в D1:** регистрация (P4). **Перед D1 или параллельно:** § P1.3d.
 
 ---
 
@@ -270,7 +294,7 @@ CSS: сетка 4 карточки desktop (2×2), mobile 1 col — соглас
 
 ---
 
-# § P4 — Кабинет: регистрация через Telegram
+# § P4 — Кабинет: регистрация через Telegram (✅ принято 2026-05-26, архив)
 
 | # | Готово когда |
 |---|----------------|

@@ -58,15 +58,15 @@
 **Канон:** [`team/product/PRODUCT_VISION.md`](team/product/PRODUCT_VISION.md) §0i
 
 1. ~~§ V10 · W2 · V10.5 · P7~~ ✅ 2026-05-26
-2. **До прода** (обязательно): [`team/architect/PRE_PROD_GATE.md`](team/architect/PRE_PROD_GATE.md) — **P1** allowlist → **D1** чипы → **P4** TG-вход
-3. **Парсеры в `.env`:** одна строка  
-   `PUBLIC_FEED_SOURCES=fl,kwork,vc_ru,freelancehunt,habr_career`  
-   (сейчас у тебя только `habr_career` из новых — остальные не вызываются) · перезапуск радара
-4. TG allowlist — уже заполнен Lead (Tier A PDF); **отписывать вручную не надо** — сделает Coder § P1.2b
-5. **Прод** — только после трёх блоков + «едем на прод» · хостинг: [`ops/DEPLOY_BUDGET.md`](ops/DEPLOY_BUDGET.md)
-6. **Логи:** как читать воронку — [`ops/RADAR_LOG.md`](ops/RADAR_LOG.md) · Coder **§ P1.4** (читаемый radar.log + пульт)
+2. ~~P1 · D1 · P4 код~~ ✅ принято 2026-05-26 · ворота до прода закрыты по коду
+3. **`.env` (обязательно сейчас):**  
+   `PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt`  
+   (убери `vc_ru` и `habr_career`) → пульт **Стоп → ▶** или `start-radar.bat`
+4. **Кабинет P4 (один раз):** Neon [`sql/003_users_telegram.sql`](../sql/003_users_telegram.sql) · `pip install -r requirements.txt` · API на `:18766` · в `wp-config.php`: `RAWLEAD_TG_BOT_USERNAME` · [`scripts/open-cabinet-local.bat`](../scripts/open-cabinet-local.bat) или `/cabinet/`
+5. **Прод § P5** — только когда скажешь **«едем на прод»** · [`ops/DEPLOY_BUDGET.md`](ops/DEPLOY_BUDGET.md)
+6. **Логи:** [`ops/RADAR_LOG.md`](ops/RADAR_LOG.md) — после правки env в цикле **3** строки бирж + `Итого`
 
-**С тебя сейчас:** ничего учить не надо. Опционально: 2+ прокси в `.env` перед VPS. Dogfood — ▶ только на ПК, пока радар не на VPS.
+**С тебя сейчас:** пункты 3–4 (10 мин). Dogfood — ▶ на ПК, пока радар не на VPS.
 
 Neon ✅ · dogfood бот — как был.
 

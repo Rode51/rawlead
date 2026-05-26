@@ -225,57 +225,58 @@ def run_cycle(
     tg_poll_state: dict[str, float] = {"last": 0.0}
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
-    stats_fl = summary.ensure("fl")
-    fl_projects = _fetch_source("fl", fetch_listing_projects, cfg, errors, stats_fl)
-    _tg_poll_if_due(cfg, storage, tg_poll_state)
-    if fl_projects is not None:
-        stats_fl.downloaded = len(fl_projects)
-        n, notify = _process_listings(
-            fl_projects,
-            storage,
-            word_filter,
-            cfg,
-            errors=errors,
-            pg=pg,
-            tg_poll_state=tg_poll_state,
-            stats=stats_fl,
-        )
-        stats_fl.new_ids = n
-        stats_fl.to_bot = notify
-        summary.total_to_bot += notify
-    _log_source_line(cfg.radar_log_path, stats_fl)
-
-    _tg_poll_if_due(cfg, storage, tg_poll_state)
-
-    stats_kwork = summary.ensure("kwork")
-    if cfg.kwork_projects_url:
-        kwork_projects = _fetch_source(
-            "kwork", fetch_kwork_listing_projects, cfg, errors, stats_kwork
-        )
-        if kwork_projects is not None:
-            stats_kwork.downloaded = len(kwork_projects)
+    if "fl" in enabled_sources:
+        stats_fl = summary.ensure("fl")
+        fl_projects = _fetch_source("fl", fetch_listing_projects, cfg, errors, stats_fl)
+        _tg_poll_if_due(cfg, storage, tg_poll_state)
+        if fl_projects is not None:
+            stats_fl.downloaded = len(fl_projects)
             n, notify = _process_listings(
-                kwork_projects,
+                fl_projects,
                 storage,
                 word_filter,
                 cfg,
                 errors=errors,
                 pg=pg,
                 tg_poll_state=tg_poll_state,
-                stats=stats_kwork,
+                stats=stats_fl,
             )
-            stats_kwork.new_ids = n
-            stats_kwork.to_bot = notify
+            stats_fl.new_ids = n
+            stats_fl.to_bot = notify
             summary.total_to_bot += notify
-    _log_source_line(cfg.radar_log_path, stats_kwork)
+        _log_source_line(cfg.radar_log_path, stats_fl)
+
+    _tg_poll_if_due(cfg, storage, tg_poll_state)
+
+    if "kwork" in enabled_sources:
+        stats_kwork = summary.ensure("kwork")
+        if cfg.kwork_projects_url:
+            kwork_projects = _fetch_source(
+                "kwork", fetch_kwork_listing_projects, cfg, errors, stats_kwork
+            )
+            if kwork_projects is not None:
+                stats_kwork.downloaded = len(kwork_projects)
+                n, notify = _process_listings(
+                    kwork_projects,
+                    storage,
+                    word_filter,
+                    cfg,
+                    errors=errors,
+                    pg=pg,
+                    tg_poll_state=tg_poll_state,
+                    stats=stats_kwork,
+                )
+                stats_kwork.new_ids = n
+                stats_kwork.to_bot = notify
+                summary.total_to_bot += notify
+        _log_source_line(cfg.radar_log_path, stats_kwork)
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
     for source_label, fetch_fn in _P1_WEB_SOURCES:
-        stats_web = summary.ensure(source_label)
         if source_label not in enabled_sources:
-            _log_source_line(cfg.radar_log_path, stats_web)
             continue
+        stats_web = summary.ensure(source_label)
         _tg_poll_if_due(cfg, storage, tg_poll_state)
         web_projects = _fetch_source(source_label, fetch_fn, cfg, errors, stats_web)
         if web_projects is not None:

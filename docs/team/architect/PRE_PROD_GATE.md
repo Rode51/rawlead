@@ -10,9 +10,9 @@
 
 | # | Блок | Кто | Готово когда |
 |---|------|-----|--------------|
-| **1** | **P1** Чистая публичная лента + ingest сайтов | @coder + allowlist TG | FL+Kwork + **4 сайта P1** ([`PUBLIC_FEED_WEB_SOURCES.txt`](../../ops/PUBLIC_FEED_WEB_SOURCES.txt)); TG только из allowlist; dogfood **отдельно** |
-| **2** | **D1** Чипы категорий в `/lenta/` | @lead-designer → @coder | 4 ниши §0i в sidebar + mobile sheet; `?category=` |
-| **3** | **P4** Кабинет + вход через Telegram | @coder | Чужой пользователь: Login → `/cabinet/` → свои теги и лента |
+| **1** | **P1** Чистая публичная лента + ingest | @coder + allowlist TG | ✅ код · env: 3 биржи |
+| **2** | **D1** Чипы категорий в `/lenta/` | **@designer** → @coder | ✅ 2026-05-26 |
+| **3** | **P4** Кабинет + вход через Telegram | @coder | ✅ код 2026-05-26 · владелец: SQL + wp-config |
 
 **После:** § P5 деплой 24/7 · опц. P6 публичный GitHub без ИИ-следов.
 

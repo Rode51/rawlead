@@ -26,6 +26,14 @@ ALL_CYCLE_SOURCES: tuple[str, ...] = (
 )
 
 
+def cycle_log_source_ids() -> tuple[str, ...]:
+    """Источники для строк P1.4 — только из PUBLIC_FEED_SOURCES (порядок канона)."""
+    from public_feed import public_feed_sources
+
+    enabled = public_feed_sources()
+    return tuple(sid for sid in ALL_CYCLE_SOURCES if sid in enabled)
+
+
 @dataclass
 class SourceCycleStats:
     """Счётчики воронки по одному источнику за цикл."""
@@ -88,7 +96,7 @@ class CycleSummary:
         return self.sources[source_id]
 
     def iter_sources(self) -> list[SourceCycleStats]:
-        return [self.ensure(sid) for sid in ALL_CYCLE_SOURCES]
+        return [self.ensure(sid) for sid in cycle_log_source_ids()]
 
     def format_header(self) -> str:
         return f"── Цикл {self.ts} ──"

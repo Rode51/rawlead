@@ -30,6 +30,7 @@
     limit: 20,
     minScore: 0,
     source: "",
+    category: "",
     sort: "time",
     draftTags: [],
     appliedTags: [],
@@ -319,13 +320,16 @@
       return;
     }
     var src = sidebar.querySelector('input[name="source"]:checked');
+    var cat = sidebar.querySelector('input[name="category"]:checked');
     var score = sidebar.querySelector('input[name="min_score"]:checked');
     var sortInp = sidebar.querySelector('input[name="sort"]:checked');
     state.source = src ? src.value : "";
+    state.category = cat ? cat.value : "";
     state.minScore = score ? parseInt(score.value, 10) || 0 : 0;
     state.sort = sortInp ? sortInp.value : "time";
     var dirty =
       state.source !== "" ||
+      state.category !== "" ||
       state.minScore !== 0 ||
       state.appliedTags.length > 0 ||
       state.sort !== "time";
@@ -638,6 +642,9 @@
     if (state.appliedTags.length) {
       params.skills = state.appliedTags.join(",");
     }
+    if (state.category) {
+      params.category = state.category;
+    }
     var url = apiUrl(params);
 
     fetch(url, { credentials: "same-origin" })
@@ -657,7 +664,7 @@
         if (items.length === 0 && state.offset === 0) {
           listEl.innerHTML =
             '<p class="rl-feed-empty">' +
-            (state.source || state.minScore
+            (state.source || state.category || state.minScore
               ? "По выбранным фильтрам ничего не найдено."
               : "Заказов пока нет. Попробуйте позже.") +
             "</p>";
@@ -768,6 +775,7 @@
     if (resetBtn) {
       resetBtn.addEventListener("click", function () {
         sidebar.querySelector('input[name="source"][value=""]').checked = true;
+        sidebar.querySelector('input[name="category"][value=""]').checked = true;
         sidebar.querySelector('input[name="min_score"][value="0"]').checked = true;
         sidebar.querySelector('input[name="sort"][value="time"]').checked = true;
         state.draftTags = [];

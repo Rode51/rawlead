@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.7.0');
+define('RAWLEAD_CHILD_VERSION', '1.7.1');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -100,10 +100,14 @@ add_action('wp_enqueue_scripts', static function (): void {
             true
         );
         wp_localize_script('rawlead-cabinet', 'rawleadCabinet', [
-            'restFeed' => esc_url_raw(rest_url('rawlead/v1/me/feed')),
-            'restTags' => esc_url_raw(rest_url('rawlead/v1/me/tags')),
-            'nonce'    => wp_create_nonce('wp_rest'),
-            'apiBase'  => rawlead_api_base_url(),
+            'restFeed'       => esc_url_raw(rest_url('rawlead/v1/me/feed')),
+            'restTags'       => esc_url_raw(rest_url('rawlead/v1/me/tags')),
+            'restAuth'       => esc_url_raw(rest_url('rawlead/v1/auth/telegram')),
+            'tgBotUsername'  => rawlead_tg_login_bot_username(),
+            'localPort'      => defined('RAWLEAD_LOCAL_SITE_PORT') ? (string) RAWLEAD_LOCAL_SITE_PORT : '10007',
+            'loginUrl'       => 'http://127.0.0.1:' . (defined('RAWLEAD_LOCAL_SITE_PORT') ? (string) RAWLEAD_LOCAL_SITE_PORT : '10007') . '/cabinet/',
+            'nonce'          => wp_create_nonce('wp_rest'),
+            'apiBase'        => rawlead_api_base_url(),
         ]);
     }
 }, 20);
@@ -208,3 +212,33 @@ add_filter('the_content', static function (string $content): string {
 
     return $content . $cta;
 }, 12);
+
+/**
+ * Local + Telegram Login: BotFather domain 127.0.0.1 — редирект /cabinet/ с .local на порт Local.
+ */
+add_filter('redirect_canonical', static function ($redirect_url, $requested_url) {
+    if (is_page('cabinet') && str_starts_with(strtolower((string) ($_SERVER['HTTP_HOST'] ?? '')), '127.0.0.1')) {
+        return false;
+    }
+    return $redirect_url;
+}, 10, 2);
+
+add_action('template_redirect', static function (): void {
+    if (!is_page('cabinet')) {
+        return;
+    }
+    $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    if ($host === '' || str_starts_with($host, '127.0.0.1')) {
+        return;
+    }
+    if (!str_contains($host, 'radarzakaz.local')) {
+        return;
+    }
+    $port = defined('RAWLEAD_LOCAL_SITE_PORT') ? (string) RAWLEAD_LOCAL_SITE_PORT : '10007';
+    $target = 'http://127.0.0.1:' . $port . '/cabinet/';
+    $qs = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== ''
+        ? '?' . (string) $_SERVER['QUERY_STRING']
+        : '';
+    wp_safe_redirect($target . $qs, 302);
+    exit;
+}, 1);

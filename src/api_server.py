@@ -16,13 +16,13 @@ import json
 import logging
 import os
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import psycopg
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from src.lead_category import (
     build_skills_groups,
@@ -34,6 +34,7 @@ from src.lead_category import (
     resolve_lead_category,
 )
 from src.public_feed import is_public_feed_source, public_feed_source_sql
+from src.jwt_auth import decode_access_token, issue_access_token
 from src.rank import (
     final_rank,
     keyword_match,
@@ -42,12 +43,13 @@ from src.rank import (
     parse_lead_tags,
     tags_as_weights,
 )
+from src.telegram_login import login_bot_token, verify_telegram_login
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-_VERSION = "0.3g"
+_VERSION = "0.4"
 _OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
 _ME_FEED_SCAN_LIMIT = 500
 _SKILLS_CATALOG_LIMIT = 50
@@ -309,23 +311,143 @@ def _require_api_key(x_api_key: str = Header(default="")) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+def _upsert_telegram_user(
+    cur: Any,
+    *,
+    tg_user_id: int,
+    username: str | None,
+    first_name: str | None,
+    photo_url: str | None,
+) -> str:
+    cur.execute(
+        "SELECT id FROM users WHERE tg_user_id = %s",
+        (tg_user_id,),
+    )
+    row = cur.fetchone()
+    if row:
+        user_id = str(row[0])
+        cur.execute(
+            """
+            UPDATE users
+            SET tg_username = %s, tg_first_name = %s, tg_photo_url = %s
+            WHERE id = %s::uuid
+            """,
+            (username, first_name, photo_url, user_id),
+        )
+        return user_id
+
+    user_id = str(uuid4())
+    cur.execute(
+        """
+        INSERT INTO users (id, tg_user_id, tg_username, tg_first_name, tg_photo_url)
+        VALUES (%s::uuid, %s, %s, %s, %s)
+        """,
+        (user_id, tg_user_id, username, first_name, photo_url),
+    )
+    cur.execute(
+        """
+        INSERT INTO subscriptions (user_id, plan)
+        VALUES (%s::uuid, 'free')
+        ON CONFLICT (user_id) DO NOTHING
+        """,
+        (user_id,),
+    )
+    return user_id
+
+
 def _resolve_user_id(
+    authorization: str = Header(default="", alias="Authorization"),
     x_rawlead_user_id: str = Header(default="", alias="X-RawLead-User-Id"),
 ) -> str:
-    """MVP: только owner UUID (#1), без JWT."""
+    """Bearer JWT (кабинет) или заголовок owner (#1) для dogfood."""
+    auth = (authorization or "").strip()
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+        if not token:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        try:
+            data = decode_access_token(token)
+        except ValueError as exc:
+            raise HTTPException(status_code=401, detail="Unauthorized") from exc
+        return str(data["sub"])
+
     uid = (x_rawlead_user_id or "").strip() or _OWNER_USER_ID
     try:
         UUID(uid)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="invalid user id") from exc
     if uid != _OWNER_USER_ID:
-        raise HTTPException(status_code=403, detail="user not supported in MVP")
+        raise HTTPException(status_code=403, detail="use telegram login")
     return uid
+
+
+class TelegramAuthPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    first_name: str = ""
+    last_name: str | None = None
+    username: str | None = None
+    photo_url: str | None = None
+    auth_date: int
+    hash: str
 
 
 # ─── app ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="RawLead API", version=_VERSION, docs_url="/docs")
+
+
+@app.post("/v1/auth/telegram")
+def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
+    """Login Widget → JWT 7d, upsert users по tg_user_id."""
+    check_data: dict[str, Any] = {
+        "id": payload.id,
+        "auth_date": payload.auth_date,
+    }
+    if payload.first_name:
+        check_data["first_name"] = payload.first_name
+    if payload.last_name:
+        check_data["last_name"] = payload.last_name
+    if payload.username:
+        check_data["username"] = payload.username
+    if payload.photo_url:
+        check_data["photo_url"] = payload.photo_url
+    check_data["hash"] = payload.hash
+
+    try:
+        verify_telegram_login(check_data, bot_token=login_bot_token())
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+    username = (payload.username or "").strip() or None
+    first_name = (payload.first_name or "").strip() or None
+    photo_url = (payload.photo_url or "").strip() or None
+
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                user_id = _upsert_telegram_user(
+                    cur,
+                    tg_user_id=int(payload.id),
+                    username=username,
+                    first_name=first_name,
+                    photo_url=photo_url,
+                )
+            conn.commit()
+    except Exception as exc:
+        logger.error("auth_telegram: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+    token = issue_access_token(user_id, tg_user_id=int(payload.id))
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user_id": user_id,
+        "tg_user_id": int(payload.id),
+        "username": username,
+        "first_name": first_name,
+    }
 
 
 # 3c1 ─────────────────────────────────────────────────────────────────────────

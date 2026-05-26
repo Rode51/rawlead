@@ -15,14 +15,92 @@
 | **Coder § P3a / W2** | ✅ **принято владельцем 2026-05-26** |
 | **§ V10.5** | ✅ **принято владельцем 2026-05-26** |
 | **§ P7 category** | ✅ **принято владельцем 2026-05-26** |
-| **Ворота прод** | ⏳ P1 ✅ → D1 → P4 → [`PRE_PROD_GATE.md`](../architect/PRE_PROD_GATE.md) |
+| **Ворота прод** | ✅ P1 · D1 · P4 код → **P5** деплой после «едем на прод» |
+| **Design D1** | ✅ спека + UI |
+| **Coder § P1.3d / D1 / P4** | ✅ **принято владельцем 2026-05-26** |
 | **Coder § P1** | ✅ P1.3c · ✅ **P1.4** · ✅ **P1.H** · TG ⏳ P1.2b |
 | **§ P5 деплой** | ⏸ после ворот + «едем на прод» |
 | **Ingest «всё для всех»** | ❌ отменено |
 | **Dogfood** | ✅ бот без ослабления фильтров |
 | **Хостинг** | ⏳ после V10 |
 
-**Coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) § **D1** (после Design) · P1.4 ✅ · **P1.H** ✅
+**Coder:** § **P5** деплой ([`PRE_PROD_GATE.md`](../architect/PRE_PROD_GATE.md)) — только по фразе «едем на прод»  
+**Lead:** проверка 2026-05-26 — см. ниже · коммит в git
+
+### Решение владельца (лентa, 2026-05-26)
+
+- Публичка: **только фриланс-биржи** — `fl`, `kwork`, `freelancehunt`
+- **Отложить** (код парсеров не удалять): `vc_ru`, `habr_career` (вакансии / job-ленты)
+- `.env`: `PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt`
+
+### Сделано (Coder § P4, 2026-05-26)
+
+| § | Что |
+|---|-----|
+| a1 | `POST /v1/auth/telegram` — проверка hash Login Widget |
+| a2 | Upsert `users` по `tg_user_id`, JWT 7d |
+| a3 | `/v1/me/*` — `Authorization: Bearer` (любой UUID); owner header — fallback |
+| a4 | `/cabinet/` — экран входа + виджет TG, `localStorage` token |
+| a5 | `.env.example` — `TELEGRAM_LOGIN_BOT_TOKEN`, `RAWLEAD_JWT_SECRET`, `RAWLEAD_TG_BOT_USERNAME` в wp-config |
+
+**Файлы:** `src/telegram_login.py`, `src/jwt_auth.py`, `src/api_server.py`, `sql/003_users_telegram.sql`, `wordpress/.../rawlead-api.php`, `page-cabinet.php`, `rawlead-cabinet.js`, `requirements.txt`
+
+**Как проверить:**
+1. Neon: `sql/003_users_telegram.sql`
+2. `pip install -r requirements.txt` · перезапуск API `:18766`
+3. `wp-config.php`: `define('RAWLEAD_TG_BOT_USERNAME', 'имя_бота');` (без @)
+4. `python scripts/wp_install_rawlead_theme.py` → `/cabinet/` → Login → теги/лента
+5. DevTools: запросы с `Authorization: Bearer …`
+
+### Принято владельцем (§ P1.3d + § D1 + § P4, 2026-05-26)
+
+- **P1.3d:** код — только источники из `PUBLIC_FEED_SOURCES`; парсеры вакансий не удалены
+- **D1:** чипы «Категория» на `/lenta/` и `/cabinet/` (код в теме WP)
+- **P4:** вход через Telegram Login + JWT + `/v1/me/*`
+
+**Проверка Lead (авто, не замена твоего клика):**
+
+| Проверка | Результат |
+|----------|-----------|
+| Код `public_feed` дефолт 3 биржи | ✅ |
+| Чипы `filter-category-*` в `page-lenta.php` | ✅ |
+| `POST /v1/auth/telegram` в `api_server.py` | ✅ |
+| **`.env` строка 70** | ⚠️ ещё **5** источников (`vc_ru`, `habr_career`) — **поменять** на 3 и **перезапуск радара** |
+| API `:18766` | ⚠️ не отвечал (таймаут) — `pip install` + старт API |
+| `radar.log` последний цикл | ⚠️ 20:17 — видны FL+Kwork, цикл оборван TG-ошибками; пульт `last_cycle` со старыми 5 источниками до рестарта |
+
+### Сделано (Coder § P1.3d, 2026-05-26)
+
+| § | Что |
+|---|-----|
+| b1 | Дефолт env: `fl,kwork,freelancehunt` — `src/public_feed.py`, `.env.example` |
+| b2 | `run_cycle` + P1.4 лог — **3** строки бирж (только из `PUBLIC_FEED_SOURCES`); vc_ru/habr_career не вызываются и не логируются |
+| b3 | Канон [`PUBLIC_FEED_WEB_SOURCES.txt`](../../ops/PUBLIC_FEED_WEB_SOURCES.txt) — без изменений |
+| b4 | Парсеры `vc_ru` / `habr_career` в `src/` — на месте |
+
+**Файлы:** `src/public_feed.py`, `src/main.py`, `src/radar_cycle_log.py`, `.env.example`
+
+**Как проверить:**
+1. `.env`: `PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt`
+2. Перезапуск радара → `data/radar.log`: `── Цикл ──` + **3** строки (FL, Kwork, Freelancehunt) + `Итого`
+3. Нет строк VC.ru / Habr Career в логе и пульте «Последний цикл»
+
+### Сделано (Coder § D1, 2026-05-26)
+
+| § | Что |
+|---|-----|
+| d1 | Sidebar + mobile sheet: блок **Категория** (5 chips) после «Источник» |
+| d2 | `GET /v1/feed?category=dev|design|marketing|text`; смена → `offset=0`, лента с нуля |
+| d3 | Desktop: Код/Дизайн/Маркетинг/Тексты; mobile: SMM для marketing |
+| d4 | «Сбросить фильтры» снимает category; `/cabinet` — те же чипы + `?category=` в me/feed |
+
+**Файлы:** `page-lenta.php`, `page-cabinet.php`, `assets/js/rawlead-feed.js`, `assets/js/rawlead-cabinet.js`, `assets/css/rawlead.css`
+
+**Как проверить:**
+1. `python scripts/wp_install_rawlead_theme.py` → Ctrl+F5 `/lenta/`
+2. Чип «Дизайн» → Network `GET …/feed?category=design&offset=0`
+3. «Сбросить фильтры» → без `category` в query
+4. `/cabinet/` — те же чипы, фильтр в персональной ленте
 
 ### Принято владельцем (§ P1.H, 2026-05-26)
 
