@@ -7,6 +7,7 @@ import os
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_SOURCES = ("fl", "kwork")
@@ -44,10 +45,10 @@ def is_public_feed_source(source: str) -> bool:
     return (source or "").strip() in public_feed_sources()
 
 
-def public_feed_source_sql() -> tuple[str, list[str]]:
-    """SQL-фрагмент + params для фильтра source."""
+def public_feed_source_sql() -> tuple[str, list[Any]]:
+    """SQL-фрагмент + params для фильтра source (один param = массив source)."""
     sources = sorted(public_feed_sources())
-    return " AND source = ANY(%s::text[])", sources
+    return " AND source = ANY(%s::text[])", [sources]
 
 
 def _normalize_tg_username(value: str) -> str:
