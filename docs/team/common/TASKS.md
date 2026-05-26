@@ -5,15 +5,27 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 
 ---
 
-## Владелец
+## Владелец — Vision v0.10 (2026-05-26)
 
 | # | Задача | Статус |
 |---|--------|--------|
-| 1 | Пульт ▶ стабильно, VPN выкл, `tg_smoke` ok | ⏳ |
-| 2 | TG: acc → бот, /start авто | ✅ владелец 2026-05-25 |
-| 3 | С **пн 2026-05-26:** отклики по вердикту «Брать», 1–2/день | ⏳ |
+| V0.1 | PM + Product §0i | ✅ |
+| V0.2 | Приёмка § P3a / W2 | ✅ 2026-05-26 |
+| V0.3 | Приёмка § V10 | ✅ 2026-05-26 |
+| V0.4 | § V10.5 + P7 + backfill | ✅ 2026-05-26 |
+| — | Хостинг / allowlist TG | ⏳ после V10 |
 
-→ детали запуска: [`../FOR_YOU.md`](../FOR_YOU.md)
+## Lead → Coder (активно)
+
+| # | § | Статус |
+|---|-----|--------|
+| 1 | **V10.1–V10.4** | **→ @coder** |
+| 2 | P7 category Neon | после V10 |
+| 3 | P5 деплой | потом |
+| — | Neon `DATABASE_URL` | ✅ |
+| — | Пульт ▶, dogfood бот | ⏳ фоном |
+
+→ полный план: [`../architect/PORTFOLIO_SPRINT.md`](../architect/PORTFOLIO_SPRINT.md) · [`../FOR_YOU.md`](../FOR_YOU.md)
 
 ---
 
@@ -53,14 +65,18 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 
 ## Lead → Coder
 
-**Промпт:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) — **§ W2** (старт) · **§ 3h** после W2
+**Ворота прод:** [`PRE_PROD_GATE.md`](../architect/PRE_PROD_GATE.md) · **Промпт:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) — **P1 → D1 → P4 → P5**
 
 | # | Трек | Статус |
 |---|------|--------|
-| … | § 3g | ✅ `54ba7d5` |
-| … | **§ W2** лендинг | ✅ Coder · ⏳ владелец |
-| … | **§ 3j** 2 колонки + wheel + пульт | **→ @coder** |
-| … | 3f ИИ-агент | после W2+3h |
+| … | § W2 · V10 · P7 | ✅ |
+| **P1** | Whitelist ленты FL/Kwork/TG | **→ @coder** |
+| **D1** | Чипы category в `/lenta/` | **→ @lead-designer**, потом @coder |
+| **P4** | TG Login кабинет | после D1 |
+| **P5** | Деплой | после ворот + «едем на прод» |
+| **P2** · **P3** · **P8** | прокси / UI / LLM | не блокер прода |
+| **P6** | Публичный git | после прода |
+| … | 3f ИИ-агент | после P |
 
 ---
 
@@ -81,6 +97,7 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 | 9 | **Волна 2** копирайт | ✅ Lead Product |
 | 10 | **§ W2** в коде | ✅ |
 | 11 | **§ 3h** в коде | ✅ |
+| 12 | **§ D1** чипы category в `/lenta/` | **→ @lead-designer** (перед продом) |
 
 ---
 

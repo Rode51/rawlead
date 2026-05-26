@@ -1,13 +1,279 @@
-# Coder — ⏸ § 3f ИИ-агент · § 3i aggregator ingest (после списка)
+# Coder — **§ P1 → D1 → P4 → P5** · V10/P7 ✅
 
-**§ 3j** ✅ сдан · тема на Local  
+**Ворота прод:** [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) — портфолио = продукт для людей, не только лендинг.
 
-**Дата:** 2026-05-25 · владелец: 2 колонки карточек, wheel в раскрытых навыках, пульт Design  
-**Закрыто:** § W2 · § 3h · § 3i — ниже архив
+**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.10** §0i.
+
+**Порядок (жёстко):** **P1** → **D1** (после Design) → **P4** → **P5** только после «едем на прод».  
+**⏸ P5** пока ворота не закрыты. **⏸** 25 источников / §3f без ТЗ.
 
 ---
 
-# § 3j — Лента 2 колонки + wheel навыков + пульт
+# § P1 — Чистая публичная лента (**→ старт**)
+
+---
+
+# § V10.5 — Hotfix (архив): `GET /v1/feed` с `skills=` (500)
+
+Тикет: [`docs/problems/2026-05-26-feed-skills-jsonb-500.md`](../../problems/2026-05-26-feed-skills-jsonb-500.md)
+
+| # | Готово когда |
+|---|----------------|
+| h1 | «Применить» в `/lenta/` — 200, лента с `sort=match` |
+| h2 | Нет `jsonb && jsonb` в логе |
+
+---
+
+# § V10 — Vision v0.10 (✅ принято 2026-05-26, архив)
+
+Канон Product: [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § «Vision v0.10».
+
+| § | Что | Файлы |
+|---|-----|--------|
+| **V10.1** | Стоп/белые списки §0i в коде | `src/filters.py`, [`FILTERS.md`](../../ops/FILTERS.md) § v0.10 |
+| **V10.2** | Пороги `ai_score` 50–55 для design/marketing/text | [`PROFILE.md`](../../ops/PROFILE.md), ingest/API |
+| **V10.3** | Skills catalog в `/lenta/` — **4 группы** (заголовки категорий) | `api_server` `/v1/skills/catalog` + `rawlead-feed.js` |
+| **V10.4** | Лендинг «Для кого» — **4 карточки** (канон строк ниже) | `audience.php`, `docs/archive/wp-skeleton/home.md` |
+
+### V10.1 — FILTERS
+
+| # | Готово когда |
+|---|----------------|
+| f1 | Дроп-токены §0i по категориям в `filters.py` (или общий стоп + category на ingest) |
+| f2 | Расширен «Берём» — design/marketing/text токены из FILTERS.md v0.10 |
+| f3 | VA, диктор, озвучка — всегда стоп |
+
+### V10.2 — PROFILE / ai_score
+
+| # | Готово когда |
+|---|----------------|
+| p1 | При `category in (design, marketing, text)` — сниженный порог для «Брать» в ленте (50–55) или отдельные подписи чипа |
+| p2 | Dogfood-бот — **без** ослабления owner PROFILE |
+
+### V10.3 — Skills catalog
+
+| # | Готово когда |
+|---|----------------|
+| s1 | API: `skills` с полем `category` (`dev`/`design`/`marketing`/`text`) или 4 массива в ответе |
+| s2 | UI: в панели «Навыки» — 4 секции с заголовками как в vision §0i |
+| s3 | Маппинг тег→категория: статический JSON в теме или эвристика по префиксу (Coder — минимальный v1) |
+
+### V10.4 — Копирайт «Для кого» (4 карточки)
+
+| # | Заголовок | Подтекст | Теги |
+|---|-----------|----------|------|
+| 1 | **Разработка & Код** | Боты, парсеры, FastAPI, веб — один поток вместо десятка вкладок. | Python · бот · парсер · автоматизация |
+| 2 | **Дизайн & Видео** | UI/UX, Reels, монтаж, motion — заказы точно по вашим навыкам, без шума. | Figma · UI · монтаж · анимация |
+| 3 | **Маркетинг & SMM** | Таргет, SEO, SMM, воронки — ИИ убирает нерелевантное до того, как вы открыли ленту. | таргет · SEO · SMM · контекст |
+| 4 | **Тексты & Переводы** | Копирайтинг, локализация, редактура — только заказы под ваш профиль. | копирайт · перевод · редактура · субтитры |
+
+CSS: сетка 4 карточки desktop (2×2), mobile 1 col — согласовать с `REFERENCE.md` §3.6.
+
+### V10.5 — STATUS
+
+Обновить [`STATUS.md`](../common/STATUS.md) — § V10.
+
+---
+
+## Вводные (ждёт владельца)
+
+| Файл | Кто |
+|------|-----|
+| [`docs/ops/PUBLIC_FEED_WEB_SOURCES.txt`](../../ops/PUBLIC_FEED_WEB_SOURCES.txt) | **канон сайтов** — 4×P1 + fl,kwork |
+| `docs/ops/TG_PUBLIC_FEED_ALLOWLIST.txt` | **Tier A PDF** — заполнен Lead 2026-05-26 |
+| `docs/ops/TG_MIGRATION_2026-05-26.md` | снос старых + droplist · join после «отписался» |
+| Старые чаты **не** в ленте | см. [`INGEST_SOURCES_PLAN.md`](INGEST_SOURCES_PLAN.md) |
+
+Пока allowlist пуст — **в API** whitelist минимум `fl`, `kwork` только.
+
+**Порядок до прода:** **P1** → **D1** → **P4** → **P5** ([`PRE_PROD_GATE.md`](PRE_PROD_GATE.md)). P1.3 сайты — опционально внутри P1.
+
+## P1.1 — Фильтр `GET /v1/feed`
+
+| # | Готово когда |
+|---|----------------|
+| f1 | Env `PUBLIC_FEED_SOURCES` = строка из [`PUBLIC_FEED_WEB_SOURCES.txt`](../../ops/PUBLIC_FEED_WEB_SOURCES.txt) (+ TG из allowlist позже) |
+| f2 | То же для `/v1/skills/catalog` (теги только из видимых источников) |
+| f3 | Док: как добавить `telegram_*` source после join allowlist |
+
+**Файлы:** `src/api_server.py`, `.env.example`
+
+## P1.2 — Радар не кормит мусор
+
+| # | Готово когда |
+|---|----------------|
+| r1 | Слушать TG только чаты из allowlist + `TG_JOIN_QUEUE` tier A (не старые MVP-чаты) |
+| r2 | Ingest с `source` вне whitelist → `is_visible=false` **или** не писать в Neon для публички (dogfood бот может остаться отдельным контуром — согласовать с Lead: owner-only notify) |
+
+## P1.2b — TG migration (⏳ доработка)
+
+**Отписка:** ❌ не делаем — владелец: пусть подписаны, **не слушаем** (`filter_listen_chat_ids`).
+
+Тикет: [`docs/problems/2026-05-26-p1-tg-migration-gaps.md`](../../problems/2026-05-26-p1-tg-migration-gaps.md)
+
+| # | Готово когда |
+|---|----------------|
+| m1 | Listen: **только** [`TG_PUBLIC_FEED_ALLOWLIST.txt`](../../ops/TG_PUBLIC_FEED_ALLOWLIST.txt) — убрать старый TG-A из listen |
+| m2 | `TG_JOIN_QUEUE_v2.csv` — Tier A PDF; join 2–3/нед |
+| m3 | Опционально: явный deny droplist chat_id (если пересечение с allowlist) |
+
+## P1.3 — Парсеры сайтов P1 (**все 4**, владелец: «сначала сайты из списка»)
+
+Канон URL и `source_id`: [`PUBLIC_FEED_WEB_SOURCES.txt`](../../ops/PUBLIC_FEED_WEB_SOURCES.txt)
+
+| source | Как |
+|--------|-----|
+| `vc_ru` | VC.ru `/jobs` API JSON |
+| `freelancehunt` | HTML projects |
+| `habr_freelance` | freelance.habr.com/tasks |
+| `habr_career` | career.habr.com/vacancies |
+
+Очередь: VC.ru → Freelancehunt → Habr Career · тот же pipeline + AI.
+
+## P1.3c — Довести парсеры до лида в Neon (**→ сейчас**, владелец)
+
+| source | Проблема | Готово когда |
+|--------|----------|----------------|
+| `habr_career` | ✅ в логе `habr_career:id=…` после `PUBLIC_FEED_SOURCES` | оставить |
+| `vc_ru` | 403 / пустая выдача | ≥1 лид/цикл в Neon или явный fallback URL в логе |
+| `freelancehunt` | HTTP 403 антибот | Playwright или прокси домашний IP; ≥1 лид/цикл |
+| `habr_freelance` | HTTP **410** сайт закрыт | **убрать** из `PUBLIC_FEED_WEB_SOURCES.txt` + не вызывать в `main.py` до нового URL |
+
+**Владелец `.env` (строка одна):**  
+`PUBLIC_FEED_SOURCES=fl,kwork,vc_ru,freelancehunt,habr_career`  
+(без `habr_freelance` пока 410)
+
+**Лог:** после цикла в `radar.log` в `ош=` должны быть префиксы `vc_ru:`, `freelancehunt:`, `habr_career:` — не только fl/kwork.
+
+---
+
+# § P2 — Опрос 2 мин + ротация прокси (FL/Kwork)
+
+| # | Готово когда |
+|---|----------------|
+| t1 | `POLL_INTERVAL_MINUTES=2` работает; в `config.py` минимум **2** (не 10) |
+| t2 | `FL_PROXY_URLS` / `KWORK_PROXY_URLS` — список через запятую; round-robin на каждый цикл или при 429/timeout — следующий |
+| t3 | Лог: какой proxy использован; не логировать пароль |
+| t4 | `.env.example` + строка в `docs/ops/RUN.md` |
+
+**Не трогать** без задачи: лимиты Telethon join.
+
+---
+
+# § P3a — Приёмка W2 (владелец 2026-05-25) — **до хостинга**
+
+Тикет: [`docs/problems/2026-05-25-portfolio-w2-acceptance.md`](../../problems/2026-05-25-portfolio-w2-acceptance.md)
+
+| # | Готово когда |
+|---|----------------|
+| u1 | Раскрытие карточки: transition height/max-height + opacity; `prefers-reduced-motion: reduce` → без анимации |
+| u2 | Accordion: **одна** `.is-expanded`; в grid 2× сосед **не** меняет высоту/контент |
+| u3 | Клик другой карточки → предыдущая закрывается (проверить с u2) |
+| u4 | «Применить» — **снаружи** `<details>`, под summary «Навыки», `hidden` пока details closed |
+| u5 | Бейдж на «Навыки»: **владелец OK** — `title="Применено навыков: N"`; только если `appliedTags.length > 0` |
+| u6 | Раскрытие: заголовок **«Задача»** + текст из `body` (логика как `telegram_notify._task_block`); `ai_reasons` — отдельным блоком «Разбор» если есть |
+
+**Файлы:** `page-lenta.php`, `rawlead-feed.js`, `rawlead.css`, `rawlead-cabinet.js` (те же u6)
+
+---
+
+# § P3 — UI/UX прочее (после P3a)
+
+| # | Готово когда |
+|---|----------------|
+| u7 | Empty state ленты: «Пока нет заказов» |
+| u8 | Прогон 375px |
+
+---
+
+# § P7 — Категория из биржи (0 ₽)
+
+Канон: [`INGEST_CATEGORY_STRATEGY.md`](INGEST_CATEGORY_STRATEGY.md)
+
+| # | Готово когда |
+|---|----------------|
+| c1 | `leads.category` в Neon + ingest |
+| c2 | FL/Kwork маппинг рубрики → category |
+| c3 | `GET /v1/feed?category=` |
+
+**API готово:** `GET /v1/feed?category=` ✅ · UI чипов — **§ D1**.
+
+---
+
+# § D1 — Чипы категорий в `/lenta/` (**после Design**)
+
+**Design:** Lead Design → `feed-cabinet-mvp.md` §2.2 дополнение · 4 чипа: Код / Дизайн / Маркетинг / Тексты (+ «Все»).
+
+| # | Готово когда |
+|---|----------------|
+| d1 | Sidebar + mobile sheet: `fieldset` «Категория» — radio/chips `dev|design|marketing|text` + пусто = все |
+| d2 | JS: `GET /v1/feed?category=…` при смене; сброс offset |
+| d3 | Подписи = `CATEGORY_TITLES` из vision (короткие на mobile) |
+| d4 | «Сбросить фильтры» учитывает category |
+
+**Не в D1:** регистрация (P4).
+
+---
+
+# § P8 — Дешёвая LLM (summary only)
+
+| # | Готово когда |
+|---|----------------|
+| m1 | `OPENROUTER_MODEL_SUMMARY` в config |
+| m2 | Промпт только title+snippet body |
+| m3 | Вердикт: правила или короткий JSON; не GPT-4o на каждый лид |
+
+
+---
+
+# § P4 — Кабинет: регистрация через Telegram
+
+| # | Готово когда |
+|---|----------------|
+| a1 | `POST /v1/auth/telegram` — body от Login Widget, проверка `hash` ([Telegram docs](https://core.telegram.org/widgets/login#checking-authorization)) |
+| a2 | Upsert `users` (tg_id, username, …), JWT `access_token` TTL 7d |
+| a3 | `/v1/me/*` — Bearer JWT; убрать 403 для не-owner UUID |
+| a4 | WP: кнопка «Войти через Telegram» на `/cabinet/` или отдельная страница; после входа — `localStorage` token → заголовки fetch |
+| a5 | `TELEGRAM_LOGIN_BOT_TOKEN` или тот же бот — в `.env.example` |
+
+**Схема:** [`TZ_API.md`](TZ_API.md) · Neon `users` — [`NEON_SCHEMA.md`](NEON_SCHEMA.md)
+
+---
+
+# § P5 — Деплой бюджет 24/7 (WP shared + VPS API+радар)
+
+**Канон:** [`docs/ops/DEPLOY_BUDGET.md`](../../ops/DEPLOY_BUDGET.md) · владелец: **без ПК**, минимум денег.
+
+| # | Готово когда |
+|---|----------------|
+| d1 | `deploy/systemd/` — `rawlead-api.service`, `rawlead-radar.service` |
+| d2 | `deploy/Caddyfile` (или nginx) — `api.домен` → :18766, TLS |
+| d3 | `docs/ops/DEPLOY_VPS.md` — clone, venv, `.env`, enable systemd, перенос `data/*telethon*` |
+| d4 | WP на shared: theme install + `rawlead_api_base_url` |
+| d5 | CORS: origin = URL WP |
+| d6 | **E1:** API на VPS, радар пока на ПК — лента живая |
+| d7 | **E2:** радар на VPS, инструкция «остановить радар на ПК» — нет дублей TG |
+| d8 | Приёмка: ПК выключен → `/lenta/` + бот через 30 мин |
+
+**Не делать:** второй VPS, Docker Swarm, туннель с ПК как прод.
+
+---
+
+# § P6 — Публичный GitHub без следов ИИ
+
+| # | Готово когда |
+|---|----------------|
+| g1 | Ветка `portfolio-public` **или** инструкция export в `rawlead-portfolio` |
+| g2 | Исключить: `.cursor/`, `docs/team/`, `docs/problems/`, `*CODER*`, `*LEAD*`, agent transcripts |
+| g3 | README: кейс человека (проблема → решение → стек → скрины), без Cursor/vibe/AI |
+| g4 | `scripts/export_portfolio_repo.sh` или `.ps1` — копирует whitelist путей |
+| g5 | Перед push: `rg -i "cursor|vibe.?cod|openrouter|lead architect" README` — 0 в публичном дереве |
+
+**Важно:** основной `uisness` может оставаться приватным; публичный — отдельный репо.
+
+---
+
+# § 3j — Лента 2 колонки + wheel навыков + пульт (архив)
 
 ## § 3j1 — Две карточки в ряд (`/lenta/`)
 

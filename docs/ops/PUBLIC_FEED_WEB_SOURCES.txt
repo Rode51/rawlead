@@ -1,0 +1,18 @@
+# Публичная лента /lenta/ — сайты (канон владельца)
+# Источник: PDF → docs/archive/INGEST_SOURCES_SNG_25.json (priority P1)
+# Решение владельца 2026-05-25: «сначала внедрим сайты из списка» (не «0–2 на выбор»)
+#
+# source_id (колонка leads.source) | URL
+# -------------------------------------|------------------------------------------
+fl                                   | https://www.fl.ru/projects/          # уже в радаре
+kwork                                | https://kwork.ru/projects            # уже в радаре
+vc_ru                                | https://vc.ru/jobs                   # API JSON — P1.3
+freelancehunt                        | https://freelancehunt.com/projects   # HTML — P1.3
+# habr_freelance — ⏸ HTTP 410 (сайт закрыт), не в PUBLIC_FEED_SOURCES до нового URL
+habr_career                          | https://career.habr.com/vacancies    # HTML — P1.3 ✅
+#
+# Env для API (пример):
+# PUBLIC_FEED_SOURCES=fl,kwork,vc_ru,freelancehunt,habr_career
+#
+# Не в публичку: Freelance.ru (P2), старые MVP-TG-чаты, TG без allowlist.
+# TG для ленты — отдельно: docs/ops/TG_PUBLIC_FEED_ALLOWLIST.txt

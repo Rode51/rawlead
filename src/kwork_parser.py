@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import requests
 
 from config import DIRECT_REQUESTS_PROXIES, Config
+from lead_category import category_from_kwork_listing_url, category_from_kwork_want
 from listing import SOURCE_KWORK, ListingProject
 
 
@@ -111,6 +112,7 @@ def _wants_to_projects(wants: list[dict], page_url: str) -> list[ListingProject]
             is_higher=bool(want.get("isHigherPrice")),
         )
 
+        listing_cat = category_from_kwork_want(want) or ""
         out.append(
             ListingProject(
                 project_id=pid,
@@ -120,6 +122,7 @@ def _wants_to_projects(wants: list[dict], page_url: str) -> list[ListingProject]
                 published_at=_published_at(want),
                 listing_snippet=description,
                 source=SOURCE_KWORK,
+                listing_category=listing_cat,
             )
         )
     if not out:
@@ -157,7 +160,7 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
     html = resp.content.decode(encoding, errors="replace")
 
     try:
-        return parse_listing_html(html, url)
+        projects = parse_listing_html(html, url)
     except KworkListingError:
         hint = _guess_blocked_or_changed(html)
         if hint:
@@ -165,3 +168,21 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
                 f"Не удалось разобрать ленту Kwork; похоже на {hint}."
             ) from None
         raise
+    feed_cat = category_from_kwork_listing_url(url) or ""
+    if not feed_cat:
+        return projects
+    return [
+        ListingProject(
+            project_id=p.project_id,
+            title=p.title,
+            budget_text=p.budget_text,
+            url=p.url,
+            published_at=p.published_at,
+            listing_snippet=p.listing_snippet,
+            source=p.source,
+            listing_category=p.listing_category or feed_cat,
+            chat_invite_url=p.chat_invite_url,
+            chat_title=p.chat_title,
+        )
+        for p in projects
+    ]

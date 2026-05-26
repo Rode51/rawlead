@@ -1,10 +1,27 @@
 # Дорожная карта
 
-**Канон vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.9.2** · [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md)
+**Канон vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.10** · [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) §0i
+
+**Аудитория:** **Digital-специалисты** — 4 категории (не «все фрилансеры»).
 
 **Ставка B:** `/lenta` + `/cabinet` + ИИ-агент; dogfood — TG-бот владельца.
 
-**Ingest (§0h v2):** **большая база** = сайты-**агрегаторы** (уже парсят вакансии) **+** основные площадки (FL, Kwork, …). **TG без модерации** — сейчас только владелец → потом **скрыть из ленты**.
+---
+
+## Сейчас (2026-05-26) — Vision v0.10
+
+| # | Что | Кто |
+|---|-----|-----|
+| **V10.1** | FILTERS §0i в коде | `@coder` |
+| **V10.2** | PROFILE пороги ai_score по категории | `@coder` |
+| **V10.3** | Skills catalog — 4 группы в `/lenta/` | `@coder` |
+| **V10.4** | Лендинг «Для кого» — 4 карточки | `@coder` |
+| — | P3a приёмка W2 | владелец |
+| — | P7 `leads.category` + API | после V10 |
+| — | P5 деплой 24/7 | [`DEPLOY_BUDGET.md`](../../ops/DEPLOY_BUDGET.md) |
+| — | 3f ИИ-агент | после V10 |
+
+**⏸ отменено как приоритет:** ingest «все специальности», 25 источников сразу, § P1.3 без категорий.
 
 ---
 
@@ -12,32 +29,17 @@
 
 | Фаза | Статус | Суть |
 |------|--------|------|
-| **0** FL + Kwork | ✅ | площадки напрямую |
-| **1** TG acc raw | ✅ сейчас / ⏳ скрыть | dogfood; **не** для публичной ленты (3k) |
-| **1b** Пульт Tauri | ✅ | |
+| **0** FL + Kwork + TG | ✅ | dogfood |
 | **3b–3d** Neon + API + WP | ✅ | `/lenta`, `/cabinet` |
-| **Волна 2** | → | UX/копирайт |
+| **P3a** UX лента | ✅ | accordion, «Задача» |
+| **V10** 4 категории Digital | **→** | FILTERS, PROFILE, skills, копирайт |
 | **3f** ИИ-агент | → | |
-| **3i** Парсеры **агрегаторов** | после 3f | сайты, которые уже парсят вакансии |
-| **3j** Новые **площадки** | → | Habr и др. по ROI |
-| **3k** TG raw owner-only | → | фильтр в API/ленте |
+| **3i** Агрегаторы | волнами | только релевантные категории |
+| **3k** TG raw owner-only | → | |
 | **3g–3h** Auth + биллинг | потом | |
 
----
-
-## Сейчас (2026-05-25)
-
-| # | Что | Кто |
-|---|-----|-----|
-| 1 | Волна 2: Design → Product → Coder | лидеры → `@coder` |
-| 2 | **3f** ИИ-агент | `@coder` |
-| 3 | TG relay стабилен | `@mechanic` |
-| 4 | Список **сайтов-агрегаторов** для 3i | владелец + Lead → Coder ТЗ |
-
-**Не сейчас:** публичная лента из сырых TG-каналов.
-
-Блокеры: [`STATUS.md`](../common/STATUS.md) · [`TASKS.md`](../common/TASKS.md)
+Блокеры: [`STATUS.md`](../common/STATUS.md) · [`TASKS.md`](../common/TASKS.md) · Coder [`CODER_PROMPT.md`](CODER_PROMPT.md) § V10
 
 ---
 
-_Lead Architect · 2026-05-25 · vision §0h v2_
+_Lead Architect · 2026-05-26 · v0.10_

@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from config import DIRECT_REQUESTS_PROXIES, Config
+from lead_category import category_from_fl_listing_url
 from listing import SOURCE_FL, ListingProject
 
 # Сколько страниц ленты запрашивать за один цикл (см. docs/SOURCES.md).
@@ -157,7 +158,24 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
             seen.add(project.project_id)
             merged.append(project)
 
-    return merged
+    feed_cat = category_from_fl_listing_url(cfg.fl_projects_url) or ""
+    if not feed_cat:
+        return merged
+    return [
+        ListingProject(
+            project_id=p.project_id,
+            title=p.title,
+            budget_text=p.budget_text,
+            url=p.url,
+            published_at=p.published_at,
+            listing_snippet=p.listing_snippet,
+            source=p.source,
+            listing_category=p.listing_category or feed_cat,
+            chat_invite_url=p.chat_invite_url,
+            chat_title=p.chat_title,
+        )
+        for p in merged
+    ]
 
 
 def fetch_project_description(

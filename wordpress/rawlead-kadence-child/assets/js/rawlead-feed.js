@@ -34,6 +34,7 @@
     draftTags: [],
     appliedTags: [],
     catalog: [],
+    catalogGroups: [],
     tagsLoading: false,
     loading: false,
     done: false,
@@ -67,11 +68,19 @@
     return sourceLabel(item.source).key === filter;
   }
 
-  function verdictChip(score, verdict) {
+  function takeThreshold(category) {
+    if (category === "design" || category === "marketing" || category === "text") {
+      return 55;
+    }
+    return 70;
+  }
+
+  function verdictChip(score, verdict, category) {
+    var takeAt = takeThreshold(category || "dev");
     if (verdict === "take" || (score !== null && score >= 85)) {
       return { text: "Брать ✓", cls: "take" };
     }
-    if (score !== null && score >= 70) {
+    if (score !== null && score >= takeAt) {
       return { text: "Брать", cls: "take" };
     }
     return { text: "Сомнительно", cls: "maybe" };
@@ -105,6 +114,93 @@
       .replace(/"/g, "&quot;");
   }
 
+  function stripLeadingTaskLabel(text) {
+    var s = String(text || "").trim();
+    var lower = s.toLowerCase();
+    var prefixes = ["задача:", "задача", "task:"];
+    var i;
+    for (i = 0; i < prefixes.length; i++) {
+      if (lower.indexOf(prefixes[i]) === 0) {
+        s = s.slice(prefixes[i].length).replace(/^[\s:]+/, "");
+        break;
+      }
+    }
+    return s;
+  }
+
+  function truncateTaskSnippet(text, maxLen) {
+    maxLen = maxLen || 500;
+    var minPart = 200;
+    var s = String(text || "").trim();
+    var chunk;
+    var seps;
+    var best;
+    var i;
+    var idx;
+    var m;
+    if (!s) {
+      return "";
+    }
+    if (s.length <= maxLen) {
+      return s;
+    }
+    chunk = s.slice(0, maxLen);
+    seps = [". ", "! ", "? ", "… ", ".\n"];
+    best = -1;
+    for (i = 0; i < seps.length; i++) {
+      idx = chunk.lastIndexOf(seps[i]);
+      if (idx >= minPart / 2 && idx > best) {
+        best = idx + seps[i].length - 1;
+      }
+    }
+    if (best > 0) {
+      return chunk.slice(0, best).trim();
+    }
+    m = chunk.match(/^[\s\S]*?[.!?…](?:\s|$)/);
+    if (m && m[0].trim()) {
+      return m[0].trim();
+    }
+    return chunk.replace(/\s+$/, "") + "…";
+  }
+
+  function taskBodyText(item) {
+    var raw = (item.body || item.title || "").trim();
+    return truncateTaskSnippet(stripLeadingTaskLabel(raw));
+  }
+
+  function renderExpandedBody(item) {
+    var task = taskBodyText(item);
+    var reasons = (item.ai_reasons || []).filter(Boolean).join(". ");
+    var html = "";
+    if (task) {
+      html +=
+        '<div class="rl-feed-card__section">' +
+        '<h4 class="rl-feed-card__section-title">Задача</h4>' +
+        '<p class="rl-feed-card__task">' +
+        escapeHtml(task) +
+        "</p></div>";
+    }
+    if (reasons) {
+      html +=
+        '<div class="rl-feed-card__section">' +
+        '<h4 class="rl-feed-card__section-title">Разбор</h4>' +
+        '<p class="rl-feed-card__text rl-feed-card__analysis">' +
+        escapeHtml(reasons) +
+        "</p></div>";
+    }
+    if (!task && !reasons) {
+      html +=
+        '<p class="rl-feed-card__text rl-feed-card__muted">Описание появится после обогащения лида.</p>';
+    }
+    if (item.url) {
+      html +=
+        '<a class="rl-btn rl-btn--ghost rl-feed-card__link" href="' +
+        escapeHtml(item.url) +
+        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Открыть оригинал ↗</a>';
+    }
+    return html;
+  }
+
   function renderTagChips(leadTags) {
     var tags = leadTags || [];
     var max = 4;
@@ -124,8 +220,7 @@
     var hasSkills = state.appliedTags.length > 0;
     var rank = item.final_rank != null ? item.final_rank : item.ai_score || 0;
     var matchLabel = hasSkills ? "Совместимость" : "Оценка ИИ";
-    var chip = verdictChip(item.ai_score, item.ai_verdict);
-    var reasons = (item.ai_reasons || []).join(". ");
+    var chip = verdictChip(item.ai_score, item.ai_verdict, item.category);
     var budget = item.budget_text || "—";
     var expanded = state.expandedId === item.id;
 
@@ -177,15 +272,9 @@
       renderTagChips(item.lead_tags) +
       "</div>" +
       '<div class="rl-feed-card__body">' +
-      '<p class="rl-feed-card__text">' +
-      escapeHtml(reasons || "Описание появится после обогащения лида.") +
-      "</p>" +
-      (item.url
-        ? '<a class="rl-btn rl-btn--ghost rl-feed-card__link" href="' +
-          escapeHtml(item.url) +
-          '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Открыть оригинал ↗</a>'
-        : "") +
-      "</div>" +
+      '<div class="rl-feed-card__body-inner">' +
+      renderExpandedBody(item) +
+      "</div></div>" +
       "</article>"
     );
   }
@@ -280,9 +369,11 @@
       if (state.appliedTags.length) {
         el.hidden = false;
         el.textContent = String(state.appliedTags.length);
+        el.title = "Применено навыков: " + state.appliedTags.length;
       } else {
         el.hidden = true;
         el.textContent = "";
+        el.removeAttribute("title");
       }
     });
   }
@@ -343,31 +434,55 @@
     });
   }
 
+  function skillChipHtml(row) {
+    var tag = row.tag || "";
+    var active = state.draftTags.indexOf(tag) >= 0;
+    return (
+      '<button type="button" class="rl-feed-chip rl-feed-skill' +
+      (active ? " is-active" : "") +
+      '" data-tag="' +
+      escapeHtml(tag) +
+      '">' +
+      escapeHtml(tag) +
+      (row.count ? ' <span class="rl-feed-skill__count">' + row.count + "</span>" : "") +
+      "</button>"
+    );
+  }
+
   function renderSkillsInto(container) {
     if (!container) {
       return;
     }
-    if (!state.catalog.length) {
+    var groups = state.catalogGroups.length ? state.catalogGroups : null;
+    if (!groups && !state.catalog.length) {
       container.innerHTML =
         '<p class="rl-feed-skills__empty">Пока нет навыков в ленте — дождитесь заказов из бота</p>';
       return;
     }
-    container.innerHTML = state.catalog
-      .map(function (row) {
-        var tag = row.tag || "";
-        var active = state.draftTags.indexOf(tag) >= 0;
-        return (
-          '<button type="button" class="rl-feed-chip rl-feed-skill' +
-          (active ? " is-active" : "") +
-          '" data-tag="' +
-          escapeHtml(tag) +
-          '">' +
-          escapeHtml(tag) +
-          (row.count ? ' <span class="rl-feed-skill__count">' + row.count + "</span>" : "") +
-          "</button>"
-        );
-      })
-      .join("");
+    if (groups) {
+      container.innerHTML = groups
+        .map(function (group) {
+          var skills = group.skills || [];
+          if (!skills.length) {
+            return "";
+          }
+          return (
+            '<div class="rl-feed-skills-group">' +
+            '<p class="rl-feed-skills-group__title">' +
+            escapeHtml(group.title || group.category || "") +
+            "</p>" +
+            '<div class="rl-feed-skills-group__chips">' +
+            skills.map(skillChipHtml).join("") +
+            "</div></div>"
+          );
+        })
+        .join("");
+    } else {
+      container.innerHTML =
+        '<div class="rl-feed-skills-group__chips">' +
+        state.catalog.map(skillChipHtml).join("") +
+        "</div>";
+    }
     bindSkillButtons(container);
   }
 
@@ -474,10 +589,12 @@
         return res.ok ? res.json() : { skills: [] };
       })
       .then(function (data) {
+        state.catalogGroups = data.groups || [];
         state.catalog = data.skills || [];
         renderSkillsCatalog();
       })
       .catch(function () {
+        state.catalogGroups = [];
         state.catalog = [];
         renderSkillsCatalog();
       });

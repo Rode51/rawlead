@@ -1,13 +1,89 @@
 # STATUS
 
-**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.9.3** (все фрилансеры, не только IT) · [`ROADMAP.md`](../architect/ROADMAP.md)
+**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.10** (4 категории Digital · §0i) · [`ROADMAP.md`](../architect/ROADMAP.md)
 
 ---
 
-## Сейчас (2026-05-25)
+## Сейчас (2026-05-26) — Vision v0.10
+
+**PM ✅** · канон §0i · план Product § «Vision v0.10».
 
 | Трек | Статус |
 |------|--------|
+| **Vision v0.10** | ✅ Product + владелец |
+| **Coder § V10** | ✅ **принято владельцем 2026-05-26** |
+| **Coder § P3a / W2** | ✅ **принято владельцем 2026-05-26** |
+| **§ V10.5** | ✅ **принято владельцем 2026-05-26** |
+| **§ P7 category** | ✅ **принято владельцем 2026-05-26** |
+| **Ворота прод** | ⏳ P1 ✅ → D1 → P4 → [`PRE_PROD_GATE.md`](../architect/PRE_PROD_GATE.md) |
+| **Coder § P1** | ✅ P1.3c парсеры (smoke 12+10+25) · приёмка лога после рестарта · TG ⏳ P1.2b |
+| **§ P5 деплой** | ⏸ после ворот + «едем на прод» |
+| **Ingest «всё для всех»** | ❌ отменено |
+| **Dogfood** | ✅ бот без ослабления фильтров |
+| **Хостинг** | ⏳ после V10 |
+
+**Coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) § **P1** (след. **D1** — Design)
+
+### Сделано (Coder § P1, 2026-05-26)
+
+| § | Что |
+|---|-----|
+| P1.1 | `PUBLIC_FEED_SOURCES` — фильтр `GET /v1/feed` и `/v1/skills/catalog` (по умолчанию `fl,kwork`) |
+| P1.1 | Ingest: `is_visible` только для source из whitelist |
+| P1.2 | TG listen: только allowlist + tier **TG-A** (`INGEST_SOURCES_SNG_25.json` + `TG_JOIN_QUEUE.csv`); MVP-чаты отфильтрованы |
+| P1.3 | Парсеры: `vc_ru`, `freelancehunt`, `habr_career` — цикл радара после Kwork |
+| P1.3c | **vc_ru** — API `api.vc.ru/v2.8/timeline?subsitesIds=jobs` (~12 постов/цикл); **habr_freelance** убран (410); **freelancehunt** — API v2 по `FREELANCEHUNT_API_TOKEN` или HTML/Playwright |
+
+**Файлы:** `src/vc_ru_parser.py`, `src/freelancehunt_parser.py`, `src/html_fetch.py`, `src/main.py`, `src/public_feed.py`, `.env.example`, `requirements.txt`
+
+**Как проверить:**
+1. `.env`: `PUBLIC_FEED_SOURCES=fl,kwork,vc_ru,freelancehunt,habr_career` + `FREELANCEHUNT_API_TOKEN=…` (https://freelancehunt.com/my/api)
+2. `pip install -r requirements.txt` → `playwright install chromium` (fallback HTML)
+3. Перезапуск `uvicorn src.api_server:app --port 18766` + радар (`start-radar.bat`)
+4. `data/radar.log` — в `ош=` префиксы `vc_ru:id=…`, `habr_career:id=…`; без токена FH — `freelancehunt:fetch:…API_TOKEN…`
+5. `GET /v1/feed?limit=5` — source из env
+6. TG — отдельно [`2026-05-26-p1-tg-migration-gaps.md`](../../problems/2026-05-26-p1-tg-migration-gaps.md)
+
+### Сделано (Coder § V10.5 + P7, 2026-05-26)
+
+| § | Что |
+|---|-----|
+| V10.5 | `_skills_sql`: пересечение через `jsonb_array_elements_text` + `ANY(text[])` — нет `jsonb && jsonb` |
+| P7 c1 | Neon `leads.category` + `sql/002_leads_category.sql` (миграция применена) |
+| P7 c2 | FL slug / Kwork `c=` + want → `listing_category` → `pg_storage` |
+| P7 c3 | `GET /v1/feed?category=design,text` · ingest `category` |
+| P7 backfill | `scripts/backfill_lead_category.py` — 3229 строк `infer_lead_category(title, body, lead_tags)`; NULL → 0 |
+| — | Dogfood PROFILE / `ai_analyze` **не трогали** |
+
+**Файлы:** `src/api_server.py`, `src/lead_category.py`, `src/pg_storage.py`, `src/fl_parser.py`, `src/kwork_parser.py`, `src/listing.py`, `sql/002_leads_category.sql`, `sql/001_neon_schema.sql`, `scripts/backfill_lead_category.py`
+
+**Как проверить:**
+1. Перезапуск `uvicorn src.api_server:app --port 18766`
+2. `/lenta/` — выбрать навыки → «Применить» → 200, `sort=match`, без 500 в логе
+3. `GET /v1/feed?skills=python&sort=match` → 200
+4. `GET /v1/feed?category=design` → только design (фильтр по колонке, не infer на read)
+5. Neon: `SELECT COUNT(*) FROM leads WHERE category IS NULL` → **0**
+6. Новый лид с радара — в Neon `leads.category` заполнен при ingest
+
+### Сделано (Coder § V10, 2026-05-26)
+
+| § | Что |
+|---|-----|
+| V10.1 | `FILTERS.md` — стоп VA/диктор/озвучка, дропы §0i, «Берём» design/marketing/text |
+| V10.2 | `/v1/feed` + чипы: design/marketing/text — порог «Брать» **55** при фильтре ≥70; dogfood (`pg_storage`, `ai_analyze`) **без изменений** |
+| V10.3 | `/v1/skills/catalog` → `groups` (4 ниши) + `skills`; UI `/lenta/` — секции с заголовками |
+| V10.4 | `audience.php` — 4 карточки; CSS 2×2 desktop; `home.md` канон |
+
+**Файлы:** `src/lead_category.py`, `src/api_server.py`, `docs/ops/FILTERS.md`, `audience.php`, `rawlead-feed.js`, `rawlead.css`, `page-lenta.php`
+
+**Как проверить:**
+1. `python -c "from src.filters import default_listing_filter; f=default_listing_filter(); assert f.rejects('диктор')"`
+2. Перезапуск `uvicorn src.api_server:app --port 18766` → `GET /v1/skills/catalog` — поле `groups`
+3. `python scripts/wp_install_rawlead_theme.py` → главная 4 карточки 2×2; `/lenta/` — навыки по группам, фильтр «Брать (≥70 / digital ≥55)»
+4. Бот: вердикт МИМО/3500 ₽ — как раньше (PROFILE не трогали)
+
+| Neon | ✅ владелец |
+| Allowlist TG | ⏳ `docs/ops/TG_PUBLIC_FEED_ALLOWLIST.txt` |
 | **Product v0.9.2** | ✅ §0h v2: агрегаторы + большая база; TG raw не в ленту |
 | **Docs / ROADMAP** | ✅ синхронизированы под ставку B |
 | **TG dogfood** | ✅ /start acc авто при подключении · acc шлют в бот (владелец 2026-05-25) · дубли python — Mechanic |
@@ -18,11 +94,33 @@
 | **Coder § 3g** | ✅ commit `54ba7d5` |
 | **WP `/lenta/`** | ✅ грузится |
 | **Волна 2** Product | ✅ канон в `LEAD_PRODUCT_PROMPT` + `wp-skeleton` |
-| **Coder § W2** | ✅ в репо · **приёмка владельцем** ⏳ (~5 мин) |
+| **Coder § P3a** | ✅ U1–U6 — приёмка владельца |
+| **Coder § P1 сайты** | ✅ код 2026-05-26 |
+| **§ W2 принято** | ⏳ повторный прогон `/lenta/` |
 | **Coder § 3h** | ✅ чипы как главная |
 | **Coder § 3i** | ✅ |
 | **Coder § 3j** | ✅ |
 | **WP `/cabinet` demo JSON** | ❌ снято (3e — живой API) |
+
+### Сделано (Coder § P3a, 2026-05-25)
+
+| § | Что |
+|---|-----|
+| u1 | Раскрытие карточки: `grid-template-rows` 0fr→1fr + opacity; `prefers-reduced-motion` — без transition |
+| u2 | Сетка 2×: `align-items: start`, карточка `align-self: start` — сосед не тянется |
+| u3 | Одна `.is-expanded`; клик другой карточки закрывает предыдущую |
+| u4 | «Применить» снаружи `<details>`, видна только при `[open]` (CSS sibling) |
+| u5 | Бейдж навыков только при `appliedTags.length > 0`, `title="Применено навыков: N"` |
+| u6 | Раскрытие: «Задача» из `body` (snippet как бот), «Разбор» из `ai_reasons`; API отдаёт `body` |
+
+**Файлы:** `page-lenta.php`, `rawlead-feed.js`, `rawlead-cabinet.js`, `rawlead.css`, `src/api_server.py`
+
+**Как проверить:**
+1. `python scripts/wp_install_rawlead_theme.py` + Ctrl+F5 `http://radarzakaz.local/lenta/`
+2. `uvicorn src.api_server:app --port 18766` — перезапуск после правки API
+3. Desktop 2 колонки: раскрыть карточку — плавно; сосед не растягивается; другая карточка закрывает первую
+4. «Навыки» → «Применить» только при открытом блоке; бейдж с tooltip после «Применить»
+5. В раскрытии — «Задача» (текст заказа), при наличии — «Разбор»
 
 ### Сделано (Coder § 3j, 2026-05-25)
 

@@ -7,6 +7,10 @@ from dataclasses import dataclass
 SOURCE_FL = "fl"
 SOURCE_KWORK = "kwork"
 SOURCE_TELEGRAM = "telegram"
+SOURCE_VC_RU = "vc_ru"
+SOURCE_FREELANCEHUNT = "freelancehunt"
+SOURCE_HABR_FREELANCE = "habr_freelance"
+SOURCE_HABR_CAREER = "habr_career"
 
 
 def telegram_source(chat_id: int) -> str:
@@ -23,5 +27,6 @@ class ListingProject:
     published_at: str
     listing_snippet: str = ""
     source: str = SOURCE_FL
+    listing_category: str = ""
     chat_invite_url: str = ""
     chat_title: str = ""

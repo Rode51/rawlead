@@ -22,7 +22,17 @@ from filters import ListingWordFilter, default_listing_filter
 
 from fl_parser import FlListingError, fetch_listing_projects
 
+from freelancehunt_parser import (
+    FreelancehuntListingError,
+    fetch_listing_projects as fetch_freelancehunt_listing,
+)
+from habr_career_parser import (
+    HabrCareerListingError,
+    fetch_listing_projects as fetch_habr_career_listing,
+)
 from kwork_parser import KworkListingError, fetch_listing_projects as fetch_kwork_listing_projects
+from public_feed import public_feed_sources
+from vc_ru_parser import VcRuListingError, fetch_listing_projects as fetch_vc_ru_listing
 
 from lead_pipeline import process_new_listing, short_err
 
@@ -39,6 +49,20 @@ from telegram_control import send_control_panel
 # Опрос getUpdates между циклами и во время run_cycle (не ждать POLL_INTERVAL).
 # Опрос getUpdates; 2 с ≈ ответ на кнопки за 2–4 с (два окна делят lock).
 _TG_POLL_INTERVAL_SEC = 2
+
+_LISTING_ERRORS = (
+    FlListingError,
+    KworkListingError,
+    VcRuListingError,
+    FreelancehuntListingError,
+    HabrCareerListingError,
+)
+
+_P1_WEB_SOURCES: tuple[tuple[str, Callable[[Config], list[ListingProject]]], ...] = (
+    ("vc_ru", fetch_vc_ru_listing),
+    ("freelancehunt", fetch_freelancehunt_listing),
+    ("habr_career", fetch_habr_career_listing),
+)
 
 
 
@@ -158,7 +182,7 @@ def _fetch_source(
 
         return fetch_fn(cfg)
 
-    except (FlListingError, KworkListingError) as exc:
+    except _LISTING_ERRORS as exc:
 
         errors.append(f"{label}:fetch:{short_err(exc)}")
 
@@ -254,6 +278,27 @@ def run_cycle(
 
             new_ids += n
 
+            notifications += notify
+
+    _tg_poll_if_due(cfg, storage, tg_poll_state)
+
+    enabled_sources = public_feed_sources()
+    for source_label, fetch_fn in _P1_WEB_SOURCES:
+        if source_label not in enabled_sources:
+            continue
+        _tg_poll_if_due(cfg, storage, tg_poll_state)
+        web_projects = _fetch_source(source_label, fetch_fn, cfg, errors)
+        if web_projects is not None:
+            n, notify = _process_listings(
+                web_projects,
+                storage,
+                word_filter,
+                cfg,
+                errors=errors,
+                pg=pg,
+                tg_poll_state=tg_poll_state,
+            )
+            new_ids += n
             notifications += notify
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)

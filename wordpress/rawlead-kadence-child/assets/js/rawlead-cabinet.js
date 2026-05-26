@@ -98,6 +98,190 @@
 
 
 
+  function stripLeadingTaskLabel(text) {
+
+    var s = String(text || "").trim();
+
+    var lower = s.toLowerCase();
+
+    var prefixes = ["задача:", "задача", "task:"];
+
+    var i;
+
+    for (i = 0; i < prefixes.length; i++) {
+
+      if (lower.indexOf(prefixes[i]) === 0) {
+
+        s = s.slice(prefixes[i].length).replace(/^[\s:]+/, "");
+
+        break;
+
+      }
+
+    }
+
+    return s;
+
+  }
+
+
+
+  function truncateTaskSnippet(text, maxLen) {
+
+    maxLen = maxLen || 500;
+
+    var minPart = 200;
+
+    var s = String(text || "").trim();
+
+    var chunk;
+
+    var seps;
+
+    var best;
+
+    var i;
+
+    var idx;
+
+    var m;
+
+    if (!s) {
+
+      return "";
+
+    }
+
+    if (s.length <= maxLen) {
+
+      return s;
+
+    }
+
+    chunk = s.slice(0, maxLen);
+
+    seps = [". ", "! ", "? ", "… ", ".\n"];
+
+    best = -1;
+
+    for (i = 0; i < seps.length; i++) {
+
+      idx = chunk.lastIndexOf(seps[i]);
+
+      if (idx >= minPart / 2 && idx > best) {
+
+        best = idx + seps[i].length - 1;
+
+      }
+
+    }
+
+    if (best > 0) {
+
+      return chunk.slice(0, best).trim();
+
+    }
+
+    m = chunk.match(/^[\s\S]*?[.!?…](?:\s|$)/);
+
+    if (m && m[0].trim()) {
+
+      return m[0].trim();
+
+    }
+
+    return chunk.replace(/\s+$/, "") + "…";
+
+  }
+
+
+
+  function taskBodyText(item) {
+
+    var raw = (item.body || item.title || "").trim();
+
+    return truncateTaskSnippet(stripLeadingTaskLabel(raw));
+
+  }
+
+
+
+  function renderExpandedBody(item) {
+
+    var task = taskBodyText(item);
+
+    var reasons = (item.ai_reasons || []).filter(Boolean).join(". ");
+
+    var html = "";
+
+    if (task) {
+
+      html +=
+
+        '<div class="rl-feed-card__section">' +
+
+        '<h4 class="rl-feed-card__section-title">Задача</h4>' +
+
+        '<p class="rl-feed-card__task">' +
+
+        escapeHtml(task) +
+
+        "</p></div>";
+
+    }
+
+    if (reasons) {
+
+      html +=
+
+        '<div class="rl-feed-card__section">' +
+
+        '<h4 class="rl-feed-card__section-title">Разбор</h4>' +
+
+        '<p class="rl-feed-card__text rl-feed-card__analysis">' +
+
+        escapeHtml(reasons) +
+
+        "</p></div>";
+
+    }
+
+    if (!task && !reasons) {
+
+      html +=
+
+        '<p class="rl-feed-card__text rl-feed-card__muted">Описание появится после обогащения лида.</p>';
+
+    }
+
+    html += '<p class="rl-feed-card__agent">🤖 Рыночная цена: скоро</p>';
+
+    html +=
+
+      '<div class="rl-feed-card__actions">' +
+
+      '<button type="button" class="rl-btn rl-btn--primary rl-btn--soon" disabled title="Скоро">Сгенерировать отклик</button>';
+
+    if (item.url) {
+
+      html +=
+
+        '<a class="rl-btn rl-btn--ghost rl-feed-card__link" href="' +
+
+        escapeHtml(item.url) +
+
+        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Открыть оригинал ↗</a>';
+
+    }
+
+    html += "</div>";
+
+    return html;
+
+  }
+
+
+
   function sourceLabel(source) {
 
     var s = (source || "").toLowerCase();
@@ -474,8 +658,6 @@
 
     var chip = verdictChip(item.ai_score, item.ai_verdict);
 
-    var reasons = (item.ai_reasons || []).join(". ");
-
     var budget = item.budget_text || "—";
 
     var expanded = state.expandedId === item.id;
@@ -574,31 +756,11 @@
 
       '<div class="rl-feed-card__body">' +
 
-      '<p class="rl-feed-card__text">' +
+      '<div class="rl-feed-card__body-inner">' +
 
-      escapeHtml(reasons || "Описание появится после обогащения лида.") +
+      renderExpandedBody(item) +
 
-      "</p>" +
-
-      '<p class="rl-feed-card__agent">🤖 Рыночная цена: скоро</p>' +
-
-      '<div class="rl-feed-card__actions">' +
-
-      '<button type="button" class="rl-btn rl-btn--primary rl-btn--soon" disabled title="Скоро">Сгенерировать отклик</button>' +
-
-      (item.url
-
-        ? '<a class="rl-btn rl-btn--ghost rl-feed-card__link" href="' +
-
-          escapeHtml(item.url) +
-
-          '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Открыть оригинал ↗</a>'
-
-        : "") +
-
-      "</div>" +
-
-      "</div>" +
+      "</div></div>" +
 
       "</article>"
 

@@ -34,6 +34,7 @@ from budget import extract_budget_text_from_post
 from filters import default_listing_filter
 from lead_pipeline import process_new_listing_from_tg, short_err
 from listing import ListingProject, telegram_source
+from public_feed import filter_listen_chat_ids
 from pg_storage import pg_storage_from_config
 from storage import storage_from_config
 from tg_bot_start import ensure_bot_started
@@ -193,8 +194,9 @@ async def _reload_listen_chats(
             f"{radar_timestamp()} тг:монитор:{account}:reload ids: {short_err(exc)}",
         )
         return []
+    listen_ids = filter_listen_chat_ids(raw_ids)
     return await _add_monitor_peers(
-        client, chat_ids, raw_ids, log_path, storage, account=account
+        client, chat_ids, listen_ids, log_path, storage, account=account
     )
 
 
@@ -356,11 +358,19 @@ async def run_monitor() -> None:
                 log_path, f"{radar_timestamp()} {msg}"
             ),
         )
+        listen_ids = filter_listen_chat_ids(list(acfg.chat_ids))
+        skipped = len(acfg.chat_ids) - len(listen_ids)
+        if skipped > 0:
+            _append_log(
+                log_path,
+                f"{radar_timestamp()} тг:монитор:{acfg.account}: "
+                f"P1 listen filter: {len(listen_ids)} из {len(acfg.chat_ids)} чатов",
+            )
         chat_ids: set[int] = set()
         await _add_monitor_peers(
             client,
             chat_ids,
-            list(acfg.chat_ids),
+            listen_ids,
             log_path,
             storage,
             account=acfg.account,

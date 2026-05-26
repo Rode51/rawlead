@@ -24,6 +24,16 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from src.lead_category import (
+    build_skills_groups,
+    category_for_listing,
+    effective_feed_min_score,
+    normalize_category,
+    parse_category_param,
+    passes_score_filter,
+    resolve_lead_category,
+)
+from src.public_feed import is_public_feed_source, public_feed_source_sql
 from src.rank import (
     final_rank,
     keyword_match,
@@ -42,6 +52,11 @@ _OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
 _ME_FEED_SCAN_LIMIT = 500
 _SKILLS_CATALOG_LIMIT = 50
 _BOT_FEED_WHERE = "is_visible = TRUE AND notified_at IS NOT NULL"
+
+
+def _feed_where_sql() -> tuple[str, list[str]]:
+    src_sql, src_params = public_feed_source_sql()
+    return _BOT_FEED_WHERE + src_sql, src_params
 
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
@@ -68,6 +83,7 @@ def _row_to_item(
         lead_id,
         source,
         title,
+        body,
         url,
         budget_text,
         ai_score,
@@ -75,16 +91,19 @@ def _row_to_item(
         lead_tags,
         ai_reasons,
         created_at,
+        stored_category,
     ) = row
     tags = parse_lead_tags(lead_tags)
     km = keyword_match_val
     fr = final_rank_val
     if fr is None:
         fr = open_rank(ai_score)
+    category = resolve_lead_category(stored_category, title or "", body or "", tags)
     return {
         "id": lead_id,
         "source": source,
         "title": title,
+        "body": body or "",
         "url": url,
         "budget_text": budget_text,
         "ai_score": ai_score,
@@ -93,14 +112,21 @@ def _row_to_item(
         "ai_reasons": ai_reasons if ai_reasons is not None else [],
         "final_rank": fr,
         "keyword_match": km,
+        "category": category,
         "created_at": created_at.isoformat() if created_at else None,
     }
 
 
 _SELECT_COLS = """
-    id, source, title, url, budget_text,
-    ai_score, ai_verdict, lead_tags, ai_reasons, created_at
+    id, source, title, body, url, budget_text,
+    ai_score, ai_verdict, lead_tags, ai_reasons, created_at, category
 """
+
+
+def _category_sql(categories: list[str]) -> tuple[str, list[Any]]:
+    if not categories:
+        return "", []
+    return " AND category = ANY(%s::text[])", [categories]
 
 
 def _load_user_tags(cur: Any, user_id: str) -> dict[str, float]:
@@ -120,7 +146,13 @@ def _parse_skills_param(skills: str) -> list[str]:
 def _skills_sql(skills: list[str]) -> tuple[str, list[Any]]:
     if not skills:
         return "", []
-    return " AND lead_tags && %s::jsonb", [json.dumps(skills, ensure_ascii=False)]
+    return (
+        " AND EXISTS ("
+        " SELECT 1 FROM jsonb_array_elements_text(COALESCE(lead_tags, '[]'::jsonb)) AS _lt(tag)"
+        " WHERE _lt.tag = ANY(%s::text[])"
+        ")",
+        [skills],
+    )
 
 
 def _rank_feed_rows(
@@ -132,11 +164,12 @@ def _rank_feed_rows(
 ) -> list[dict[str, Any]]:
     ranked: list[dict[str, Any]] = []
     for row in rows:
-        tags = parse_lead_tags(row[7])
+        tags = parse_lead_tags(row[8])
+        category = resolve_lead_category(row[11], row[2] or "", row[3] or "", tags)
         km = keyword_match(tags, tag_weights) if tag_weights else 0
-        fr = final_rank(row[5], km)
-        score_for_filter = fr if sort == "match" else (row[5] or 0)
-        if score_for_filter < min_score:
+        fr = final_rank(row[6], km)
+        score_for_filter = fr if sort == "match" else (row[6] or 0)
+        if not passes_score_filter(int(score_for_filter), min_score, category):
             continue
         ranked.append(_row_to_item(row, keyword_match_val=km, final_rank_val=fr))
     if sort == "match":
@@ -154,37 +187,38 @@ def _feed_page_time(
     offset: int,
     min_score: int,
     skills: list[str],
+    categories: list[str],
     tag_weights: dict[str, float],
 ) -> tuple[list[dict[str, Any]], int]:
     extra, extra_params = _skills_sql(skills)
+    cat_sql, cat_params = _category_sql(categories)
+    sql_min = min_score
+    if min_score >= 70:
+        sql_min = effective_feed_min_score(min_score, "text")
+    feed_where, feed_params = _feed_where_sql()
     cur.execute(
         f"""
         SELECT {_SELECT_COLS}
         FROM leads
-        WHERE {_BOT_FEED_WHERE}
+        WHERE {feed_where}
           AND (ai_score IS NULL OR ai_score >= %s)
-          {extra}
+          {extra}{cat_sql}
         ORDER BY created_at DESC
         LIMIT %s OFFSET %s
         """,
-        (min_score, *extra_params, limit, offset),
+        (*feed_params, sql_min, *extra_params, *cat_params, limit, offset),
     )
     rows = cur.fetchall()
-    items = [
-        _row_to_item(
-            r,
-            keyword_match_val=keyword_match(parse_lead_tags(r[7]), tag_weights)
-            if tag_weights
-            else 0,
-            final_rank_val=final_rank(
-                r[5],
-                keyword_match(parse_lead_tags(r[7]), tag_weights)
-                if tag_weights
-                else 0,
-            ),
-        )
-        for r in rows
-    ]
+    items: list[dict[str, Any]] = []
+    for r in rows:
+        tags = parse_lead_tags(r[8])
+        category = resolve_lead_category(r[11], r[2] or "", r[3] or "", tags)
+        km = keyword_match(tags, tag_weights) if tag_weights else 0
+        fr = final_rank(r[6], km)
+        score_for_filter = r[6] or 0
+        if not passes_score_filter(int(score_for_filter), min_score, category):
+            continue
+        items.append(_row_to_item(r, keyword_match_val=km, final_rank_val=fr))
     return items, len(items)
 
 
@@ -195,19 +229,22 @@ def _feed_page_match(
     offset: int,
     min_score: int,
     skills: list[str],
+    categories: list[str],
     tag_weights: dict[str, float],
 ) -> tuple[list[dict[str, Any]], int]:
     extra, extra_params = _skills_sql(skills)
+    cat_sql, cat_params = _category_sql(categories)
+    feed_where, feed_params = _feed_where_sql()
     cur.execute(
         f"""
         SELECT {_SELECT_COLS}
         FROM leads
-        WHERE {_BOT_FEED_WHERE}
-          {extra}
+        WHERE {feed_where}
+          {extra}{cat_sql}
         ORDER BY created_at DESC
         LIMIT %s
         """,
-        (*extra_params, _ME_FEED_SCAN_LIMIT),
+        (*feed_params, *extra_params, *cat_params, _ME_FEED_SCAN_LIMIT),
     )
     ranked = _rank_feed_rows(
         cur.fetchall(),
@@ -227,29 +264,33 @@ def _personal_feed_page(
     offset: int,
     min_score: int,
     skills: list[str],
+    categories: list[str],
     sort: str,
 ) -> tuple[list[dict[str, Any]], int]:
     user_tags = _load_user_tags(cur, user_id)
     extra, extra_params = _skills_sql(skills)
+    cat_sql, cat_params = _category_sql(categories)
+    feed_where, feed_params = _feed_where_sql()
     cur.execute(
         f"""
         SELECT {_SELECT_COLS}
         FROM leads
-        WHERE {_BOT_FEED_WHERE}
-          {extra}
+        WHERE {feed_where}
+          {extra}{cat_sql}
         ORDER BY created_at DESC
         LIMIT %s
         """,
-        (*extra_params, _ME_FEED_SCAN_LIMIT),
+        (*feed_params, *extra_params, *cat_params, _ME_FEED_SCAN_LIMIT),
     )
     rows = cur.fetchall()
     if sort == "time":
         ranked: list[dict[str, Any]] = []
         for row in rows:
-            tags = parse_lead_tags(row[7])
+            tags = parse_lead_tags(row[8])
+            category = resolve_lead_category(row[11], row[2] or "", row[3] or "", tags)
             km = keyword_match(tags, user_tags)
-            fr = final_rank(row[5], km)
-            if (row[5] or 0) < min_score:
+            fr = final_rank(row[6], km)
+            if not passes_score_filter(row[6], min_score, category):
                 continue
             ranked.append(_row_to_item(row, keyword_match_val=km, final_rank_val=fr))
         ranked.sort(key=lambda x: x.get("created_at") or "", reverse=True)
@@ -304,26 +345,27 @@ def skills_catalog(
 ) -> dict[str, Any]:
     """Топ навыков из lead_tags лидов, уже ушедших в бот."""
     try:
+        feed_where, feed_params = _feed_where_sql()
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     SELECT tag, COUNT(*) AS cnt
                     FROM leads,
                          jsonb_array_elements_text(lead_tags) AS tag
-                    WHERE is_visible = TRUE
-                      AND notified_at IS NOT NULL
+                    WHERE {feed_where}
                     GROUP BY tag
                     ORDER BY cnt DESC, tag ASC
                     LIMIT %s
                     """,
-                    (limit,),
+                    (*feed_params, limit),
                 )
-                skills = [{"tag": row[0], "count": row[1]} for row in cur.fetchall()]
+                rows = cur.fetchall()
+                groups, skills = build_skills_groups(rows)
     except Exception as exc:
         logger.error("skills_catalog: %s", exc)
         raise HTTPException(status_code=500, detail="db error")
-    return {"skills": skills}
+    return {"groups": groups, "skills": skills}
 
 
 @app.get("/v1/feed")
@@ -332,12 +374,14 @@ def feed(
     offset: int = Query(default=0, ge=0),
     min_score: int = Query(default=0, ge=0, le=100),
     skills: str = Query(default=""),
+    category: str = Query(default=""),
     sort: str = Query(default="time"),
 ) -> dict[str, Any]:
     """Лента: только notified_at; skills → rank; sort=time|match."""
     if sort not in ("time", "match"):
         raise HTTPException(status_code=400, detail="sort must be time or match")
     skill_list = _parse_skills_param(skills)
+    category_list = parse_category_param(category)
     tag_weights = tags_as_weights(skill_list)
     try:
         with psycopg.connect(_db_url()) as conn:
@@ -349,6 +393,7 @@ def feed(
                         offset=offset,
                         min_score=min_score,
                         skills=skill_list,
+                        categories=category_list,
                         tag_weights=tag_weights,
                     )
                 else:
@@ -358,6 +403,7 @@ def feed(
                         offset=offset,
                         min_score=min_score,
                         skills=skill_list,
+                        categories=category_list,
                         tag_weights=tag_weights,
                     )
     except Exception as exc:
@@ -370,6 +416,7 @@ def feed(
         "count": count,
         "sort": sort,
         "skills": skill_list,
+        "category": category_list,
     }
 
 
@@ -454,12 +501,14 @@ def me_feed(
     offset: int = Query(default=0, ge=0),
     min_score: int = Query(default=0, ge=0, le=100),
     skills: str = Query(default=""),
+    category: str = Query(default=""),
     sort: str = Query(default="match"),
 ) -> dict[str, Any]:
     """Персональная лента: user_tags, notified_at; sort=time|match."""
     if sort not in ("time", "match"):
         raise HTTPException(status_code=400, detail="sort must be time or match")
     skill_list = _parse_skills_param(skills)
+    category_list = parse_category_param(category)
     try:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
@@ -470,6 +519,7 @@ def me_feed(
                     offset=offset,
                     min_score=min_score,
                     skills=skill_list,
+                    categories=category_list,
                     sort=sort,
                 )
     except Exception as exc:
@@ -482,6 +532,7 @@ def me_feed(
         "count": count,
         "sort": sort,
         "skills": skill_list,
+        "category": category_list,
     }
 
 
@@ -507,6 +558,7 @@ class IngestPayload(BaseModel):
     ai_reasons: list[str] = []
     is_visible: bool = False
     content_hash: str | None = None
+    category: str | None = None
 
 
 @app.post(
@@ -519,10 +571,22 @@ def ingest_lead(payload: IngestPayload) -> Any:
     h = (payload.content_hash or "").strip() or None
     tags_j = json.dumps(payload.lead_tags, ensure_ascii=False)
     reasons_j = json.dumps(payload.ai_reasons, ensure_ascii=False)
+    stored_cat = normalize_category(payload.category or "")
+    ingest_cat = (
+        stored_cat
+        if stored_cat and stored_cat != "other"
+        else category_for_listing(
+            payload.source,
+            listing_category=payload.category or "",
+            title=payload.title,
+            snippet=payload.body,
+        )
+    )
+    ingest_visible = payload.is_visible and is_public_feed_source(payload.source)
 
     base_cols = (
         "source, external_id, title, body, url, budget_text, "
-        "ai_score, ai_verdict, lead_tags, ai_reasons, is_visible"
+        "ai_score, ai_verdict, lead_tags, ai_reasons, is_visible, category"
     )
     base_vals = (
         payload.source,
@@ -535,7 +599,8 @@ def ingest_lead(payload: IngestPayload) -> Any:
         payload.ai_verdict,
         tags_j,
         reasons_j,
-        payload.is_visible,
+        ingest_visible,
+        ingest_cat,
     )
 
     try:
@@ -545,7 +610,7 @@ def ingest_lead(payload: IngestPayload) -> Any:
                     cur.execute(
                         f"""
                         INSERT INTO leads ({base_cols}, content_hash)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s,%s)
                         ON CONFLICT (content_hash) DO NOTHING
                         RETURNING id
                         """,
@@ -555,7 +620,7 @@ def ingest_lead(payload: IngestPayload) -> Any:
                     cur.execute(
                         f"""
                         INSERT INTO leads ({base_cols}, content_hash)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,NULL)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,NULL,%s)
                         ON CONFLICT (source, external_id) DO NOTHING
                         RETURNING id
                         """,

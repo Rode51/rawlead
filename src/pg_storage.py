@@ -10,7 +10,9 @@ from typing import TYPE_CHECKING
 import psycopg
 
 from config import Config
+from lead_category import category_for_listing
 from listing import ListingProject
+from public_feed import is_public_feed_source
 if TYPE_CHECKING:
     from ai_analyze import AiAnalysis
 
@@ -84,6 +86,12 @@ class NeonLeadStorage:
             return True
         h = (content_hash or "").strip() or None
         body_text = (body or project.listing_snippet or project.title or "").strip()
+        category = category_for_listing(
+            project.source,
+            listing_category=project.listing_category,
+            title=project.title,
+            snippet=body_text,
+        )
         params = (
             project.source,
             str(project.project_id),
@@ -93,6 +101,7 @@ class NeonLeadStorage:
             project.budget_text,
             json.dumps([], ensure_ascii=False),
             False,
+            category,
         )
         try:
             with psycopg.connect(self._url) as conn:
@@ -102,9 +111,9 @@ class NeonLeadStorage:
                             """
                             INSERT INTO leads (
                                 source, external_id, title, body, url, budget_text,
-                                lead_tags, is_visible, content_hash
+                                lead_tags, is_visible, content_hash, category
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s)
                             ON CONFLICT (content_hash) DO NOTHING
                             RETURNING id
                             """,
@@ -115,9 +124,9 @@ class NeonLeadStorage:
                             """
                             INSERT INTO leads (
                                 source, external_id, title, body, url, budget_text,
-                                lead_tags, is_visible, content_hash
+                                lead_tags, is_visible, content_hash, category
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, NULL)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, NULL, %s)
                             ON CONFLICT (source, external_id) DO NOTHING
                             RETURNING id
                             """,
@@ -145,9 +154,17 @@ class NeonLeadStorage:
             return
         ai_verdict = analysis.verdict if analysis is not None else None
         ai_score = _ai_score_stub(analysis)
-        is_visible = _is_visible_stub(analysis)
+        is_visible = _is_visible_stub(analysis) and is_public_feed_source(
+            project.source
+        )
         lead_tags = _lead_tags_json(analysis)
         body_text = (body or project.listing_snippet or project.title or "").strip()
+        category = category_for_listing(
+            project.source,
+            listing_category=project.listing_category,
+            title=project.title,
+            snippet=body_text,
+        )
         notified_at = datetime.now(timezone.utc)
         try:
             with psycopg.connect(self._url) as conn:
@@ -163,7 +180,8 @@ class NeonLeadStorage:
                             ai_score = %s,
                             lead_tags = %s::jsonb,
                             is_visible = %s,
-                            notified_at = %s
+                            notified_at = %s,
+                            category = COALESCE(NULLIF(category, ''), %s)
                         WHERE source = %s AND external_id = %s
                         """,
                         (
@@ -176,6 +194,7 @@ class NeonLeadStorage:
                             lead_tags,
                             is_visible,
                             notified_at,
+                            category,
                             project.source,
                             str(project.project_id),
                         ),

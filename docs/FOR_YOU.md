@@ -53,16 +53,21 @@
 3. Удали файл `data\.radar_desktop.lock` если есть.
 4. Снова двойной клик на ярлык — подождать 5 с.
 
-## Твои шаги сейчас
+## Твои шаги сейчас — Vision v0.10
 
-1. ~~MVP скелет WP (`/lenta/` + `/cabinet/`)~~ ✅ принято 2026-05-25
-2. **Приёмка волны 2 (~5 мин):** `scripts/wp_install_rawlead_theme.py` → открыть `http://radarzakaz.local/`
-   - nav без «Главная»; hero «Смотреть ленту» + «Смотреть тарифы ↓» → скролл к тарифу
-   - «Для кого» — 3 ниши (не только IT); `/how/`, `/faq/` — новые тексты (если старые: WP → Плагины → выкл/вкл **RawLead Landing** или `python scripts/wp_skeleton_setup.py`)
-   - ок → напиши Lead **«W2 принято»**
-3. **Dogfood:** отклики по боту, 1–2 в день
-4. **§ 3j** у `@coder`: 2 карточки в ряд, wheel в раскрытых «Навыки», пульт (вкладка Статус)
-5. После 3j → **3f** ИИ-агент
+**Канон:** [`team/product/PRODUCT_VISION.md`](team/product/PRODUCT_VISION.md) §0i
+
+1. ~~§ V10 · W2 · V10.5 · P7~~ ✅ 2026-05-26
+2. **До прода** (обязательно): [`team/architect/PRE_PROD_GATE.md`](team/architect/PRE_PROD_GATE.md) — **P1** allowlist → **D1** чипы → **P4** TG-вход
+3. **Парсеры в `.env`:** одна строка  
+   `PUBLIC_FEED_SOURCES=fl,kwork,vc_ru,freelancehunt,habr_career`  
+   (сейчас у тебя только `habr_career` из новых — остальные не вызываются) · перезапуск радара
+4. TG allowlist — уже заполнен Lead (Tier A PDF); **отписывать вручную не надо** — сделает Coder § P1.2b
+5. **Прод** — только после трёх блоков + «едем на прод» · хостинг: [`ops/DEPLOY_BUDGET.md`](ops/DEPLOY_BUDGET.md)
+
+**С тебя сейчас:** ничего учить не надо. Опционально: 2+ прокси в `.env` перед VPS. Dogfood — ▶ только на ПК, пока радар не на VPS.
+
+Neon ✅ · dogfood бот — как был.
 
 С понедельника: отклики **по боту** (вердикт «Брать»), 1–2 сильных в день.
 

@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS leads (
     is_visible BOOLEAN NOT NULL DEFAULT TRUE,
     content_hash TEXT,
     notified_at TIMESTAMPTZ,
+    category TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (source, external_id)
 );
@@ -71,8 +72,10 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS lead_tags JSONB NOT NULL DEFAULT '[]'
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS ai_reasons JSONB;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_visible BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS content_hash TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS category TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_leads_is_visible ON leads (is_visible) WHERE is_visible = TRUE;
+CREATE INDEX IF NOT EXISTS idx_leads_category ON leads (category) WHERE category IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_leads_lead_tags ON leads USING GIN (lead_tags);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_content_hash ON leads (content_hash);
 

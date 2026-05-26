@@ -28,6 +28,21 @@
 
 ---
 
+## § D1 — Чипы категорий в `/lenta/` (**→ перед продом**)
+
+**Триггер:** владелец 2026-05-26 — прод только с рабочим продуктом. API `?category=` есть, UI нет.
+
+| # | Задача |
+|---|--------|
+| 1 | Дополнить [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) §2.2: блок **«Категория»** — 4 ниши §0i + «Все» |
+| 2 | Визуал: как «Источник» / «ИИ-оценка» — active chip `#0A0A0A` |
+| 3 | Mobile: в bottom sheet после «Фильтры» |
+| 4 | Handoff → `@coder` § D1 в [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) |
+
+Канон названий: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §0i.
+
+---
+
 ## Документы (все готовы)
 
 | Файл | Что |

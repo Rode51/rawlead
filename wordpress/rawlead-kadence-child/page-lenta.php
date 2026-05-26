@@ -26,7 +26,7 @@ rawlead_get_part('header');
 				<fieldset class="rl-feed-filter">
 					<legend><?php esc_html_e('ИИ-оценка', 'rawlead-kadence-child'); ?></legend>
 					<label class="rl-feed-chip is-active"><input type="radio" name="min_score" value="0" checked> <?php esc_html_e('Любая', 'rawlead-kadence-child'); ?></label>
-					<label class="rl-feed-chip"><input type="radio" name="min_score" value="70"> <?php esc_html_e('Брать (≥70)', 'rawlead-kadence-child'); ?></label>
+					<label class="rl-feed-chip"><input type="radio" name="min_score" value="70"> <?php esc_html_e('Брать (≥70 / digital ≥55)', 'rawlead-kadence-child'); ?></label>
 					<label class="rl-feed-chip"><input type="radio" name="min_score" value="85"> <?php esc_html_e('Уверенно (≥85)', 'rawlead-kadence-child'); ?></label>
 				</fieldset>
 				<details class="rl-feed-filter rl-feed-skills-dd">
@@ -38,9 +38,9 @@ rawlead_get_part('header');
 						<p class="rl-feed-skills__lead"><?php esc_html_e('Отметьте, что умеете — лента подстроится', 'rawlead-kadence-child'); ?></p>
 						<div class="rl-feed-skills" id="rl-feed-skills" aria-live="polite"></div>
 						<p class="rl-feed-skills__hint" id="rl-feed-skills-hint" hidden><?php esc_html_e('Выберите навыки и нажмите Применить', 'rawlead-kadence-child'); ?></p>
-						<button type="button" class="rl-btn rl-btn--primary rl-feed-skills-apply" id="rl-feed-skills-apply"><?php esc_html_e('Применить', 'rawlead-kadence-child'); ?></button>
 					</div>
 				</details>
+				<button type="button" class="rl-btn rl-btn--primary rl-feed-skills-apply" id="rl-feed-skills-apply"><?php esc_html_e('Применить', 'rawlead-kadence-child'); ?></button>
 				<fieldset class="rl-feed-filter">
 					<legend><?php esc_html_e('Сортировка', 'rawlead-kadence-child'); ?></legend>
 					<label class="rl-feed-chip is-active"><input type="radio" name="sort" value="time" checked> <?php esc_html_e('Новые', 'rawlead-kadence-child'); ?></label>
