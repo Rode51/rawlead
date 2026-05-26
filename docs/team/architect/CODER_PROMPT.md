@@ -147,6 +147,42 @@ CSS: сетка 4 карточки desktop (2×2), mobile 1 col — соглас
 
 ---
 
+# § P1.4 — Читаемые логи + пульт (**→ после P1.3c**, владелец)
+
+**Зачем:** понять **появляются ли вакансии** и **где режет фильтр/ИИ**, без разбора `ош=habr_career:id=… skip:dup_content`.
+
+Канон для владельца: [`docs/ops/RADAR_LOG.md`](../../ops/RADAR_LOG.md)
+
+## P1.4.1 — `data/radar.log` (человекочитаемо)
+
+| # | Готово когда |
+|---|----------------|
+| l1 | После **каждого источника** в `run_cycle` — одна строка: `FL.ru │ скачано N │ новых │ в бот │ filter │ МИМО │ dup │ budget` (русские подписи) |
+| l2 | Источники: `fl`, `kwork`, `vc_ru`, `freelancehunt`, `habr_career` — **всегда** строка (даже 0 скачано или `fetch:ошибка`) |
+| l3 | Начало цикла: `── Цикл {ts} ──` · конец: `Итого в бот: X │ на сайт: X` (`notified_at`) |
+| l4 | Счётчики: класс `SourceCycleStats` в `lead_pipeline` / `main` — не раздувать `errors[]` только для статистики |
+| l5 | Старый формат `карточки_fl=…` — убрать или одна строка «legacy» внизу (предпочтительно **заменить**) |
+
+**Файлы:** `src/main.py`, `src/lead_pipeline.py` (опц. `src/radar_cycle_log.py`)
+
+## P1.4.2 — Пульт (desktop + radar_control)
+
+| # | Готово когда |
+|---|----------------|
+| p1 | `scripts/radar_control.py`: `_TAIL_LINES` **800** (или 1000) для `/logs/radar.log` |
+| p2 | Вкладка **Статус**: блок **«Последний цикл»** — те же 5 источников + итого (из SQLite `storage` settings, пишет `record_fl_kwork_cycle` / новый `record_cycle_summary`) |
+| p3 | API `/status` JSON (если пульт на JSON): поле `last_cycle` для ламп/баннера — опционально |
+| p4 | `docs/ops/RUN.md` — как читать лог |
+
+**Файлы:** `scripts/radar_control.py`, `src/radar_status.py`, `desktop/src/main.ts` (рендер Статус), `desktop/index.html` при необходимости
+
+## Не в P1.4
+
+- Менять FILTERS/PROFILE (отдельно, после смотрения воронки)
+- Показывать на `/lenta/` всё без `notified_at` (отдельное ТЗ, согласовать с Lead)
+
+---
+
 # § P2 — Опрос 2 мин + ротация прокси (FL/Kwork)
 
 | # | Готово когда |

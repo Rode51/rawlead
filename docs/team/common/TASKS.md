@@ -70,7 +70,7 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 | # | Трек | Статус |
 |---|------|--------|
 | … | § W2 · V10 · P7 | ✅ |
-| **P1** | Whitelist ленты FL/Kwork/TG | **→ @coder** |
+| **P1** | Whitelist + парсеры + **P1.4 логи** | **→ @coder** (P1.4 после 3c) |
 | **D1** | Чипы category в `/lenta/` | **→ @lead-designer**, потом @coder |
 | **P4** | TG Login кабинет | после D1 |
 | **P5** | Деплой | после ворот + «едем на прод» |
