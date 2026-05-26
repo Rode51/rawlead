@@ -1,27 +1,25 @@
 """Оркестрация: ленты FL/Kwork → SQLite → фильтр → [ИИ] → Telegram. TZ §4–5."""
 
-
-
 from __future__ import annotations
 
-
-
 import random
-
+import sys
 import time
-
 from collections.abc import Callable
-
 from pathlib import Path
 
+if sys.platform == "win32":
+    import msvcrt
+else:
+    msvcrt = None  # type: ignore
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_MAIN_LOCK = _PROJECT_ROOT / "data" / ".main.lock"
+_main_lock_fh = None
 
 from config import Config, load_config, radar_timestamp
-
 from filters import ListingWordFilter, default_listing_filter
-
 from fl_parser import FlListingError, fetch_listing_projects
-
 from freelancehunt_parser import (
     FreelancehuntListingError,
     fetch_listing_projects as fetch_freelancehunt_listing,
@@ -35,19 +33,16 @@ from public_feed import public_feed_sources
 from vc_ru_parser import VcRuListingError, fetch_listing_projects as fetch_vc_ru_listing
 
 from lead_pipeline import process_new_listing, short_err
-
 from listing import ListingProject
-
 from pg_storage import NeonLeadStorage, pg_storage_from_config
+from radar_cycle_log import CycleSummary, SourceCycleStats, record_cycle_summary
 from storage import ProjectStorage, storage_from_config
 
 from bot_poll import try_poll_commands
 from health_check import run_health_check
-from radar_status import record_fl_kwork_cycle
 from telegram_control import send_control_panel
 
 # Опрос getUpdates между циклами и во время run_cycle (не ждать POLL_INTERVAL).
-# Опрос getUpdates; 2 с ≈ ответ на кнопки за 2–4 с (два окна делят lock).
 _TG_POLL_INTERVAL_SEC = 2
 
 _LISTING_ERRORS = (
@@ -65,69 +60,80 @@ _P1_WEB_SOURCES: tuple[tuple[str, Callable[[Config], list[ListingProject]]], ...
 )
 
 
+def _release_main_lock() -> None:
+    global _main_lock_fh
+    if _main_lock_fh is not None:
+        try:
+            if msvcrt is not None:
+                _main_lock_fh.seek(0)
+                msvcrt.locking(_main_lock_fh.fileno(), msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+        try:
+            _main_lock_fh.close()
+        except OSError:
+            pass
+        _main_lock_fh = None
+    try:
+        _MAIN_LOCK.unlink(missing_ok=True)
+    except OSError:
+        pass
 
+
+def _acquire_main_lock() -> bool:
+    global _main_lock_fh
+    _MAIN_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fh = open(_MAIN_LOCK, "a+b")
+    except OSError:
+        return False
+    if msvcrt is not None:
+        try:
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError:
+            fh.close()
+            return False
+    _main_lock_fh = fh
+    return True
+
+
+def _log_main_lock_busy() -> None:
+    try:
+        cfg = load_config()
+        log_path = cfg.radar_log_path
+    except Exception:
+        log_path = _PROJECT_ROOT / "data" / "radar.log"
+    msg = f"{radar_timestamp()} радар:дубль:второй main — уже работает"
+    print("[!] Второй запуск main — уже работает окно RawLead — биржи", flush=True)
+    _append_log_line(log_path, msg)
+
+
+def _enter_main_single_instance() -> bool:
+    if _acquire_main_lock():
+        return True
+    _log_main_lock_busy()
+    return False
 
 
 def _echo(line: str) -> None:
     """Дублирует важные строки в консоль (окно start-radar.bat)."""
-    print(line, flush=True)
+    try:
+        print(line, flush=True)
+    except UnicodeEncodeError:
+        pass  # cp1251 при spawn с пульта; radar.log уже в utf-8
 
 
 def _append_log_line(log_path: Path, line: str, *, echo: bool = False) -> None:
-
     log_path = Path(log_path)
-
     parent = log_path.parent
-
     if str(parent) not in ("", "."):
-
         parent.mkdir(parents=True, exist_ok=True)
-
     text = line.rstrip("\n") + "\n"
-
     with log_path.open("a", encoding="utf-8") as f:
-
         f.write(text)
-
     if echo:
-
         _echo(line.rstrip("\n"))
-
-
-
-
-
-def _log_cycle(
-
-    log_path: Path,
-
-    *,
-
-    ts: str,
-
-    cards_fl: int,
-
-    cards_kwork: int,
-
-    new_ids: int,
-
-    notifications: int,
-
-    errors: list[str],
-
-) -> None:
-
-    err_part = "; ".join(errors) if errors else "-"
-
-    line = (
-        f"{ts} карточки_fl={cards_fl} карточки_kwork={cards_kwork} "
-        f"новых={new_ids} уведом={notifications} ош={err_part}"
-    )
-
-    _append_log_line(log_path, line, echo=True)
-
-
-
 
 
 def _process_listings(
@@ -139,6 +145,7 @@ def _process_listings(
     errors: list[str],
     pg: NeonLeadStorage | None = None,
     tg_poll_state: dict[str, float] | None = None,
+    stats: SourceCycleStats | None = None,
 ) -> tuple[int, int]:
     """Обработка карточек одного источника; возвращает (new_ids, notifications)."""
     new_ids = 0
@@ -154,6 +161,7 @@ def _process_listings(
             cfg,
             errors=errors,
             pg=pg,
+            stats=stats,
         )
         if was_new:
             new_ids += 1
@@ -163,81 +171,65 @@ def _process_listings(
     return new_ids, notifications
 
 
-
-
-
 def _fetch_source(
-
     label: str,
-
     fetch_fn: Callable[[Config], list[ListingProject]],
-
     cfg: Config,
-
     errors: list[str],
-
+    stats: SourceCycleStats | None = None,
 ) -> list[ListingProject] | None:
-
     try:
-
         return fetch_fn(cfg)
-
     except _LISTING_ERRORS as exc:
-
-        errors.append(f"{label}:fetch:{short_err(exc)}")
-
+        msg = short_err(exc)
+        errors.append(f"{label}:fetch:{msg}")
+        if stats is not None:
+            stats.fetch_error = msg
         return None
-
     except Exception as exc:
-
-        errors.append(f"{label}:fetch:{short_err(exc)}")
-
+        msg = short_err(exc)
+        errors.append(f"{label}:fetch:{msg}")
+        if stats is not None:
+            stats.fetch_error = msg
         return None
 
 
+def _log_source_line(log_path: Path, stats: SourceCycleStats) -> None:
+    _append_log_line(log_path, stats.format_line(), echo=True)
 
+
+def _collect_misc_errors(errors: list[str], summary: CycleSummary) -> None:
+    """Ошибки без skip:* / fetch: — в конец цикла (не дублировать воронку)."""
+    for err in errors:
+        if ":fetch:" in err or " skip:" in err:
+            continue
+        if err not in summary.misc_errors:
+            summary.misc_errors.append(err)
 
 
 def run_cycle(
-
     cfg: Config,
-
     storage: ProjectStorage,
-
     word_filter: ListingWordFilter,
-
     pg: NeonLeadStorage | None = None,
-
 ) -> None:
-
     """Один проход: FL, затем Kwork (если URL задан) → storage → фильтр → TG."""
 
     ts = radar_timestamp()
-
     errors: list[str] = []
+    summary = CycleSummary(ts=ts)
+    enabled_sources = public_feed_sources()
 
-    cards_fl = 0
-
-    cards_kwork = 0
-
-    new_ids = 0
-
-    notifications = 0
-
-
-
-    _append_log_line(cfg.radar_log_path, f"{ts} цикл:старт")
+    _append_log_line(cfg.radar_log_path, summary.format_header(), echo=True)
 
     tg_poll_state: dict[str, float] = {"last": 0.0}
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
-    fl_projects = _fetch_source("fl", fetch_listing_projects, cfg, errors)
+    stats_fl = summary.ensure("fl")
+    fl_projects = _fetch_source("fl", fetch_listing_projects, cfg, errors, stats_fl)
     _tg_poll_if_due(cfg, storage, tg_poll_state)
-
     if fl_projects is not None:
-
-        cards_fl = len(fl_projects)
-
+        stats_fl.downloaded = len(fl_projects)
         n, notify = _process_listings(
             fl_projects,
             storage,
@@ -246,26 +238,22 @@ def run_cycle(
             errors=errors,
             pg=pg,
             tg_poll_state=tg_poll_state,
+            stats=stats_fl,
         )
-
-        new_ids += n
-
-        notifications += notify
+        stats_fl.new_ids = n
+        stats_fl.to_bot = notify
+        summary.total_to_bot += notify
+    _log_source_line(cfg.radar_log_path, stats_fl)
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
+    stats_kwork = summary.ensure("kwork")
     if cfg.kwork_projects_url:
-
         kwork_projects = _fetch_source(
-
-            "kwork", fetch_kwork_listing_projects, cfg, errors
-
+            "kwork", fetch_kwork_listing_projects, cfg, errors, stats_kwork
         )
-
         if kwork_projects is not None:
-
-            cards_kwork = len(kwork_projects)
-
+            stats_kwork.downloaded = len(kwork_projects)
             n, notify = _process_listings(
                 kwork_projects,
                 storage,
@@ -274,21 +262,24 @@ def run_cycle(
                 errors=errors,
                 pg=pg,
                 tg_poll_state=tg_poll_state,
+                stats=stats_kwork,
             )
-
-            new_ids += n
-
-            notifications += notify
+            stats_kwork.new_ids = n
+            stats_kwork.to_bot = notify
+            summary.total_to_bot += notify
+    _log_source_line(cfg.radar_log_path, stats_kwork)
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
-    enabled_sources = public_feed_sources()
     for source_label, fetch_fn in _P1_WEB_SOURCES:
+        stats_web = summary.ensure(source_label)
         if source_label not in enabled_sources:
+            _log_source_line(cfg.radar_log_path, stats_web)
             continue
         _tg_poll_if_due(cfg, storage, tg_poll_state)
-        web_projects = _fetch_source(source_label, fetch_fn, cfg, errors)
+        web_projects = _fetch_source(source_label, fetch_fn, cfg, errors, stats_web)
         if web_projects is not None:
+            stats_web.downloaded = len(web_projects)
             n, notify = _process_listings(
                 web_projects,
                 storage,
@@ -297,41 +288,25 @@ def run_cycle(
                 errors=errors,
                 pg=pg,
                 tg_poll_state=tg_poll_state,
+                stats=stats_web,
             )
-            new_ids += n
-            notifications += notify
+            stats_web.new_ids = n
+            stats_web.to_bot = notify
+            summary.total_to_bot += notify
+        _log_source_line(cfg.radar_log_path, stats_web)
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
-    record_fl_kwork_cycle(
-        storage,
-        cards_fl=cards_fl,
-        cards_kwork=cards_kwork,
-        new_ids=new_ids,
-        notifications=notifications,
-        errors=errors,
-    )
+    _collect_misc_errors(errors, summary)
+    record_cycle_summary(storage, summary)
 
-    _log_cycle(
-
-        cfg.radar_log_path,
-
-        ts=ts,
-
-        cards_fl=cards_fl,
-
-        cards_kwork=cards_kwork,
-
-        new_ids=new_ids,
-
-        notifications=notifications,
-
-        errors=errors,
-
-    )
-
-
-
+    _append_log_line(cfg.radar_log_path, summary.format_footer(), echo=True)
+    if summary.misc_errors:
+        _append_log_line(
+            cfg.radar_log_path,
+            f"Прочее: {'; '.join(summary.misc_errors[:5])}",
+            echo=True,
+        )
 
 
 def _poll_and_log_tg_commands(cfg: Config, storage: ProjectStorage) -> None:
@@ -377,18 +352,32 @@ def _sleep_with_tg_poll(
         time.sleep(min(float(chunk_sec), remaining))
 
 
+def _log_failed_cycle(
+    log_path: Path,
+    storage: ProjectStorage,
+    ts: str,
+    exc: BaseException,
+) -> None:
+    summary = CycleSummary(ts=ts)
+    summary.misc_errors.append(f"cycle:{short_err(exc)}")
+    _append_log_line(log_path, summary.format_header(), echo=True)
+    for stats in summary.iter_sources():
+        _append_log_line(log_path, stats.format_line(), echo=True)
+    _append_log_line(log_path, summary.format_footer(), echo=True)
+    _append_log_line(
+        log_path,
+        f"Прочее: {summary.misc_errors[0]}",
+        echo=True,
+    )
+    record_cycle_summary(storage, summary)
+
+
 def main() -> None:
-
     cfg = load_config()
-
     storage = storage_from_config(cfg)
-
     pg = pg_storage_from_config(cfg)
-
     word_filter = default_listing_filter()
-
     interval_sec = max(1, cfg.poll_interval_minutes * 60)
-
     _echo(f"=== RawLead запущен ({radar_timestamp()}, Иркутск) ===")
     _echo(f"Лог: {cfg.radar_log_path.resolve()}")
     _echo(
@@ -415,73 +404,40 @@ def main() -> None:
         )
 
     while True:
-
         _poll_and_log_tg_commands(cfg, storage)
 
         try:
             run_health_check(cfg, storage, log_path=cfg.radar_log_path, force=False)
         except Exception as exc:
-            ts_h = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            ts_h = radar_timestamp()
             _append_log_line(
                 cfg.radar_log_path,
                 f"{ts_h} здравье:ошибка {short_err(exc)}",
             )
 
         if storage.is_radar_paused():
-
             ts = radar_timestamp()
-
             _append_log_line(cfg.radar_log_path, f"{ts} цикл:пауза", echo=True)
-
             _sleep_with_tg_poll(cfg, storage, random.randint(10, 15))
-
             continue
 
         try:
-
             run_cycle(cfg, storage, word_filter, pg)
-
         except Exception as exc:
-
             ts = radar_timestamp()
-
-            _log_cycle(
-
-                cfg.radar_log_path,
-
-                ts=ts,
-
-                cards_fl=0,
-
-                cards_kwork=0,
-
-                new_ids=0,
-
-                notifications=0,
-
-                errors=[f"cycle:{short_err(exc)}"],
-
-            )
+            _log_failed_cycle(cfg.radar_log_path, storage, ts, exc)
 
         _sleep_with_tg_poll(cfg, storage, interval_sec)
 
 
-
-
-
 if __name__ == "__main__":
-
-    import sys
-
-
-
     if len(sys.argv) >= 2 and sys.argv[1] == "--telegram-smoke":
-
         from tg_smoke import run_smoke
 
-
-
         raise SystemExit(run_smoke())
-
-    main()
-
+    if not _enter_main_single_instance():
+        raise SystemExit(1)
+    try:
+        main()
+    finally:
+        _release_main_lock()

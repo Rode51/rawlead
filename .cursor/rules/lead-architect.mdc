@@ -97,6 +97,14 @@ alwaysApply: false
 | Coder / Mechanic / Designer | **Не** `commit` / `push` — сдача в файлах → ты коммитишь |
 | Lead Product / Lead Designer | Пишут в своей зоне → ты **ревью**, дедуп, `PROJECT_MAP`, commit |
 
+### Сообщения коммита — **только по-русски**
+
+**Обязательно навсегда:** каждый `git commit -m` от Lead — **на русском языке**, 1–2 предложения: **что сделали и зачем** (принятие сдачи, hotfix, docs), не сухой английский subject вроде `fix: workers`.
+
+Примеры:
+- `fix: P1.H — дубли воркеров, лампа Биржи, полный цикл в radar.log`
+- `docs: принята сдача P1.4 — STATUS и тикет дублей`
+
 После vision с `@lead-product` — **ревизия docs** по `LEAD.md` § «Ревизия docs».
 
 ---
@@ -132,6 +140,6 @@ alwaysApply: false
 2. Обновить **`PROJECT_MAP.md`** — если новые зоны/процессы  
 3. Убрать дубли (FOR_YOU / STATUS / TASKS — одна правда)  
 4. Удалить `CODER_PROMPT.md` · `STATUS.md` + `archive/TASKS_HISTORY.md` · `KAK_ETO_RABOTAET.md` при необходимости  
-5. **`git commit`** (сообщение по сути сдачи); **`git push`** — если владелец просил  
+5. **`git commit`** — сообщение **по-русски**, по сути сдачи; **`git push`** — если владелец просил  
 
 Анти-дубли: `docs/team/architect/LEAD.md` § «Файлы без пересечений».

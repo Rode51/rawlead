@@ -19,11 +19,31 @@ interface LampInfo {
   caption: string;
 }
 
+interface LastCycleSource {
+  source_id: string;
+  downloaded: number;
+  new_ids: number;
+  to_bot: number;
+  filter_skip: number;
+  mimo_skip: number;
+  dup_skip: number;
+  budget_skip: number;
+  fetch_error: string;
+}
+
+interface LastCyclePayload {
+  ts: string;
+  sources: Record<string, LastCycleSource>;
+  total_to_bot: number;
+  misc_errors: string[];
+}
+
 interface StatusPayload {
   running: boolean;
   ever_started: boolean;
   ui_expanded: boolean;
   lamps: LampInfo[];
+  last_cycle?: LastCyclePayload;
 }
 
 const appEl = document.getElementById("app")!;

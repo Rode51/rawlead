@@ -66,7 +66,7 @@ def _acquire_single_instance() -> bool:
     try:
         fh = open(_TG_MAIN_LOCK, "a+b")
     except OSError:
-        return True
+        return False
     if msvcrt is not None:
         try:
             fh.seek(0)
@@ -122,6 +122,11 @@ async def _heartbeat_loop(cfg, storage, log_path: Path) -> None:
     while True:
         await _write_pulse(cfg, storage, log_path)
         await asyncio.sleep(_HEARTBEAT_SEC)
+
+
+def _log_tg_lock_busy(log_path: Path) -> None:
+    line = f"{radar_timestamp()} радар:дубль:второй tg_main — уже работает"
+    _append_log(log_path, line)
 
 
 def _log_start() -> None:
@@ -198,10 +203,16 @@ async def _loop() -> None:
 
 
 if __name__ == "__main__":
-    _log_start()
+    try:
+        _cfg = load_config()
+        _log_path = _cfg.radar_log_path
+    except Exception:
+        _log_path = _ROOT / "data" / "radar.log"
     if not _acquire_single_instance():
+        _log_tg_lock_busy(_log_path)
         raise SystemExit(1)
     try:
+        _log_start()
         asyncio.run(_loop())
     except KeyboardInterrupt:
         print("TG-монитор остановлен.", flush=True)

@@ -1,7 +1,7 @@
 # Дубли python (venv + system) ломают TG
 
 **Дата:** 2026-05-24  
-**Статус:** решено (Mechanic 2026-05-24, регрессия radar_control)  
+**Статус:** регрессия 2026-05-26 — см. [`2026-05-26-duplicate-workers-regression.md`](2026-05-26-duplicate-workers-regression.md) · было «решено» 2026-05-24  
 **Связь:** [`2026-05-24-tg-forward-not-via-bot.md`](2026-05-24-tg-forward-not-via-bot.md) § I
 
 ## Симптом

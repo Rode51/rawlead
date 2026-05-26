@@ -20,6 +20,7 @@ from health_check import (
     is_tg_monitor_active,
     tg_monitor_warmup_remaining_sec,
 )
+from radar_cycle_log import format_cycle_status_block, load_cycle_summary
 from storage import ProjectStorage
 from tg_bot_start import is_bot_started
 from tg_client import resolve_telethon_account
@@ -313,28 +314,7 @@ def format_status_message(cfg: Config, storage: ProjectStorage) -> str:
         f"опрос {cfg.poll_interval_minutes} мин"
     )
 
-    cycle_at = storage.get_setting(_STATUS_FL_CYCLE_AT, "").strip()
-    if cycle_at:
-        lines.append(f"Последний цикл: {cycle_at}")
-        lines.append(
-            f"  Карточки: FL {_int_setting(storage, _STATUS_FL[0])}, "
-            f"Kwork {_int_setting(storage, _STATUS_FL[1])}"
-        )
-        lines.append(
-            f"  Новых: {_int_setting(storage, _STATUS_FL[2])} · "
-            f"в бот: {_int_setting(storage, _STATUS_FL[3])}"
-        )
-        err_raw = storage.get_setting(_STATUS_FL[4], "[]")
-        try:
-            fl_errors = json.loads(err_raw)
-        except json.JSONDecodeError:
-            fl_errors = []
-        if fl_errors:
-            lines.append("  Ошибки цикла:")
-            for e in fl_errors[:3]:
-                lines.append(f"    · {str(e)[:120]}")
-    else:
-        lines.append("Последний цикл: ещё не было")
+    lines.extend(format_cycle_status_block(storage))
 
     lines.append("")
     tg_ok, tg_detail = _tg_monitor_state(storage)

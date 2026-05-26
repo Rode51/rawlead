@@ -16,13 +16,66 @@
 | **§ V10.5** | ✅ **принято владельцем 2026-05-26** |
 | **§ P7 category** | ✅ **принято владельцем 2026-05-26** |
 | **Ворота прод** | ⏳ P1 ✅ → D1 → P4 → [`PRE_PROD_GATE.md`](../architect/PRE_PROD_GATE.md) |
-| **Coder § P1** | ✅ P1.3c парсеры (smoke 12+10+25) · приёмка лога после рестарта · TG ⏳ P1.2b |
+| **Coder § P1** | ✅ P1.3c · ✅ **P1.4** · ✅ **P1.H** · TG ⏳ P1.2b |
 | **§ P5 деплой** | ⏸ после ворот + «едем на прод» |
 | **Ingest «всё для всех»** | ❌ отменено |
 | **Dogfood** | ✅ бот без ослабления фильтров |
 | **Хостинг** | ⏳ после V10 |
 
-**Coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) § **P1** (след. **D1** — Design)
+**Coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) § **D1** (после Design) · P1.4 ✅ · **P1.H** ✅
+
+### Принято владельцем (§ P1.H, 2026-05-26)
+
+- Пульт: **Биржи ok**, `count_radar_workers() == (1, 1)`
+- `data/radar.log`: цикл **18:38:11** — один `── Цикл ──`, 5 бирж + `Итого в бот`
+- `GET /status` → `last_cycle.ts` совпадает с логом
+- Доп. фикс: `main.py` `_echo` — `UnicodeEncodeError` под cp1251 (spawn с пульта), иначе main падал сразу после заголовка цикла
+- Оговорка: иногда остаются **system Python** дубли main/tg — снять **Стоп → ▶** с пульта; не критерий отказа
+
+### Сделано (Coder § P1.H, 2026-05-26)
+
+| § | Что |
+|---|-----|
+| R1 | `src/main.py` — `data/.main.lock`, второй экземпляр exit 1 + строка в `radar.log` |
+| R2 | **Не** `kill_duplicate` в `main`/`tg_main` при старте (убивал дочерний system Python, exit 15/0). Очистка — `radar_control` `pre_spawn` + lock |
+| R2b | `kill_duplicate_radar_workers` — `keep_pids` / дерево `expand_spawn_keep_pids` (не резать child PID) |
+| R3 | После ▶: только `pre_spawn` (без `post_spawn`/`trim`); `count==(1,1)`; при наличии `.venv` воркера — 1 логический main/tg |
+| R3b | `kill_non_venv`: не трогать **только** `.venv\\Scripts\\python(.exe)`; system+путь проекта — убить |
+| R3d | `count_radar_workers` — shim+child = 1 логический воркер |
+| R4 | `data/.radar_ops.lock` — межпроцессный lock `/start`/`/stop` (гонка 2× radar_control) |
+| R5 | `stop-radar.bat` — main/tg/join (`python`+`pythonw`), **без** `radar_control` / API |
+| R6 | `tg_main` — lock до `_log_start`; fail-closed; `radar_control` lock — fail-closed |
+| — | `start-radar-desktop.bat` — если `/health` ok, не kill API (двойной ярлык) |
+
+**Источник 2× main:** гонка двух `radar_control` на `/start` (каждый spawn main+tg) + system/Cursor воркеры; не bat spawn.
+
+**Файлы:** `src/main.py`, `scripts/tg_main.py`, `src/process_guard.py`, `scripts/radar_control.py`, `scripts/stop-radar.bat`, `scripts/start-radar-desktop.bat`
+
+**Как проверить:**
+0. После правок **перезапустить API пульта** (закрыть Tauri / убить `radar_control.py`, снова `start-radar-desktop.bat`) — иначе старый код в памяти
+1. Пульт уже открыт (API жив) → `scripts\stop-radar.bat` → API **не** падает (`http://127.0.0.1:18765/health` ok)
+2. Пульт ▶ → `count_radar_workers()` → `(1, 1)`, **5+ мин** живы (exe может быть `.venv` или system+путь проекта)
+3. `data/radar.log` — **нет** `радар:дубль` с `radar_control:post_spawn` / `:trim` сразу после ▶; один `── Цикл ──`, 5 строк FL…Habr + `Итого`, лампа **Биржи ok**
+4. Второй ручной `start-radar-all.bat` при работающем пульте — lock, дубль не остаётся
+
+Тикет: [`2026-05-26-duplicate-workers-regression.md`](../../problems/2026-05-26-duplicate-workers-regression.md)
+
+### Сделано (Coder § P1.4, 2026-05-26)
+
+| § | Что |
+|---|-----|
+| P1.4.1 | `data/radar.log` — `── Цикл … ──`, строка на **5** источников (fl/kwork/vc_ru/freelancehunt/habr_career), `Итого в бот │ на сайт` |
+| P1.4.1 | `SourceCycleStats` — filter / МИМО / dup / budget без раздувания `errors[]` |
+| P1.4.2 | `radar_control` tail **800** строк; вкладка **Статус** — «Последний цикл» из SQLite |
+| P1.4.2 | `GET /status` → `last_cycle` JSON (опц.) |
+
+**Файлы:** `src/radar_cycle_log.py`, `src/main.py`, `src/lead_pipeline.py`, `src/radar_status.py`, `scripts/radar_control.py`, `desktop/src/main.ts`, `docs/ops/RUN.md`, `docs/ops/RADAR_LOG.md`
+
+**Как проверить:**
+1. Перезапуск радара (`start-radar.bat`)
+2. `data/radar.log` — после цикла 5 строк источников + итого (не `карточки_fl=…`)
+3. Пульт → вкладка **Статус** — те же строки в блоке «Последний цикл»
+4. [`RADAR_LOG.md`](../../ops/RADAR_LOG.md) — расшифровка колонок
 
 ### Сделано (Coder § P1, 2026-05-26)
 

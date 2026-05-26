@@ -25,6 +25,8 @@ _ALL_MATCH = (
 )
 # CommandLine без полного пути (system pythonw + scripts\radar_control.py)
 _RADAR_CONTROL_MATCH = r"radar_control\.py"
+# Пульт spawn'ит только .venv\Scripts\python.exe — system/Cursor воркеры = дубль
+_VENV_EXE = re.compile(r"\.venv[\\/]Scripts[\\/]python(?:w)?\.exe", re.IGNORECASE)
 
 
 def _iter_python_procs():
@@ -46,6 +48,155 @@ def _cmd_str(proc) -> str:
         return ""
 
 
+def _is_venv_interpreter(cmd: str) -> bool:
+    return bool(_VENV_EXE.search(cmd))
+
+
+def _is_project_radar_cmd(cmd: str) -> bool:
+    """main/tg_main из корня репо — воркер пульта, даже если exe не .venv\\Scripts\\python."""
+    if not cmd:
+        return False
+    base = re.escape(str(_PROJECT_ROOT))
+    main_rx = re.compile(rf"{base}[\\/]src[\\/]main\.py", re.IGNORECASE)
+    tg_rx = re.compile(rf"{base}[\\/]scripts[\\/]tg_main\.py", re.IGNORECASE)
+    return bool(main_rx.search(cmd) or tg_rx.search(cmd))
+
+
+def _is_trusted_radar_worker(cmd: str) -> bool:
+    return _is_venv_interpreter(cmd) or _is_project_radar_cmd(cmd)
+
+
+def _is_real_radar_worker(cmd: str) -> bool:
+    """Дочерний процесс venv-shim: system/home python + скрипт из корня проекта."""
+    return _is_project_radar_cmd(cmd) and not _is_venv_interpreter(cmd)
+
+
+def expand_spawn_keep_pids(pids: set[int] | None) -> set[int]:
+    """popen.pid + дерево потомков (Windows: .venv exe → system python + main.py)."""
+    expanded: set[int] = set(pids or ())
+    for pid in list(expanded):
+        try:
+            proc = psutil.Process(pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+        for child in proc.children(recursive=True):
+            try:
+                name = (child.name() or "").lower()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+            if name in ("python.exe", "pythonw.exe"):
+                expanded.add(child.pid)
+    return expanded
+
+
+def _kill_pids(pids: list[int]) -> list[int]:
+    killed: list[int] = []
+    for pid in pids:
+        try:
+            psutil.Process(pid).kill()
+            killed.append(pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    return killed
+
+
+def _worker_groups() -> tuple[list[tuple[int, bool, str]], list[tuple[int, bool, str]]]:
+    """(pid, is_venv, cmdline) для main и tg_main."""
+    main_rx = re.compile(_ROLE_MATCH["main"], re.IGNORECASE)
+    tg_rx = re.compile(_ROLE_MATCH["tg_main"], re.IGNORECASE)
+    mains: list[tuple[int, bool, str]] = []
+    tgs: list[tuple[int, bool, str]] = []
+    for proc in _iter_python_procs():
+        cmd = _cmd_str(proc)
+        if not cmd:
+            continue
+        venv = _is_venv_interpreter(cmd)
+        if main_rx.search(cmd):
+            mains.append((proc.pid, venv, cmd))
+        if tg_rx.search(cmd):
+            tgs.append((proc.pid, venv, cmd))
+    return mains, tgs
+
+
+def _pick_worker_to_keep(
+    group: list[tuple[int, bool, str]], keep_pids: set[int]
+) -> int | None:
+    if not group:
+        return None
+
+    def rank(item: tuple[int, bool, str]) -> tuple:
+        pid, _venv, cmd = item
+        return (
+            pid in keep_pids,
+            _is_real_radar_worker(cmd),
+            _is_trusted_radar_worker(cmd),
+            pid,
+        )
+
+    return max(group, key=rank)[0]
+
+
+def _count_logical_group(group: list[tuple[int, bool, str]]) -> int:
+    """Один логический воркер: приоритет .venv; иначе system+скрипт проекта."""
+    if not group:
+        return 0
+    if any(venv for _pid, venv, _cmd in group):
+        return 1
+    reals = [item for item in group if _is_real_radar_worker(item[2])]
+    if reals:
+        return len(reals)
+    return 1
+
+
+def kill_non_venv_radar_workers(
+    *,
+    keep_pids: set[int] | None = None,
+    log_path: Path | None = None,
+    log_source: str = "guard:non_venv",
+) -> list[int]:
+    """Убить main/tg_main вне .venv и вне корня проекта (Cursor, чужой bat)."""
+    if sys.platform != "win32":
+        return []
+    keep = keep_pids or set()
+    mains, tgs = _worker_groups()
+    pids: list[int] = []
+    for pid, _venv, cmd in mains + tgs:
+        if pid in keep:
+            continue
+        if _is_venv_interpreter(cmd):
+            continue
+        pids.append(pid)
+    killed = _kill_pids(pids)
+    if killed:
+        log_duplicate_kills(killed, log_path=log_path, source=log_source)
+    return killed
+
+
+def trim_radar_workers_to_pair(
+    *,
+    keep_pids: set[int] | None = None,
+    log_path: Path | None = None,
+    log_source: str = "guard:trim",
+) -> list[int]:
+    """Оставить не больше 1 main и 1 tg; приоритет keep_pids, затем .venv, затем новый PID."""
+    if sys.platform != "win32":
+        return []
+    keep = keep_pids or set()
+    mains, tgs = _worker_groups()
+    to_kill: list[int] = []
+    for group in (mains, tgs):
+        if len(group) <= 1:
+            continue
+        keep_pid = _pick_worker_to_keep(group, keep)
+        if keep_pid is None:
+            continue
+        to_kill.extend(pid for pid, _, _ in group if pid != keep_pid)
+    killed = _kill_pids(to_kill)
+    if killed:
+        log_duplicate_kills(killed, log_path=log_path, source=log_source)
+    return killed
+
+
 def _kill_matching(pattern: str, except_pid: int | None = None) -> list[int]:
     killed: list[int] = []
     rx = re.compile(pattern, re.IGNORECASE)
@@ -62,19 +213,11 @@ def _kill_matching(pattern: str, except_pid: int | None = None) -> list[int]:
 
 
 def count_radar_workers() -> tuple[int, int]:
-    """Число процессов main.py и tg_main.py (Windows)."""
+    """Число логических воркеров main.py и tg_main.py (Windows)."""
     if sys.platform != "win32":
         return 0, 0
-    main_rx = re.compile(_ROLE_MATCH["main"], re.IGNORECASE)
-    tg_rx = re.compile(_ROLE_MATCH["tg_main"], re.IGNORECASE)
-    mc = tc = 0
-    for proc in _iter_python_procs():
-        cmd = _cmd_str(proc)
-        if main_rx.search(cmd):
-            mc += 1
-        if tg_rx.search(cmd):
-            tc += 1
-    return mc, tc
+    mains, tgs = _worker_groups()
+    return _count_logical_group(mains), _count_logical_group(tgs)
 
 
 def log_duplicate_kills(
@@ -125,23 +268,58 @@ def kill_duplicate_radar_workers(
     *,
     role: str | None = None,
     except_pid: int | None = None,
+    keep_pids: set[int] | None = None,
     log_path: Path | None = None,
     log_source: str = "guard",
 ) -> list[int]:
     """Завершить чужие uisness main/tg_main/join. role — только свой скрипт; без role — все воркеры."""
     if sys.platform != "win32":
         return []
-    pid = int(except_pid if except_pid is not None else os.getpid())
+    keep = set(keep_pids or ())
+    if except_pid is not None:
+        keep.add(int(except_pid))
+    elif not keep:
+        keep.add(os.getpid())
+    keep = expand_spawn_keep_pids(keep)
     if role is not None:
         match = _ROLE_MATCH.get(role)
         if not match:
             return []
     else:
         match = _ALL_MATCH
-    killed = _kill_matching(match, except_pid=pid)
+    rx = re.compile(match, re.IGNORECASE)
+    killed: list[int] = []
+    for proc in _iter_python_procs():
+        if proc.pid in keep:
+            continue
+        if rx.search(_cmd_str(proc)):
+            try:
+                proc.kill()
+                killed.append(proc.pid)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
     if killed:
         log_duplicate_kills(killed, log_path=log_path, source=log_source)
     return killed
+
+
+def release_stale_worker_locks() -> None:
+    """Снять lock-файлы воркеров после stop/kill, если процессов не осталось."""
+    if sys.platform != "win32":
+        return
+    time.sleep(0.25)
+    mc, _tc = count_radar_workers()
+    if mc == 0:
+        try:
+            (_PROJECT_ROOT / "data" / ".main.lock").unlink(missing_ok=True)
+        except OSError:
+            pass
+    try:
+        from health_check import try_release_stale_tg_main_lock
+
+        try_release_stale_tg_main_lock()
+    except Exception:
+        pass
 
 
 def wait_radar_workers_stopped(*, timeout_sec: float = 8.0) -> bool:

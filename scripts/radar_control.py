@@ -10,6 +10,8 @@ import json
 import subprocess
 import sys
 import threading
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -27,20 +29,49 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
 _LOCK_PATH = _ROOT / "data" / ".radar_desktop.lock"
+_OPS_LOCK_PATH = _ROOT / "data" / ".radar_ops.lock"
 _PYTHON = _ROOT / ".venv" / "Scripts" / "python.exe"
 _LOG_RADAR = _ROOT / "data" / "radar.log"
 _LOG_JOIN = _ROOT / "data" / "tg_join.log"
-_TAIL_LINES = 200
+_TAIL_LINES = 800
 _DEFAULT_PORT = 18765
 
 from process_guard import (
     count_radar_workers,
     kill_duplicate_radar_workers,
-    kill_other_radar_control,
+    kill_non_venv_radar_workers,
     wait_radar_workers_stopped,
 )
 
 _lock_fh = None
+_ops_lock_fh = None
+
+
+@contextmanager
+def _radar_ops_lock():
+    """Межпроцессный lock: два radar_control не гоняют /start (4 воркера)."""
+    global _ops_lock_fh
+    _OPS_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    fh = None
+    try:
+        fh = open(_OPS_LOCK_PATH, "a+b")
+        if msvcrt is not None:
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        _ops_lock_fh = fh
+        yield True
+    except OSError:
+        yield False
+    finally:
+        if fh is not None:
+            try:
+                if msvcrt is not None:
+                    fh.seek(0)
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
+            fh.close()
+        _ops_lock_fh = None
 
 
 def _acquire_single_instance() -> bool:
@@ -49,7 +80,7 @@ def _acquire_single_instance() -> bool:
     try:
         fh = open(_LOCK_PATH, "a+b")
     except OSError:
-        return True
+        return False
     if msvcrt is not None:
         try:
             fh.seek(0)
@@ -91,12 +122,9 @@ def _hidden_popen(args: list[str], cwd: Path) -> subprocess.Popen:
 
 def _release_stale_tg_lock() -> None:
     try:
-        from health_check import try_release_stale_tg_main_lock
+        from process_guard import release_stale_worker_locks
 
-        import time
-
-        time.sleep(0.3)
-        try_release_stale_tg_main_lock()
+        release_stale_worker_locks()
     except Exception:
         pass
 
@@ -159,54 +187,91 @@ class RadarController:
             self._ui_expanded = expanded
 
     def start(self) -> dict:
-        with self._lock:
-            if self._starting:
-                return {"ok": False, "error": "already_starting"}
-            if not _PYTHON.is_file():
-                return {
-                    "ok": False,
-                    "error": "no_venv",
-                    "detail": f"Нет Python: {_PYTHON}",
-                }
-            mc, tc = count_radar_workers()
-            popens_ok = all(
-                s.popen is not None and s.popen.poll() is None for s in self.children
-            )
-            if popens_ok and mc >= 1 and tc >= 1:
-                return {"ok": False, "error": "already_running"}
-            self._starting = True
-            self._ever_started = True
-            errors: list[str] = []
-            try:
+        with _radar_ops_lock() as ops_ok:
+            if not ops_ok:
+                return {"ok": False, "error": "ops_lock_busy"}
+            with self._lock:
+                if self._starting:
+                    return {"ok": False, "error": "already_starting"}
+                if not _PYTHON.is_file():
+                    return {
+                        "ok": False,
+                        "error": "no_venv",
+                        "detail": f"Нет Python: {_PYTHON}",
+                    }
+                mc, tc = count_radar_workers()
+                popens_ok = all(
+                    s.popen is not None and s.popen.poll() is None
+                    for s in self.children
+                )
+                if popens_ok and mc >= 1 and tc >= 1:
+                    return {"ok": False, "error": "already_running"}
+                self._starting = True
+                self._ever_started = True
+                errors: list[str] = []
                 try:
-                    from config import load_config, telethon_monitor_accounts
-                    from radar_status import reset_tg_session_stats
-                    from storage import storage_from_config
-
-                    reset_tg_session_stats(
-                        storage_from_config(load_config()),
-                        telethon_monitor_accounts(),
-                    )
-                except Exception:
-                    pass
-                self._stop_unlocked(sweep_orphans=True)
-                for spec in self.children:
-                    script = spec.script_path()
-                    if not script.is_file():
-                        errors.append(f"Нет файла: {script}")
-                        continue
                     try:
-                        spec.popen = _hidden_popen(
-                            [str(_PYTHON), "-u", str(script)],
-                            _ROOT,
+                        from config import load_config, telethon_monitor_accounts
+                        from radar_status import reset_tg_session_stats
+                        from storage import storage_from_config
+
+                        reset_tg_session_stats(
+                            storage_from_config(load_config()),
+                            telethon_monitor_accounts(),
                         )
-                    except OSError as exc:
-                        errors.append(f"{spec.label}: {exc}")
-                        spec.popen = None
-                self._ui_expanded = False
-                return {"ok": len(errors) == 0, "errors": errors}
-            finally:
-                self._starting = False
+                    except Exception:
+                        pass
+                    self._stop_unlocked(sweep_orphans=True)
+                    kill_duplicate_radar_workers(
+                        log_source="radar_control:pre_spawn"
+                    )
+                    kill_non_venv_radar_workers(
+                        log_source="radar_control:pre_spawn"
+                    )
+                    for spec in self.children:
+                        script = spec.script_path()
+                        if not script.is_file():
+                            errors.append(f"Нет файла: {script}")
+                            continue
+                        try:
+                            spec.popen = _hidden_popen(
+                                [str(_PYTHON), "-u", str(script)],
+                                _ROOT,
+                            )
+                        except OSError as exc:
+                            errors.append(f"{spec.label}: {exc}")
+                            spec.popen = None
+                    mc, tc = 0, 0
+                    deadline = time.monotonic() + 5.0
+                    spawn_failed = False
+                    while time.monotonic() < deadline:
+                        for spec in self.children:
+                            if spec.popen is None:
+                                continue
+                            rc = spec.popen.poll()
+                            if rc is not None:
+                                errors.append(
+                                    f"{spec.label}: процесс завершился (код {rc})"
+                                )
+                                spawn_failed = True
+                        if spawn_failed:
+                            break
+                        mc, tc = count_radar_workers()
+                        if mc == 1 and tc == 1:
+                            break
+                        time.sleep(0.25)
+                    else:
+                        if not spawn_failed:
+                            errors.append(
+                                f"воркеры main={mc} tg={tc} (ожидалось 1/1)"
+                            )
+                            spawn_failed = True
+                    if spawn_failed or mc != 1 or tc != 1:
+                        self._stop_unlocked(sweep_orphans=True)
+                    self._ui_expanded = False
+                    return {"ok": len(errors) == 0, "errors": errors}
+                finally:
+                    self._starting = False
 
     def _stop_unlocked(self, *, sweep_orphans: bool = True) -> dict:
         """Остановка без захвата lock (вызывать только из start/stop под lock)."""
@@ -235,12 +300,15 @@ class RadarController:
             pass
 
     def stop(self, silent: bool = False) -> dict:
-        with self._lock:
-            was_running = self.workers_running()
-            result = self._stop_unlocked(sweep_orphans=True)
-            if was_running and not silent:
-                self._notify_goodbye()
-            return result
+        with _radar_ops_lock() as ops_ok:
+            if not ops_ok:
+                return {"ok": False, "error": "ops_lock_busy"}
+            with self._lock:
+                was_running = self.workers_running()
+                result = self._stop_unlocked(sweep_orphans=True)
+                if was_running and not silent:
+                    self._notify_goodbye()
+                return result
 
     def lamp_state(self, spec: ChildSpec, workers_active: bool) -> str:
         if self._is_alive(spec):
@@ -294,12 +362,25 @@ class RadarController:
                         "caption": caption,
                     }
                 )
-            return {
+            payload: dict = {
                 "running": workers,
                 "ever_started": self._ever_started,
                 "ui_expanded": self._ui_expanded,
                 "lamps": lamps,
             }
+            try:
+                from config import load_config
+                from radar_cycle_log import load_cycle_summary
+                from storage import storage_from_config
+
+                if storage is None:
+                    storage = storage_from_config(load_config())
+                summary = load_cycle_summary(storage)
+                if summary is not None:
+                    payload["last_cycle"] = summary.to_storage_dict()
+            except Exception:
+                pass
+            return payload
 
     def status_text(self) -> tuple[int, str]:
         try:

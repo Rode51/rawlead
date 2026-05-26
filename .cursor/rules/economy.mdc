@@ -36,6 +36,7 @@ alwaysApply: true
 - **Lead = 0 кода** (только `docs/`); код — `@coder` / `@mechanic` (см. `lead-no-code.mdc`)
 - Coder: **новый чат на задачу**; цикл — `docs/team/common/SCALE.md`
 - **Git commit / push** — **только Lead Architect**; Coder/Mechanic/Designer не коммитят; push — по просьбе владельца
+- **Сообщения коммита Lead** — **только по-русски** (что сделали / приняли), см. `lead-architect.mdc` § Git
 - **Перед работой** — [`docs/README.md`](docs/README.md) → [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) → файл роли; не «тыкаться» по всему repo
 - **После `CODER_PROMPT.md`** — в чат владельцу: блок **копипаст** для `@coder` (см. `lead-architect.mdc`)
 - **Код:** без простыней; карта — `docs/team/architect/CODE_STRUCTURE.md`; перенос папок — отдельное TZ + правка путей

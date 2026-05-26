@@ -13,6 +13,14 @@
 
 ---
 
+# § P1.H — HOTFIX: дубли процессов + красная «Биржи» (✅ принято 2026-05-26, архив)
+
+Тикет: [`docs/problems/2026-05-26-duplicate-workers-regression.md`](../../problems/2026-05-26-duplicate-workers-regression.md) · факты: [`STATUS.md`](../common/STATUS.md) § P1.H
+
+**Следующий Coder:** § **D1** (после Design), не P1.H.
+
+---
+
 # § V10.5 — Hotfix (архив): `GET /v1/feed` с `skills=` (500)
 
 Тикет: [`docs/problems/2026-05-26-feed-skills-jsonb-500.md`](../../problems/2026-05-26-feed-skills-jsonb-500.md)

@@ -4,6 +4,10 @@ call "%~dp0_radar-env.bat"
 if errorlevel 1 pause & exit /b 1
 cd /d "%RADAR_ROOT%"
 
+REM API уже жив — не убивать radar_control (двойной клик по ярлыку)
+"%RADAR_ROOT%\.venv\Scripts\python.exe" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18765/health', timeout=2)" >nul 2>&1
+if not errorlevel 1 goto desktop_only
+
 REM Python API — убить все radar_control (venv + system), потом запустить чистый
 "%RADAR_ROOT%\.venv\Scripts\python.exe" -c "import sys; sys.path.insert(0,r'%RADAR_ROOT%\src'); from process_guard import kill_all_radar_control; kill_all_radar_control()" >nul 2>&1
 timeout /t 1 /nobreak >nul
@@ -20,6 +24,7 @@ set "PYTHONPATH=%RADAR_ROOT%\.venv\Lib\site-packages"
 start "" /B "%RADAR_PYW%" "%RADAR_ROOT%\scripts\radar_control.py"
 timeout /t 2 /nobreak >nul
 
+:desktop_only
 cd /d "%RADAR_ROOT%\desktop"
 if not exist "node_modules\" (
   echo npm install v desktop\ ...

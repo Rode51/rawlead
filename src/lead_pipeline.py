@@ -14,6 +14,7 @@ from listing import SOURCE_FL, ListingProject
 from listing_dedup import listing_content_hash
 from pg_storage import NeonLeadStorage
 from storage import ProjectStorage
+from radar_cycle_log import SourceCycleStats
 from telegram_notify import TelegramNotifyError, send_project_notification_from_config
 
 _TELEGRAM_BOT_IN_PATH = re.compile(r"(/bot)[^/\s]+(/)")
@@ -82,6 +83,7 @@ def plan_new_listing(
     *,
     errors: list[str],
     pg: NeonLeadStorage | None = None,
+    stats: SourceCycleStats | None = None,
 ) -> tuple[bool, ListingNotifyPlan | None]:
     """Возвращает (was_new, plan). plan — только если нужно слать уведомление."""
     try:
@@ -97,6 +99,8 @@ def plan_new_listing(
 
     if not word_filter.accepts_listing(project, wide=cfg.filter_wide):
         errors.append(f"{project.source}:id={project.project_id} skip:filter")
+        if stats is not None:
+            stats.note_skip("skip:filter")
         return True, None
 
     fingerprint = listing_content_hash(
@@ -106,6 +110,8 @@ def plan_new_listing(
         fingerprint, source=project.source
     ):
         errors.append(f"{project.source}:id={project.project_id} skip:dup_content")
+        if stats is not None:
+            stats.note_skip("skip:dup_content")
         return True, None
 
     if pg is not None:
@@ -117,6 +123,8 @@ def plan_new_listing(
             body=ingest_body,
         ):
             errors.append(f"{project.source}:id={project.project_id} skip:dup_content")
+            if stats is not None:
+                stats.note_skip("skip:dup_content")
             return True, None
 
     analysis = None
@@ -126,6 +134,8 @@ def plan_new_listing(
     if cfg.ai_active:
         if not meets_min_budget(project.budget_text, cfg.min_budget_rub):
             errors.append(f"{project.source}:id={project.project_id} skip:budget")
+            if stats is not None:
+                stats.note_skip("skip:budget")
             return True, None
 
         description = _resolve_description(project, cfg, errors)
@@ -143,9 +153,10 @@ def plan_new_listing(
         if analysis is None:
             ai_unavailable = True
         elif not _should_notify_after_ai(cfg, analysis):
-            errors.append(
-                f"{project.source}:id={project.project_id} skip:ai:{analysis.verdict}"
-            )
+            reason = f"skip:ai:{analysis.verdict}"
+            errors.append(f"{project.source}:id={project.project_id} {reason}")
+            if stats is not None:
+                stats.note_skip(reason)
             return True, None
 
     return True, ListingNotifyPlan(
@@ -200,10 +211,11 @@ def process_new_listing(
     *,
     errors: list[str],
     pg: NeonLeadStorage | None = None,
+    stats: SourceCycleStats | None = None,
 ) -> tuple[bool, bool]:
     """Возвращает (was_new, notified). Дубликат в SQLite → (False, False)."""
     was_new, plan = plan_new_listing(
-        project, storage, word_filter, cfg, errors=errors, pg=pg
+        project, storage, word_filter, cfg, errors=errors, pg=pg, stats=stats
     )
     if plan is None:
         return was_new, False
@@ -220,6 +232,7 @@ async def process_new_listing_from_tg(
     *,
     errors: list[str],
     pg: NeonLeadStorage | None = None,
+    stats: SourceCycleStats | None = None,
     account: str = "",
     chat_title: str = "",
 ) -> tuple[bool, bool]:
@@ -227,7 +240,7 @@ async def process_new_listing_from_tg(
     from tg_forward import format_tg_acc_label, forward_listing_to_owner
 
     was_new, plan = plan_new_listing(
-        project, storage, word_filter, cfg, errors=errors, pg=pg
+        project, storage, word_filter, cfg, errors=errors, pg=pg, stats=stats
     )
     if plan is None:
         return was_new, False
