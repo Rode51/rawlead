@@ -155,18 +155,54 @@ cd C:\Users\hramo\uisness
 
 **Как не сломать снова:** [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) § «Антирегресс: пульт / API / ▶» · тикет [`problems/2026-05-27-pult-start-killed-api.md`](problems/2026-05-27-pult-start-killed-api.md).
 
-## Твои шаги сейчас — к прод (2026-05-27)
+## Остановить радар / спам «Статус» (сейчас)
 
-**Канон:** [`team/architect/PRE_PROD_GATE.md`](team/architect/PRE_PROD_GATE.md) · Coder: § **NEON-DEDUP-REPLAY**
+**Полный стоп (всё гасит, токены OpenRouter тоже):**
 
-1. **Site ▶** (`start-radar-desktop-site.vbs`) — **единственный** писатель в Neon (биржи). Legacy ▶ — только consumer, **не** должен крутить `main` с FL в логе.
-2. **`.env.site`:** `TELEGRAM_CHAT_ID` = чат, куда **уже писал** [@rawlead_bot](https://t.me/rawlead_bot) (напиши `/start`). Иначе в `radar_site.log`: `chat not found`.
-3. **`.env.site`:** `PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt` · `DATABASE_URL` = тот же Neon, что в Console.
-4. **Дождись @coder** § NEON-DEDUP-REPLAY → перезапуск Site ▶ → проверь `/lenta/` и Neon (строки с L1 / `is_visible`).
-5. **Лог Site:** `data/radar_site.log` — после Coder смотри `neon_insert` / `neon_replay`, не только `dup`.
-6. **Прод P5** — только после п.4 + твоё **«едем на прод»** в чат Lead.
+```text
+scripts\stop-radar-desktop-full.vbs
+```
 
-**Не прод:** пока в Neon 0 обновлений за сутки и лента пустая — это баг воронки, не «на бирже нет дизайна».
+Закрой окна пульта (✕). Проверка: в `data\radar_site.log` **нет** новых строк с текущим временем.
+
+**Только пауза (API можно оставить):** в пульте **■ Стоп** (Site и/или Legacy) — воркеры `main`/`tg`/`neon` остановятся.
+
+**Спам вкладки «Статус» в пульте** — это не баг радара: открытая панель логов **обновляет `/status-text` каждые ~1.5 с**. Чтобы не мелькало:
+
+- сверни лог (стрелка вниз) или закрой окно пульта;
+- смотри **`radar_site.log`**, не вкладку «Статус» в UI;
+- **Legacy ▶** не нужен, пока смотришь только Site/ленту — иначе `neon:цикл` в `radar_legacy.log` крутится часто.
+
+**Не жми** ℹ «Статус» в @rawlead_bot без нужды — бот пришлёт сводку в ЛС.
+
+---
+
+## Что попадает в ленту `/lenta/` (Site)
+
+| Этап | Куда | Что видишь |
+|------|------|------------|
+| Биржи FL + Kwork | Site `main` → Neon | footer: `neon_insert`, `ИИ L1=…` |
+| Фильтр слов | `FILTERS_SITE` | `filter` / `МИМО` в логе |
+| L1 (OpenRouter) | Neon `is_visible`, score | карточка на сайте |
+| L2 + TG владельцу | по навыкам / бот | **биржи Site в @rawlead_bot не шлют** (split) |
+| Legacy | Neon → @FLPARSINGBOT | «брать заказы» владельцу, **не** в `/lenta/` |
+
+**Смотреть:** `data\radar_site.log` (вкладка **radar** в пульте или файл) — строки `FL.ru │`, `Итого в бот: 0` на биржах **норма** для Site.
+
+---
+
+## Твои шаги дальше — по порядку (2026-05-27)
+
+**Пульт ✅** · дальше — **воронка в Neon**, не отладка запуска.
+
+1. **Стоп** (выше), если крутится лишнее → снова **только Site** VBS → ▶ **один раз**.
+2. **`.env.site`:** `PUBLIC_FEED_SOURCES=fl,kwork` (без freelancehunt).
+3. **15–30 мин** Site ▶ → в логе: `neon_insert` > 0 или `neon_replay` · открыть `/lenta/`.
+4. Если лента пустая — **@coder** § NEON-DEDUP-REPLAY / LOG-NEON-CYCLE (не трогать bat/пульт).
+5. **Legacy ▶** — только когда нужны карточки в @FLPARSINGBOT, отдельно от ленты.
+6. **Прод P5** — после п.3–4 + «едем на прод».
+
+**Не прод:** Neon/лента пустые при живом цикле FL/Kwork в логе.
 
 Neon ✅ · dogfood бот — как был.
 

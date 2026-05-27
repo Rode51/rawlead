@@ -86,6 +86,8 @@ Exe: `desktop\src-tauri\target\release\` (имя по `productName` в `tauri.co
 
 **Coder:** не трогать `radar_spawn_workers.py` / `/start` без приёмки ▶ + `/health` после ▶. Тикет: [`problems/2026-05-27-pult-start-killed-api.md`](../problems/2026-05-27-pult-start-killed-api.md).
 
+**Вкладка «Статус» в пульте:** при открытых логах UI опрашивает `/status-text` каждые ~1.5 с — это не радар, а обновление экрана. Смотреть воронку — вкладка **radar** / файл `data\radar_site.log`.
+
 ---
 
 ## Три окна cmd (запасной способ)
