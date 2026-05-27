@@ -58,15 +58,22 @@
 **Канон:** [`team/product/PRODUCT_VISION.md`](team/product/PRODUCT_VISION.md) §0i
 
 1. ~~§ V10 · W2 · V10.5 · P7~~ ✅ 2026-05-26
-2. ~~P1 · D1 · P4 код~~ ✅ принято 2026-05-26 · ворота до прода закрыты по коду
-3. **`.env` (обязательно сейчас):**  
+2. ~~P1 · D1 · P4 код~~ ✅ 2026-05-26
+3. **Сейчас — не прод:**  
+   - **Ты** — **не** правишь стоп-слова сам: Deep Research уже в [`team/archive/FILTERS_DEEP_RESEARCH_2026.md`](team/archive/FILTERS_DEEP_RESEARCH_2026.md) → Coder § **F-RESEARCH** вносит в `FILTERS.md`. Твоя роль: 1–2 недели «ложный стоп / мусор прошёл» в чат  
+   - **Coder § F-PROMPT** — нормальные промпты L1/L2 + чтобы L2 **не повторял** L1 ([`team/architect/AI.md`](team/architect/AI.md))  
+   - **Coder § F-LOCAL** — код, лента, бот, TG  
+   - **Lead Design** — в конце
+4. **`.env` строка 70** — должно быть ровно:  
    `PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt`  
-   (убери `vc_ru` и `habr_career`) → пульт **Стоп → ▶** или `start-radar.bat`
-4. **Кабинет P4 (один раз):** Neon [`sql/003_users_telegram.sql`](../sql/003_users_telegram.sql) · `pip install -r requirements.txt` · API на `:18766` · в `wp-config.php`: `RAWLEAD_TG_BOT_USERNAME` · [`scripts/open-cabinet-local.bat`](../scripts/open-cabinet-local.bat) или `/cabinet/`
-5. **Прод § P5** — только когда скажешь **«едем на прод»** · [`ops/DEPLOY_BUDGET.md`](ops/DEPLOY_BUDGET.md)
-6. **Логи:** [`ops/RADAR_LOG.md`](ops/RADAR_LOG.md) — после правки env в цикле **3** строки бирж + `Итого`
+   (не `PUBLIC_FEED_SOURCES=PUBLIC_FEED_SOURCES=…`) → **Стоп → ▶** на пульте
+5. **Крутить отсев:** `FILTER_WIDE=1` — почти всё в ИИ (дороже); `0` — жёстче словами (дешевле). Стоп-лист — правки в `FILTERS.md` → перезапуск радара
+6. **Лог:** [`ops/RADAR_LOG.md`](ops/RADAR_LOG.md) — смотри колонки `filter` / `МИМО` / `dup` / `в бот`
+7. **Кабинет P4** — по желанию (SQL + API + wp-config)
+8. **Прод P5** — после F-LOCAL + **«едем на прод»**
+9. **Lead Designer** — в **конце**, когда стабилизируем фильтры и сменим концепцию
 
-**С тебя сейчас:** пункты 3–4 (10 мин). Dogfood — ▶ на ПК, пока радар не на VPS.
+**С тебя:** п.4–5 + 1–2 дня смотреть бот — «Брать» должны быть в тему.
 
 Neon ✅ · dogfood бот — как был.
 

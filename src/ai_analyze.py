@@ -43,8 +43,33 @@ _FORBIDDEN_REPLY_RE = re.compile(
 )
 
 _DEFAULT_TIMEOUT_SEC = 60.0
+_LITE_TIMEOUT_SEC = 45.0
 _MAX_DESCRIPTION_CHARS = 7_000
+_MAX_LITE_SNIPPET_CHARS = 600
 _MAX_PROFILE_EXCERPT_CHARS = 3_200
+
+_cycle_ai_l1 = 0
+_cycle_ai_l2 = 0
+
+
+def reset_cycle_ai_counters() -> None:
+    global _cycle_ai_l1, _cycle_ai_l2
+    _cycle_ai_l1 = 0
+    _cycle_ai_l2 = 0
+
+
+def note_ai_l1_call() -> None:
+    global _cycle_ai_l1
+    _cycle_ai_l1 += 1
+
+
+def note_ai_l2_call() -> None:
+    global _cycle_ai_l2
+    _cycle_ai_l2 += 1
+
+
+def cycle_ai_counts() -> tuple[int, int]:
+    return _cycle_ai_l1, _cycle_ai_l2
 
 # docs/AI.md v6.1
 _SYSTEM_PROMPT_HEAD = """Ты — жёсткий ИИ-архитектор фриланс-заказов. Прагматичный техаудитор для Никиты (29). Тон прямой, сухой, на «ты», без соплей.
@@ -98,6 +123,22 @@ reply_draft ЗАПРЕЩЕНО: Cursor, ИИ, нейросеть, ChatGPT, Gemin
 
 class AiAnalyzeError(RuntimeError):
     """Ошибка вызова API или разбора ответа ИИ."""
+
+
+@dataclass(frozen=True)
+class AiLiteAnalysis:
+    """L1 ingest: короткий разбор для /lenta/ (без reply_draft и L2-полей)."""
+
+    verdict: str
+    task_summary: str
+    lead_tags: tuple[str, ...] = ()
+    ai_reasons: tuple[str, ...] = ()
+
+    def is_skip_verdict(self) -> bool:
+        return self.verdict.strip().casefold() in _SKIP_VERDICTS
+
+    def is_take_verdict(self) -> bool:
+        return self.verdict.strip().casefold() in ("брать", "брат")
 
 
 @dataclass(frozen=True)
@@ -315,9 +356,85 @@ def _log_ai_failure(
     errors.append(f"{log_prefix}ai:{kind}:{detail}")
 
 
+_LITE_SYSTEM = """Ты — фильтр фриланс-заказов для ленты RawLead (Digital: код, дизайн, маркетинг, тексты).
+
+Верни один JSON без markdown:
+verdict — «Брать» | «Сомнительно» | «МИМО»
+task_summary — 1–2 предложения: что нужно сделать простым языком (не копипаста описания)
+lead_tags — 3–6 навыков lowercase без #
+ai_reasons — массив 2–3 коротких строк «почему такой verdict»
+
+МИМО: Figma/чистый фронт, 1С, mobile с нуля, накрутки, крипта, инфобиз, дипломы, нет бюджета.
+Брать: парсеры, TG-боты, Python-автоматизация, правки бэкенда 1–2 файла.
+Сомнительно: между Брать и МИМО.
+
+Не выводи reply_draft, approach, money, risks."""
+
+
+def _build_lite_user_message(
+    *,
+    title: str,
+    budget_text: str,
+    url: str,
+    snippet: str,
+) -> str:
+    return (
+        f"Заголовок: {title.strip()}\n"
+        f"Бюджет: {budget_text.strip()}\n"
+        f"Ссылка: {url.strip()}\n\n"
+        f"Краткое описание:\n---\n{snippet.strip()}\n---\n\n"
+        "Верни только JSON: verdict, task_summary, lead_tags, ai_reasons."
+    )
+
+
+def _parse_lite_analysis(data: dict[str, Any]) -> AiLiteAnalysis:
+    verdict_raw = str(data.get("verdict", "")).strip()
+    if not verdict_raw:
+        raise AiAnalyzeError("L1: нет verdict")
+    v_key = verdict_raw.casefold()
+    if v_key not in _VALID_VERDICTS:
+        raise AiAnalyzeError(f"L1: недопустимый verdict: {verdict_raw!r}")
+    if v_key in ("мимо", "пропустить"):
+        verdict = "МИМО"
+    elif v_key == "сомнительно":
+        verdict = "Сомнительно"
+    else:
+        verdict = "Брать"
+
+    task_summary = str(data.get("task_summary", "")).strip()
+    if not task_summary:
+        task_summary = str(data.get("work_summary", "")).strip()
+    if not task_summary and verdict != "МИМО":
+        raise AiAnalyzeError("L1: пустой task_summary")
+
+    raw_tags = data.get("lead_tags", [])
+    if isinstance(raw_tags, list):
+        lead_tags = tuple(normalize_tags([str(t) for t in raw_tags]))[:8]
+    else:
+        lead_tags = ()
+
+    raw_reasons = data.get("ai_reasons", [])
+    reasons: list[str] = []
+    if isinstance(raw_reasons, list):
+        for item in raw_reasons[:3]:
+            s = str(item).strip()
+            if s:
+                reasons.append(s)
+    elif isinstance(raw_reasons, str) and raw_reasons.strip():
+        reasons.append(raw_reasons.strip())
+
+    return AiLiteAnalysis(
+        verdict=verdict,
+        task_summary=task_summary,
+        lead_tags=lead_tags,
+        ai_reasons=tuple(reasons),
+    )
+
+
 def _openrouter_chat(
     cfg: Config,
     *,
+    model: str,
     system: str,
     user: str,
     timeout_sec: float,
@@ -328,7 +445,7 @@ def _openrouter_chat(
         "Content-Type": "application/json",
     }
     body: dict[str, Any] = {
-        "model": cfg.ai_model,
+        "model": model,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -360,6 +477,7 @@ def _call_once(
     system: str,
     user: str,
     *,
+    model: str,
     budget_text: str,
     timeout_sec: float,
 ) -> AiAnalysis:
@@ -368,6 +486,7 @@ def _call_once(
         try:
             raw = _openrouter_chat(
                 cfg,
+                model=model,
                 system=system,
                 user=user,
                 timeout_sec=timeout_sec,
@@ -386,6 +505,89 @@ def _call_once(
     raise AiAnalyzeError("OpenRouter: пустой ответ.")
 
 
+def _call_lite_once(
+    cfg: Config,
+    system: str,
+    user: str,
+    *,
+    timeout_sec: float,
+) -> AiLiteAnalysis:
+    last_err: Exception | None = None
+    for json_mode in (True, False):
+        try:
+            raw = _openrouter_chat(
+                cfg,
+                model=cfg.ai_model_summary,
+                system=system,
+                user=user,
+                timeout_sec=timeout_sec,
+                json_mode=json_mode,
+            )
+            return _parse_lite_analysis(_extract_json_object(raw))
+        except (
+            AiAnalyzeError,
+            requests.RequestException,
+            json.JSONDecodeError,
+            ValueError,
+        ) as exc:
+            last_err = exc
+    if last_err:
+        raise last_err
+    raise AiAnalyzeError("L1: пустой ответ OpenRouter.")
+
+
+def analyze_lite(
+    cfg: Config,
+    *,
+    title: str,
+    budget_text: str,
+    snippet: str,
+    url: str,
+    timeout_sec: float = _LITE_TIMEOUT_SEC,
+    errors: list[str] | None = None,
+    log_prefix: str = "",
+) -> AiLiteAnalysis | None:
+    """L1: дешёвая модель, title + snippet ≤600 симв → лента."""
+    if not cfg.ai_active or cfg.ai_provider != "openrouter":
+        return None
+
+    snip = (snippet or title or "").strip()
+    if len(snip) > _MAX_LITE_SNIPPET_CHARS:
+        snip = snip[: _MAX_LITE_SNIPPET_CHARS - 1] + "…"
+    budget_for_prompt = display_budget_text(
+        budget_text,
+        is_telegram="t.me" in (url or "").casefold(),
+    )
+    user = _build_lite_user_message(
+        title=title,
+        budget_text=budget_for_prompt,
+        url=url,
+        snippet=snip,
+    )
+
+    last_exc: BaseException | None = None
+    for attempt in range(2):
+        try:
+            result = _call_lite_once(
+                cfg, _LITE_SYSTEM, user, timeout_sec=timeout_sec
+            )
+            note_ai_l1_call()
+            return result
+        except (
+            AiAnalyzeError,
+            requests.RequestException,
+            json.JSONDecodeError,
+            ValueError,
+        ) as exc:
+            last_exc = exc
+            if attempt == 0:
+                continue
+
+    if last_exc is not None:
+        _log_ai_failure(errors, log_prefix, last_exc)
+    return None
+
+
 def analyze_project(
     cfg: Config,
     *,
@@ -397,8 +599,9 @@ def analyze_project(
     timeout_sec: float = _DEFAULT_TIMEOUT_SEC,
     errors: list[str] | None = None,
     log_prefix: str = "",
+    model: str | None = None,
 ) -> AiAnalysis | None:
-    """Один stateless-запрос (OpenRouter). При ошибке после retry → None."""
+    """L2 premium: полный разбор (OpenRouter). При ошибке после retry → None."""
     if not cfg.ai_active:
         return None
     if cfg.ai_provider != "openrouter":
@@ -417,17 +620,21 @@ def analyze_project(
         description=desc,
         truncated=truncated,
     )
+    use_model = (model or cfg.ai_model_premium).strip()
 
     last_exc: BaseException | None = None
     for attempt in range(2):
         try:
-            return _call_once(
+            result = _call_once(
                 cfg,
                 system,
                 user,
+                model=use_model,
                 budget_text=budget_for_prompt,
                 timeout_sec=timeout_sec,
             )
+            note_ai_l2_call()
+            return result
         except (
             AiAnalyzeError,
             requests.RequestException,
@@ -441,6 +648,29 @@ def analyze_project(
     if last_exc is not None:
         _log_ai_failure(errors, log_prefix, last_exc)
     return None
+
+
+def analyze_premium(
+    cfg: Config,
+    *,
+    title: str,
+    budget_text: str,
+    description: str,
+    url: str,
+    errors: list[str] | None = None,
+    log_prefix: str = "",
+) -> AiAnalysis | None:
+    """L2 для Telegram-бота при вердикте «Брать»."""
+    return analyze_project(
+        cfg,
+        title=title,
+        budget_text=budget_text,
+        description=description,
+        url=url,
+        errors=errors,
+        log_prefix=log_prefix,
+        model=cfg.ai_model_premium,
+    )
 
 
 analyze = analyze_project

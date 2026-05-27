@@ -215,6 +215,9 @@ def run_cycle(
 ) -> None:
     """Один проход: FL, затем Kwork (если URL задан) → storage → фильтр → TG."""
 
+    from ai_analyze import reset_cycle_ai_counters
+
+    reset_cycle_ai_counters()
     ts = radar_timestamp()
     errors: list[str] = []
     summary = CycleSummary(ts=ts)

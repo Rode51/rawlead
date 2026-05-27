@@ -9,10 +9,12 @@ from typing import TYPE_CHECKING
 
 import psycopg
 
+from ai_analyze import AiLiteAnalysis
 from config import Config
 from lead_category import category_for_listing
 from listing import ListingProject
 from public_feed import is_public_feed_source
+
 if TYPE_CHECKING:
     from ai_analyze import AiAnalysis
 
@@ -41,6 +43,33 @@ def _ai_score_stub(analysis: AiAnalysis | None) -> int | None:
     if analysis is None:
         return None
     return _VERDICT_SCORE.get(analysis.verdict.strip().casefold(), 50)
+
+
+def _ai_score_lite(lite: AiLiteAnalysis | None) -> int | None:
+    if lite is None:
+        return None
+    return _VERDICT_SCORE.get(lite.verdict.strip().casefold(), 50)
+
+
+def _lite_tags_json(lite: AiLiteAnalysis | None) -> str:
+    if lite is None or not lite.lead_tags:
+        return json.dumps([], ensure_ascii=False)
+    return json.dumps(list(lite.lead_tags), ensure_ascii=False)
+
+
+def _lite_reasons_json(lite: AiLiteAnalysis | None) -> str | None:
+    if lite is None or not lite.ai_reasons:
+        return None
+    return json.dumps(list(lite.ai_reasons), ensure_ascii=False)
+
+
+def _is_visible_lite(lite: AiLiteAnalysis | None) -> bool:
+    if lite is None:
+        return True
+    if lite.verdict.strip().casefold() in ("мимо", "пропустить"):
+        return False
+    score = _ai_score_lite(lite)
+    return score is not None and score >= _MIN_AI_SCORE_VISIBLE
 
 
 def _is_visible_stub(analysis: AiAnalysis | None) -> bool:
@@ -141,30 +170,77 @@ class NeonLeadStorage:
             errors.append(msg)
             return True
 
-    def update_on_notify(
+    def update_after_lite(
         self,
         project: ListingProject,
         *,
-        analysis: AiAnalysis | None,
+        lite: AiLiteAnalysis | None,
         errors: list[str],
-        body: str = "",
+        body_snippet: str,
     ) -> None:
-        """После отправки в TG — ИИ-поля, is_visible, время уведомления."""
+        """После L1: поля ленты (не перезаписывать полным FL-body)."""
         if not self.enabled:
             return
-        ai_verdict = analysis.verdict if analysis is not None else None
-        ai_score = _ai_score_stub(analysis)
-        is_visible = _is_visible_stub(analysis) and is_public_feed_source(
-            project.source
-        )
-        lead_tags = _lead_tags_json(analysis)
-        body_text = (body or project.listing_snippet or project.title or "").strip()
+        snippet = (body_snippet or project.listing_snippet or project.title or "").strip()
+        ai_verdict = lite.verdict if lite is not None else None
+        ai_score = _ai_score_lite(lite)
+        task_summary = lite.task_summary.strip() if lite is not None else None
+        lead_tags = _lite_tags_json(lite)
+        reasons = _lite_reasons_json(lite)
+        is_visible = _is_visible_lite(lite) and is_public_feed_source(project.source)
         category = category_for_listing(
             project.source,
             listing_category=project.listing_category,
             title=project.title,
-            snippet=body_text,
+            snippet=snippet,
         )
+        try:
+            with psycopg.connect(self._url) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE leads
+                        SET body = %s,
+                            ai_verdict = %s,
+                            ai_score = %s,
+                            lead_tags = %s::jsonb,
+                            ai_reasons = %s::jsonb,
+                            task_summary = COALESCE(%s, task_summary),
+                            is_visible = %s,
+                            category = COALESCE(NULLIF(category, ''), %s)
+                        WHERE source = %s AND external_id = %s
+                        """,
+                        (
+                            snippet,
+                            ai_verdict,
+                            ai_score,
+                            lead_tags,
+                            reasons,
+                            task_summary,
+                            is_visible,
+                            category,
+                            project.source,
+                            str(project.project_id),
+                        ),
+                    )
+                conn.commit()
+        except Exception as exc:
+            msg = (
+                f"pg:lite:{project.source}:id={project.project_id}:"
+                f"{_short_pg_err(exc)}"
+            )
+            logger.warning("%s", msg)
+            errors.append(msg)
+
+    def mark_notified(
+        self,
+        project: ListingProject,
+        *,
+        errors: list[str],
+    ) -> None:
+        """После TG: только notified_at (L1-поля ленты не трогаем)."""
+        if not self.enabled:
+            return
         notified_at = datetime.now(timezone.utc)
         try:
             with psycopg.connect(self._url) as conn:
@@ -172,29 +248,11 @@ class NeonLeadStorage:
                     cur.execute(
                         """
                         UPDATE leads
-                        SET title = %s,
-                            body = %s,
-                            url = %s,
-                            budget_text = %s,
-                            ai_verdict = %s,
-                            ai_score = %s,
-                            lead_tags = %s::jsonb,
-                            is_visible = %s,
-                            notified_at = %s,
-                            category = COALESCE(NULLIF(category, ''), %s)
+                        SET notified_at = %s
                         WHERE source = %s AND external_id = %s
                         """,
                         (
-                            project.title,
-                            body_text,
-                            project.url,
-                            project.budget_text,
-                            ai_verdict,
-                            ai_score,
-                            lead_tags,
-                            is_visible,
                             notified_at,
-                            category,
                             project.source,
                             str(project.project_id),
                         ),

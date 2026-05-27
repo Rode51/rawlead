@@ -16,10 +16,56 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from lead_category import category_for_listing
 from listing import ListingProject
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_FILTERS_PATH = _PROJECT_ROOT / "docs" / "ops" / "FILTERS.md"
+
+# Синхрон с docs/ops/FILTERS.md § Vision v0.10 (v0.10.1)
+_GLOBAL_ALWAYS_STOP: tuple[str, ...] = (
+    "виртуальный ассистент",
+    "va ",
+    "диктор",
+    "озвучка",
+    "голос за",
+)
+_CATEGORY_STOP: dict[str, tuple[str, ...]] = {
+    "dev": (
+        "1с",
+        "битрикс",
+        "bitrix",
+        "сисадмин",
+        "администрирование сервер",
+        "windows server",
+        "настройка домена",
+    ),
+    "design": (
+        "рендеринг интерьер",
+        "архитектурная визуализация",
+        "ландшафтный дизайн",
+        "планировка квартир",
+    ),
+    "marketing": (
+        "обзвон",
+        "холодные звонки",
+        "лайки за",
+        "накрутка подписчик",
+        "капча",
+        "ручной ввод",
+        "реферальн",
+        "пирамид",
+    ),
+    "text": (
+        "диплом",
+        "реферат",
+        "курсовая",
+        "контрольная",
+        "решебник",
+        "ручная транскрибац",
+        "расшифровка аудио вручную",
+    ),
+}
 
 # В markdown: **Категория:** слова — двоеточие внутри жирного, конец жирного сразу после «:».
 _TAKE_LINE = re.compile(r"^\*\*.+?:\*\*\s*(.+)$")
@@ -56,7 +102,10 @@ def parse_filters_markdown(text: str) -> tuple[tuple[str, ...], tuple[str, ...]]
         if line.startswith("### Отсекаем"):
             mode = "stop"
             continue
-        if line.startswith("## Уровень 3"):
+        if line.startswith("### TG"):
+            mode = "stop"
+            continue
+        if line.startswith("## Уровень 3") or line.startswith("## Vision v0.10"):
             break
 
         if mode == "take":
@@ -120,8 +169,36 @@ class ListingWordFilter:
     def rejects(self, title: str, listing_snippet: str = "", *, wide: bool = False) -> bool:
         return not self.accepts(title, listing_snippet, wide=wide)
 
+    def rejects_category(
+        self,
+        title: str,
+        listing_snippet: str = "",
+        *,
+        category: str | None,
+    ) -> bool:
+        hay = self.haystack(title, listing_snippet)
+        for token in _GLOBAL_ALWAYS_STOP:
+            if token.casefold() in hay:
+                return True
+        cat = (category or "").strip().casefold()
+        if cat in _CATEGORY_STOP:
+            for token in _CATEGORY_STOP[cat]:
+                if token.casefold() in hay:
+                    return True
+        return False
+
     def accepts_listing(self, project: ListingProject, *, wide: bool = False) -> bool:
-        return self.accepts(project.title, project.listing_snippet, wide=wide)
+        if not self.accepts(project.title, project.listing_snippet, wide=wide):
+            return False
+        cat = category_for_listing(
+            project.source,
+            listing_category=project.listing_category,
+            title=project.title,
+            snippet=project.listing_snippet,
+        )
+        return not self.rejects_category(
+            project.title, project.listing_snippet, category=cat
+        )
 
 
 def default_listing_filter() -> ListingWordFilter:

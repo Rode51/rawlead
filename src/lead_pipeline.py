@@ -5,7 +5,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ai_analyze import AiAnalysis, analyze
+from ai_analyze import (
+    AiAnalysis,
+    AiLiteAnalysis,
+    analyze_lite,
+    analyze_premium,
+)
 from budget import meets_min_budget
 from config import Config
 from filters import ListingWordFilter
@@ -56,19 +61,26 @@ def _resolve_description(
     return project.listing_snippet or project.title
 
 
-def _should_notify_after_ai(cfg: Config, analysis: AiAnalysis | None) -> bool:
-    if analysis is None:
+def _should_notify_bot(
+    cfg: Config,
+    lite: AiLiteAnalysis | None,
+    *,
+    ai_unavailable: bool,
+) -> bool:
+    """Бот: только «Брать» (L1); при сбое L1 — как раньше (MVP)."""
+    if not cfg.ai_active or ai_unavailable or lite is None:
         return True
-    if analysis.is_skip_verdict() and not cfg.ai_notify_skip:
+    if lite.is_skip_verdict() and not cfg.ai_notify_skip:
         return False
-    return True
+    return lite.is_take_verdict()
 
 
 @dataclass(frozen=True)
 class ListingNotifyPlan:
-    """Готово к уведомлению (фильтр и ИИ пройдены)."""
+    """Готово к уведомлению (фильтр и L1 пройдены; L2 — в send)."""
 
     project: ListingProject
+    lite_analysis: AiLiteAnalysis | None
     analysis: AiAnalysis | None
     ai_unavailable: bool
     task_fallback_text: str
@@ -127,9 +139,10 @@ def plan_new_listing(
                 stats.note_skip("skip:dup_content")
             return True, None
 
-    analysis = None
+    lite_analysis: AiLiteAnalysis | None = None
     ai_unavailable = False
-    task_fallback_text = (project.listing_snippet or project.title).strip()
+    ingest_snippet = (project.listing_snippet or project.title).strip()
+    task_fallback_text = ingest_snippet
 
     if cfg.ai_active:
         if not meets_min_budget(project.budget_text, cfg.min_budget_rub):
@@ -138,30 +151,54 @@ def plan_new_listing(
                 stats.note_skip("skip:budget")
             return True, None
 
-        description = _resolve_description(project, cfg, errors)
-        task_fallback_text = description or task_fallback_text
         log_prefix = f"{project.source}:id={project.project_id} "
-        analysis = analyze(
+        lite_analysis = analyze_lite(
             cfg,
             title=project.title,
             budget_text=project.budget_text,
-            description=description,
+            snippet=ingest_snippet,
             url=project.url,
             errors=errors,
             log_prefix=log_prefix,
         )
-        if analysis is None:
+        if lite_analysis is None:
             ai_unavailable = True
-        elif not _should_notify_after_ai(cfg, analysis):
-            reason = f"skip:ai:{analysis.verdict}"
+        elif lite_analysis.is_skip_verdict():
+            reason = f"skip:ai:{lite_analysis.verdict}"
             errors.append(f"{project.source}:id={project.project_id} {reason}")
             if stats is not None:
                 stats.note_skip(reason)
+            if pg is not None:
+                pg.update_after_lite(
+                    project,
+                    lite=lite_analysis,
+                    errors=errors,
+                    body_snippet=ingest_snippet,
+                )
+            return True, None
+
+        if pg is not None:
+            pg.update_after_lite(
+                project,
+                lite=lite_analysis,
+                errors=errors,
+                body_snippet=ingest_snippet,
+            )
+
+        if not _should_notify_bot(
+            cfg, lite_analysis, ai_unavailable=ai_unavailable
+        ):
+            if lite_analysis is not None:
+                reason = f"skip:ai:{lite_analysis.verdict}"
+                errors.append(f"{project.source}:id={project.project_id} {reason}")
+                if stats is not None:
+                    stats.note_skip(reason)
             return True, None
 
     return True, ListingNotifyPlan(
         project=project,
-        analysis=analysis,
+        lite_analysis=lite_analysis,
+        analysis=None,
         ai_unavailable=ai_unavailable,
         task_fallback_text=task_fallback_text,
     )
@@ -175,22 +212,47 @@ def send_listing_notification(
     pg: NeonLeadStorage | None = None,
 ) -> bool:
     project = plan.project
+    premium = plan.analysis
+    task_text = plan.task_fallback_text
+
+    if cfg.ai_active and premium is None:
+        log_prefix = f"{project.source}:id={project.project_id} "
+        if plan.lite_analysis is not None and plan.lite_analysis.is_take_verdict():
+            description = _resolve_description(project, cfg, errors)
+            task_text = description or task_text
+            premium = analyze_premium(
+                cfg,
+                title=project.title,
+                budget_text=project.budget_text,
+                description=description,
+                url=project.url,
+                errors=errors,
+                log_prefix=log_prefix,
+            )
+        elif plan.lite_analysis is None:
+            description = _resolve_description(project, cfg, errors)
+            task_text = description or task_text
+            premium = analyze_premium(
+                cfg,
+                title=project.title,
+                budget_text=project.budget_text,
+                description=description,
+                url=project.url,
+                errors=errors,
+                log_prefix=log_prefix,
+            )
+
     try:
         send_project_notification_from_config(
             project,
             cfg,
-            analysis=plan.analysis,
-            ai_unavailable=plan.ai_unavailable,
-            task_fallback_text=plan.task_fallback_text,
+            analysis=premium,
+            ai_unavailable=plan.ai_unavailable and premium is None,
+            task_fallback_text=task_text,
             tg_acc_label=plan.tg_acc_label,
         )
         if pg is not None:
-            pg.update_on_notify(
-                project,
-                analysis=plan.analysis,
-                errors=errors,
-                body=plan.task_fallback_text.strip(),
-            )
+            pg.mark_notified(project, errors=errors)
         return True
     except TelegramNotifyError as exc:
         errors.append(
@@ -259,6 +321,7 @@ async def process_new_listing_from_tg(
     if acc_label:
         plan = ListingNotifyPlan(
             project=plan.project,
+            lite_analysis=plan.lite_analysis,
             analysis=plan.analysis,
             ai_unavailable=plan.ai_unavailable,
             task_fallback_text=plan.task_fallback_text,

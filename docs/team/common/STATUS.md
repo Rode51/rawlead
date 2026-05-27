@@ -15,7 +15,8 @@
 | **Coder § P3a / W2** | ✅ **принято владельцем 2026-05-26** |
 | **§ V10.5** | ✅ **принято владельцем 2026-05-26** |
 | **§ P7 category** | ✅ **принято владельцем 2026-05-26** |
-| **Ворота прод** | ✅ P1 · D1 · P4 код → **P5** деплой после «едем на прод» |
+| **Ворота прод** | ✅ P1 · D1 · P4 код → **F-LOCAL** фильтры+ИИ → P5 |
+| **Lead Design** | ⏸ **в конце** (концепция); сейчас UI без редизайна |
 | **Design D1** | ✅ спека + UI |
 | **Coder § P1.3d / D1 / P4** | ✅ **принято владельцем 2026-05-26** |
 | **Coder § P1** | ✅ P1.3c · ✅ **P1.4** · ✅ **P1.H** · TG ⏳ P1.2b |
@@ -24,14 +25,64 @@
 | **Dogfood** | ✅ бот без ослабления фильтров |
 | **Хостинг** | ⏳ после V10 |
 
-**Coder:** § **P5** деплой ([`PRE_PROD_GATE.md`](../architect/PRE_PROD_GATE.md)) — только по фразе «едем на прод»  
-**Lead:** проверка 2026-05-26 — см. ниже · коммит в git
+**Coder:** хвост **F-PROMPT p3** (L2 + L1 в одном промпте) · dogfood 1–2 нед · **⏸ P5**  
+**⏸ @lead-designer** — последняя очередь
+
+### Продукт (владелец 2026-05-26, F-LOCAL)
+
+| Поверхность | ИИ |
+|-------------|-----|
+| **Telegram-бот (ты)** | Полный разбор + уведомление — **как подписка**, без изменений по смыслу |
+| **`/lenta/` публичка** | Карточка заказа **без** «разбора от бота» (не дублировать TG-простыню) |
+| **Дедуп** | ✅ `listing_dedup` — уже в пайплайне |
+| **TG скоро** | Автоджойн + стоп рекламы в [`FILTERS.md`](../../ops/FILTERS.md) § TG |
+| **ИИ 2 уровня** | L1: score + **`task_summary`** (2 предл.) для карточки; L2 → бот при «Брать» · полный текст — ссылка на источник · [`CODER_PROMPT`](../architect/CODER_PROMPT.md) § F-LOCAL |
 
 ### Решение владельца (лентa, 2026-05-26)
 
 - Публичка: **только фриланс-биржи** — `fl`, `kwork`, `freelancehunt`
 - **Отложить** (код парсеров не удалять): `vc_ru`, `habr_career` (вакансии / job-ленты)
 - `.env`: `PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt`
+
+### Принято владельцем (§ F-LOCAL + F-RESEARCH, 2026-05-26)
+
+**С оговорками:** L2 пока **не** получает блок L1 в промпт (см. доработку ниже); 20 тестов §6 research — не в STATUS.
+
+### Проверка Lead (авто, 2026-05-26)
+
+| Критерий | Результат |
+|----------|-----------|
+| `.env` `PUBLIC_FEED_SOURCES` | ✅ `fl,kwork,freelancehunt` |
+| `filters.py` smoke (стоп/берём) | ✅ |
+| L1 `analyze_lite` + `task_summary` → Neon/API/JS | ✅ `sql/004_task_summary.sql`, `rawlead-feed.js` «Суть задания» |
+| L2 только при «Брать» в `send_listing_notification` | ✅ |
+| Счётчик `ИИ L1=… L2=…` в футере цикла | ✅ |
+| `FILTERS.md` + v0.10 + § TG | ✅ |
+| L2 user с контекстом L1 (`analyze_premium(lite=…)`) | ⚠️ **нет** — L2 как раньше, риск дубля смысла |
+| F-RESEARCH r4 — 20 тестов pass/fail | ⚠️ не сдано |
+| `stop_tg` отдельно | ⏸ опционально |
+| Git | ⚠️ не закоммичено (после 445c603) |
+
+**Доработка Coder (малый хвост):** § F-PROMPT **p3** — L2 system/user с блоком «уже от L1»; не переспрашивать verdict.
+
+### Сделано (Coder § F-LOCAL, 2026-05-26)
+
+| § | Что |
+|---|-----|
+| f1 | V10.1 + TG-стопы: `filters.py` ← [`FILTERS.md`](../../ops/FILTERS.md) |
+| f2–ai3 | L1 `analyze_lite` / L2 `analyze_premium`; env `OPENROUTER_MODEL_*`; счётчик L1/L2 в `radar.log` |
+| f4 | `/lenta/`: `task_summary` в API + JS; бот — только «Брать» + полный L2 |
+| f5 | Ниже — как крутить фильтры и лог |
+
+**Файлы:** `src/ai_analyze.py`, `src/lead_pipeline.py`, `src/pg_storage.py`, `src/filters.py`, `src/config.py`, `src/api_server.py`, `sql/004_task_summary.sql`, `wordpress/.../rawlead-feed.js`, `.env.example`
+
+**Как проверить:**
+1. Neon: `sql/004_task_summary.sql`
+2. `.env`: `AI_ENABLED=1`, `OPENROUTER_MODEL_SUMMARY=deepseek/deepseek-chat` (опц.), перезапуск радара
+3. `data/radar.log`: строки `filter` / `МИМО` / `dup`; в футере `ИИ L1=… L2=…` (L2 ≪ L1)
+4. `/lenta/`: в карточке «Суть задания», не простыня body; в бот — полный разбор только на «Брать»
+
+**FILTERS + лог (владелец):** правки списков → [`docs/ops/FILTERS.md`](../../ops/FILTERS.md) → перезапуск радара; `FILTER_WIDE=1` — в ИИ всё кроме стопа, `0` — ещё нужно «берём». В логе смотри `filter` (Python), `МИМО` (L1), `dup`, футер `L1` vs `L2`.
 
 ### Сделано (Coder § P4, 2026-05-26)
 
@@ -65,7 +116,7 @@
 | Код `public_feed` дефолт 3 биржи | ✅ |
 | Чипы `filter-category-*` в `page-lenta.php` | ✅ |
 | `POST /v1/auth/telegram` в `api_server.py` | ✅ |
-| **`.env` строка 70** | ⚠️ ещё **5** источников (`vc_ru`, `habr_career`) — **поменять** на 3 и **перезапуск радара** |
+| **`.env` `PUBLIC_FEED_SOURCES`** | ⚠️ проверить: **одна** строка `PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt` (без `PUBLIC_FEED_SOURCES=` внутри значения) |
 | API `:18766` | ⚠️ не отвечал (таймаут) — `pip install` + старт API |
 | `radar.log` последний цикл | ⚠️ 20:17 — видны FL+Kwork, цикл оборван TG-ошибками; пульт `last_cycle` со старыми 5 источниками до рестарта |
 

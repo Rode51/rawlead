@@ -94,6 +94,7 @@ def _row_to_item(
         ai_reasons,
         created_at,
         stored_category,
+        task_summary,
     ) = row
     tags = parse_lead_tags(lead_tags)
     km = keyword_match_val
@@ -106,6 +107,7 @@ def _row_to_item(
         "source": source,
         "title": title,
         "body": body or "",
+        "task_summary": (task_summary or "").strip(),
         "url": url,
         "budget_text": budget_text,
         "ai_score": ai_score,
@@ -121,7 +123,8 @@ def _row_to_item(
 
 _SELECT_COLS = """
     id, source, title, body, url, budget_text,
-    ai_score, ai_verdict, lead_tags, ai_reasons, created_at, category
+    ai_score, ai_verdict, lead_tags, ai_reasons, created_at, category,
+    task_summary
 """
 
 

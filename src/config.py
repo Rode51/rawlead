@@ -35,6 +35,8 @@ class Config:
     ai_enabled: bool
     ai_api_key: str
     ai_model: str
+    ai_model_summary: str
+    ai_model_premium: str
     ai_provider: str
     min_budget_rub: int
     ai_notify_skip: bool
@@ -640,6 +642,18 @@ def load_config() -> Config:
         if ai_model_raw and str(ai_model_raw).strip()
         else "google/gemini-2.5-flash-lite"
     )
+    summary_raw = os.environ.get("OPENROUTER_MODEL_SUMMARY")
+    ai_model_summary = (
+        str(summary_raw).strip()
+        if summary_raw and str(summary_raw).strip()
+        else ai_model
+    )
+    premium_raw = os.environ.get("OPENROUTER_MODEL_PREMIUM")
+    ai_model_premium = (
+        str(premium_raw).strip()
+        if premium_raw and str(premium_raw).strip()
+        else ai_model
+    )
 
     ai_provider = _parse_ai_provider(os.environ.get("AI_PROVIDER"))
     min_budget_rub = _parse_min_budget_rub()
@@ -663,6 +677,8 @@ def load_config() -> Config:
         ai_enabled=ai_enabled,
         ai_api_key=ai_api_key,
         ai_model=ai_model,
+        ai_model_summary=ai_model_summary,
+        ai_model_premium=ai_model_premium,
         ai_provider=ai_provider,
         min_budget_rub=min_budget_rub,
         ai_notify_skip=ai_notify_skip,

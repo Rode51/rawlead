@@ -102,10 +102,16 @@ class CycleSummary:
         return f"── Цикл {self.ts} ──"
 
     def format_footer(self) -> str:
-        return (
+        from ai_analyze import cycle_ai_counts
+
+        l1, l2 = cycle_ai_counts()
+        base = (
             f"Итого в бот: {self.total_to_bot} │ "
             f"на сайт /lenta/: {self.total_to_bot}"
         )
+        if l1 or l2:
+            return f"{base} │ ИИ L1={l1} L2={l2}"
+        return base
 
     def format_lines(self) -> list[str]:
         lines = [self.format_header(), *[s.format_line() for s in self.iter_sources()]]
