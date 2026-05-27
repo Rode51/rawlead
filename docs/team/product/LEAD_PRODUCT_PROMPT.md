@@ -93,22 +93,139 @@
 | r4 | Артефакт: `docs/team/product/SKILLS_TOOLS_CATALOG.md` — **согласовано с владельцем** |
 | r5 | Handoff → @lead-designer § PRE-LAUNCH-UX v2 (E3 в [`TASKS.md`](../common/TASKS.md)) |
 
+**Статус r1–r5: ✅ E2 закрыт (2026-05-27)**
+
+| # | Статус |
+|---|--------|
+| r1 | ✅ Tier A/B по 4 нишам + инструменты в `SKILLS_TOOLS_CATALOG.md` |
+| r2 | ✅ Синонимы RU/EN, Tier, shows_in_ui, дедуп |
+| r3 | ✅ 25 реальных лидов из Neon, FILTERS_SITE, AI.md |
+| r4 | ✅ Подтверждено владельцем 2026-05-27 |
+| r5 | ✅ → @lead-designer E3 |
+
+**Доп. задача E2b** (до Design, параллельно): § CANONICAL-TAGS выше → @lead-architect → @coder.
+
 **Блокер:** без r1–r5 Design рисует UI под урезанный каталог.
+
+---
+
+## § CANONICAL-TAGS — L1 из пула + pending_tags (2026-05-27) — **E2b, перед E3**
+
+**Решение владельца:** L1 тегирует заказы только из canonical_tag пула (`SKILLS_TOOLS_CATALOG.md`). Теги вне пула → `pending_tags` (не в UI). Catalog растёт органически.
+
+**Почему важно до Design:** без этого match % = 0% для marketing/text у всех пользователей. Design нарисует фильтр — он не будет работать.
+
+### Для `@lead-architect` → `@coder`
+
+> **Задача E2b — L1 canonical pool + pending_tags**
+>
+> **Контекст:** `docs/team/product/SKILLS_TOOLS_CATALOG.md` — таблица навыков, колонка `canonical_tag`. L1 сейчас пишет произвольные теги на русском → match = 0% для нерусских canonical.
+>
+> **1. Neon — новая таблица `pending_tags`:**
+> ```sql
+> CREATE TABLE IF NOT EXISTS pending_tags (
+>   id SERIAL PRIMARY KEY,
+>   tag TEXT NOT NULL,
+>   category TEXT,
+>   first_seen_at TIMESTAMPTZ DEFAULT NOW(),
+>   seen_count INT DEFAULT 1,
+>   UNIQUE(tag)
+> );
+> ```
+>
+> **2. `docs/team/architect/AI.md` — промпт `analyze_lite`:**
+> - Добавить блок «Разрешённые теги» — полный список `canonical_tag` из каталога (dev/design/marketing/text)
+> - Инструкция: «выбирай теги **строго** из списка; если навык не покрыт — не добавляй»
+> - Максимум 5 тегов на заказ
+>
+> **3. `src/pg_storage.py` или `src/ai_analyze.py`:**
+> - После получения тегов от L1: разделить на `known` (есть в canonical_tag пуле) и `unknown`
+> - `known` → `lead_tags` (как сейчас)
+> - `unknown` → INSERT INTO `pending_tags` (ON CONFLICT → `seen_count + 1`)
+>
+> **4. `src/api_server.py`:**
+> - `GET /v1/skills/catalog` — отдавать из хардкодированного каталога (или отдельной таблицы `skills_catalog`), **не** из агрегации `lead_tags`
+> - Анон `/lenta/` навыки: **только сортировка** (не OR-фильтр). Параметр `skills=` меняет `final_rank`, но не убирает заказы из выдачи
+>
+> **5. Acceptance:**
+> - Лид с «яндекс.директ» в тексте → `lead_tags` содержит `yandex_direct` (из пула), а не `яндекс.директ`
+> - Лид с `tilda` → `pending_tags` увидит `tilda` (пока не в пуле) с `seen_count`
+> - `GET /v1/skills/catalog` → теги из каталога, не из агрегации
+> - Анон выбрал навыки → заказы остаются все, match-заказы выше
+
+---
+
+## § DESIGN-DIRECTION — новое направление (2026-05-27)
+
+**Решение владельца ✅ 2026-05-28:** пересобрать визуальный стиль + структуру страниц (революция). Текущий REFERENCE (editorial B2B, Linear/Notion) — отменён.
+
+**Аудитория:** фрилансер 25–35, работает в Telegram и на телефоне.
+
+**Новое направление: «Рабочий инструмент»** — тёплый, прямой, mobile-first. Не SaaS, не биржа — как хорошее приложение.
+
+### Product-бриф для @lead-designer
+
+| Параметр | Новое |
+|----------|-------|
+| **Атмосфера** | Тёплый и практичный — «это работает», не «мы платформа» |
+| **Фон** | Тёплый белый `#FAFAF8` (не холодный `#FFFFFF`) |
+| **Шрифт** | Только **Manrope** — убрать Unbounded (слишком агрессивный для аудитории) |
+| **Акцент** | Один цвет — **Indigo `#4F46E5`** вместо чёрных CTA (тёплый, отличается от FL/Kwork) |
+| **Карточки** | Мягкая тень + больший border-radius — как мессенджер-карточка, не жёсткая рамка |
+| **Mobile** | Mobile-first: большие зоны касания, минимум скролла, навигация снизу опционально |
+| **Иконки категорий** | Простые line-иконки для dev / design / marketing / text |
+| **Анимации** | Сохранить принцип (ease-out, no layout reflow), упростить — меньше «театра» |
+
+### Тон голоса (Product канон — передать в REFERENCE)
+
+- Прямой, активный залог: «ИИ убрал мусор», не «заказы были отфильтрованы»
+- Без восклицательных знаков
+- Mobile-метки: «Дизайн» вместо «Дизайн & Видео» в узком контейнере
+- Кнопки называют действие: «Смотреть ленту», «Войти в кабинет» — не «Попробовать»
+
+### Scope
+
+**Эволюция (рекомендую):** новые токены + шрифты + карточки + mobile-first — структура страниц остаётся. ~3–4 дня Designer + Coder.
+
+**Революция (если нужна новая структура страниц):** сказать Lead Designer явно — добавит к плану отдельный этап.
+
+### Для `@lead-designer`
+
+> Обнови `docs/design/wp/REFERENCE.md` под новое направление «Рабочий инструмент»:
+> 1. Новые токены (см. таблицу выше) — фон, акцент, шрифт
+> 2. Карточки — мягкая тень вместо жёсткой рамки
+> 3. Mobile-first компоненты (лента, фильтры, кабинет)
+> 4. Тон голоса — зафиксировать в REFERENCE §«Голос»
+> 5. После: Coder обновляет CSS-переменные и компоненты
 
 ---
 
 ## § PRE-LAUNCH-UX — копирайт (**после** Design, 2026-05-27)
 
-**Когда:** после согласования макета с владельцем ([`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § PRE-LAUNCH-UX v2).
+**Когда:** после согласования макета с владельцем ([`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § PRE-LAUNCH-UX v2). **Перед P5 / трафиком** (E4 в [`TASKS.md`](../common/TASKS.md)).
+
+**Решение владельца (2026-05-27):** **нет** «закрытого тестирования», «оставьте заявку», «ранний доступ», waitlist. Продукт открыт: лента `/lenta/`, кабинет, dogfood владельца в TG. Тест — автоматом + лично владельцем, **не** отдельная маркетинговая фаза.
 
 | # | Задача |
 |---|--------|
 | c1 | Подписи filter-bar: специализация, навыки, «Сбросить», «Совместимость N%» |
 | c2 | Лента: заголовок, empty states, подсказки при 0 match |
 | c3 | «Сообщить об ошибке»: заголовок, placeholder, success/thank you |
-| c4 | Контакты: тексты без early-access |
+| c4 | **Убрать closed beta / early access:** FAQ, контакты, тариф, CTA — живые формулировки («Смотреть ленту», «Войти в кабинет», связь TG/email). См. список файлов ниже |
 | c5 | Mobile: короткие версии тех же строк |
 | c6 | Handoff → @coder (не дублировать в чат — только в этом файле + DESIGN addendum) |
+
+**Где сейчас старый копирайт (Product правит канон строк → Coder в WP):**
+
+| Файл | Что убрать/заменить |
+|------|---------------------|
+| `wordpress/rawlead-landing/content/faq.html` | «Идёт закрытое тестирование… Оставьте заявку… раннего доступа» |
+| `wordpress/rawlead-landing/content/contact.html` | «оставьте заявку через форму» (если нет реальной формы — честный контакт) |
+| `wordpress/rawlead-kadence-child/template-parts/rawlead/pricing-preview.php` | «Ранний доступ», «участники раннего доступа» |
+| `wordpress/rawlead-kadence-child/inc/marketing.php` | subtitle contact «Ранний доступ — Telegram или форма» |
+| `wordpress/rawlead-kadence-child/functions.php` | CTA «Ранний доступ» на inner pages |
+
+**Не путать:** § SKILLS-TOOLS `tier_b_only` / `early stage` — теги каталога, не маркетинг.
 
 ---
 

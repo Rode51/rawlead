@@ -285,6 +285,35 @@ LEGACY pipeline (один ИИ) не трогать без задачи влад
 | d2-9 | Проверка персонализации: при смене навыков владельца в ЛК (`PUT /v1/me/tags`) и повторной генерации L2 текст `reply_draft` меняется под профиль (не только сортировка ленты) |
 | d2-10 | Сетка карточек в `/lenta/` и `/cabinet/` рендерится **построчно** (row-major): `1 2 / 3 4 / 5 6`, без «колоночного добора» вида `1 5 / 2 6`. Нужен обычный grid/flex layout, не masonry/columns |
 
+**Lead verify 2026-05-27:** d2-10 **❌ не сдано** — в `rawlead.css` осталось `column-count: 2` на `#rl-feed-list`. Убрать columns/masonry; `display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))` (mobile: 1 col). **→ сейчас только этот пункт** (+ опц. d2-1 title без ellipsis при `.is-expanded`, d2-7 чек-лист в STATUS).
+
+**✅ § LEGACY-REPLY-DRAFT** — Lead verify 2026-05-27 (приёмка ⏳). Тикет [`2026-05-27-legacy-bot-empty-reply-draft.md`](../problems/2026-05-27-legacy-bot-empty-reply-draft.md).
+
+**✅ § LEGACY-DRAFT-LEN-SOFTEN** — Lead verify 2026-05-27 (приёмка ⏳). Не терять заказ из‑за счётчика предложений.
+
+**🔴 § CANONICAL-TAGS-E2b (Product E2, 2026-05-27, P0 до E5)** — L1 + API под [`SKILLS_TOOLS_CATALOG.md`](../product/SKILLS_TOOLS_CATALOG.md). Полное ТЗ: `LEAD_PRODUCT_PROMPT.md` § CANONICAL-TAGS.
+
+| # | Готово когда |
+|---|--------------|
+| e2b-1 | `AI.md` + L1: теги **только** из canonical_tag пула каталога; границы category (text ≠ 3D, dev ≠ нейминг) |
+| e2b-2 | Neon `pending_tags` + после L1: unknown → pending, known → `lead_tags` |
+| e2b-3 | `GET /v1/skills/catalog` — из каталога (не агрегация `lead_tags`) |
+| e2b-4 | Анон `/lenta/`: `skills=` — **сортировка** (все заказы в выдаче, match выше), не OR-фильтр |
+| e2b-5 | Приёмка: `yandex_direct` не `яндекс.директ`; tilda вне пула → `pending_tags`; каталог в API |
+
+**Файлы:** `docs/team/architect/AI.md`, `src/ai_analyze.py`, `src/pg_storage.py`, `src/api_server.py`, `src/rank.py`, `sql/` (миграция `pending_tags`), опц. `src/keyword_match.py`
+
+| # | Готово когда |
+|---|----------------|
+| s1 | `_validate_reply_draft_take` / `_maybe`: **не** `raise` по `n < 4` / `n > 8` / `n < 2` — только пустой draft + `_validate_reply_draft_base` (стоп-слова) |
+| s2 | Если `n` вне целевого диапазона — **всё равно** слать в TG; в `errors[]` / `neon:skip` **не** skip; опц. `warn:reply_draft_sentences=N verdict=…` в лог (не блокер) |
+| s3 | Промпт `_LEGACY_SYSTEM` — «стремись к N предложениям», не «иначе пусто» |
+| s4 | `AI.md` § dogfood — как выше (Lead уже правит канон) |
+
+**Не менять:** skip при пустом draft, МИМО, `ai_unavailable`. `/lenta/` не трогать.
+
+**Файлы:** `src/ai_analyze.py`, `src/lead_pipeline.py` (только warn в errors), `docs/team/architect/AI.md`
+
 **Файлы:** `wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js`, `wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js`, `wordpress/rawlead-kadence-child/assets/css/rawlead.css`, `wordpress/rawlead-kadence-child/page-lenta.php`, `wordpress/rawlead-kadence-child/page-cabinet.php`, `src/api_server.py`, `docs/team/common/STATUS.md`
 
 ## E — Не в этом спринте (→ Design/Product)
@@ -306,7 +335,7 @@ LEGACY pipeline (один ИИ) не трогать без задачи влад
 
 | # | Готово когда |
 |---|----------------|
-| u0 | → Product § SKILLS-TOOLS-RESEARCH (каталог навыков/инструментов; импорт в API/UI — отдельная задача после каталога) |
+| u0 | ✅ Product § SKILLS-TOOLS-RESEARCH — `SKILLS_TOOLS_CATALOG.md` v0.2 |
 | u1 | Lead Design: [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § PRE-LAUNCH-UX v2 — горизонтальная filter-bar, воздух у «Лента заказов», контакты без early-access, report bug, mobile |
 | u2 | @lead-product: копирайт § PRE-LAUNCH-UX copy |
 | u3 | @coder: WP/CSS/JS по макету + `feed-cabinet-mvp.md` addendum |

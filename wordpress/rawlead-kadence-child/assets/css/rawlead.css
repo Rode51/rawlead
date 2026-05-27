@@ -1896,40 +1896,41 @@ body.page-contact .rl-prose > h2:first-of-type + p strong {
 }
 
 .rl-feed-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: 1rem;
-}
-
-body.page-lenta #rl-feed-list {
-  column-count: 2;
-  column-gap: 1rem;
   max-width: 880px;
   width: 100%;
   margin: 0 auto;
 }
 
+/* Раскрыта одна карточка — соседи не тянутся по её высоте */
+.rl-feed-list:has(.rl-lead-card.is-expanded) {
+  align-items: start;
+}
+
 @media (max-width: 767px) {
-  body.page-lenta #rl-feed-list {
-    column-count: 1;
+  .rl-feed-list {
+    grid-template-columns: 1fr;
   }
 }
 
-#rl-cabinet-list {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-}
-
 .rl-feed-list .rl-lead-card {
-  display: inline-flex;
+  display: flex;
   flex: none;
-  break-inside: avoid;
-  align-self: start;
   flex-direction: column;
-  height: auto;
+  height: 100%;
+  min-height: 0;
   max-width: 420px;
   width: 100%;
   cursor: pointer;
-  margin: 0 0 1rem;
+  margin: 0;
+  justify-self: center;
+}
+
+.rl-feed-list:has(.rl-lead-card.is-expanded) .rl-lead-card {
+  height: auto;
 }
 
 .rl-feed-list .rl-lead-card .rl-chips {
@@ -1942,13 +1943,23 @@ body.page-lenta #rl-feed-list {
   flex: 0 0 auto;
 }
 
+.rl-feed-list .rl-lead-card:not(.is-expanded) .rl-feed-card__body,
+#rl-cabinet-list .rl-lead-card:not(.is-expanded) .rl-feed-card__body {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
 #rl-cabinet-list .rl-lead-card {
   flex: none;
   display: flex;
   flex-direction: column;
-  max-width: none;
+  height: 100%;
+  min-height: 0;
+  max-width: 420px;
   width: 100%;
   cursor: pointer;
+  justify-self: center;
 }
 
 #rl-cabinet-list .rl-lead-card .rl-chips {
@@ -1961,10 +1972,18 @@ body.page-lenta #rl-feed-list {
   flex: 0 0 auto;
 }
 
-.rl-feed-list .rl-lead-card__title {
+.rl-feed-list .rl-lead-card__title,
+#rl-cabinet-list .rl-lead-card__title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.rl-feed-list .rl-lead-card.is-expanded .rl-lead-card__title,
+#rl-cabinet-list .rl-lead-card.is-expanded .rl-lead-card__title {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
 }
 
 .rl-feed-list .rl-lead-card.rl-match-ready .rl-match__fill,
@@ -2123,7 +2142,8 @@ body.page-lenta #rl-feed-list {
   }
 }
 
-body.page-lenta #rl-feed-list > .rl-feed-empty,
+.rl-feed-list > .rl-feed-empty,
+.rl-feed-list > .rl-feed-skeleton:first-child:last-child,
 body.page-lenta #rl-feed-list > .rl-feed-end {
   grid-column: 1 / -1;
   justify-self: center;

@@ -1,6 +1,6 @@
 # /cabinet/ — Telegram Login не завершает вход (локалка)
 
-**Статус:** открыто  
+**Статус:** ✅ принято владельцем 2026-05-27 (fallback login)  
 **Дата:** 2026-05-27  
 **Приоритет:** P0 (блокер PRE-LAUNCH / P4)
 
@@ -27,6 +27,7 @@
 - Дефолт login bot для кабинета: `rawlead_bot`.
 - Добавлены подсказки/диагностика в UI кабинета.
 - API переведен на профильную env-загрузку (`.env.site`) для login token.
+- **Coder:** fallback UI + popup/deep-link (`rawlead-cabinet.js`, `functions.php`); `FOR_YOU.md` / `RUN.md` § `RAWLEAD_TG_LOGIN_FALLBACK_URL`.
 
 ## Требование владельца
 

@@ -1,7 +1,15 @@
 # SKILLS_TOOLS_CATALOG
 
-Статус: draft v0.1 (нужна валидация на 10 реальных лидах из Neon, шаг 3).
+Статус: **v0.2** — r4 ✅ владелец 2026-05-27 · Lead verify E2 ✅ · handoff **@lead-designer** (E3). Код: **E2b** → `CODER_PROMPT` § CANONICAL-TAGS-E2b.
 Основа: `docs/team/product/SKILLS_TOOLS_RESEARCH_PROMPT.md`.
+
+## ⚠️ Критические находки (валидация шаг 3, 2026-05-27)
+
+| Проблема | Влияние | Кто чинит |
+|----------|---------|-----------|
+| L1 пишет рус. теги (`яндекс.директ`), canonical — EN (`yandex_direct`) → match = 0% | Match сломан для marketing/text у всех | @coder: добавить synonym map в `keyword_match` ИЛИ обновить L1-промпт выводить canonical_tag → `AI.md` |
+| `text` category содержит 3D/Blender/парсинг; `dev` — нейминг, описания | Пользователь-копирайтер видит 3D-заказы | @coder: уточнить границы категорий в L1-промпте (`AI.md`) |
+| `tilda` и `vk_ads` отсутствуют в каталоге | Частые реальные заказы → 0 match | Добавлено ниже в v0.2 |
 
 ## Как пользоваться фильтром, чтобы не резать ленту
 
@@ -21,13 +29,15 @@
 | telegram_bot_dev | dev | A | Telegram-боты | telegram bot, телеграм бот | yes | cross-niche dev/marketing |
 | api_integration | dev | A | API интеграции | rest api, интеграция api | yes | backend integrations |
 | sql | dev | A | SQL | postgresql, mysql, скл | yes | db queries |
-| web_scraping | dev | B | Парсинг сайтов | scraping, веб-скрейпинг | tier_b_only | automation niche |
+| web_scraping | dev | B | Парсинг сайтов | scraping, веб-скрейпинг, парсер, сбор данных | tier_b_only | automation niche |
 | docker | dev | B | Docker | докер | tier_b_only | often tool in L2 too |
 | django | dev | B | Django | джанго | tier_b_only | python framework |
 | fastapi | dev | B | FastAPI | фастапи | tier_b_only | python api |
 | vue_js | dev | B | Vue.js | vue, вью | tier_b_only | frontend alt |
 | html_css | dev | B | HTML/CSS | верстка, frontend markup | tier_b_only | common, but still useful |
 | ai_integration | dev | B | Интеграция AI | openai api, llm integration | tier_b_only | growing demand |
+| tilda_dev | dev | B | Tilda разработка | tilda, тильда, tilda site | tier_b_only | very frequent on FL/Kwork |
+| email_automation | dev | B | Email-автоматизация | email рассылка, email integration, шаблоны писем | tier_b_only | dev side of email |
 | ui_ux | design | A | UI/UX дизайн | ui ux, ux/ui | yes | base design tag |
 | web_design | design | A | Веб-дизайн | website design, дизайн сайта | yes | landing + corp sites |
 | figma | design | A | Figma | фигма | yes | skill + tool |
@@ -43,9 +53,11 @@
 | wireframing | design | B | Вайрфреймы | прототипирование, wireframes | tier_b_only | early stage |
 | typography | design | B | Типографика | шрифты, type design | tier_b_only | support skill |
 | illustration | design | B | Иллюстрации | illustration design, иллюстратор | tier_b_only | optional niche |
+| threed_modeling | design | B | 3D-моделирование | 3d model, blender, 3д моделирование | tier_b_only | explainer/character 3D only; архвиз — стоп |
 | smm | marketing | A | SMM | social media marketing, смм | yes | social management |
-| target_ads | marketing | A | Таргетированная реклама | таргет, paid social | yes | meta/vk focused |
-| yandex_direct | marketing | A | Яндекс Директ | директ, yandex ads | yes | ru core channel |
+| target_ads | marketing | A | Таргетированная реклама | таргет, paid social, таргетированная реклама | yes | meta/vk focused |
+| vk_ads | marketing | A | Реклама ВКонтакте | vk ads, реклама вк, вк реклама, вконтакте реклама | yes | dominant RU social ads |
+| yandex_direct | marketing | A | Яндекс Директ | директ, yandex ads, яндекс.директ, я.директ | yes | ru core channel |
 | google_ads | marketing | A | Google Ads | google adwords, гугл реклама | yes | global channel |
 | seo | marketing | A | SEO | сео, search optimization | yes | core inbound |
 | ppc | marketing | A | PPC | контекстная реклама, paid search | yes | performance marketing |
@@ -57,6 +69,8 @@
 | crm_marketing | marketing | B | CRM-маркетинг | сегментация crm, lifecycle | tier_b_only | retention |
 | conversion_rate_optimization | marketing | B | CRO/конверсия | оптимизация конверсии, cro | tier_b_only | paired with analytics |
 | chatbot_marketing | marketing | B | Маркетинг-боты | senler bot, salebot funnels | tier_b_only | tg/vk funnels |
+| wordpress_marketing | marketing | B | WordPress (маркетинг) | wp сайт, wordpress сайт | tier_b_only | cross-niche dev/marketing |
+| telegram_bot_marketing | marketing | B | Telegram-боты (маркетинг) | telegram bot, телеграм бот, тг бот | tier_b_only | cross-niche dev/marketing |
 | copywriting | text | A | Копирайтинг | тексты, writing | yes | broad commercial text |
 | seo_copywriting | text | A | SEO-копирайтинг | seo тексты, оптимизированные тексты | yes | search content |
 | sales_copywriting | text | A | Продающие тексты | sales pages, рекламные тексты | yes | funnels/landing |
@@ -132,10 +146,34 @@
    **Почему:** профиль держим простым (специализации + навыки), инструменты остаются контекстом конкретного заказа.  
    **v2 опция:** позже можно добавить «Любимые инструменты» как подсказку для генерации отклика.
 
+## Вопрос к владельцу — финальный (нужен ответ для r4)
+
+**Q: Анон на /lenta/ выбирает навыки — фильтр или сортировка?**
+**Решение владельца (2026-05-27): Б — только сортировка.** Все заказы остаются в ленте, заказы с совпавшими тегами выше. Лента никогда не пустеет.
+_Текущий код: OR-фильтр → нужно изменить под сортировку для анона. Задача @coder (см. ниже)._
+
+**Q: Кросс-нишевые навыки (wordpress, telegram_bot) — дублировать в несколько ниш?**
+**Решение владельца (2026-05-27): да, дублируем.** Навык показывается во всех релевантных нишах.
+
+## Задачи для @coder (по итогам валидации + решений владельца)
+
+| # | Задача | Файл | Приоритет |
+|---|--------|------|-----------|
+| 1 | L1-промпт: тегировать из canonical_tag пула (этот каталог) — только теги из списка, строго | `docs/team/architect/AI.md` → промпт `analyze_lite` | P0 |
+| 2 | L1-промпт: уточнить границы категорий (text ≠ 3D, dev ≠ нейминг) | `docs/team/architect/AI.md` | P0 |
+| 3 | Анон /lenta/: навыки — только сортировка (не OR-фильтр) | `src/api_server.py`, `src/rank.py` | P1 |
+| 4 | pending_tags таблица: теги от L1 не из пула → в очередь, не в UI | Neon + `src/pg_storage.py` | P1 (если владелец выбрал вариант Б) |
+
+_Передать через @lead-architect → CODER_PROMPT._
+
 ## Чеклист приёмки
 
-- [ ] По каждой нише есть Tier A (8-15 навыков).
-- [ ] Нет дублей canonical tags и мусорных общих чипов.
-- [ ] Для Tier A/B заполнены `synonyms` и `shows_in_ui`.
-- [ ] Ясно разделены skills (match/filter) и tools (L2 context).
-- [ ] Подтверждено на 10 реальных лидах (шаг 3 research).
+- [x] По каждой нише есть Tier A (8-15 навыков).
+- [x] Нет дублей canonical tags и мусорных общих чипов.
+- [x] Для Tier A/B заполнены `synonyms` и `shows_in_ui`.
+- [x] Ясно разделены skills (match/filter) и tools (L2 context).
+- [x] Подтверждено на 25 реальных лидах (шаг 3 research, 2026-05-27).
+- [x] Ответ владельца: анон /lenta/ — **сортировка** (Б).
+- [x] Ответ владельца: кросс-нишевые — **дублируем**.
+- [x] Ответ владельца: L1 canonical pool — **пул + pending_tags (Б)** (2026-05-27).
+- [x] Владелец подтвердил каталог (r4) ✅ 2026-05-27 → handoff @lead-designer.

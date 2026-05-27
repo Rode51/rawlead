@@ -466,8 +466,10 @@ def send_listing_notification(
             )
             return False
         if not (premium.reply_draft or "").strip():
+            verdict = (premium.verdict or "").strip() or "—"
             errors.append(
-                f"{project.source}:id={project.project_id} skip:ai:no_reply_draft"
+                f"{project.source}:id={project.project_id} "
+                f"skip:ai:no_reply_draft verdict={verdict}"
             )
             return False
 
@@ -614,7 +616,8 @@ def process_legacy_neon_listing(
             return True, False
         elif not (full_analysis.reply_draft or "").strip():
             errors.append(
-                f"{project.source}:id={project.project_id} skip:ai:no_reply_draft"
+                f"{project.source}:id={project.project_id} "
+                f"skip:ai:no_reply_draft verdict={full_analysis.verdict}"
             )
             return True, False
 
@@ -625,7 +628,7 @@ def process_legacy_neon_listing(
                 "skip:ai_unavailable_no_draft"
                 if ai_unavailable or full_analysis is None
                 else (
-                    "skip:ai:no_reply_draft"
+                    f"skip:ai:no_reply_draft verdict={full_analysis.verdict}"
                     if not (full_analysis.reply_draft or "").strip()
                     else f"skip:ai:{full_analysis.verdict}"
                 )

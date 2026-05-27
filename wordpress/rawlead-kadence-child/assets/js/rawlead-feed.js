@@ -42,6 +42,7 @@
     done: false,
     totalShown: 0,
     expandedId: null,
+    loadGeneration: 0,
   };
 
   function apiUrl(params) {
@@ -661,12 +662,14 @@
   }
 
   function resetAndLoad() {
+    state.loadGeneration += 1;
     state.offset = 0;
     state.done = false;
     state.totalShown = 0;
     state.expandedId = null;
+    state.loading = false;
     if (listEl) {
-      listEl.innerHTML = skeletonHtml(3);
+      listEl.innerHTML = skeletonHtml(2);
     }
     if (endEl) {
       endEl.hidden = true;
@@ -675,9 +678,13 @@
   }
 
   function loadMore(replace) {
-    if (state.loading || state.done) {
+    if (state.done) {
       return;
     }
+    if (state.loading && !replace) {
+      return;
+    }
+    var gen = state.loadGeneration;
     state.loading = true;
     var params = {
       limit: state.limit,
@@ -701,9 +708,17 @@
         return res.json();
       })
       .then(function (data) {
+        if (gen !== state.loadGeneration) {
+          return;
+        }
         var items = (data.items || []).filter(function (item) {
           return matchSource(item, state.source);
         });
+        if (listEl) {
+          listEl.querySelectorAll(".rl-feed-skeleton").forEach(function (el) {
+            el.remove();
+          });
+        }
         if (replace && listEl) {
           listEl.innerHTML = "";
         }
@@ -740,13 +755,18 @@
         });
       })
       .catch(function () {
+        if (gen !== state.loadGeneration) {
+          return;
+        }
         if (replace && listEl) {
           listEl.innerHTML = "";
         }
         showError("Не удалось загрузить ленту.");
       })
       .finally(function () {
-        state.loading = false;
+        if (gen === state.loadGeneration) {
+          state.loading = false;
+        }
       });
   }
 

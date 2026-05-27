@@ -530,6 +530,8 @@
 
     tagsLoading: false,
 
+    loadGeneration: 0,
+
   };
 
 
@@ -1430,6 +1432,8 @@
 
     }
 
+    state.loadGeneration += 1;
+
     state.offset = 0;
 
     state.done = false;
@@ -1437,6 +1441,8 @@
     state.totalShown = 0;
 
     state.expandedId = null;
+
+    state.loading = false;
 
     if (noMatchEl) {
 
@@ -1446,7 +1452,7 @@
 
     if (listEl) {
 
-      listEl.innerHTML = skeletonHtml(3);
+      listEl.innerHTML = skeletonHtml(2);
 
       listEl.hidden = false;
 
@@ -1466,11 +1472,19 @@
 
   function loadMore(replace) {
 
-    if (state.loading || state.done || state.tags.length === 0) {
+    if (state.done || state.tags.length === 0) {
 
       return;
 
     }
+
+    if (state.loading && !replace) {
+
+      return;
+
+    }
+
+    var gen = state.loadGeneration;
 
     state.loading = true;
 
@@ -1510,11 +1524,27 @@
 
       .then(function (data) {
 
+        if (gen !== state.loadGeneration) {
+
+          return;
+
+        }
+
         var items = (data.items || []).filter(function (item) {
 
           return matchSource(item, state.source);
 
         });
+
+        if (listEl) {
+
+          listEl.querySelectorAll(".rl-feed-skeleton").forEach(function (el) {
+
+            el.remove();
+
+          });
+
+        }
 
         if (replace && listEl) {
 
@@ -1600,6 +1630,12 @@
 
       .catch(function () {
 
+        if (gen !== state.loadGeneration) {
+
+          return;
+
+        }
+
         if (replace && listEl) {
 
           listEl.innerHTML = "";
@@ -1612,7 +1648,11 @@
 
       .finally(function () {
 
-        state.loading = false;
+        if (gen === state.loadGeneration) {
+
+          state.loading = false;
+
+        }
 
       });
 

@@ -6,7 +6,7 @@
 
 ## Сейчас (2026-05-27) — подготовка к прод
 
-**PM ✅** · split legacy/site ✅ · **Neon dup-replay L1** ✅ код · приёмка владельцем ⏳.  
+**PM ✅** · **E0/E1** ✅ · **E2** SKILLS-TOOLS ✅ Lead verify 2026-05-27 · **→ E3** Design · **E2b** @coder (canonical tags).  
 **Роли:** Coder = `CODER_PROMPT` · Mechanic = `docs/problems/` + **Gemini 2.5 (2M)** · канон [`LEAD.md`](../architect/LEAD.md) § «Coder vs Mechanic».
 
 ### STOP-STATUS-SPAM (§ P0, 2026-05-27) — **✅ принято владельцем**
@@ -17,27 +17,94 @@
 | **Фикс** | consumer в kill; offset per bot; poll lock по token |
 | **Приёмка** | владелец 2026-05-27 — **спама нет** |
 
-### § PRE-LAUNCH A→D (Coder 2026-05-27) — **⚠️ частично, приёмка не пройдена**
+### LEGACY-REPLY-DRAFT (§ P0, 2026-05-27) — **✅ принято владельцем 2026-05-27**
 
-| § | Что |
-|---|-----|
-| **A** | `/lenta/` + `/cabinet/`: без чипов Брать/Сомнительно и фильтра «ИИ-оценка»; карточка — **Совместимость N%** |
-| **B** | Multi category + `GET …/skills/catalog?category=`; навыки по специализациям; «Применить» |
-| **C** | L2: `tools_required` + `reply_draft`; TG; Neon + кабинет (раскрытие) |
-| **D** | Параллельный fetch FL+Kwork; футер `цикл: N.Nс`; `FL_LISTING_MAX_PAGES` |
+| | |
+|--|--|
+| **Симптом** | @FLPARSINGBOT: разбор есть, «Черновик отклика» **пустой** при **Сомнительно** |
+| **Решение** | **B:** Брать 4–8 предл. · Сомнительно **2–4 предл.** · МИМО без карточки; `/lenta/` не трогали |
+| **Lead verify** | см. выше · **LEGACY-DRAFT-LEN-SOFTEN** ✅ принято владельцем 2026-05-27 |
+| **Сразу** | `stop-radar-desktop-full.vbs` → Legacy ▶ **один раз** (иначе старый consumer) |
+| **Тикет** | [`2026-05-27-legacy-bot-empty-reply-draft.md`](../problems/2026-05-27-legacy-bot-empty-reply-draft.md) — код ✅ |
 
-**Neon:** `sql/005_premium_subscriber.sql` — **✅ применено** (Coder, проект `parser`, 2026-05-27): `tools_required`, `reply_draft` в `leads`.
+**Как проверить (владелец, ~5 мин):**
 
-**Факт владельца (2026-05-27 вечер):** D2 по UI/кабинету **не принят** (часть пунктов работает нестабильно), плюс в legacy @FLPARSINGBOT пришла карточка без черновика отклика.  
-Доп. требование по ленте: порядок карточек должен быть построчный `1 2 / 3 4 / 5 6` (row-major), не «колонки вниз» `1 5 / 2 6`.
-**Добив (2026-05-27, @coder):** `/cabinet/` Telegram Login default bot = `rawlead_bot` (в т.ч. hint), legacy отправка ужесточена: без `reply_draft` всегда `skip:ai_unavailable_no_draft`/`skip:ai:no_reply_draft`, без отправки карточки.
+1. `scripts\stop-radar-desktop-full.vbs` → ярлык **RawLead Legacy** → ▶.
+2. Дождаться лида **Сомнительно** в @FLPARSINGBOT — в «Черновик отклика» **2–4 предложения** (не пусто).
+3. Лид **Брать** — черновик **4–8 предл.** с «Здравствуйте. Готов реализовать…».
+4. **МИМО** / пустой draft — **нет** карточки; в `data\radar_legacy.log`: `neon:skip … skip:ai:no_reply_draft verdict=…` или `skip:ai:МИМО`.
+5. `/lenta/` — без регрессии (только match % / L1, без черновика в UI).
 
-**Блокер до P5:** добить [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) § PRE-LAUNCH D2 + C4/C5 (legacy без `reply_draft` не шлём; логируем skip-причину) + **CABINET-LOGIN-FALLBACK** (вход при битом Telegram Widget).
+**Файлы:** `src/ai_analyze.py`, `src/telegram_notify.py`, `src/lead_pipeline.py`, `docs/FOR_YOU.md`, `docs/team/architect/AI.md` (канон уже был)
 
-**Новый P0-блокер (2026-05-27):** `/cabinet/` Telegram Login widget в WP-контексте может не завершать вход (серый/битый placeholder).  
-Тикет: [`2026-05-27-cabinet-telegram-widget-login-fails.md`](../problems/2026-05-27-cabinet-telegram-widget-login-fails.md) → fallback без iframe (одноразовый код/ deep-link) обязателен для локальной приёмки.
+### LEGACY-DRAFT-LEN-SOFTEN (§ P0, 2026-05-27) — **✅ принято владельцем 2026-05-27**
 
-### → Сейчас: @coder (E0) → ЛК (E1) → research навыков (E2) → Design+Product UX (E3–E4) → Coder polish (E5) → P5/stress
+| | |
+|--|--|
+| **Симптом** | Заказ терялся: ИИ вернул 1 или 5 предложений → `AiAnalyzeError` → `skip:ai_unavailable_no_draft` |
+| **Фикс** | Длина 4–8 / 2–4 — **цель промпта**, не hard fail; skip только пустой draft / стоп-слова / МИМО |
+| **Лог** | Вне диапазона: `warn:reply_draft_sentences=N verdict=…` в `radar_legacy.log` (не `skip`) |
+
+**Как проверить (владелец):**
+
+1. `stop-radar-desktop-full.vbs` → Legacy ▶ (один consumer).
+2. Дождаться **Сомнительно** с коротким черновиком (1 предл.) — карточка **приходит**, в логе `warn:reply_draft_sentences=1` (опц.).
+3. **Брать** с 3 или 9 предл. — карточка **приходит**, не `skip:ai_unavailable`.
+4. Пустой draft / **МИМО** — по-прежнему **нет** карточки (`skip:ai:no_reply_draft` / `skip:ai:МИМО`).
+
+**Файлы:** `src/ai_analyze.py`, `docs/team/architect/AI.md`
+
+### § PRE-LAUNCH D2 d2-10 (Coder 2026-05-27) — **✅ принято владельцем 2026-05-27**
+
+| # | Что | Файлы |
+|---|-----|-------|
+| **d2-10** | Сетка row-major `1 2 / 3 4` на `/lenta/` и `/cabinet/` | `rawlead.css` — `display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))`; mobile 1 col; убраны `column-count` / `break-inside` |
+| **d2-1** | Title: tooltip при hover; при `.is-expanded` — без ellipsis, полная строка + блок «Полное название» в body | `rawlead.css`, JS уже с `title=` |
+| **d2-7** | Чек-лист ниже | — |
+
+**Как проверить (владелец, ~5 мин):**
+
+1. `python scripts/wp_install_rawlead_theme.py` → Ctrl+F5 `http://radarzakaz.local/lenta/`
+2. **Сетка:** desktop — карточки **1, 2** в первой строке, **3, 4** во второй (не 1 над 5). Mobile ≤767px — одна колонка.
+3. **Title:** наведи на обрезанный заголовок — tooltip; клик раскрыть — заголовок читается целиком.
+4. **Фильтры:** DevTools → Network → клик category «Дизайн» → `GET /v1/feed?category=design` **200**, список карточек меняется; 2 category → `category=dev,design`; навыки → «Применить» → `skills=` + `sort=match`.
+5. **Кабинет:** вход (widget или fallback) → та же 2-col сетка; раскрыть карточку — «Инструменты» / «Черновик отклика» (placeholder если L2 пуст).
+
+**Deploy:** `python scripts/wp_install_rawlead_theme.py`
+
+### § PRE-LAUNCH A→D + D2 — **✅ E0/E1 принято владельцем 2026-05-27**
+
+| § | Статус |
+|---|--------|
+| **A–D, C4/C5, d2-10, d2-1, d2-7** | ✅ принято |
+| **C6** fallback login | ✅ принято |
+| **Оговорка** | `/cabinet/` — фильтр `min_score` 50/70% остался (не блокер legacy) |
+
+**Neon:** `sql/005_premium_subscriber.sql` — **✅ применено**.
+
+**Остаётся (не E0):**
+
+| # | Пункт |
+|---|--------|
+| **c7 / d2-9** | L2 `reply_draft` под `user_tags` → **§ P4b** |
+
+**→ Сейчас:** **E3** @lead-designer (PRE-LAUNCH-UX v2 + DESIGN-DIRECTION) · **E2b** @coder (CANONICAL-TAGS) параллельно → E4 copy → E5 WP → P5/stress
+
+**Артефакт E2:** [`SKILLS_TOOLS_CATALOG.md`](../product/SKILLS_TOOLS_CATALOG.md) v0.2 · решения владельца: анон = сортировка; кросс-нише = дубли; L1 = пул + pending_tags.
+
+**Тикет login:** [`2026-05-27-cabinet-telegram-widget-login-fails.md`](../problems/2026-05-27-cabinet-telegram-widget-login-fails.md) — ✅ принято 2026-05-27.
+
+### E2 SKILLS-TOOLS-RESEARCH (2026-05-27) — **✅ Lead verify Product**
+
+| r# | Статус |
+|----|--------|
+| r1–r3 | ✅ 4 ниши, Tier A/B, tools, синонимы, 25 лидов Neon |
+| r4 | ✅ по артефакту (владелец 2026-05-27) |
+| r5 | ✅ handoff Design |
+
+**Замечания (не блокер E3):** в tools-таблице есть `related_skills` вне пула (git_workflow…) — поправить при E5; блок «вопросы §8» частично дублирует финальные решения владельца.
+
+### → Сейчас: Design (E3) + Coder E2b параллельно → E4 → E5 → P5/stress
 
 **Дорожная карта этапов:** [`TASKS.md`](TASKS.md) § «Поэтапно до трафика».  
 **UX-бриф владельца (фильтры, контакты, feedback, mobile):** [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § PRE-LAUNCH-UX v2 — **после** research, **спор с владельцем до идеала**.
@@ -46,7 +113,7 @@
 
 | Готово в коде/БД | Ещё не «прод для каждого подписчика» |
 |------------------|--------------------------------------|
-| Схема `users`, `user_tags`, `subscriptions`; JWT + `/v1/me/*` | Вход `/cabinet/` **блокер** (widget → fallback в работе) |
+| Схема `users`, `user_tags`, `subscriptions`; JWT + `/v1/me/*` | Вход `/cabinet/` — **fallback** ✅ принято 2026-05-27 (`FOR_YOU.md` § fallback) |
 | `GET /v1/me/feed` — match % по **тегам пользователя** | `/v1/me/subscription` — **заглушка** `free` (биллинга нет) |
 | L2 поля в Neon: `tools_required`, `reply_draft`; UI в раскрытии кабинета | Нет gate «только paid видит L2» на API |
 | L1 `task_summary` на ленте | Каталог навыков ≈ top-теги из лидов, не полный research-список |
@@ -54,7 +121,7 @@
 
 **Вывод:** скелет ЛК и персональный **match по навыкам** — да; **полный продукт «каждый платный получает свой ИИ-разбор под навыки»** — после login + каталог + подписка + приёмка L2.
 
-### → Дальше: приёмка PRE-LAUNCH · UX (Design) · P5 · **PRE-PROD-STRESS** · трафик
+### → Дальше: E2–E5 PRE-LAUNCH-UX · P4b · P5 · **PRE-PROD-STRESS** · трафик
 
 **Ворота трафика:** [`PRE_PROD_GATE.md`](../architect/PRE_PROD_GATE.md) — после P5 на хосте § **PRE-PROD-STRESS** (S1–S5), затем «едем на прод».
 
@@ -749,7 +816,7 @@
 | **FEED-DECOUPLE + SITE-AI-FALLBACK** | ✅ код · owner-проверка: `/v1/feed` при `notified_at IS NULL` и отсутствие TG-спама при `ai_unavailable` |
 | **Neon dup без L1 → лента пустая** | ✅ код · владелец: replay + Site ▶ 30 мин |
 | **Site-бот `chat not found`** | владелец · `.env.site` `TELEGRAM_CHAT_ID` |
-| **`/cabinet/` Telegram Widget битый/пустой** | **@coder (P0)** · fallback login по тикету [`2026-05-27-cabinet-telegram-widget-login-fails.md`](../problems/2026-05-27-cabinet-telegram-widget-login-fails.md) |
+| **`/cabinet/` сетка / login** | ✅ принято 2026-05-27 · [`2026-05-27-cabinet-telegram-widget-login-fails.md`](../problems/2026-05-27-cabinet-telegram-widget-login-fails.md) |
 | Пульт «Нет связи с API» | Mechanic · [`2026-05-24-pult-no-api-connection.md`](../problems/2026-05-24-pult-no-api-connection.md) |
 | 2× `main.py` | Mechanic · [`2026-05-24-duplicate-python-processes.md`](../problems/2026-05-24-duplicate-python-processes.md) |
 | TG relay+card (если снова сломается) | prompt-test · [`2026-05-24-tg-forward-not-via-bot.md`](../problems/2026-05-24-tg-forward-not-via-bot.md) |

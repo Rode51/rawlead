@@ -200,7 +200,9 @@ Get-CimInstance Win32_Process | Where-Object {
 | Фильтр слов | `FILTERS_SITE` | `filter` / `МИМО` в логе |
 | L1 (OpenRouter) | Neon `is_visible`, score | карточка на сайте |
 | L2 + TG владельцу | по навыкам / бот | **биржи Site в @rawlead_bot не шлют** (split) |
-| Legacy | Neon → @FLPARSINGBOT | «брать заказы» владельцу, **не** в `/lenta/` |
+| Legacy | Neon → @FLPARSINGBOT | Полный разбор + **черновик** (Брать 4–8 предл., Сомнительно 2–4 предл.); **не** в `/lenta/` — там только L1 без простыни ИИ |
+
+**После правки промпта legacy (Coder):** `scripts\stop-radar-desktop-full.vbs` → ярлык **RawLead Legacy** → ▶ **один раз** (иначе consumer на старом коде в памяти).
 
 **Смотреть:** `data\radar_site.log` (вкладка **radar** в пульте или файл) — строки `FL.ru │`, `Итого в бот: 0` на биржах **норма** для Site.
 
@@ -210,22 +212,24 @@ Get-CimInstance Win32_Process | Where-Object {
 
 **Полная лестница:** [`team/common/TASKS.md`](team/common/TASKS.md) § «Поэтапно до трафика».
 
-### Сейчас (ждём @coder)
+### Сейчас (**Coder ok** 2026-05-27 — фаза 2)
 
-1. **Стоп** (выше), если крутится лишнее → **только Site** VBS → ▶ один раз.
-2. Приёмка **PRE-LAUNCH** + **вход в `/cabinet/`** (fallback login, когда сдадут).
-3. **Legacy ▶** — только для @FLPARSINGBOT, отдельно от ленты.
+| Шаг | Кто | Что |
+|-----|-----|-----|
+| 1 | **@lead-designer** | E3: [`LEAD_DESIGN_PROMPT.md`](team/design/LEAD_DESIGN_PROMPT.md) § **PRE-LAUNCH-UX v2** + **DESIGN-DIRECTION** · каталог [`SKILLS_TOOLS_CATALOG.md`](team/product/SKILLS_TOOLS_CATALOG.md) |
+| 1b | **@coder** | E2b: `CODER_PROMPT` § **CANONICAL-TAGS-E2b** (match/L1 — параллельно Design) |
+| 3 | **@lead-product** | E4: копирайт + убрать closed beta / заявки |
+| 4 | **@coder** | E5: вёрстка WP · потом P5 + stress |
 
-### Потом по шагам (не параллельить UX раньше research)
+E0/E1 ✅ — см. [`team/common/STATUS.md`](team/common/STATUS.md).
 
-| Шаг | Ты / роли |
-|-----|-----------|
-| **ЛК** | Зайти, навыки, L2 в карточке — когда login ок |
-| **Research** | С @lead-product: [`team/product/SKILLS_TOOLS_RESEARCH_PROMPT.md`](team/product/SKILLS_TOOLS_RESEARCH_PROMPT.md) (**до** дизайна) |
-| **Дизайн** | @lead-designer — фильтры сверху, воздух, контакты, «сообщить об ошибке», mobile (**спорься до идеала**) |
-| **Тексты** | @lead-product — копирайт по макету |
-| **Код сайта** | @coder — последняя вёрстка |
-| **Прод** | P5 + stress + «едем на прод» |
+### Порядок
+
+| Принято | Дальше |
+|---------|--------|
+| E0/E1: лента, кабинет, legacy-бот | Product → Design → copy → Coder → P5/stress |
+
+Детали: [`team/common/TASKS.md`](team/common/TASKS.md) § «Фаза 1 / Фаза 2».
 
 **Не прод:** пустая лента при живом Site в логе · нельзя войти в кабинет · UX не согласован.
 

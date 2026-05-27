@@ -20,13 +20,13 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 | Очередь | § | Кто |
 |---------|-----|-----|
 | 1 | **STOP-STATUS-SPAM** | ✅ владелец 2026-05-27 |
-| 2 | **CABINET-LOGIN-FALLBACK** — вход без Telegram Widget (код/deep-link), если iframe битый | **→ @coder (P0)** · [`2026-05-27-cabinet-telegram-widget-login-fails.md`](../problems/2026-05-27-cabinet-telegram-widget-login-fails.md) |
-| 3 | **PRE-LAUNCH D2** — добив приёмки (карточки/category/skills reset/cabinet L2) | **→ @coder** |
-| 4 | **PRE-LAUNCH A** — лента: только % совпадения, без Брать/Сомнительно/оценки | **→ @coder** |
-| 5 | **PRE-LAUNCH B** — специализации: multi + навыки по category | @coder |
-| 6 | **PRE-LAUNCH C** — L2 подписчик: инструменты + отклик (промпт) | @lead-product → @coder |
-| 7 | **Legacy без draft** — @FLPARSINGBOT не шлёт без `reply_draft` (лог skip-причины) | **→ @coder (P0)** |
-| 8 | **PRE-LAUNCH D** — быстрее парсинг | @coder |
+| 2 | **CABINET-LOGIN-FALLBACK** | ✅ принято 2026-05-27 |
+| 3 | **PRE-LAUNCH D2** — d2-10/d2-1 | ✅ принято 2026-05-27 |
+| 4 | **PRE-LAUNCH A** | ✅ принято 2026-05-27 |
+| 5 | **PRE-LAUNCH B** | ✅ принято 2026-05-27 |
+| 6 | **PRE-LAUNCH C** L2 в кабинете | ✅ принято 2026-05-27 |
+| 7 | **LEGACY-REPLY-DRAFT** + **LEN-SOFTEN** | ✅ принято 2026-05-27 |
+| 8 | **PRE-LAUNCH D** | ✅ код |
 | 9 | **P4b L2-PER-USER** — персональный `reply_draft` под профиль/навыки пользователя | **→ @coder + @lead-product (P0 до P5)** |
 | 10 | **P5** деплой на хост | @coder |
 | 11 | **PRE-PROD-STRESS** — ИИ/сайт/API/радар на prod URL | @coder → [`PRE_PROD_GATE.md`](../architect/PRE_PROD_GATE.md) |
@@ -34,23 +34,24 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 
 ### Поэтапно до трафика (владелец 2026-05-27 вечер)
 
-**Сейчас ждём @coder** (п.2–8). Параллельно владелец не блокирует — только приёмка по чек-листам.
+**Сейчас (фаза 2):** **E2** ✅ · **→ E3** @lead-designer · **E2b** @coder (CANONICAL-TAGS) · E4 → E5 → P5/stress.
 
 | Этап | Что | Кто | Готово когда |
 |------|-----|-----|--------------|
-| **E0** | Техника: login fallback, PRE-LAUNCH A–D, legacy draft | **@coder** | STATUS § PRE-LAUNCH принят |
-| **E1** | **ЛК рабочий:** вход, теги/навыки, L2 в раскрытии, match % | владелец + @coder | `/cabinet/` без блокеров, me/* 200 |
-| **E2** | **Deep research:** полный каталог навыков + инструментов по 4 специализациям (не top-50 из ленты) | владелец + **@lead-product** (структура) · опц. @coder (выгрузка) | артефакт § SKILLS-TOOLS-RESEARCH в `LEAD_PRODUCT_PROMPT` |
+| **E0** | Техника: login fallback, PRE-LAUNCH A–D, legacy draft | **@coder** | ✅ 2026-05-27 |
+| **E1** | **ЛК рабочий:** вход, теги/навыки, L2 в раскрытии, match % | владелец + @coder | ✅ 2026-05-27 |
+| **E2** | **Deep research:** каталог навыков/инструментов §0i | **@lead-product** | ✅ Lead verify 2026-05-27 · `SKILLS_TOOLS_CATALOG.md` v0.2 |
+| **E2b** | L1 canonical pool + `pending_tags` + catalog API + анон sort | **@coder** | `CODER_PROMPT` § CANONICAL-TAGS-E2b |
 | **E3** | **PRE-LAUNCH-UX (дизайн):** спор с владельцем до «идеала» — фильтры, воздух, контакты, «сообщить об ошибке», mobile | **@lead-designer** | макет/правила в `LEAD_DESIGN_PROMPT` § PRE-LAUNCH-UX v2 |
-| **E4** | **Копирайт сайта:** тексты по макету Design | **@lead-product** | `LEAD_PRODUCT_PROMPT` § PRE-LAUNCH-UX copy |
+| **E4** | **Копирайт сайта:** тексты по макету Design; **убрать** closed testing / заявки / ранний доступ (владелец 2026-05-27) | **@lead-product** | `LEAD_PRODUCT_PROMPT` § PRE-LAUNCH-UX copy · c4 |
 | **E5** | **Финальная вёрстка WP** по Design + Product + P4b (L2 per-user) | **@coder** | приёмка владельцем на prod URL |
 | **E6** | P5 + PRE-PROD-STRESS + «едем на прод» | @coder → владелец | `PRE_PROD_GATE` S1–S6 |
 
 **E2 обязательно до E3** — иначе Design рисует узкий каталог из текущего `/v1/skills/catalog`.
 
-| Очередь UX (после E0, в E3) | § |
-|-----------------------------|---|
-| **PRE-LAUNCH-UX** — фильтры, лента, контакты, feedback, mobile | @lead-designer → @lead-product → @coder |
+| Фаза 2 (**активно**) | § |
+|----------------------|---|
+| **PRE-LAUNCH-UX** | E2 ✅ → **→** @lead-designer (E3) → @lead-product (E4) → @coder (E5 + E2b) |
 
 ## Lead → Design / Coder (активно)
 
@@ -61,7 +62,7 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 | **0a** | **BOT-NOTIFY-SPLIT** — два бота | ✅ Lead verify 2026-05-27 |
 | **0b** | **SQLITE-NEON-SYNC** — resync (s7–s12) | ✅ Lead verify 2026-05-27 (footer `neon_insert: 17`) |
 | **0c** | **PRE-LAUNCH** (A–D) + POST-RESTART c1–c2,c6–c7 | → @coder |
-| **0d** | **PRE-LAUNCH-UX** | ⏸ @lead-designer перед P5 |
+| **0d** | **PRE-LAUNCH-UX** | E2 ✅ · **→** @lead-designer E3 · E2b @coder |
 | **1** | **NEON-DEDUP-REPLAY** + **LOG-NEON-CYCLE** | ✅ код 2026-05-27 · owner verify ⏳ |
 | **2** | **P5-PREP** (CORS, логи воркеров, locks если Linux) | → @coder после PRE-LAUNCH |
 | **3** | **FEED-DECOUPLE** | ✅ код · owner verify ⏳ |
@@ -76,8 +77,9 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 | 0d2 | **PULT-THEME** | ✅ код · приёмка ⏳ |
 | 0e | **F-PROMPT p3** | ✅ код |
 | 0f | **P5** деплой | ⏸ после п.1–2 + «едем на прод» |
-| — | **@lead-designer** | ⏸ **E3 PRE-LAUNCH-UX v2** — после E2 research, спор с владельцем |
-| — | **@lead-product** | ⏸ **E2** SKILLS-TOOLS-RESEARCH → **E4** копирайт после Design |
+| — | **@lead-designer** | **→ E3** PRE-LAUNCH-UX v2 + § DESIGN-DIRECTION |
+| — | **@lead-product** | **E4** копирайт после Design |
+| — | **@coder** | **E2b** CANONICAL-TAGS (P0, параллельно E3) |
 | — | Neon `DATABASE_URL` | ✅ |
 | — | Аудит Gemini | справочник → [`problems/2026-05-27-preprod-audit-full.md`](../problems/2026-05-27-preprod-audit-full.md) |
 

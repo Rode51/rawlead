@@ -214,7 +214,8 @@ def format_ai_message(
         if project.source.startswith("tg:")
         else [f"🔗 {project.url.strip()}"]
     )
-    draft = _esc(analysis.reply_draft, html_mode=html_mode)
+    draft_raw = (analysis.reply_draft or "").strip()
+    draft = _esc(draft_raw, html_mode=html_mode) if draft_raw else ""
     tools = analysis.tools_required
     tools_block = ""
     if tools:
@@ -223,6 +224,9 @@ def format_ai_message(
             + "\n".join(f"• {_esc(t, html_mode=html_mode)}" for t in tools)
             + "\n\n"
         )
+    draft_block = ""
+    if draft:
+        draft_block = f"———\n✍️ Черновик отклика:\n\n{draft}\n\n"
     tail = (
         f"———\n"
         f"🤖 Разбор\n\n"
@@ -232,15 +236,16 @@ def format_ai_message(
         f"Срок заказчику: {_esc(analysis.time_for_client, html_mode=html_mode)}\n"
         f"Деньги: {_esc(analysis.money, html_mode=html_mode)}\n"
         f"Риски: {_esc(analysis.risks, html_mode=html_mode)}\n\n"
-        f"———\n"
-        f"✍️ Черновик отклика:\n\n"
-        f"{draft}\n\n"
+        f"{draft_block}"
         f"———\n"
         f"{chr(10).join(link_lines)}"
     )
     text = "\n".join(head) + "\n\n" + tail
     if len(text) <= _TELEGRAM_TEXT_LIMIT:
         return text
+
+    if not draft:
+        return text[: _TELEGRAM_TEXT_LIMIT]
 
     overhead = len(text) - len(draft)
     max_draft = max(120, _TELEGRAM_TEXT_LIMIT - overhead - 24)
