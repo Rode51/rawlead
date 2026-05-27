@@ -13,5 +13,11 @@ call npm run build
 if errorlevel 1 pause & exit /b 1
 call npm run tauri build
 if errorlevel 1 pause & exit /b 1
-echo [pult] Gotovo: src-tauri\target\release\RawLead.exe
+echo [pult] Gotovo: src-tauri\target\release\desktop.exe
+echo.
+echo Yarlyki na rabochij stol — TOLKO na VBS (ne na desktop.exe):
+echo   Site:   scripts\start-radar-desktop-site.vbs
+echo   Legacy: scripts\start-radar-desktop-legacy.vbs
+echo Polnyj stopp: scripts\stop-radar-desktop-full.vbs
+echo Sm. docs\ops\DESKTOP_LAUNCH.md
 pause

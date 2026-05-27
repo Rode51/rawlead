@@ -412,9 +412,17 @@
 
   function taskBodyText(item) {
 
+    var summary = (item.task_summary || "").trim();
+
+    if (summary) {
+
+      return summary;
+
+    }
+
     var raw = (item.body || item.title || "").trim();
 
-    return truncateTaskSnippet(stripLeadingTaskLabel(raw));
+    return truncateTaskSnippet(stripLeadingTaskLabel(raw), 280);
 
   }
 
@@ -424,8 +432,6 @@
 
     var task = taskBodyText(item);
 
-    var reasons = (item.ai_reasons || []).filter(Boolean).join(". ");
-
     var html = "";
 
     if (task) {
@@ -434,7 +440,7 @@
 
         '<div class="rl-feed-card__section">' +
 
-        '<h4 class="rl-feed-card__section-title">Задача</h4>' +
+        '<h4 class="rl-feed-card__section-title">Суть задания</h4>' +
 
         '<p class="rl-feed-card__task">' +
 
@@ -442,29 +448,11 @@
 
         "</p></div>";
 
-    }
-
-    if (reasons) {
+    } else {
 
       html +=
 
-        '<div class="rl-feed-card__section">' +
-
-        '<h4 class="rl-feed-card__section-title">Разбор</h4>' +
-
-        '<p class="rl-feed-card__text rl-feed-card__analysis">' +
-
-        escapeHtml(reasons) +
-
-        "</p></div>";
-
-    }
-
-    if (!task && !reasons) {
-
-      html +=
-
-        '<p class="rl-feed-card__text rl-feed-card__muted">Описание появится после обогащения лида.</p>';
+        '<p class="rl-feed-card__text rl-feed-card__muted">Краткое описание появится после следующего цикла радара.</p>';
 
     }
 

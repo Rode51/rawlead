@@ -13,6 +13,26 @@ from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_VALID_RADAR_PROFILES = frozenset({"legacy", "site"})
+_PROFILE_DEFAULTS: dict[str, dict[str, str]] = {
+    "legacy": {
+        "RADAR_LOG_PATH": "data/radar_legacy.log",
+        "AI_MODE": "legacy",
+        "RADAR_CONTROL_PORT": "18765",
+        "RADAR_TG_ENABLED": "0",
+        "RADAR_EXCHANGES_ENABLED": "0",
+        "FILTERS_MD_PATH": "docs/ops/FILTERS_LEGACY.md",
+    },
+    "site": {
+        "RADAR_LOG_PATH": "data/radar_site.log",
+        "AI_MODE": "split",
+        "RADAR_CONTROL_PORT": "18775",
+        "RADAR_TG_ENABLED": "1",
+        "RADAR_EXCHANGES_ENABLED": "1",
+        "FILTERS_MD_PATH": "docs/ops/FILTERS_SITE.md",
+        "TG_JOIN_QUEUE_CSV": "docs/ops/TG_JOIN_QUEUE_v2.csv",
+    },
+}
 
 # http://host:port:user:pass — удобный формат провайдеров; requests ждёт user:pass@host:port
 _PROXY_HOST_PORT_USER_PASS = re.compile(
@@ -42,11 +62,118 @@ class Config:
     ai_notify_skip: bool
     filter_wide: bool
     database_url: str
+    radar_profile: str
+    ai_mode: str
+    filters_md_path: Path
+    site_notify_on_ai_unavailable: bool
+    site_notify_owner: bool
 
     @property
     def ai_active(self) -> bool:
         """ИИ включён в .env и задан ключ."""
         return self.ai_enabled and bool(self.ai_api_key)
+
+    @property
+    def ai_uses_l1_l2(self) -> bool:
+        """SITE: L1 → лента, L2 → бот; LEGACY: один analyze_project."""
+        return self.ai_mode == "split"
+
+    @property
+    def neon_ingest_wide(self) -> bool:
+        """SITE: в Neon до словесного FILTERS_SITE (широкий ingest для legacy consumer)."""
+        return self.radar_profile == "site"
+
+
+def apply_profile_argv(argv: list[str] | None = None) -> None:
+    """`--profile legacy|site` до load_config (main/tg_main/radar_control)."""
+    if argv is None:
+        import sys
+
+        argv = sys.argv
+    for i, arg in enumerate(argv):
+        if arg == "--profile" and i + 1 < len(argv):
+            os.environ["RADAR_PROFILE"] = str(argv[i + 1]).strip().casefold()
+            break
+
+
+def radar_profile() -> str:
+    raw = os.environ.get("RADAR_PROFILE", "legacy").strip().casefold()
+    if raw not in _VALID_RADAR_PROFILES:
+        raise ValueError(
+            f"RADAR_PROFILE: ожидается 'legacy' или 'site', получено: {raw!r}"
+        )
+    return raw
+
+
+def _apply_profile_defaults(profile: str) -> None:
+    for key, value in _PROFILE_DEFAULTS[profile].items():
+        if not os.environ.get(key, "").strip():
+            os.environ[key] = value
+
+
+def load_radar_env() -> str:
+    """Профиль → defaults → `.env.{profile}` или fallback `.env`."""
+    apply_profile_argv()
+    profile = radar_profile()
+    os.environ["RADAR_PROFILE"] = profile
+    _apply_profile_defaults(profile)
+    specific = _PROJECT_ROOT / f".env.{profile}"
+    fallback = _PROJECT_ROOT / ".env"
+    if specific.is_file():
+        load_dotenv(specific, override=True)
+    if fallback.is_file():
+        load_dotenv(fallback, override=False)
+    return profile
+
+
+def radar_tg_enabled() -> bool:
+    """Telethon/tg_main: site=1, legacy=0 (биржи + бот без acc)."""
+    load_radar_env()
+    profile = radar_profile()
+    default = profile == "site"
+    return _parse_bool_flag(os.environ.get("RADAR_TG_ENABLED"), default=default)
+
+
+def radar_exchanges_enabled() -> bool:
+    """main.py (FL/Kwork/FH): site=1 (единственный парсер), legacy=0 (Neon consumer)."""
+    load_radar_env()
+    profile = radar_profile()
+    default = profile == "site"
+    return _parse_bool_flag(os.environ.get("RADAR_EXCHANGES_ENABLED"), default=default)
+
+
+def legacy_neon_consumer_enabled() -> bool:
+    """Legacy без бирж: читать Neon вместо main.py."""
+    load_radar_env()
+    return radar_profile() == "legacy" and not radar_exchanges_enabled()
+
+
+def filters_md_path() -> Path:
+    raw = os.environ.get("FILTERS_MD_PATH", "").strip()
+    if raw:
+        path = Path(raw)
+        return path if path.is_absolute() else _PROJECT_ROOT / path
+    name = (
+        "FILTERS_LEGACY.md" if radar_profile() == "legacy" else "FILTERS_SITE.md"
+    )
+    return _PROJECT_ROOT / "docs" / "ops" / name
+
+
+def radar_lock_path(name: str) -> Path:
+    """Lock-файл с суффиксом профиля: main, tg_main, bot_poll, radar_desktop, radar_ops."""
+    profile = radar_profile()
+    return _PROJECT_ROOT / "data" / f".{name}_{profile}.lock"
+
+
+def _parse_ai_mode(raw: str | None, *, profile: str) -> str:
+    if raw is None or not str(raw).strip():
+        return _PROFILE_DEFAULTS[profile]["AI_MODE"]
+    mode = str(raw).strip().casefold()
+    if mode not in ("legacy", "split"):
+        raise ValueError(
+            f"AI_MODE: ожидается 'legacy' или 'split', получено: {raw!r}"
+        )
+    return mode
 
 
 def _require_str(name: str) -> str:
@@ -404,7 +531,7 @@ def parse_telethon_chat_ids(raw: str) -> list[int]:
 
 def load_tg_monitor_config() -> TgMonitorConfig:
     """Настройки только для scripts/tg_main.py (не нужны main.py)."""
-    load_dotenv(_PROJECT_ROOT / ".env")
+    load_radar_env()
 
     monitor_accounts = telethon_monitor_accounts()
     account_rows: list[TgMonitorAccountConfig] = []
@@ -537,7 +664,7 @@ def tg_join_daemon_accounts() -> list[str]:
 
 def load_tg_join_config() -> TgJoinConfig:
     """Настройки scripts/tg_join_queue.py (без TELETHON_CHAT_IDS)."""
-    load_dotenv(_PROJECT_ROOT / ".env")
+    load_radar_env()
 
     def _pos_int(name: str, default: int, *, minimum: int = 1) -> int:
         raw = os.environ.get(name)
@@ -603,8 +730,8 @@ def is_join_night_window(cfg: TgJoinConfig, *, now=None) -> bool:
 
 
 def load_config() -> Config:
-    """Читает `.env`, проверяет обязательные поля MVP до сетевых вызовов."""
-    load_dotenv(_PROJECT_ROOT / ".env")
+    """Читает `.env.{profile}` / `.env`, проверяет обязательные поля MVP."""
+    profile = load_radar_env()
 
     fl_url = _require_str("FL_PROJECTS_URL")
     _validate_http_url(fl_url, "FL_PROJECTS_URL")
@@ -633,7 +760,7 @@ def load_config() -> Config:
     tg_proxy_url = _require_proxy_url("TG_PROXY_URL")
 
     ai_enabled = _parse_bool_flag(os.environ.get("AI_ENABLED"), default=False)
-    ai_key_raw = os.environ.get("AI_API_KEY")
+    ai_key_raw = os.environ.get("AI_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
     ai_api_key = str(ai_key_raw).strip() if ai_key_raw is not None else ""
 
     ai_model_raw = os.environ.get("AI_MODEL")
@@ -664,6 +791,17 @@ def load_config() -> Config:
     db_raw = os.environ.get("DATABASE_URL")
     database_url = str(db_raw).strip() if db_raw is not None else ""
 
+    ai_mode = _parse_ai_mode(os.environ.get("AI_MODE"), profile=profile)
+    filters_path = filters_md_path()
+    site_notify_on_ai_unavailable = _parse_bool_flag(
+        os.environ.get("SITE_NOTIFY_ON_AI_UNAVAILABLE"),
+        default=False,
+    )
+    site_notify_owner = _parse_bool_flag(
+        os.environ.get("SITE_NOTIFY_OWNER"),
+        default=False,
+    )
+
     return Config(
         fl_projects_url=fl_url,
         kwork_projects_url=kwork_url,
@@ -684,4 +822,9 @@ def load_config() -> Config:
         ai_notify_skip=ai_notify_skip,
         filter_wide=filter_wide,
         database_url=database_url,
+        radar_profile=profile,
+        ai_mode=ai_mode,
+        filters_md_path=filters_path,
+        site_notify_on_ai_unavailable=site_notify_on_ai_unavailable,
+        site_notify_owner=site_notify_owner,
     )

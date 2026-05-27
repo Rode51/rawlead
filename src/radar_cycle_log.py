@@ -44,6 +44,7 @@ class SourceCycleStats:
     to_bot: int = 0
     filter_skip: int = 0
     mimo_skip: int = 0
+    ai_unavailable: int = 0
     dup_skip: int = 0
     budget_skip: int = 0
     fetch_error: str = ""
@@ -57,8 +58,12 @@ class SourceCycleStats:
             self.filter_skip += 1
         elif reason == "skip:dup_content":
             self.dup_skip += 1
+        elif reason == "skip:neon_dup_skip":
+            pass
         elif reason == "skip:budget":
             self.budget_skip += 1
+        elif reason == "skip:ai_unavailable":
+            self.ai_unavailable += 1
         elif reason.startswith("skip:ai:"):
             self.mimo_skip += 1
 
@@ -74,6 +79,8 @@ class SourceCycleStats:
             tail.append(f"filter {self.filter_skip}")
         if self.mimo_skip:
             tail.append(f"МИМО {self.mimo_skip}")
+        if self.ai_unavailable:
+            tail.append(f"ai_unavailable {self.ai_unavailable}")
         if self.dup_skip:
             tail.append(f"dup {self.dup_skip}")
         if self.budget_skip:
@@ -84,10 +91,57 @@ class SourceCycleStats:
 
 
 @dataclass
+class NeonCycleStats:
+    """Счётчики Neon за цикл (§ LOG-NEON-CYCLE) — не смешивать с dup SQLite."""
+
+    insert: int = 0
+    replay: int = 0
+    skip: int = 0
+    sqlite_resync: int = 0
+
+
+_neon_cycle = NeonCycleStats()
+
+
+def reset_neon_cycle_counters() -> None:
+    global _neon_cycle
+    _neon_cycle = NeonCycleStats()
+
+
+def note_neon_insert() -> None:
+    _neon_cycle.insert += 1
+
+
+def note_neon_replay() -> None:
+    _neon_cycle.replay += 1
+
+
+def note_neon_dup_skip() -> None:
+    _neon_cycle.skip += 1
+
+
+def note_neon_sqlite_resync() -> None:
+    _neon_cycle.sqlite_resync += 1
+
+
+def neon_cycle_counts() -> tuple[int, int, int, int]:
+    return (
+        _neon_cycle.insert,
+        _neon_cycle.replay,
+        _neon_cycle.skip,
+        _neon_cycle.sqlite_resync,
+    )
+
+
+@dataclass
 class CycleSummary:
     ts: str
     sources: dict[str, SourceCycleStats] = field(default_factory=dict)
     total_to_bot: int = 0
+    neon_insert: int = 0
+    neon_replay: int = 0
+    neon_dup_skip: int = 0
+    neon_sqlite_resync: int = 0
     misc_errors: list[str] = field(default_factory=list)
 
     def ensure(self, source_id: str) -> SourceCycleStats:
@@ -101,14 +155,34 @@ class CycleSummary:
     def format_header(self) -> str:
         return f"── Цикл {self.ts} ──"
 
+    def sync_neon_from_globals(self) -> None:
+        ins, rep, sk, resync = neon_cycle_counts()
+        self.neon_insert = ins
+        self.neon_replay = rep
+        self.neon_dup_skip = sk
+        self.neon_sqlite_resync = resync
+
     def format_footer(self) -> str:
         from ai_analyze import cycle_ai_counts
 
+        self.sync_neon_from_globals()
         l1, l2 = cycle_ai_counts()
-        base = (
-            f"Итого в бот: {self.total_to_bot} │ "
-            f"на сайт /lenta/: {self.total_to_bot}"
-        )
+        parts = [f"Итого в бот: {self.total_to_bot}"]
+        if (
+            self.neon_insert
+            or self.neon_replay
+            or self.neon_dup_skip
+            or self.neon_sqlite_resync
+        ):
+            parts.append(f"neon_insert: {self.neon_insert}")
+            if self.neon_replay:
+                parts.append(f"neon_replay: {self.neon_replay}")
+            if self.neon_sqlite_resync:
+                parts.append(f"neon_sqlite_resync: {self.neon_sqlite_resync}")
+            if self.neon_dup_skip:
+                parts.append(f"neon_dup_skip: {self.neon_dup_skip}")
+        parts.append("лента после L1 — см. Neon is_visible")
+        base = " │ ".join(parts)
         if l1 or l2:
             return f"{base} │ ИИ L1={l1} L2={l2}"
         return base
@@ -131,6 +205,10 @@ class CycleSummary:
                 for sid, st in self.sources.items()
             },
             "total_to_bot": self.total_to_bot,
+            "neon_insert": self.neon_insert,
+            "neon_replay": self.neon_replay,
+            "neon_dup_skip": self.neon_dup_skip,
+            "neon_sqlite_resync": self.neon_sqlite_resync,
             "misc_errors": self.misc_errors[:10],
         }
 
@@ -147,6 +225,10 @@ def load_cycle_summary(storage: ProjectStorage) -> CycleSummary | None:
         return None
     summary = CycleSummary(ts=str(data.get("ts", "")))
     summary.total_to_bot = int(data.get("total_to_bot", 0) or 0)
+    summary.neon_insert = int(data.get("neon_insert", 0) or 0)
+    summary.neon_replay = int(data.get("neon_replay", 0) or 0)
+    summary.neon_dup_skip = int(data.get("neon_dup_skip", 0) or 0)
+    summary.neon_sqlite_resync = int(data.get("neon_sqlite_resync", 0) or 0)
     misc = data.get("misc_errors")
     if isinstance(misc, list):
         summary.misc_errors = [str(x) for x in misc[:10]]
@@ -161,6 +243,7 @@ def load_cycle_summary(storage: ProjectStorage) -> CycleSummary | None:
             st.to_bot = int(row.get("to_bot", 0) or 0)
             st.filter_skip = int(row.get("filter_skip", 0) or 0)
             st.mimo_skip = int(row.get("mimo_skip", 0) or 0)
+            st.ai_unavailable = int(row.get("ai_unavailable", 0) or 0)
             st.dup_skip = int(row.get("dup_skip", 0) or 0)
             st.budget_skip = int(row.get("budget_skip", 0) or 0)
             st.fetch_error = str(row.get("fetch_error", "") or "")
@@ -194,9 +277,21 @@ def format_cycle_status_block(storage: ProjectStorage) -> list[str]:
         return ["Последний цикл: ещё не было"]
     lines = [f"Последний цикл: {summary.ts}"]
     lines.extend(s.format_line() for s in summary.iter_sources())
-    lines.append(
-        f"Итого в бот: {summary.total_to_bot} │ на сайт: {summary.total_to_bot}"
-    )
+    footer_bits = [f"Итого в бот: {summary.total_to_bot}"]
+    if (
+        summary.neon_insert
+        or summary.neon_replay
+        or summary.neon_dup_skip
+        or summary.neon_sqlite_resync
+    ):
+        footer_bits.append(f"neon_insert: {summary.neon_insert}")
+        if summary.neon_replay:
+            footer_bits.append(f"neon_replay: {summary.neon_replay}")
+        if summary.neon_sqlite_resync:
+            footer_bits.append(f"neon_sqlite_resync: {summary.neon_sqlite_resync}")
+        if summary.neon_dup_skip:
+            footer_bits.append(f"neon_dup_skip: {summary.neon_dup_skip}")
+    lines.append(" │ ".join(footer_bits))
     if summary.misc_errors:
         lines.append("Прочие ошибки:")
         for err in summary.misc_errors[:3]:

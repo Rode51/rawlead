@@ -15,7 +15,9 @@ _DEFAULT_LOG = _PROJECT_ROOT / "data" / "radar.log"
 
 # role=main | tg_main — только свой скрипт (uisness в пути опционален: system pythonw + rel path)
 _ROLE_MATCH = {
-    "main": r"(?:uisness[\\/].*)?src[\\/]main\.py",
+    "main": (
+        r"(?:uisness[\\/].*)?src[\\/](?:main|neon_legacy_consumer)\.py"
+    ),
     "tg_main": r"(?:uisness[\\/].*)?scripts[\\/]tg_main\.py",
 }
 # Пульт /stop и kill без role — все воркеры радара
@@ -27,6 +29,21 @@ _ALL_MATCH = (
 _RADAR_CONTROL_MATCH = r"radar_control\.py"
 # Пульт spawn'ит только .venv\Scripts\python.exe — system/Cursor воркеры = дубль
 _VENV_EXE = re.compile(r"\.venv[\\/]Scripts[\\/]python(?:w)?\.exe", re.IGNORECASE)
+_PROFILE_ARG = re.compile(r"--profile\s+(legacy|site)", re.IGNORECASE)
+
+
+def _profile_from_cmd(cmd: str) -> str:
+    m = _PROFILE_ARG.search(cmd)
+    if m:
+        return m.group(1).casefold()
+    return "legacy"
+
+
+def _current_profile() -> str:
+    from config import load_radar_env, radar_profile
+
+    load_radar_env()
+    return radar_profile()
 
 
 def _iter_python_procs():
@@ -57,7 +74,10 @@ def _is_project_radar_cmd(cmd: str) -> bool:
     if not cmd:
         return False
     base = re.escape(str(_PROJECT_ROOT))
-    main_rx = re.compile(rf"{base}[\\/]src[\\/]main\.py", re.IGNORECASE)
+    main_rx = re.compile(
+        rf"{base}[\\/]src[\\/](?:main|neon_legacy_consumer)\.py",
+        re.IGNORECASE,
+    )
     tg_rx = re.compile(rf"{base}[\\/]scripts[\\/]tg_main\.py", re.IGNORECASE)
     return bool(main_rx.search(cmd) or tg_rx.search(cmd))
 
@@ -75,6 +95,8 @@ def expand_spawn_keep_pids(pids: set[int] | None) -> set[int]:
     """popen.pid + дерево потомков (Windows: .venv exe → system python + main.py)."""
     expanded: set[int] = set(pids or ())
     for pid in list(expanded):
+        if pid <= 0:
+            continue
         try:
             proc = psutil.Process(pid)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -100,8 +122,11 @@ def _kill_pids(pids: list[int]) -> list[int]:
     return killed
 
 
-def _worker_groups() -> tuple[list[tuple[int, bool, str]], list[tuple[int, bool, str]]]:
-    """(pid, is_venv, cmdline) для main и tg_main."""
+def _worker_groups(
+    profile: str | None = None,
+) -> tuple[list[tuple[int, bool, str]], list[tuple[int, bool, str]]]:
+    """(pid, is_venv, cmdline) для main и tg_main одного RADAR_PROFILE."""
+    want = profile or _current_profile()
     main_rx = re.compile(_ROLE_MATCH["main"], re.IGNORECASE)
     tg_rx = re.compile(_ROLE_MATCH["tg_main"], re.IGNORECASE)
     mains: list[tuple[int, bool, str]] = []
@@ -109,6 +134,8 @@ def _worker_groups() -> tuple[list[tuple[int, bool, str]], list[tuple[int, bool,
     for proc in _iter_python_procs():
         cmd = _cmd_str(proc)
         if not cmd:
+            continue
+        if _profile_from_cmd(cmd) != want:
             continue
         venv = _is_venv_interpreter(cmd)
         if main_rx.search(cmd):
@@ -125,11 +152,11 @@ def _pick_worker_to_keep(
         return None
 
     def rank(item: tuple[int, bool, str]) -> tuple:
-        pid, _venv, cmd = item
+        pid, venv, cmd = item
         return (
             pid in keep_pids,
-            _is_real_radar_worker(cmd),
-            _is_trusted_radar_worker(cmd),
+            venv,
+            not _is_real_radar_worker(cmd),
             pid,
         )
 
@@ -137,14 +164,15 @@ def _pick_worker_to_keep(
 
 
 def _count_logical_group(group: list[tuple[int, bool, str]]) -> int:
-    """Один логический воркер: приоритет .venv; иначе system+скрипт проекта."""
+    """Число воркеров для spawn-check: дубли venv+system или 2+ main не схлопываем."""
     if not group:
         return 0
-    if any(venv for _pid, venv, _cmd in group):
-        return 1
-    reals = [item for item in group if _is_real_radar_worker(item[2])]
-    if reals:
-        return len(reals)
+    venv_n = sum(1 for _pid, venv, _cmd in group if venv)
+    system_n = len(group) - venv_n
+    if venv_n and system_n:
+        return len(group)
+    if len(group) > 1:
+        return len(group)
     return 1
 
 
@@ -153,12 +181,14 @@ def kill_non_venv_radar_workers(
     keep_pids: set[int] | None = None,
     log_path: Path | None = None,
     log_source: str = "guard:non_venv",
+    profile: str | None = None,
 ) -> list[int]:
-    """Убить main/tg_main вне .venv и вне корня проекта (Cursor, чужой bat)."""
+    """Убить main/tg_main/radar_control вне .venv (дубль system+venv)."""
     if sys.platform != "win32":
         return []
+    want_profile = profile or _current_profile()
     keep = keep_pids or set()
-    mains, tgs = _worker_groups()
+    mains, tgs = _worker_groups(want_profile)
     pids: list[int] = []
     for pid, _venv, cmd in mains + tgs:
         if pid in keep:
@@ -166,6 +196,18 @@ def kill_non_venv_radar_workers(
         if _is_venv_interpreter(cmd):
             continue
         pids.append(pid)
+    ctrl_rx = re.compile(_RADAR_CONTROL_MATCH, re.IGNORECASE)
+    for proc in _iter_python_procs():
+        if proc.pid in keep:
+            continue
+        cmd = _cmd_str(proc)
+        if not ctrl_rx.search(cmd):
+            continue
+        if _profile_from_cmd(cmd) != want_profile:
+            continue
+        if _is_venv_interpreter(cmd):
+            continue
+        pids.append(proc.pid)
     killed = _kill_pids(pids)
     if killed:
         log_duplicate_kills(killed, log_path=log_path, source=log_source)
@@ -212,11 +254,11 @@ def _kill_matching(pattern: str, except_pid: int | None = None) -> list[int]:
     return killed
 
 
-def count_radar_workers() -> tuple[int, int]:
-    """Число логических воркеров main.py и tg_main.py (Windows)."""
+def count_radar_workers(profile: str | None = None) -> tuple[int, int]:
+    """Число логических воркеров main.py и tg_main.py (Windows), один профиль."""
     if sys.platform != "win32":
         return 0, 0
-    mains, tgs = _worker_groups()
+    mains, tgs = _worker_groups(profile)
     return _count_logical_group(mains), _count_logical_group(tgs)
 
 
@@ -243,11 +285,39 @@ def log_duplicate_kills(
     print(line, flush=True)
 
 
-def kill_all_radar_control() -> list[int]:
-    """Завершить все radar_control (перед чистым стартом из bat)."""
+def kill_all_radar_control(*, profile: str | None = None) -> list[int]:
+    """Завершить radar_control + main/tg_main/join профиля (любой python.exe)."""
     if sys.platform != "win32":
         return []
-    killed = _kill_matching(_RADAR_CONTROL_MATCH)
+    want = profile or _current_profile()
+    rx = re.compile(_RADAR_CONTROL_MATCH, re.IGNORECASE)
+    killed: list[int] = []
+    for proc in _iter_python_procs():
+        cmd = _cmd_str(proc)
+        if not rx.search(cmd):
+            continue
+        if _profile_from_cmd(cmd) != want:
+            continue
+        try:
+            proc.kill()
+            killed.append(proc.pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    # keep_pids={-1}: не оставлять os.getpid() — убить и system, и venv воркеры
+    killed.extend(
+        kill_duplicate_radar_workers(
+            keep_pids={-1},
+            profile=want,
+            log_source="kill_all:workers",
+        )
+    )
+    killed.extend(
+        kill_non_venv_radar_workers(
+            keep_pids={-1},
+            profile=want,
+            log_source="kill_all:non_venv",
+        )
+    )
     if killed:
         log_duplicate_kills(killed, source="radar_control:all")
     return killed
@@ -271,10 +341,12 @@ def kill_duplicate_radar_workers(
     keep_pids: set[int] | None = None,
     log_path: Path | None = None,
     log_source: str = "guard",
+    profile: str | None = None,
 ) -> list[int]:
     """Завершить чужие uisness main/tg_main/join. role — только свой скрипт; без role — все воркеры."""
     if sys.platform != "win32":
         return []
+    want_profile = profile or _current_profile()
     keep = set(keep_pids or ())
     if except_pid is not None:
         keep.add(int(except_pid))
@@ -292,12 +364,16 @@ def kill_duplicate_radar_workers(
     for proc in _iter_python_procs():
         if proc.pid in keep:
             continue
-        if rx.search(_cmd_str(proc)):
-            try:
-                proc.kill()
-                killed.append(proc.pid)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
+        cmd = _cmd_str(proc)
+        if not rx.search(cmd):
+            continue
+        if _profile_from_cmd(cmd) != want_profile:
+            continue
+        try:
+            proc.kill()
+            killed.append(proc.pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
     if killed:
         log_duplicate_kills(killed, log_path=log_path, source=log_source)
     return killed
@@ -308,10 +384,13 @@ def release_stale_worker_locks() -> None:
     if sys.platform != "win32":
         return
     time.sleep(0.25)
+    from config import load_radar_env, radar_lock_path
+
+    load_radar_env()
     mc, _tc = count_radar_workers()
     if mc == 0:
         try:
-            (_PROJECT_ROOT / "data" / ".main.lock").unlink(missing_ok=True)
+            radar_lock_path("main").unlink(missing_ok=True)
         except OSError:
             pass
     try:

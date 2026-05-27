@@ -6,8 +6,10 @@
 
 | Способ | Команда / файл |
 |--------|----------------|
-| Двойной клик (без консоли) | **`scripts\start-radar-desktop.vbs`** |
-| Двойной клик (с консолью в dev) | **`scripts\start-radar-desktop.bat`** |
+| Site (без консоли) | **`scripts\start-radar-desktop-site.vbs`** |
+| Legacy (без консоли) | **`scripts\start-radar-desktop-legacy.vbs`** |
+| Legacy / общий bat | `start-radar-desktop.bat` (консоль в dev) |
+| **Полный стоп** site+legacy | **`scripts\stop-radar-desktop-full.vbs`** |
 | API вручную | `.venv\Scripts\python.exe scripts\radar_control.py` |
 | UI dev (после Rust) | `cd desktop` → `npm run tauri dev` |
 | UI в браузере (отладка) | API + `cd desktop` → `npm run dev` → http://localhost:1420 |
@@ -35,28 +37,20 @@ Exe: `desktop\src-tauri\target\release\` (имя по `productName` в `tauri.co
 
 ### Ярлык на рабочий стол
 
-**Без чёрного PowerShell:**
+**Только VBS** (не `desktop.exe` — иначе bat не убивает зомби-API):
 
-1. Готовый файл: **`scripts\start-radar-desktop.vbs`**
-2. ПКМ по **`.vbs`** → **Отправить** → **Рабочий стол (создать ярлык)**
+| Профиль | Файл ярлыка |
+|---------|-------------|
+| Site | `scripts\start-radar-desktop-site.vbs` |
+| Legacy | `scripts\start-radar-desktop-legacy.vbs` |
+| Полный стоп | `scripts\stop-radar-desktop-full.vbs` |
 
-Окно cmd **не** мелькает (режим 0). Пульт **без** стандартной полосы Windows (`decorations: false`); свернуть/закрыть — кнопки в UI справа сверху.
+1. ПКМ по нужному **`.vbs`** → **Отправить** → **Рабочий стол (создать ярлык)**
+2. ПКМ ярлык → **Свойства** → **Объект** должен заканчиваться на этот `.vbs`
 
-**Через bat (будет консоль в dev-режиме):**
+Окно cmd **не** мелькает. Пульт **без** стандартной полосы Windows; **✕** — стоп воркеров + завершение API **этого** профиля (`/shutdown`).
 
-1. Проводник → `uisness\scripts\`
-2. ПКМ по **`start-radar-desktop.bat`** → **Отправить** → **Рабочий стол (создать ярлык)**
-3. ПКМ по ярлыку → **Свойства** → **Рабочая папка:** `C:\Users\…\uisness` (корень проекта)
-4. По желанию: **Сменить значок** → любой `.ico`
-
-**После сборки exe** (удобнее, без окна npm):
-
-1. `cd desktop` → `npm run tauri build`
-2. Exe: `desktop\src-tauri\target\release\RawLead.exe` (после `npm run tauri build`; старые `fl-radar*.exe` тоже работают)
-3. ПКМ по exe → **Отправить** → **Рабочий стол**
-4. В свойствах ярлыка **Объект:** полный путь к exe; **Рабочая папка:** `…\uisness` (чтобы находил `.venv` и `data\`)
-
-Пульт **сам** поднимает `radar_control.py` только из bat. Ярлык **только на exe** — сначала один раз запусти bat или добавь в Coder задачу «exe + sidecar API».
+**Сборка exe** (`scripts\rebuild-pult.bat` или `npm run tauri build`) — для запуска из bat/VBS, **не** для ярлыка на рабочий стол.
 
 ### Legacy PyQt6
 
@@ -64,7 +58,7 @@ Exe: `desktop\src-tauri\target\release\` (имя по `productName` в `tauri.co
 
 Пауза радара FL/Kwork — только в Telegram-боте (кнопка ℹ), в пульте строки про бота **нет**.
 
-Перед повторным стартом пульт вызывает стоп (как `stop-radar.bat`).
+Перед повторным стартом: **Stop** в пульте или **`stop-radar-desktop-full.vbs`** (убивает API). `stop-radar.bat` — только воркеры, без `radar_control`.
 
 ---
 
@@ -128,8 +122,11 @@ SELECT source, COUNT(*) FROM leads GROUP BY source ORDER BY source;
 | `scripts\start-radar-all.bat` | **2 окна:** биржи + TG |
 | `scripts\start-radar-full.bat` | **3 окна:** + join acc2/acc3 (рекомендуется) |
 | `scripts\start-join-daemons.bat` | только окно join (если birzhi+TG уже работают) |
-| `scripts\stop-radar.bat` | стоп процессов |
-| `scripts\start-radar-desktop.bat` | пульт v2 (Tauri + API) |
+| `scripts\stop-radar.bat` | стоп воркеров (без API) |
+| `scripts\stop-radar-desktop-full.bat` / `.vbs` | полный стоп site + legacy |
+| `scripts\start-radar-desktop-site.vbs` | пульт Site + API :18775 |
+| `scripts\start-radar-desktop-legacy.vbs` | пульт Legacy + API :18765 |
+| `scripts\start-radar-desktop.bat` | пульт Legacy (с консолью) |
 | `scripts\radar_control.py` | HTTP API пульта |
 | `scripts\radar_desktop.py` | legacy PyQt6 |
 
@@ -141,7 +138,7 @@ SELECT source, COUNT(*) FROM leads GROUP BY source ORDER BY source;
 |---------|---------|---------|
 | `cargo metadata` · **program not found** | Rust не установлен или **нет в PATH** | См. ниже § Rust |
 | API не отвечает | `radar_control` не запущен | `.venv\Scripts\python.exe scripts\radar_control.py` |
-| Второй пульт | lock | Закрыть старый, `scripts\stop-radar.bat` |
+| Второй пульт / зомби API | lock / system python | `stop-radar-desktop-full.vbs`, ярлык только на `.vbs` |
 
 ### Rust (обязательно для Tauri)
 

@@ -38,7 +38,7 @@
 | **Lead Architect** | `ROADMAP`, `TASKS`, `STATUS`, `CODER_PROMPT`, карты | `src/`, commit чужих без сдачи |
 | **Coder** | файлы из § «Файлы» в `CODER_PROMPT` + `STATUS` | любой другой `docs/team/*.md` |
 | **Designer** | `docs/design/`, `DESIGN_BRIEF` по промпту | `src/`, `wordpress/` |
-| **Mechanic** | `docs/problems/*` + код из тикета | `TASKS`, `FOR_YOU`, vision |
+| **Mechanic** | `docs/problems/*` + код из тикета; модель **Gemini 2.5 (~2M)**; широкий разбор при инциденте | `TASKS`, `FOR_YOU`, vision, активный `CODER_PROMPT` (без дубля) |
 
 **Отменено v0.9 (не возвращать в код/docs):** `contour` owner/saas · демо `/cabinet` на JSON · [`../archive/SOURCES_SAAS.md`](../archive/SOURCES_SAAS.md)
 
@@ -106,6 +106,40 @@ flowchart TB
 | **Join** | только **внутри** `tg_main` (`TG_JOIN_IN_TG_MAIN=1`) |
 
 Запуск: [`../ops/DESKTOP_LAUNCH.md`](../ops/DESKTOP_LAUNCH.md) · схема: [`ARCHITECTURE.md`](../architect/ARCHITECTURE.md)
+
+---
+
+## Два контура (legacy / site) — решение владельца 2026-05-27
+
+**Один repo, два независимых запуска.** Не «ветка git = проект», а **профиль окружения** `RADAR_PROFILE=legacy|site`.
+
+```text
+┌──────────────────────── LEGACY (заморожен) ────────────────────────┐
+│ .env.legacy          │ TELEGRAM_BOT_TOKEN = старый бот               │
+│ FILTERS_LEGACY.md    │ OpenRouter key = legacy (твой текущий)        │
+│ radar_legacy.log     │ Пульт :18765  ·  **consumer** (без main бирж)   │
+│ ИИ                   │ legacy ИИ → @FLPARSINGBOT (из Neon Site)        │
+│ TG acc               │ нет (RADAR_TG_ENABLED=0)                      │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────── SITE (новый продукт) ────────────────────────┐
+│ .env.site            │ @rawlead_bot                                  │
+│ FILTERS_SITE.md      │ OpenRouter site (L1+L2)                       │
+│ radar_site.log       │ Пульт :18775  ·  **единственный** main + tg   │
+│ ИИ                   │ L1 → /lenta/  ·  L2 → подписчики              │
+│ TG acc               │ acc1–acc3 + join                              │
+│ WP                   │ /lenta/ + /cabinet/ + Login Widget            │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+| Что | LEGACY | SITE |
+|-----|--------|------|
+| Фильтры Python | `docs/ops/FILTERS_LEGACY.md` | `docs/ops/FILTERS_SITE.md` |
+| Промпты ИИ | `AI.md` § legacy (как сейчас) | `AI.md` § L1/L2 |
+| Neon | **читает** (consumer + SQLite дедуп бота) | **пишет** — единственный парсер бирж |
+| Кто правит | **Mechanic** только по тикету | **Coder** § S-SPLIT |
+
+**Агентам:** в `CODER_PROMPT` всегда указан профиль. **LEGACY не менять** при задаче SITE. См. § S-SPLIT.
 
 ---
 

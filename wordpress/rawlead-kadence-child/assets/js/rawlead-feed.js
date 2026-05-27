@@ -165,39 +165,33 @@
   }
 
   function taskBodyText(item) {
+    var summary = (item.task_summary || "").trim();
+    if (summary) {
+      return summary;
+    }
     var raw = (item.body || item.title || "").trim();
-    return truncateTaskSnippet(stripLeadingTaskLabel(raw));
+    return truncateTaskSnippet(stripLeadingTaskLabel(raw), 280);
   }
 
   function renderExpandedBody(item) {
     var task = taskBodyText(item);
-    var reasons = (item.ai_reasons || []).filter(Boolean).join(". ");
     var html = "";
     if (task) {
       html +=
         '<div class="rl-feed-card__section">' +
-        '<h4 class="rl-feed-card__section-title">Задача</h4>' +
+        '<h4 class="rl-feed-card__section-title">Суть задания</h4>' +
         '<p class="rl-feed-card__task">' +
         escapeHtml(task) +
         "</p></div>";
-    }
-    if (reasons) {
+    } else {
       html +=
-        '<div class="rl-feed-card__section">' +
-        '<h4 class="rl-feed-card__section-title">Разбор</h4>' +
-        '<p class="rl-feed-card__text rl-feed-card__analysis">' +
-        escapeHtml(reasons) +
-        "</p></div>";
-    }
-    if (!task && !reasons) {
-      html +=
-        '<p class="rl-feed-card__text rl-feed-card__muted">Описание появится после обогащения лида.</p>';
+        '<p class="rl-feed-card__text rl-feed-card__muted">Краткое описание появится после следующего цикла радара.</p>';
     }
     if (item.url) {
       html +=
         '<a class="rl-btn rl-btn--ghost rl-feed-card__link" href="' +
         escapeHtml(item.url) +
-        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Открыть оригинал ↗</a>';
+        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Читать на бирже ↗</a>';
     }
     return html;
   }

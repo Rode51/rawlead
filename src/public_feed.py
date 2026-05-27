@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from functools import lru_cache
@@ -13,7 +12,6 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_SOURCES = ("fl", "kwork", "freelancehunt")
 _PUBLIC_FEED_SOURCES_ENV = "PUBLIC_FEED_SOURCES"
 _ALLOWLIST_PATH = _PROJECT_ROOT / "docs" / "ops" / "TG_PUBLIC_FEED_ALLOWLIST.txt"
-_INGEST_TG_A_JSON = _PROJECT_ROOT / "docs" / "archive" / "INGEST_SOURCES_SNG_25.json"
 _TME_RE = re.compile(
     r"^https?://t\.me/(?:joinchat/)?([A-Za-z0-9_+/-]+)/?$",
     re.I,
@@ -65,27 +63,6 @@ def _normalize_tg_username(value: str) -> str:
 
 
 @lru_cache(maxsize=1)
-def _tg_tier_a_usernames() -> frozenset[str]:
-    if not _INGEST_TG_A_JSON.is_file():
-        return frozenset()
-    try:
-        data = json.loads(_INGEST_TG_A_JSON.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return frozenset()
-    out: set[str] = set()
-    for row in data:
-        if not isinstance(row, dict):
-            continue
-        if str(row.get("priority", "")).strip().upper() != "TG-A":
-            continue
-        url = str(row.get("url", "")).strip()
-        user = _normalize_tg_username(url if url.startswith("http") else f"@{url}")
-        if user:
-            out.add(user)
-    return frozenset(out)
-
-
-@lru_cache(maxsize=1)
 def _tg_allowlist_usernames() -> frozenset[str]:
     out: set[str] = set()
     for line in _read_nonempty_lines(_ALLOWLIST_PATH):
@@ -95,27 +72,26 @@ def _tg_allowlist_usernames() -> frozenset[str]:
     return frozenset(out)
 
 
+def _tg_join_queue_path() -> Path:
+    rel = os.getenv("TG_JOIN_QUEUE_CSV", "docs/ops/TG_JOIN_QUEUE.csv").strip()
+    p = Path(rel)
+    return p if p.is_absolute() else _PROJECT_ROOT / p
+
+
 @lru_cache(maxsize=1)
 def tg_listen_allowed_chat_ids() -> frozenset[int]:
-    """
-    Peer/chat id для Telethon listen: allowlist + TG-A из join queue (done).
-    Пусто → не слушать TG (только биржи/сайты).
-    """
-    allowed_users = set(_tg_tier_a_usernames()) | set(_tg_allowlist_usernames())
+    """Peer/chat id: allowlist ∩ join queue (done). TG-A JSON и droplist не используются."""
+    allowed_users = set(_tg_allowlist_usernames())
     if not allowed_users:
         return frozenset()
 
     try:
-        from tg_join_lib import QUEUE_CSV, read_queue_csv, username_from_invite
+        from tg_join_lib import read_queue_csv, username_from_invite
     except ModuleNotFoundError:
-        from src.tg_join_lib import (  # type: ignore[no-redef]
-            QUEUE_CSV,
-            read_queue_csv,
-            username_from_invite,
-        )
+        from src.tg_join_lib import read_queue_csv, username_from_invite  # type: ignore[no-redef]
 
     ids: set[int] = set()
-    _, rows = read_queue_csv(QUEUE_CSV)
+    _, rows = read_queue_csv(_tg_join_queue_path())
     for row in rows:
         if row.get("status", "").strip().lower() != "done":
             continue
@@ -145,7 +121,7 @@ def _chat_id_keys(chat_id: int) -> set[int]:
 
 
 def filter_listen_chat_ids(raw_ids: list[int]) -> list[int]:
-    """Оставить только id из allowlist+tier A; пустой whitelist TG → []."""
+    """Оставить только id из allowlist (done в join queue); пустой allowlist → []."""
     allowed = tg_listen_allowed_chat_ids()
     if not allowed:
         return []

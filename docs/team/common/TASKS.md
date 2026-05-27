@@ -19,15 +19,27 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 
 | # | § | Статус |
 |---|-----|--------|
+| **0** | **SITE-BAT-VENV** — дубли system/venv (b4–b10) | ✅ Lead verify 2026-05-27 |
+| **0a** | **BOT-NOTIFY-SPLIT** — два бота | ✅ Lead verify 2026-05-27 |
+| **0b** | **SQLITE-NEON-SYNC** — resync (s7–s12) | ✅ Lead verify 2026-05-27 (footer `neon_insert: 17`) |
+| **0b** | **POST-RESTART-CHECK + WP/TG/PROXY + UX** | → @coder |
+| **1** | **NEON-DEDUP-REPLAY** + **LOG-NEON-CYCLE** | ✅ код 2026-05-27 · owner verify ⏳ |
+| **2** | **P5-PREP** (CORS, логи воркеров, locks если Linux) | → @coder после п.1 |
+| **3** | **FEED-DECOUPLE** (лента = `is_visible`, не `notified_at`) | ✅ код 2026-05-27 · owner verify ⏳ |
+| **4** | **SITE-AI-FALLBACK** (не слать “всё” при `ai_unavailable`) | ✅ код 2026-05-27 · owner verify ⏳ |
+| **5** | **LOG-NOTIFY-DETAIL** — подробные трейс-логи доставки в TG | → @coder после п.1 |
 | 0 | **P1.3d / D1 / P4** | ✅ принято 2026-05-26 |
-| 0b | **F-LOCAL** фильтры + ИИ | **→ @coder** · владелец: `.env` + `FILTERS.md` |
-| 0c | **P5** деплой | ⏸ после F-LOCAL + «едем на прод» |
-| — | **@lead-designer** | ⏸ последняя очередь (концепция) |
-| 1 | **V10.1–V10.4** | **→ @coder** |
-| 2 | P7 category Neon | после V10 |
-| 3 | P5 деплой | потом |
+| 0b | **F-LOCAL** фильтры + ИИ | ✅ принято 2026-05-26 |
+| 0c | **S-SPLIT** legacy/site | ✅ код · env владелец 2026-05-27 |
+| 0c2 | **S-SPLIT-NEON-DATA** | ✅ код · приёмка ⏳ |
+| 0c3 | **F-SITE-FILTERS-0i** + пульт | ✅ код 2026-05-27 · приёмка ⏳ |
+| 0d | **S-SPLIT-TG** | ✅ код · Site `TELEGRAM_CHAT_ID` ⏳ владелец |
+| 0d2 | **PULT-THEME** | ✅ код · приёмка ⏳ |
+| 0e | **F-PROMPT p3** | ✅ код |
+| 0f | **P5** деплой | ⏸ после п.1–2 + «едем на прод» |
+| — | **@lead-designer** | ⏸ последняя очередь |
 | — | Neon `DATABASE_URL` | ✅ |
-| — | Пульт ▶, dogfood бот | ⏳ фоном |
+| — | Аудит Gemini | справочник → [`problems/2026-05-27-preprod-audit-full.md`](../problems/2026-05-27-preprod-audit-full.md) |
 
 → полный план: [`../architect/PORTFOLIO_SPRINT.md`](../architect/PORTFOLIO_SPRINT.md) · [`../FOR_YOU.md`](../FOR_YOU.md)
 

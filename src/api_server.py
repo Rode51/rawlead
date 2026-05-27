@@ -53,7 +53,7 @@ _VERSION = "0.4"
 _OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
 _ME_FEED_SCAN_LIMIT = 500
 _SKILLS_CATALOG_LIMIT = 50
-_BOT_FEED_WHERE = "is_visible = TRUE AND notified_at IS NOT NULL"
+_BOT_FEED_WHERE = "is_visible = TRUE"
 
 
 def _feed_where_sql() -> tuple[str, list[str]]:
@@ -502,7 +502,7 @@ def feed(
     category: str = Query(default=""),
     sort: str = Query(default="time"),
 ) -> dict[str, Any]:
-    """Лента: только notified_at; skills → rank; sort=time|match."""
+    """Лента: is_visible=true; skills → rank; sort=time|match."""
     if sort not in ("time", "match"):
         raise HTTPException(status_code=400, detail="sort must be time or match")
     skill_list = _parse_skills_param(skills)
@@ -629,7 +629,7 @@ def me_feed(
     category: str = Query(default=""),
     sort: str = Query(default="match"),
 ) -> dict[str, Any]:
-    """Персональная лента: user_tags, notified_at; sort=time|match."""
+    """Персональная лента: user_tags, is_visible=true; sort=time|match."""
     if sort not in ("time", "match"):
         raise HTTPException(status_code=400, detail="sort must be time or match")
     skill_list = _parse_skills_param(skills)

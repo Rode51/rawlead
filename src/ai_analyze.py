@@ -156,6 +156,9 @@ class AiAnalysis:
     def is_skip_verdict(self) -> bool:
         return self.verdict.strip().casefold() in _SKIP_VERDICTS
 
+    def is_take_verdict(self) -> bool:
+        return self.verdict.strip().casefold() in ("брать", "брат")
+
 
 def load_profile_text(path: Path | None = None) -> str:
     p = path or _PROFILE_PATH
@@ -189,6 +192,43 @@ def _truncate_description(description: str) -> tuple[str, bool]:
     if len(s) <= _MAX_DESCRIPTION_CHARS:
         return s, False
     return s[: _MAX_DESCRIPTION_CHARS - 1] + "…", True
+
+
+def _build_premium_split_system(profile_excerpt: str) -> str:
+    return _PREMIUM_SPLIT_SYSTEM + "\n\nПрофиль (docs/ops/PROFILE.md):\n" + profile_excerpt
+
+
+def _build_premium_user_with_lite(
+    *,
+    title: str,
+    budget_text: str,
+    url: str,
+    description: str,
+    truncated: bool,
+    lite: AiLiteAnalysis,
+) -> str:
+    trunc_note = (
+        "\n\n[Описание обрезано — оценивай по видимой части; в risks укажи если ТЗ неполное.]"
+        if truncated
+        else ""
+    )
+    tags = ", ".join(lite.lead_tags) if lite.lead_tags else "—"
+    reasons = ""
+    if lite.ai_reasons:
+        reasons = "\nПричины L1: " + "; ".join(lite.ai_reasons[:3])
+    fields = ", ".join(_PREMIUM_SPLIT_FIELDS)
+    return (
+        f"Заголовок: {title.strip()}\n"
+        f"Бюджет на бирже (поле «На бирже» в money — как здесь): "
+        f"{budget_text.strip()}\n"
+        f"Ссылка: {url.strip()}\n\n"
+        f"Уже от L1 (не пересказывай task_summary):\n"
+        f"verdict: {lite.verdict}\n"
+        f"task_summary: {lite.task_summary}\n"
+        f"lead_tags: {tags}{reasons}\n\n"
+        f"Полное описание заказа:\n---\n{description}\n---{trunc_note}\n\n"
+        f"Верни только JSON с полями: {fields}."
+    )
 
 
 def _build_user_message(
@@ -335,6 +375,31 @@ def _parse_analysis(data: dict[str, Any], *, budget_text: str) -> AiAnalysis:
     )
 
 
+def _parse_premium_analysis(
+    data: dict[str, Any],
+    *,
+    budget_text: str,
+    lite: AiLiteAnalysis | None = None,
+) -> AiAnalysis:
+    payload = dict(data)
+    if lite is not None and not str(payload.get("verdict", "")).strip():
+        payload["verdict"] = lite.verdict
+    analysis = _parse_analysis(payload, budget_text=budget_text)
+    if lite is not None and lite.is_take_verdict():
+        return AiAnalysis(
+            verdict="Брать",
+            work_summary=analysis.work_summary,
+            difficulty=analysis.difficulty,
+            approach=analysis.approach,
+            time_for_client=analysis.time_for_client,
+            money=analysis.money,
+            reply_draft=analysis.reply_draft,
+            risks=analysis.risks,
+            lead_tags=analysis.lead_tags or lite.lead_tags,
+        )
+    return analysis
+
+
 def _ai_error_kind(exc: BaseException) -> str:
     msg = str(exc).casefold()
     if isinstance(exc, requests.RequestException):
@@ -356,6 +421,7 @@ def _log_ai_failure(
     errors.append(f"{log_prefix}ai:{kind}:{detail}")
 
 
+# Канон: docs/team/architect/AI.md § L1/L2 «Тексты system»
 _LITE_SYSTEM = """Ты — фильтр фриланс-заказов для ленты RawLead (Digital: код, дизайн, маркетинг, тексты).
 
 Верни один JSON без markdown:
@@ -369,6 +435,30 @@ ai_reasons — массив 2–3 коротких строк «почему т�
 Сомнительно: между Брать и МИМО.
 
 Не выводи reply_draft, approach, money, risks."""
+
+_PREMIUM_SPLIT_SYSTEM = """Ты — ИИ-архитектор фриланс-заказов (L2 premium) для Telegram-уведомления Никиты.
+
+Заказ уже отфильтрован — verdict «Брать» (блок L1). Не меняй verdict, не переспрашивай и не копируй task_summary; в work_summary не дублируй L1 — только развёрнутый смысл для исполнителя.
+
+Дай: work_summary (2–4 предл.), difficulty, approach (ровно 2 предл.), time_for_client, money («На бирже: … | Рынок: … | Старт отклика: …»), risks, reply_draft (4–8 предл., начало «Здравствуйте. Готов реализовать…»), lead_tags (дополни теги из L1 до 3–8, не переписывай список с нуля).
+
+Стек: Python (FastAPI, Telethon, aiogram 3), Neon, WordPress. Cursor Agent + Sandbox; сложные API — Gemini Deep Research → выжимка → @file в Cursor. Расходники платит заказчик.
+
+JSON без markdown: work_summary, difficulty, approach, time_for_client, money, reply_draft, risks, lead_tags.
+Не выводи verdict, task_summary, ai_reasons.
+
+reply_draft ЗАПРЕЩЕНО: Cursor, ИИ, нейросеть, ChatGPT, Gemini, AI, агент, промпт."""
+
+_PREMIUM_SPLIT_FIELDS = (
+    "work_summary",
+    "difficulty",
+    "approach",
+    "time_for_client",
+    "money",
+    "reply_draft",
+    "risks",
+    "lead_tags",
+)
 
 
 def _build_lite_user_message(
@@ -480,6 +570,7 @@ def _call_once(
     model: str,
     budget_text: str,
     timeout_sec: float,
+    lite: AiLiteAnalysis | None = None,
 ) -> AiAnalysis:
     last_err: Exception | None = None
     for json_mode in (True, False):
@@ -492,7 +583,11 @@ def _call_once(
                 timeout_sec=timeout_sec,
                 json_mode=json_mode,
             )
-            return _parse_analysis(_extract_json_object(raw), budget_text=budget_text)
+            return _parse_premium_analysis(
+                _extract_json_object(raw),
+                budget_text=budget_text,
+                lite=lite,
+            )
         except (
             AiAnalyzeError,
             requests.RequestException,
@@ -657,20 +752,70 @@ def analyze_premium(
     budget_text: str,
     description: str,
     url: str,
+    lite: AiLiteAnalysis | None = None,
+    profile_path: Path | None = None,
+    timeout_sec: float = _DEFAULT_TIMEOUT_SEC,
     errors: list[str] | None = None,
     log_prefix: str = "",
 ) -> AiAnalysis | None:
-    """L2 для Telegram-бота при вердикте «Брать»."""
-    return analyze_project(
-        cfg,
-        title=title,
-        budget_text=budget_text,
-        description=description,
-        url=url,
-        errors=errors,
-        log_prefix=log_prefix,
-        model=cfg.ai_model_premium,
+    """L2 для Telegram-бота; при lite — system/user с блоком L1 (без дубля verdict)."""
+    if not cfg.ai_active or cfg.ai_provider != "openrouter":
+        return None
+
+    desc, truncated = _truncate_description(description)
+    excerpt = build_profile_excerpt(profile_path)
+    budget_for_prompt = display_budget_text(
+        budget_text,
+        is_telegram="t.me" in (url or "").casefold(),
     )
+    if lite is not None:
+        system = _build_premium_split_system(excerpt)
+        user = _build_premium_user_with_lite(
+            title=title,
+            budget_text=budget_for_prompt,
+            url=url,
+            description=desc,
+            truncated=truncated,
+            lite=lite,
+        )
+    else:
+        system = _build_system_prompt(excerpt)
+        user = _build_user_message(
+            title=title,
+            budget_text=budget_for_prompt,
+            url=url,
+            description=desc,
+            truncated=truncated,
+        )
+    use_model = cfg.ai_model_premium.strip()
+
+    last_exc: BaseException | None = None
+    for attempt in range(2):
+        try:
+            result = _call_once(
+                cfg,
+                system,
+                user,
+                model=use_model,
+                budget_text=budget_for_prompt,
+                timeout_sec=timeout_sec,
+                lite=lite,
+            )
+            note_ai_l2_call()
+            return result
+        except (
+            AiAnalyzeError,
+            requests.RequestException,
+            json.JSONDecodeError,
+            ValueError,
+        ) as exc:
+            last_exc = exc
+            if attempt == 0:
+                continue
+
+    if last_exc is not None:
+        _log_ai_failure(errors, log_prefix, last_exc)
+    return None
 
 
 analyze = analyze_project

@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-radar-env"
+description = "RADAR_CONTROL_PORT / RADAR_PROFILE из env процесса (ярлык bat)."
+commands.allow = ["radar_env_port", "radar_env_profile"]

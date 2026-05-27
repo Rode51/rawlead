@@ -7,10 +7,492 @@
 **Порядок (жёстко):** **P1** → **D1** (после Design) → **P4** → **P5** только после «едем на прод».  
 **⏸ P5** пока ворота не закрыты. **⏸** 25 источников / §3f без ТЗ.
 
-**→ Сейчас @coder:** § **F-PROMPT p3** (L2 user + system: блок «уже от L1», не дублировать verdict/task_summary). § F-LOCAL/F-RESEARCH — ✅ принято 2026-05-26 с оговоркой p3.  
-**⏸ P5** — после F-LOCAL + «едем на прод».  
-**⏸ Lead Design** — в конце.  
-**Архив:** P1.3d · D1 · P4 ✅ принято 2026-05-26.
+**→ Сейчас @coder (порядок):**
+
+0a. § **BOT-NOTIFY-SPLIT** — **P0 продукт:** Site **не** шлёт биржи владельцу в @rawlead_bot; биржи → только Legacy → @FLPARSINGBOT (**блокер**, владелец 2026-05-27)
+0. § **SITE-BAT-VENV** — **довести:** один `radar_control` + воркеры только из `.venv` (**блокер**, Lead verify ❌ 2026-05-27 ~16:00)
+0b. § **SQLITE-NEON-SYNC** — **довести:** resync SQLite→Neon на биржах в рантайме (**блокер**, Lead verify ❌ 2026-05-27 ~16:00)
+1. § **NEON-DEDUP-REPLAY** — зомби в Neon + dup без L1 (**блокер ленты**)
+2. § **LOG-NEON-CYCLE** — счётчики в `radar_site.log` (не путать dup с «нет заказов»)
+3. § **FEED-DECOUPLE** — лента не зависит от TG (`notified_at`) (**P0 продукта**)
+4. § **SITE-AI-FALLBACK** — при сбое ИИ не слать “всё подряд” (только управляемо флагом)
+3. § **P5-PREP** — только пункты под выбранный хостинг (после п.1–2)
+4. § **P5** — **только** после ворот + «едем на прод» от владельца
+
+LEGACY pipeline (один ИИ) не трогать без задачи владельца. § F-SITE-FILTERS-0i · S-SPLIT-* — **код ✅**, приёмка владельцем после п.1.
+
+**Диагностика (Lead 2026-05-27):** Neon ~3260 строк, **0 insert с 26.05 ~09:00 UTC**; `category=design` ~260, `is_visible=true` ~1; figma-лиды с `ai_verdict IS NULL` — wide ingest + старый стоп **до** L1, затем `dup` без replay.
+
+---
+
+# § BOT-NOTIFY-SPLIT — Два бота, два смысла (**→ сейчас**, владелец 2026-05-27)
+
+**Симптом:** в ЛС приходят карточки заказов с бирж от **@rawlead_bot**, хотя это поток **@FLPARSINGBOT** (личный парсер владельца).
+
+**Канон (владелец, не спорить):**
+
+| Контур | Бот | ИИ | Кому шлёт TG |
+|--------|-----|-----|----------------|
+| **LEGACY** | @FLPARSINGBOT | `AI_MODE=legacy`, `FILTERS_LEGACY`, один `analyze_project` | **Владелец** (`TELEGRAM_CHAT_ID` в `.env.legacy`) — «брать заказы» |
+| **SITE** | @rawlead_bot | `AI_MODE=split`, L1→лента, L2→бот | **Подписчики** по навыкам из `/cabinet/` (Neon `users` + tags). **Не** дублировать legacy-поток бирж владельцу |
+
+**Факт в логе (Lead verify):** `radar_site.log` **14:13** — `FL.ru … в бот 7`, `Kwork … в бот 1`, `Итого в бот: 8`, `tg:цепь … bot=8989158953` (@rawlead). `radar_legacy.log` **16:14** — `выборка 8` / `32`, **`новых 0 │ в бот 0`**.
+
+**Причина (код):** `main.py --profile site` → `process_new_listing` → `send_listing_notification` → `TELEGRAM_BOT_TOKEN` site + **`TELEGRAM_CHAT_ID` владельца** — тот же путь, что dogfood, без разделения «биржи = только legacy».
+
+## Задачи
+
+| # | Готово когда |
+|---|----------------|
+| n0 | **Site + `PUBLIC_FEED_SOURCES` (fl, kwork, freelancehunt):** после L1/L2 **не** вызывать `send_listing_notification` в `TELEGRAM_CHAT_ID` владельца. Только Neon (`is_visible`) + `/lenta/`. |
+| n1 | **Legacy consumer:** биржи из Neon → `FILTERS_LEGACY` → legacy ИИ → **только** `.env.legacy` бот → владелец. В логе `новых N │ в бот N` при живых заказах (если 0 — логировать `skip:*` по каждому id). |
+| n2 | **Site TG** (`tg:*`): уведомления в rawlead — **не** на legacy-чат владельца для бирж; для TG — отдельное правило (см. n3). |
+| n3 | **Подписчики (MVP v1):** если нет multi-user push — флаг `.env.site` `SITE_NOTIFY_OWNER=0` (default): site **вообще** не шлёт владельцу; dogfood бирж **только** Legacy ▶. Опц. `SITE_NOTIFY_OWNER=1` — только для отладки L1/L2 в rawlead. |
+| n4 | **L2 / навыки:** когда будет push подписчикам — отдельная ветка (JWT `/me`, tags), **не** `TELEGRAM_CHAT_ID` из `.env.site` для fl/kwork/fh. |
+| n5 | `FOR_YOU.md` + `STATUS`: таблица «куда что приходит». |
+| n6 | Приёмка: Site ▶ + Legacy ▶; новый заказ FL «Брать» по legacy-фильтру → **только** FLPARSING; в rawlead **нет** карточек fl/kwork/fh владельцу; `/lenta/` живая. |
+
+## Файлы
+
+| Путь |
+|------|
+| `src/lead_pipeline.py` |
+| `src/main.py` |
+| `src/neon_legacy_consumer.py` |
+| `src/config.py` |
+| `.env.example` |
+| `docs/FOR_YOU.md` |
+| `docs/team/common/STATUS.md` |
+
+**Не делать:** менять `FILTERS_LEGACY.md`; убирать Site ingest в Neon; слать биржи в rawlead «для теста» без флага.
+
+---
+
+# § SITE-BAT-VENV — Фикс запуска воркеров с пульта (**→ сейчас**, 2026-05-27)
+
+**Симптом:** лампа «Биржи» в пульте красная. В `radar_site_exchanges.log` ошибка `Unable to create process using '"C:\Users\hramo\AppData\Local\Programs\Python\Python311\python.exe" -u ...\src\main.py --profile site'`.
+
+**Причина:** при разделении на профили в `start-radar-desktop-site.bat` (и `start-radar-desktop.bat`) остался старый код, который вытаскивает `RADAR_PYHOME` из `pyvenv.cfg` и запускает `radar_control.py` через **системный** `pythonw.exe`. Из-за этого `radar_control` наследует кривое окружение, и когда он пытается сделать `subprocess.Popen` для дочернего воркера через `.venv\Scripts\python.exe`, Windows блокирует создание процесса.
+
+## Задачи
+
+| # | Готово когда |
+|---|----------------|
+| b1 | В `scripts/start-radar-desktop-site.bat` удалить блок парсинга `pyvenv.cfg` (`findstr /b "home" ...`). Запускать `radar_control.py` напрямую через `"%RADAR_ROOT%\.venv\Scripts\pythonw.exe"`. |
+| b2 | Сделать то же самое в `scripts/start-radar-desktop.bat` (legacy). |
+| b3 | Приёмка: после запуска пульта через VBS и нажатия ▶ лампа «Биржи» становится зелёной, в `radar_site_exchanges.log` нет ошибки `Unable to create process`, воркер `main.py` нормально стартует. |
+
+### Lead verify (2026-05-27 ~16:00) — **частично**
+
+| Факт | Значение |
+|------|----------|
+| bat b1–b2 | ✅ в репо: запуск через `.venv\Scripts\pythonw.exe` |
+| Цикл бирж | ✅ в `radar_site.log` есть строки FL/Kwork/FH (~16:00) |
+| Дубли процессов | ❌ одновременно venv **и** `Python311\python.exe` для `main.py` / `tg_main.py` / `radar_control.py` |
+| `Unable to create process` | ⏳ ушла после bat, но при ▶ с пульта снова появляются system-воркеры |
+
+| # | Готово когда |
+|---|----------------|
+| b4 | `process_guard.kill_all_radar_control(profile=site)` (и legacy) завершает **все** `radar_control`/`main`/`tg_main` с **любым** python (не только venv) |
+| b5 | `radar_control.py` spawn воркеров: **только** `_ROOT/.venv/Scripts/python.exe`; родитель `radar_control` — только venv `pythonw` (проверить, что desktop/VBS не поднимает system `pythonw` вторым API) |
+| b6 | Приёмка: после одного VBS + ▶ — в списке процессов **нет** `...\Python311\python.exe` с `main.py`/`tg_main.py`/`radar_control.py` для site; лампа «Биржи» зелёная ≥1 цикл |
+
+### Владелец: откуда дубли (Lead 2026-05-27, не баг «кликает не так»)
+
+| Источник | Механизм |
+|----------|----------|
+| ✕ закрытие пульта | `main.ts` → POST `/stop` — гасит **воркеры**, **`radar_control` остаётся** |
+| `stop-radar.bat` | Убивает main/tg/join, **не** `radar_control` — в FOR_YU было неверно |
+| Legacy bat `:desktop_only` | Если `/health` ок — **не** вызывает `kill_all_radar_control` → второй `desktop.exe`, старый system API жив |
+| Ярлык только на `desktop.exe` | Bat с kill **не запускается** → зомби system `pythonw` + новый venv из другого ярлыка |
+| Два профиля Site+Legacy | 2 API — норма; **4+** `main.py` — баг |
+
+| # | Готово когда |
+|---|----------------|
+| b7 | `scripts/stop-radar-desktop-full.bat` (+ `.vbs` без окна): `kill_all_radar_control` для **site** и **legacy**; в `FOR_YOU.md` / `DESKTOP_LAUNCH.md` — канон вместо «только stop-radar.bat» |
+| b8 | Legacy bat: при `goto desktop_only` всё равно `kill_non_venv_radar_workers(profile=legacy)` (или не пропускать kill API при втором ярлыке) |
+| b9 | Опция (продуктово): ✕ на пульте → `/stop` + `kill_all_radar_control` **только своего** профиля; или явная кнопка «Выход и остановить API» |
+| b10 | `rebuild-pult.bat` / инструкция: ярлыки на стол **только** на `start-radar-desktop-*-.vbs`, не на exe |
+
+## Файлы
+
+| Путь |
+|------|
+| `scripts/start-radar-desktop-site.bat` |
+| `scripts/start-radar-desktop.bat` |
+| `scripts/stop-radar-desktop-full.bat` (новый) |
+| `scripts/radar_control.py` |
+| `src/process_guard.py` |
+| `desktop/src/main.ts` (закрытие окна) |
+| `docs/FOR_YOU.md` · `docs/ops/DESKTOP_LAUNCH.md` |
+
+---
+
+# § SQLITE-NEON-SYNC — SQLite «видел», Neon нет (**→ сейчас**, Lead verify ❌ 2026-05-27 ~16:00)
+
+**Симптом (факты Lead, не гипотеза):** сверка живых лент FL/Kwork/FH (парсеры Site) с Neon `leads`:
+
+| Биржа | На ленте | В Neon по `external_id` | В SQLite `projects` | В SQLite, но **нет** в Neon |
+|--------|----------|------------------------|----------------------|-----------------------------|
+| FL | 90 | 8 | 85 | **~77** |
+| Kwork | 12 | 2 | 12 | **10** |
+| FH | 10 | 0 | 9 | **9** |
+
+В `radar_site.log` при этом: `FL … новых 8` ≈ только те 8 ID, что **уже** в Neon; `neon_insert: 0`, `neon_dup_skip` в основном **TG**. Это **не** «99% дублей на бирже».
+
+**Причина (код):** `lead_pipeline.process_new_listing` → `storage.try_record_new` → при `False` ранний `return`, **без** `pg.record_new_lead`, если нет `neon_replay`. Локальная SQLite накопила ID с прошлых прогонов (wide ingest / сбой L1 / старый профиль), Neon — нет.
+
+**Параллельно у владельца:** OpenRouter 401 на Site, пока в `.env.site` ключ **не** тот же, что в `.env` (суффикс `178`). Site грузит `.env.site` с `override=True`, потом `.env` с `override=False` — **переменные из `.env.site` не перезаписываются** общим `.env`. После фикса env — **Stop → ▶ Site** (процесс должен перечитать env).
+
+## Задачи
+
+| # | Готово когда |
+|---|----------------|
+| s1 | Если `neon_ingest_wide` и `pg.enabled`: при `try_record_new` → `False` проверить Neon по `(source, external_id)`. **Нет строки** → выполнить `record_new_lead` + дальше фильтр/L1 (как для нового), **не** выходить молча |
+| s2 | Если строка в Neon есть, но `ai_verdict` NULL — путь **neon_replay** (см. § NEON-DEDUP-REPLAY), не считать «полным dup» |
+| s3 | Счётчик/лог: `neon_sqlite_resync` (или явный skip-reason) — когда SQLite был «старый», Neon догнали |
+| s4 | **One-shot:** `scripts/replay_neon_lite_site.py` (или новый) — опция `--backfill-missing`: live listing ∪ SQLite-only → INSERT в Neon для `PUBLIC_FEED_SOURCES`, затем L1; `--dry-run` печатает N «sqlite без neon» (Внимание: скрипт сейчас падает с `UnicodeEncodeError` на символе `│` при выводе в консоль Windows, нужно добавить `sys.stdout.reconfigure(encoding='utf-8')`) |
+| s5 | Приёмка: после Site ▶ 30 мин — в Neon есть `external_id` с **сегодняшней** ленты FL (пример: ID > `5506729`); в логе `neon_insert` > 0 **или** `neon_replay` с успешным L1; **нет** массового `ai:http:…401` (ключ — зона владельца) |
+| s6 | `STATUS.md`: 5 строк — симптом, причина, фикс, как проверить |
+
+### Lead verify (2026-05-27 ~16:00) — **не принято**
+
+| Факт | Значение |
+|------|----------|
+| Footer цикла | `neon_insert: 0` · `neon_replay: 2` · `neon_dup_skip: 110` · **`neon_sqlite_resync` в логе нет** |
+| Биржи | FL скачано 90, **новых 2**; Kwork новых 8; FH новых 7 — массового догона ~77 FL **нет** |
+| dry-run | `replay_neon_lite_site.py --backfill-missing --dry-run` → **sqlite без Neon: 1475** (на живой ленте **98**) |
+| Гипотезы | (1) `lead_exists` true, хотя по `external_id` нет; (2) ранний `neon_dup_skip` / `skip:dup_content` до resync; (3) ветка `in_neon` + нет L1 replay + `not inserted` → return без AI; (4) дубль system+venv воркер — гонка/старый код |
+
+| # | Готово когда |
+|---|----------------|
+| s7 | В `process_new_listing` (только `PUBLIC_FEED_SOURCES` / биржи): при `try_record_new`→False **сначала** `lead_exists(source, external_id)`; если False — **обязательно** `record_new_lead` + L1, не `_neon_dup_skip_return` |
+| s8 | Debug-лог (1 строка на лид, rate-limit ok): `neon_resync_check` / `neon_resync_insert` / `neon_resync_skip:<reason>` — чтобы в `radar_site.log` было видно, почему не догнали |
+| s9 | Счётчик `neon_sqlite_resync` в footer цикла (уже в ТЗ) — **появляется** при реальном догоне |
+| s10 | `replay_neon_lite_site.py`: UTF-8 stdout (Windows); `--backfill-missing --dry-run` без падения; `--limit 50` (без dry-run) — в Neon появляются строки с сегодняшних FL id |
+| s11 | Проверить/откатить посторонний патч `pg_storage.py` (если есть `connection()` context manager от Lead — привести к одному стилю psycopg, без поломки `with psycopg.connect`) |
+| s12 | Приёмка: 1 цикл Site после фикса → footer `neon_insert` > 0 **или** `neon_sqlite_resync` > 0; для FL id с ленты (пример `5506883+`) — строка в Neon; **нет** `ai:http:401` (ключ — владелец, Stop→▶) |
+
+## Файлы
+
+| Путь |
+|------|
+| `src/lead_pipeline.py` |
+| `src/pg_storage.py` |
+| `src/storage.py` (только если нужен helper «exists in sqlite») |
+| `scripts/replay_neon_lite_site.py` |
+| `src/radar_cycle_log.py` |
+| `docs/team/common/STATUS.md` |
+
+**Не делать:** чистить SQLite вслепую без логики; ломать legacy consumer; снимать UNIQUE `content_hash`.
+
+---
+
+# § POST-RESTART-CHECK + WP/TG/PROXY + UX (**→ сейчас**, владелец 2026-05-27)
+
+**Контекст владельца:** после перезапуска Site проверить живые логи/уведомления и донастроить продуктовую подачу.
+
+## Задачи
+
+| # | Готово когда |
+|---|----------------|
+| c1 | Проверка `radar_site.log` после перезапуска: есть циклы бирж, нет критических ошибок, отдельно отчёт по TG (`join/listen/send`) с причиной, если уведомлений нет |
+| c2 | TG-каналы: подтвердить, что подписка и listen идут по актуальному allowlist/queue; если нет уведомлений — указать точку обрыва (не подписались / нет chat_id / фильтр / send) и дать фикс |
+| c3 | WP/TG ИИ-подача: для платного сценария в L2 оставить «инструменты для выполнения + человеческий отклик» как обязательные поля выдачи |
+| c4 | Убрать текстовые ярлыки `Брать/Не брать/Сомнительно` из UI ленты и кабинета; оставить числовой score + сортировку по навыкам как главную механику |
+| c5 | UX фильтров: предложить и внедрить v1 улучшение панели фильтров (структура, видимость активных фильтров, mobile/desktop), чтобы сценарий использования был понятен без обучения |
+| c6 | Прокси для бирж: включить ротацию по спискам прокси (`FL_PROXY_URLS`, `KWORK_PROXY_URLS`) с переключением между IP по циклу/ошибкам и понятным логом «какой прокси выбран» (без секретов) |
+| c7 | Обновить `STATUS.md`: коротко «что было не так после перезапуска», «что исправлено», «как проверить владельцу за 10 минут» |
+
+## Файлы
+
+| Путь |
+|------|
+| `src/main.py` |
+| `src/tg_monitor.py` / `scripts/tg_main.py` |
+| `src/telegram_notify.py` |
+| `src/ai_analyze.py` |
+| `src/lead_pipeline.py` |
+| `src/fl_parser.py` |
+| `src/kwork_parser.py` |
+| `wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js` |
+| `wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js` |
+| `wordpress/rawlead-kadence-child/assets/css/rawlead.css` |
+| `wordpress/rawlead-kadence-child/page-lenta.php` |
+| `wordpress/rawlead-kadence-child/page-cabinet.php` |
+| `docs/team/common/STATUS.md` |
+
+**Не трогать:** LEGACY-поток (`FILTERS_LEGACY`, consumer) без отдельного запроса владельца.
+
+---
+
+# § NEON-DEDUP-REPLAY — Dup не должен убивать L1 (**→ сейчас**, Lead 2026-05-27)
+
+**Симптом:** Site `main` крутится, в логе `новых N │ dup N`, в Neon **нет новых** строк и **нет** L1 на вчерашних лидах; `/lenta/` пустая при живой бирже.
+
+**Причина (канон):** `neon_ingest_wide` → `INSERT` в Neon → `FILTERS_SITE` → при стопе **выход без L1**. Позже тот же текст → `ON CONFLICT (content_hash)` → **ранний return** в `plan_new_listing` **без** `update_after_lite`. Категория `design` **не участвует** в dedup — только `listing_content_hash(title, snippet)`.
+
+## Задачи
+
+| # | Готово когда |
+|---|----------------|
+| r1 | **Dup + нет L1:** если `record_new_lead` вернул `False` (dup), загрузить строку из Neon по `content_hash` или `(source, external_id)`. Если `ai_verdict` / `ai_score` **NULL** — **не** `return` сразу: пройти `FILTERS_SITE` → L1 → `update_after_lite` (как для новой вставки) |
+| r2 | **Dup + L1 уже был:** оставить короткий путь (не дублировать платный L1 без флага) |
+| r3 | **Опц. one-shot:** `scripts/replay_neon_lite_site.py` — `--dry-run` / `--limit N`: SELECT `leads` WHERE `ai_verdict IS NULL` AND `source` ∈ `PUBLIC_FEED_SOURCES` → filter + `analyze_lite` + `update_after_lite` |
+| r4 | **Не ломать** legacy consumer: он читает Neon; replay только **site** профиль / биржи+TG из allowlist |
+| r5 | Приёмка: после Site ▶ 30 мин в Neon есть строки с `created_at` **сегодня** **или** обновлённые `ai_verdict` у старых design; `/lenta/` — карточки с «Суть задания»; в логе есть `neon_replay` / отдельный счётчик (см. LOG-NEON-CYCLE) |
+
+**Не делать:** снимать `content_hash` UNIQUE; писать ingest с legacy; менять `FILTERS_LEGACY.md`.
+
+## Файлы
+
+| Путь |
+|------|
+| `src/lead_pipeline.py` |
+| `src/pg_storage.py` |
+| `src/radar_cycle_log.py` |
+| `scripts/replay_neon_lite_site.py` (новый, если r3) |
+| `docs/team/common/STATUS.md` |
+
+---
+
+# § LOG-NEON-CYCLE — Понятный лог Site (**→ с NEON-DEDUP-REPLAY**)
+
+| # | Готово когда |
+|---|----------------|
+| l1 | В `SourceCycleStats` / футере цикла отдельно: `neon_insert`, `neon_dup_replay` (dup, догнали L1), `neon_dup_skip` (dup, L1 уже был) — **не** один общий `dup` |
+| l2 | Футер: `Итого в бот: N │ neon_insert: X │ neon_replay: Y` — убрать вводящую в заблуждение копию «на сайт = в бот» или явно подписать «лента после L1» |
+| l3 | Ошибки `pg:record:*` / `pg:lite:*` — по-прежнему в `errors[]`, в «Прочее» цикла если не skip |
+
+## Файлы
+
+| Путь |
+|------|
+| `src/radar_cycle_log.py` |
+| `src/main.py` |
+| `docs/ops/RADAR_LOG.md` |
+
+---
+
+# § FEED-DECOUPLE — Лента = `is_visible`, не `notified_at` (**P0**, решение владельца 2026-05-27)
+
+**Проблема:** сейчас `/v1/feed` (и значит WP `/lenta/`) зависит от `notified_at`, который ставится только после успешной отправки TG. Любой сбой TG/ИИ превращает ленту в пустоту, хотя Neon наполнен.
+
+**Решение (канон):**
+
+- **Лента (public feed)**: `WHERE is_visible = TRUE` + фильтр `PUBLIC_FEED_SOURCES`
+- `notified_at` остаётся **только** как тех.метка “уведомление в TG отправлено”
+
+## Задачи
+
+| # | Готово когда |
+|---|----------------|
+| f1 | В `src/api_server.py` заменить `_BOT_FEED_WHERE` с `is_visible = TRUE AND notified_at IS NOT NULL` на `is_visible = TRUE` |
+| f2 | Проверка: `GET /v1/feed?limit=5` возвращает лиды даже если `notified_at IS NULL` |
+| f3 | WP `/lenta/` показывает `is_visible=true` по Neon без зависимости от TG |
+
+## Файлы
+
+| Путь |
+|------|
+| `src/api_server.py` |
+| `wordpress/rawlead-kadence-child/inc/rawlead-api.php` (не требуется менять, только проверка) |
+| `docs/ops/RUN.md` (при необходимости обновить формулировку “лента: is_visible”) |
+
+---
+
+# § SITE-AI-FALLBACK — “ИИ недоступен” не должен превращать Site-бот в спам (**P0**, решение владельца 2026-05-27)
+
+**Симптом:** при `AI недоступен` Site шлёт MVP-карточки, которые “не по фильтрам”, потому что L1 не отработал, а `FILTER_WIDE=1` пропускает всё кроме стопа.
+
+**Решение (канон):**
+
+- По умолчанию: **если L1 недоступен**, **не отправлять** в @rawlead_bot (только лог/счётчик).
+- Исключение: отдельный флаг `.env.site`, напр. `SITE_NOTIFY_ON_AI_UNAVAILABLE=1` (opt-in для отладки).
+
+## Задачи
+
+| # | Готово когда |
+|---|----------------|
+| a1 | В `src/lead_pipeline.py`/`telegram_notify.py`: Site-уведомление при `ai_unavailable` управляется флагом; по умолчанию = **не слать** |
+| a2 | В логе цикла отдельный счётчик `ai_unavailable` (чтобы видеть проблему без спама в TG) |
+| a3 | Приёмка: при искусственном падении L1 (невалидный ключ) — в логах видно `ai_unavailable`, но TG не заспамлен |
+
+## Файлы
+
+| Путь |
+|------|
+| `src/lead_pipeline.py` |
+| `src/config.py` (если нужен новый env-флаг) |
+| `src/telegram_notify.py` |
+
+---
+
+# § P5-PREP — Перед деплоем (из аудита, узко) (**→ после NEON-DEDUP-REPLAY**)
+
+**Не тащить весь аудит Gemini** — только под [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) и решение владельца по хостингу.
+
+| # | Готово когда | Когда |
+|---|----------------|--------|
+| h1 | `RADAR_CORS_ORIGINS` в `.env` / `radar_control` — не `*` если API доступен не с localhost | P5 / API наружу |
+| h2 | Дочерние `main`/`tg_main`: stdout/stderr в файл профиля (не только `DEVNULL`), ротация по размеру | VPS / 24/7 |
+| h3 | Locks: `filelock` или `fcntl` fallback **если** владелец подтвердил **Linux VPS** для радара | P5 Linux |
+| h4 | `process_guard` — **без** регрессии P1.H; любое смягчение — с тестом «2× main не появляется» | По тикету |
+| h5 | Tauri `capabilities` — сузить HTTP до `127.0.0.1:18765/18775/18766` | Сборка пульта перед прод |
+
+**Отложено (не блокер dogfood на Windows):** `sys.path.insert` рефакторинг; лог прокси; `_OWNER_USER_ID` в env.
+
+## Файлы
+
+| Путь |
+|------|
+| `scripts/radar_control.py` |
+| `src/process_guard.py` (только с h4) |
+| `desktop/src-tauri/capabilities/default.json` |
+| `.env.example` |
+| `docs/ops/DEPLOY_VPS.md` (если есть — дописать h1–h3) |
+
+---
+
+# § S-SPLIT — Два контура: LEGACY + SITE (владелец 2026-05-27)
+
+**Решение:** жёсткое разграничение. Старый бот работает как сейчас. Новый бот — сайт и подписка. Отдельные ключи OpenRouter.
+
+## Как выглядит для владельца
+
+1. **LEGACY** — ярлык «Радар Legacy», пульт :18765, старый бот, фильтры **не меняются** при тюнинге сайта.
+2. **SITE** — ярлык «Радар Site», пульт :18775, **новый** бот; ты регистрируешься через `/cabinet/` и тестируешь как подписчик.
+3. Деньги LLM: **два ключа** OpenRouter — в `.env.legacy` и `.env.site`.
+
+## Задачи Coder
+
+| # | Готово когда |
+|---|----------------|
+| s1 | `RADAR_PROFILE=legacy|site` в config; загрузка `.env.legacy` / `.env.site` (или `--profile`) |
+| s2 | `docs/ops/FILTERS_LEGACY.md` — **копия текущего** `FILTERS.md` на момент split; **не править** при SITE-тюнинге |
+| s3 | `docs/ops/FILTERS_SITE.md` — фильтры для сайта (F-LOCAL); `filters.py` читает файл по профилю |
+| s4 | Логи: `data/radar_legacy.log` / `data/radar_site.log`; lock-файлы с суффиксом |
+| s5 | Пульт SITE: `radar_control` на **другом порту** (напр. 18775), отдельный ярлык VBS |
+| s6 | SITE: `TELEGRAM_BOT_TOKEN` + `OPENROUTER_API_KEY` (или `AI_API_KEY`) из `.env.site` |
+| s7 | LEGACY: pipeline **без** L1/L2 split — один `analyze_project` как до F-LOCAL (или флаг `AI_MODE=legacy`) |
+| s8 | SITE: L1 → лента, L2 → подписчики (новый бот); LEGACY — без изменений поведения |
+| s9 | `.env.example` — шаблоны обоих профилей; `FOR_YOU.md` — два ярлыка |
+
+**Не делать:** один `.env` на оба бота; правка `FILTERS_LEGACY` при задаче SITE; один пульт без метки профиля.
+
+**Приёмка:** LEGACY 24 ч без регрессии; SITE — новый бот шлёт L2, `/lenta/` с `task_summary`.
+
+---
+
+# § S-SPLIT-DUAL — Оба пульта ▶ одновременно (**→ сейчас**, владелец 2026-05-27)
+
+**Зачем:** Legacy = **брать заказы** (@FLPARSINGBOT). Site = **продукт** (лента, TG, @rawlead_bot). Оба работают **вместе**, не «или-или».
+
+| Контур | ▶ поднимает | Куда заказы | Биржи FL/Kwork/FH |
+|--------|-------------|-------------|-------------------|
+| **Legacy** | **не** `main` (см. NEON-DATA) | @FLPARSINGBOT | **нет** — читает Neon |
+| **Site** | `main` + `tg_main` | @rawlead_bot + `/lenta/` | **да** — **единственный** парсер бирж |
+
+| # | Готово когда |
+|---|----------------|
+| d1 | Site **с** `main` (§ NEON-DATA); Legacy **без** spawn `main` |
+| d2 | Legacy: `RADAR_TG_ENABLED=0` — без `tg_main` |
+| d3 | Сервер: Site ▶ 24/7; Legacy ▶ только consumer (ПК по желанию) |
+| d4 | ~~два парсера~~ **отменено** |
+| d5 | `kill_non_venv` — один venv на роль |
+| d6 | `FOR_YOU.md` — один круглосуточный радар на сервере |
+
+**Не делать:** два `main.py` на биржи; Legacy `record_new_lead` (только Site пишет Neon).
+
+---
+
+# § S-SPLIT-NEON-DATA — Один парсер → Neon; Legacy читает (**→ сейчас**, владелец 2026-05-27)
+
+**Решение владельца (уточнение):** биржи качает **только Site** (сервер 24/7). Legacy **не парсит** FL/Kwork/FH — **подбирает из Neon** по `FILTERS_LEGACY.md` + legacy ИИ → @FLPARSINGBOT. SQLite legacy — только «уже слал в бот».
+
+```text
+Сервер 24/7:  Site main + tg → Neon (все новые вакансии с бирж)
+              → FILTERS_SITE + L1 → is_visible /lenta/
+
+ПК (опц.):    Legacy consumer → Neon (read) → FILTERS_LEGACY → ИИ → FLPARSING
+              SQLite: дедуп «уже в бот»
+```
+
+| Контур | Парсит биржи | Neon | Фильтр |
+|--------|--------------|------|--------|
+| **Site** | **да** (`main`, `.env.site`) | **пишет** | `FILTERS_SITE` + L1 → лента |
+| **Legacy** | **нет** | **читает** | `FILTERS_LEGACY` + legacy ИИ → бот |
+
+| # | Готово когда |
+|---|----------------|
+| n1 | `RADAR_EXCHANGES_ENABLED=0` + **не** spawn `main` в `.env.legacy` / legacy `radar_control` |
+| n2 | `RADAR_EXCHANGES_ENABLED=1` в `.env.site`; Site spawn `main` + `tg_main`; `DATABASE_URL` только `.env.site` |
+| n3 | **Ingest широкий:** в Neon попадают **новые** листинги с бирж **до** жёсткого отсева Site (или `FILTER_WIDE=1` + только стоп); иначе Legacy не увидит то, что Site отрезал словами |
+| n4 | **Legacy consumer:** cron/цикл `legacy` — SELECT новых из Neon → `FILTERS_LEGACY` → `analyze_project` → TG; поле/флаг `legacy_notified_at` (или SQLite), **не** второй парсинг |
+| n5 | `.env.legacy`: `DATABASE_URL` = **read** тот же Neon (read-only user ок) **или** read через API — на выбор Coder; **не** писать ingest с legacy |
+| n6 | `FOR_YOU.md` / `PROJECT_MAP` — схема выше |
+
+**Фильтры:** см. § **F-SITE-FILTERS-0i** (Site ≠ LEGACY). Ingest в Neon — широкий (`neon_ingest_wide`).
+
+**Не теряем:** те же вакансии с FL/Kwork/FH в Neon, если n3 соблюдён. **Теряем** только то, что Site выкинул **до** записи в Neon — поэтому n3 обязателен.
+
+**Не делать:** два `main` на биржи; отключать Site `main` «чтобы не дублировать» — дублирование снимается **одним** парсером.
+
+**Приёмка:** Site 24 ч — Neon растёт, `/lenta/` живая; Legacy consumer — в бот приходят заказы по **FILTERS_LEGACY**, без `main` legacy на биржах.
+
+**P5:** после n1–n5 + § F-SITE-FILTERS-0i. Прокси Site — опционально позже.
+
+---
+
+# § F-SITE-FILTERS-0i — FILTERS_SITE под аудиторию §0i (**→ сейчас**, PM 2026-05-27)
+
+**Канон Product:** [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § «FILTERS_SITE — критерии для /lenta/».
+
+| # | Готово когда |
+|---|----------------|
+| f0 | `FILTERS_SITE.md` **≠** клон LEGACY: убрать из **стопа** Site токены дизайн/маркетинг (таблица PM); `FILTERS_LEGACY.md` **не менять** |
+| f1 | «Берём» Site — 4 ниши §0i (блоки уже в шаблоне — сверить с PM) |
+| f2 | Site ingest: `neon_ingest_wide` + после правки стопа — L1 доходит до дизайн/маркетинг карточек |
+| f3 | `MIN_AI_SCORE` site: 40 код / 50 нетех — по PM (`ai_analyze.py` / `AI.md`) |
+| f4 | Приёмка: заказ с «figma»/«таргет» в title → в Neon → `is_visible` после L1 на `/lenta/`; Legacy consumer — тот же заказ **может** не идти в FLPARSING (стоп LEGACY) |
+
+**Пульт (в этой же задаче):**
+
+| # | Готово когда |
+|---|----------------|
+| p1 | Legacy ▶: лампа **«Neon»** (consumer), не «Биржи main»; Site ▶: **Биржи** + **TG** |
+| p2 | `FOR_YOU.md` / подписи ламп — как § «Два пульта»; после кода — `rebuild-pult.bat` |
+| p3 | Site bat: перезапуск API при старте (как site.bat сейчас) — без зомби `main --profile site` |
+
+---
+
+# § S-SPLIT-TG — TG только на SITE (**→ сейчас**, владелец 2026-05-27)
+
+**Решение:** Legacy = **биржи + @FLPARSINGBOT**, **без** Telethon. Site = **acc1–acc3 + join + @rawlead_bot + L1/L2**.
+
+| # | Готово когда |
+|---|----------------|
+| g1 | `RADAR_TG_ENABLED=0` в `.env.legacy` → `radar_control` **не** spawn `tg_main`; лампа TG серая / «выкл» |
+| g2 | `RADAR_TG_ENABLED=1` (default) на site — как сейчас |
+| g3 | Два пульта ▶ одновременно **без** дублей TG (только site трогает acc) |
+| g4 | `.env.site`: отдельный OpenRouter + `OPENROUTER_MODEL_SUMMARY` / `PREMIUM` (владелец проставил) |
+
+**Не делать:** TG на legacy; один OpenRouter на оба профиля.
+
+---
+
+# § PULT-THEME — Legacy пульт визуально другой (**→ сейчас**, владелец 2026-05-27)
+
+**Зачем:** два пульта на столе — с первого взгляда не перепутать. Site = текущий светлый канон. **Legacy — отдельная тема на выбор Coder** (тёплый/янтарь, тёмный акцент, «инструментальный» вид — без согласования Lead).
+
+| # | Готово когда |
+|---|----------------|
+| t1 | `data-profile=legacy|site` на `<html>` или `body`; CSS-переменные в `desktop/src/styles/` (legacy ≠ site) |
+| t2 | В заголовке пульта бейдж **LEGACY** / **SITE** (не только цвет) |
+| t3 | Site-пульт **всегда** API `:18775`: `VITE_RADAR_API` в bat **и** runtime fallback `RADAR_CONTROL_PORT` / query для собранного `RawLead.exe` |
+| t4 | Legacy bat не трогает site `radar_control` (уже по profile — проверить) |
+
+**Не делать:** одинаковый UI без метки; site exe на :18765.
 
 ---
 
@@ -301,6 +783,7 @@ CSS: сетка 4 карточки desktop (2×2), mobile 1 col — соглас
 | l3 | Начало цикла: `── Цикл {ts} ──` · конец: `Итого в бот: X │ на сайт: X` (`notified_at`) |
 | l4 | Счётчики: класс `SourceCycleStats` в `lead_pipeline` / `main` — не раздувать `errors[]` только для статистики |
 | l5 | Старый формат `карточки_fl=…` — убрать или одна строка «legacy» внизу (предпочтительно **заменить**) |
+| l6 | Debug трейс доставки TG: на каждый кандидат-лид (или хотя бы на `skip`-кейсы) логировать `source/external_id`, `bot_target` (rawlead/FLPARSINGBOT), `stage` (fetch/filter/dedup/ai_notify/ai_skip), `decision` (take/skip/send_fail), `skip_reason`, и флаги `ai_verdict/ai_score/budget_ok` + агрегаты по причинам за цикл |
 
 **Файлы:** `src/main.py`, `src/lead_pipeline.py` (опц. `src/radar_cycle_log.py`)
 

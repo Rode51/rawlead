@@ -12,9 +12,16 @@ from telethon.errors import FloodWaitError, UserAlreadyParticipantError
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.messages import ImportChatInviteRequest
 
-from config import _PROJECT_ROOT
+from config import _PROJECT_ROOT, _path_from_env
 
-QUEUE_CSV = _PROJECT_ROOT / "docs" / "ops" / "TG_JOIN_QUEUE.csv"
+def join_queue_csv_path() -> Path:
+    """Путь очереди join: env TG_JOIN_QUEUE_CSV (site → v2)."""
+    rel = _path_from_env("TG_JOIN_QUEUE_CSV", "docs/ops/TG_JOIN_QUEUE.csv")
+    p = Path(rel)
+    return p if p.is_absolute() else _PROJECT_ROOT / p
+
+
+QUEUE_CSV = join_queue_csv_path()
 INVITES_FALLBACK = _PROJECT_ROOT / "scripts" / "tg_invites.txt"
 
 _PUBLIC_USERNAME_RE = re.compile(r"^https?://t\.me/([A-Za-z0-9_]+)/?$", re.I)
@@ -63,7 +70,8 @@ def _registry_keys_for_chat_id(chat_id: int) -> list[int]:
     return list(keys)
 
 
-def load_chat_registry_from_queue(path: Path = QUEUE_CSV) -> dict[int, dict[str, str]]:
+def load_chat_registry_from_queue(path: Path | None = None) -> dict[int, dict[str, str]]:
+    path = path or join_queue_csv_path()
     """peer_id / short id → {name, invite, username?} из строк CSV со status=done."""
     registry: dict[int, dict[str, str]] = {}
     _, rows = read_queue_csv(path)
@@ -150,7 +158,8 @@ async def join_one(client, link: str) -> JoinResult:
         return JoinResult(ok=False, error=f"{type(exc).__name__}: {exc}")
 
 
-def read_queue_csv(path: Path = QUEUE_CSV) -> tuple[list[str], list[dict[str, str]]]:
+def read_queue_csv(path: Path | None = None) -> tuple[list[str], list[dict[str, str]]]:
+    path = path or join_queue_csv_path()
     if not path.is_file():
         return [], []
     with path.open(encoding="utf-8", newline="") as fh:
@@ -163,8 +172,9 @@ def read_queue_csv(path: Path = QUEUE_CSV) -> tuple[list[str], list[dict[str, st
 def write_queue_csv(
     fieldnames: list[str],
     rows: list[dict[str, str]],
-    path: Path = QUEUE_CSV,
+    path: Path | None = None,
 ) -> None:
+    path = path or join_queue_csv_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames, lineterminator="\n")

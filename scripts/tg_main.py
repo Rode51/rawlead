@@ -17,8 +17,11 @@ sys.path.insert(0, str(_ROOT / "src"))
 
 from bot_poll import try_poll_commands  # noqa: E402
 from config import (  # noqa: E402
+    apply_profile_argv,
     load_config,
+    load_radar_env,
     load_tg_monitor_config,
+    radar_lock_path,
     radar_timestamp,
     telethon_monitor_accounts,
 )
@@ -36,12 +39,18 @@ from tg_relay_allowlist import refresh_allowlist_from_accounts  # noqa: E402
 
 _POLL_SEC = 2.0
 _HEARTBEAT_SEC = 120.0
-_TG_MAIN_LOCK = _ROOT / "data" / ".tg_main.lock"
 _tg_main_lock_fh = None
+
+
+def _tg_main_lock_path() -> Path:
+    apply_profile_argv()
+    load_radar_env()
+    return radar_lock_path("tg_main")
 
 
 def _release_single_instance() -> None:
     global _tg_main_lock_fh
+    lock_path = _tg_main_lock_path()
     if _tg_main_lock_fh is not None:
         try:
             if msvcrt is not None:
@@ -55,16 +64,17 @@ def _release_single_instance() -> None:
             pass
         _tg_main_lock_fh = None
     try:
-        _TG_MAIN_LOCK.unlink(missing_ok=True)
+        lock_path.unlink(missing_ok=True)
     except OSError:
         pass
 
 
 def _acquire_single_instance() -> bool:
     global _tg_main_lock_fh
-    _TG_MAIN_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = _tg_main_lock_path()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        fh = open(_TG_MAIN_LOCK, "a+b")
+        fh = open(lock_path, "a+b")
     except OSError:
         return False
     if msvcrt is not None:

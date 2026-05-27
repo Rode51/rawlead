@@ -20,7 +20,6 @@ from lead_category import category_for_listing
 from listing import ListingProject
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_FILTERS_PATH = _PROJECT_ROOT / "docs" / "ops" / "FILTERS.md"
 
 # Синхрон с docs/ops/FILTERS.md § Vision v0.10 (v0.10.1)
 _GLOBAL_ALWAYS_STOP: tuple[str, ...] = (
@@ -202,5 +201,8 @@ class ListingWordFilter:
 
 
 def default_listing_filter() -> ListingWordFilter:
-    """Правила из docs/ops/FILTERS.md."""
-    return ListingWordFilter.from_path(_DEFAULT_FILTERS_PATH)
+    """Правила по RADAR_PROFILE: FILTERS_LEGACY.md или FILTERS_SITE.md."""
+    from config import filters_md_path, load_radar_env
+
+    load_radar_env()
+    return ListingWordFilter.from_path(filters_md_path())

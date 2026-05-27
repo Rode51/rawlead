@@ -86,11 +86,45 @@ body {
   font-size: 1.35rem;
   font-weight: 800;
   letter-spacing: -0.04em;
-  line-height: 1;
+  line-height: 1.15;
   color: var(--color-text);
   cursor: default;
   -webkit-app-region: drag;
   app-region: drag;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  vertical-align: middle;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.profile-badge[hidden] {
+  display: none !important;
+}
+
+.profile-badge--legacy {
+  color: #92400e;
+  background: rgba(180, 83, 9, 0.14);
+  border: 1px solid rgba(180, 83, 9, 0.35);
+}
+
+.profile-badge--site {
+  color: #1e40af;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.28);
 }
 
 .window-controls {
@@ -373,6 +407,13 @@ body {
   font-family: var(--font-display);
   letter-spacing: -0.02em;
   color: var(--color-text);
+}
+
+.lamp__caption {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  min-height: 1.1em;
 }
 
 .log-panel {

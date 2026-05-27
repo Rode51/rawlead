@@ -6,6 +6,19 @@
 
 ---
 
+## Блокер ленты (2026-05-27) — до «едем на прод»
+
+| # | Блок | Кто | Готово когда |
+|---|------|-----|--------------|
+| **N** | **NEON-DEDUP-REPLAY** — dup не обрывает L1; зомби в Neon догоняются | @coder | Neon: новые/обновлённые строки с L1; `/lenta/` не пустая при Site ▶; см. [`CODER_PROMPT.md`](CODER_PROMPT.md) § NEON-DEDUP-REPLAY |
+| **F** | **FEED-DECOUPLE** — `/v1/feed` не зависит от `notified_at` | @coder | `/lenta/` показывает `is_visible=true` даже при `notified_at IS NULL` |
+| **A** | **SITE-AI-FALLBACK** — site-бот не спамит при `ai_unavailable` | @coder | при сбое L1 в логах есть счётчик, но TG без мусора |
+| **O** | **Site-бот** — `TELEGRAM_CHAT_ID` в `.env.site` = чат, куда писал @rawlead_bot | владелец | Нет `chat not found` в `radar_site.log` |
+
+Промпт Coder: § **NEON-DEDUP-REPLAY** · § **LOG-NEON-CYCLE** · затем § **P5-PREP**.
+
+---
+
 ## Обязательно до P5 (код)
 
 ### F-LOCAL — фильтры Python + экономия ИИ (владелец 2026-05-26)
@@ -57,7 +70,7 @@
 ## Порядок Coder
 
 ```
-P1 (whitelist + ingest) → D1 (чипы category UI) → P4 (TG auth) → P5 (деплой)
+P1 → D1 → P4 → F-LOCAL → S-SPLIT* → NEON-DEDUP-REPLAY → LOG-NEON-CYCLE → P5-PREP → P5 (деплой)
 ```
 
 Промпт: [`CODER_PROMPT.md`](CODER_PROMPT.md) · Design: [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § D1

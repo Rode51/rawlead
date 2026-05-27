@@ -17,11 +17,31 @@
 
 ---
 
-## Что работает
+## Два радара (legacy + site)
 
-- **FL + Kwork** → фильтр → ИИ → бот **@FLPARSINGBOT**
-- **TG:** acc1 + acc2 + acc3 в одном `tg_main`
-- **Пульт:** `start-radar-desktop.vbs` — ▶/■/✕, **2** процесса (.venv)
+| Ярлык | Профиль | Бот | Зачем |
+|-------|---------|-----|--------|
+| **Радар Site** (сервер 24/7) | `site` | [@rawlead_bot](https://t.me/rawlead_bot) | **Парсит** биржи + TG → **Neon** → `/lenta/` |
+| **Радар Legacy** (ПК, по желанию) | `legacy` | @FLPARSINGBOT | **Не парсит** биржи — **читает Neon**, `FILTERS_LEGACY` → бот |
+
+- Фильтры **разные файлы**: `FILTERS_SITE.md` (лента) vs `FILTERS_LEGACY.md` (твой бот)
+- **Один парсер** на сервере (Site ▶); Legacy — отбор из той же Neon, SQLite «уже слал»
+- `SITE_NOTIFY_OWNER=0` (по умолчанию): Site **не шлёт** owner-уведомления в TG; биржи владельцу идут только через Legacy consumer
+- OpenRouter: **два ключа** — legacy и site
+- На прод: регистрируешься на сайте → новый бот → тест как платный подписчик
+
+Подробно: [`team/common/PROJECT_MAP.md`](team/common/PROJECT_MAP.md) § «Два контура»
+
+### Какой `.env` правильный?
+
+| Файл | Когда используется | Что хранить |
+|------|-------------------|-------------|
+| **`.env`** | Всегда (вторым слоем) | **Общее:** Neon `DATABASE_URL`, Telethon acc1–3, FL/Kwork URL, прокси, `FREELANCEHUNT_API_TOKEN` |
+| **`.env.legacy`** | Ярлык **Legacy** / `--profile legacy` | **@FLPARSINGBOT**, `RADAR_*` legacy, `FILTERS_LEGACY`, свой OpenRouter |
+| **`.env.site`** | Ярлык **Site** / `--profile site` | **@rawlead_bot**, `RADAR_*` site, `FILTERS_SITE`, `TG_JOIN_QUEUE_v2`, свой OpenRouter, `RAWLEAD_API_KEY` |
+
+**Не путать:** бот и `TELEGRAM_CHAT_ID` — **в профильном файле**. В `.env` ботов больше нет (только shared).  
+**Site-бот:** напиши `/start` в ЛС [@rawlead_bot](https://t.me/rawlead_bot) — иначе `chat not found` в логе.
 
 ---
 
@@ -40,40 +60,89 @@
 
 ## Запуск пульта
 
-1. Двойной клик на ярлык **FL Radar** на рабочем столе → подождать **5 с**.
-2. Пульт открылся, нет красного баннера → ▶ один раз.
-3. Лампы «Биржи» и «TG» зелёные — всё работает.
+| Ярлык (создай на рабочем столе) | Скрипт | Пульт API |
+|----------------------------------|--------|-----------|
+| **RawLead Legacy** (ярлык на столе) | `scripts\start-radar-desktop-legacy.vbs` | `http://127.0.0.1:18765` |
+| **RawLead Site** (ярлык на столе) | `scripts\start-radar-desktop-site.vbs` | `http://127.0.0.1:18775` |
+
+Старый ярлык **FL Radar** заменён на **RawLead Legacy**.
+
+1. После обновления Coder: `scripts\rebuild-pult.bat` → ярлык запускает **`desktop.exe`** (свежий), не старый `RawLead.exe` от 25.05.
+2. Двойной клик на нужный ярлык → подождать **5 с**.
+3. Пульт открылся, нет красного баннера → ▶ один раз.
+4. Legacy: бейдж **LEGACY**, янтарь, TG «выкл». Site: бейдж **SITE**, TG живая.
+
+**Не открывается:** `scripts\start-radar-desktop-legacy-debug.bat` — увидишь ошибку в консоли.
+
+`.env.legacy` / `.env.site` уже на ПК. Site: @rawlead_bot. Второй ключ OpenRouter — по желанию (пока может быть тот же).
 
 **Не запускай** `start-radar-full.bat` и `python tg_main` вручную — дубли ломают бота.
+
+## Откуда дубли (ты ничего «лишнего» не делаешь — так устроен пульт)
+
+| Что ты делаешь | Что реально остаётся в Windows |
+|----------------|--------------------------------|
+| Ярлык → **VBS** → bat | Поднимается **`radar_control.py`** (фон, без окна) + окно **`desktop.exe`** |
+| Закрываешь пульт **крестиком ✕** | Окно закрывается, вызывается **Stop** воркеров — но **`radar_control` часто остаётся жить** в фоне |
+| Снова ярлык | Bat пытается убить старый API и поднять новый — если остался **старый** API на **system Python** (с прошлых запусков), получаешь **два** `main.py` / два `radar_control` |
+| Два ярлыка (Site + Legacy) | Это **норма**: два API (`:18775` и `:18765`). Плохо, если **на один профиль** два python (`.venv` **и** `Python311`) |
+
+**Частая ошибка ярлыка:** «Объект» указывает на **`desktop.exe`** или старый **`RawLead.exe`**, а не на **`start-radar-desktop-site.vbs`**. Тогда bat с `kill_all` **не вызывается**, остаётся зомби-API с system Python.
+
+**Проверка ярлыка (10 сек):** ПКМ ярлык → **Свойства** → **Объект** должен заканчиваться на:
+- `...\uisness\scripts\start-radar-desktop-site.vbs` — Site
+- `...\uisness\scripts\start-radar-desktop-legacy.vbs` — Legacy  
+
+**Не** `desktop.exe` / **не** `start-radar-desktop.bat` (если не знаешь зачем консоль).
+
+### Полный стоп перед запуском (сделай так)
+
+`scripts\stop-radar.bat` **не убивает** `radar_control` (только воркеры) — из‑за этого и копятся зомби.
+
+1. Закрой все окна пульта (✕) — пульт сам шлёт `/shutdown` и гасит API **своего** профиля.
+2. **Полный стоп site + legacy** — двойной клик **`scripts\stop-radar-desktop-full.vbs`** (без окна) или bat с консолью. Убивает оба `radar_control` и все воркеры.
+3. Подожди 3 с → **один** двойной клик по ярлыку **Site** (или Legacy) → 5 с → **▶ один раз**.
+4. Второй профиль (если нужен) — **другой** ярлык, снова ▶ один раз.
+
+Пока в диспетчере на **один** профиль два `python` (`.venv` + `Python311`) — пиши Lead → **@coder** § SITE-BAT-VENV b7–b9.
+
+**Два пульта — как ты работаешь (цель):**
+
+| | **Legacy ▶** | **Site ▶** |
+|---|--------------|------------|
+| Зачем | **Брать заказы** | **Продукт** (лента, TG, кабинет) |
+| Биржи → Neon | Site `main` (24/7) | — |
+| Биржи → бот | Legacy consumer → @FLPARSINGBOT | ❌ (только Neon + `/lenta/`) |
+| TG → бот | ❌ | ✅ → @rawlead_bot (owner, если `SITE_NOTIFY_OWNER=1`) |
+| Оба ▶ вместе | **да** — Site `main`+`tg_main` + Legacy consumer (без второго `main`) |
+
+**Режим «оба ▶»:** Site ▶ — парсит биржи → Neon + TG. Legacy ▶ — читает Neon → @FLPARSINGBOT (лампа **Neon** = consumer, не биржи). Один парсер бирж.
+
+**Биржи:** только Site (`main` + `RADAR_EXCHANGES_ENABLED=1` в `.env.site`). Legacy — `neon_legacy_consumer` из Neon, не `main`.
+
+**@rawlead_bot /start** — на проде, полный путь регистрации как пользователь.
+
+**Join в новые 19 каналов (Site ▶):** как в [`ops/TG_JOIN_SCHEDULE.md`](ops/TG_JOIN_SCHEDULE.md) — до **4 в час** на acc, пауза **15–20 мин**, **ночью 02:00–07:00 Irkutsk join не идёт**. Очередь: `TG_JOIN_QUEUE_v2.csv` (`pending` → `done` автоматически в `tg_main`).
 
 ## Если пульт не ответил («API не отвечает»)
 
 1. Закрой пульт (✕).
-2. Запусти `scripts\stop-radar.bat` (двойной клик).
-3. Удали файл `data\.radar_desktop.lock` если есть.
-4. Снова двойной клик на ярлык — подождать 5 с.
+2. **Полный стоп** — `scripts\stop-radar-desktop-full.vbs`. `stop-radar.bat` один — **недостаточно**.
+3. Удали lock: `data\.radar_desktop_legacy.lock` / `data\.radar_desktop_site.lock` (если есть).
+4. Ярлык **только .vbs** → подождать 5 с → ▶.
 
-## Твои шаги сейчас — Vision v0.10
+## Твои шаги сейчас — к прод (2026-05-27)
 
-**Канон:** [`team/product/PRODUCT_VISION.md`](team/product/PRODUCT_VISION.md) §0i
+**Канон:** [`team/architect/PRE_PROD_GATE.md`](team/architect/PRE_PROD_GATE.md) · Coder: § **NEON-DEDUP-REPLAY**
 
-1. ~~§ V10 · W2 · V10.5 · P7~~ ✅ 2026-05-26
-2. ~~P1 · D1 · P4 код~~ ✅ 2026-05-26
-3. **Сейчас — не прод:**  
-   - **Ты** — **не** правишь стоп-слова сам: Deep Research уже в [`team/archive/FILTERS_DEEP_RESEARCH_2026.md`](team/archive/FILTERS_DEEP_RESEARCH_2026.md) → Coder § **F-RESEARCH** вносит в `FILTERS.md`. Твоя роль: 1–2 недели «ложный стоп / мусор прошёл» в чат  
-   - **Coder § F-PROMPT** — нормальные промпты L1/L2 + чтобы L2 **не повторял** L1 ([`team/architect/AI.md`](team/architect/AI.md))  
-   - **Coder § F-LOCAL** — код, лента, бот, TG  
-   - **Lead Design** — в конце
-4. **`.env` строка 70** — должно быть ровно:  
-   `PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt`  
-   (не `PUBLIC_FEED_SOURCES=PUBLIC_FEED_SOURCES=…`) → **Стоп → ▶** на пульте
-5. **Крутить отсев:** `FILTER_WIDE=1` — почти всё в ИИ (дороже); `0` — жёстче словами (дешевле). Стоп-лист — правки в `FILTERS.md` → перезапуск радара
-6. **Лог:** [`ops/RADAR_LOG.md`](ops/RADAR_LOG.md) — смотри колонки `filter` / `МИМО` / `dup` / `в бот`
-7. **Кабинет P4** — по желанию (SQL + API + wp-config)
-8. **Прод P5** — после F-LOCAL + **«едем на прод»**
-9. **Lead Designer** — в **конце**, когда стабилизируем фильтры и сменим концепцию
+1. **Site ▶** (`start-radar-desktop-site.vbs`) — **единственный** писатель в Neon (биржи). Legacy ▶ — только consumer, **не** должен крутить `main` с FL в логе.
+2. **`.env.site`:** `TELEGRAM_CHAT_ID` = чат, куда **уже писал** [@rawlead_bot](https://t.me/rawlead_bot) (напиши `/start`). Иначе в `radar_site.log`: `chat not found`.
+3. **`.env.site`:** `PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt` · `DATABASE_URL` = тот же Neon, что в Console.
+4. **Дождись @coder** § NEON-DEDUP-REPLAY → перезапуск Site ▶ → проверь `/lenta/` и Neon (строки с L1 / `is_visible`).
+5. **Лог Site:** `data/radar_site.log` — после Coder смотри `neon_insert` / `neon_replay`, не только `dup`.
+6. **Прод P5** — только после п.4 + твоё **«едем на прод»** в чат Lead.
 
-**С тебя:** п.4–5 + 1–2 дня смотреть бот — «Брать» должны быть в тему.
+**Не прод:** пока в Neon 0 обновлений за сутки и лента пустая — это баг воронки, не «на бирже нет дизайна».
 
 Neon ✅ · dogfood бот — как был.
 

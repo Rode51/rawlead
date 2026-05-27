@@ -1,6 +1,7 @@
-const API_BASE =
-  (import.meta.env.VITE_RADAR_API as string | undefined) ??
-  "http://127.0.0.1:18765";
+type RadarProfile = "legacy" | "site";
+
+let API_BASE = "http://127.0.0.1:18765";
+let UI_PROFILE: RadarProfile = "legacy";
 
 const POLL_STATUS_MS = 2500;
 const POLL_LOGS_MS = 1500;
@@ -46,6 +47,11 @@ interface StatusPayload {
   last_cycle?: LastCyclePayload;
 }
 
+const profileBadge = document.getElementById("profile-badge");
+const tgJoinTab = document.querySelector<HTMLButtonElement>(
+  '.log-tab[data-tab="tg_join.log"]',
+);
+
 const appEl = document.getElementById("app")!;
 const heroBtn = document.getElementById("hero-btn") as HTMLButtonElement;
 const playIcon = heroBtn.querySelector(".hero__icon--play") as SVGElement;
@@ -81,6 +87,80 @@ const LOG_SCROLL_BOTTOM_THRESHOLD = 32;
 
 function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
+}
+
+async function resolveRadarUiConfig(): Promise<{
+  apiBase: string;
+  profile: RadarProfile;
+}> {
+  const params = new URLSearchParams(location.search);
+  const profileParam = params.get("profile");
+  if (profileParam === "site" || profileParam === "legacy") {
+    const port = profileParam === "site" ? "18775" : "18765";
+    const api = (params.get("api") ?? `http://127.0.0.1:${port}`).replace(
+      /\/$/,
+      "",
+    );
+    return { apiBase: api, profile: profileParam };
+  }
+
+  const apiParam = params.get("api");
+  if (apiParam) {
+    const base = apiParam.replace(/\/$/, "");
+    return {
+      apiBase: base,
+      profile: base.includes(":18775") ? "site" : "legacy",
+    };
+  }
+
+  const portParam = params.get("port");
+  if (portParam === "18775" || portParam === "18765") {
+    return {
+      apiBase: `http://127.0.0.1:${portParam}`,
+      profile: portParam === "18775" ? "site" : "legacy",
+    };
+  }
+
+  const viteApi = import.meta.env.VITE_RADAR_API as string | undefined;
+  if (viteApi) {
+    const base = viteApi.replace(/\/$/, "");
+    return {
+      apiBase: base,
+      profile: base.includes(":18775") ? "site" : "legacy",
+    };
+  }
+
+  if (isTauri()) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const port = await invoke<number | null>("radar_env_port");
+      const profile = await invoke<string | null>("radar_env_profile");
+      if (port === 18775 || profile === "site") {
+        return { apiBase: "http://127.0.0.1:18775", profile: "site" };
+      }
+      if (port === 18765 || profile === "legacy") {
+        return { apiBase: "http://127.0.0.1:18765", profile: "legacy" };
+      }
+    } catch {
+      /* invoke недоступен — fallback ниже */
+    }
+  }
+
+  return { apiBase: "http://127.0.0.1:18765", profile: "legacy" };
+}
+
+function applyProfileTheme(profile: RadarProfile): void {
+  document.documentElement.dataset.profile = profile;
+  if (profileBadge) {
+    profileBadge.hidden = false;
+    profileBadge.textContent = profile === "site" ? "SITE" : "LEGACY";
+    profileBadge.className = `profile-badge profile-badge--${profile}`;
+  }
+  if (tgJoinTab) {
+    tgJoinTab.hidden = profile === "legacy";
+  }
+  document.title =
+    profile === "site" ? "RawLead — пульт SITE" : "RawLead — пульт LEGACY";
 }
 
 function isCanceledError(err: unknown): boolean {
@@ -143,7 +223,7 @@ async function stopRadarForClose(): Promise<void> {
   pauseStatusPoll();
   stopLogPoll();
   try {
-    await apiPost("/stop", "{}", CLOSE_STOP_MS);
+    await apiPost("/shutdown", "{}", CLOSE_STOP_MS);
   } catch {
     /* таймаут / API недоступен — окно всё равно закрываем */
   }
@@ -316,7 +396,8 @@ function renderLamps(lamps: LampInfo[]): void {
       (l) => `
     <div class="lamp" data-key="${l.key}">
       <span class="lamp__dot lamp__dot--${l.state}"></span>
-      <span class="lamp__label">${l.label}</span>
+      <span class="lamp__label">${escapeHtml(l.label)}</span>
+      <span class="lamp__caption">${l.caption ? escapeHtml(l.caption) : "&nbsp;"}</span>
     </div>`,
     )
     .join("");
@@ -644,6 +725,11 @@ tabButtons.forEach((btn) => {
 });
 
 void (async () => {
+  const ui = await resolveRadarUiConfig();
+  API_BASE = ui.apiBase;
+  UI_PROFILE = ui.profile;
+  applyProfileTheme(UI_PROFILE);
+
   try {
     await initHttpFetch();
   } catch (err) {
@@ -670,10 +756,11 @@ void (async () => {
 
   const ok = await waitForApi();
   if (!ok) {
-    showStatus(
-      "API не отвечает. Запустите start-radar-desktop.vbs",
-      "error",
-    );
+    const hint =
+      UI_PROFILE === "site"
+        ? "start-radar-desktop-site.vbs"
+        : "start-radar-desktop-legacy.vbs";
+    showStatus(`API не отвечает (${API_BASE}). Запустите ${hint}`, "error");
   } else {
     clearStatus();
   }

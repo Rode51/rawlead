@@ -22,8 +22,9 @@
 | **Инженерия:** docs, Coder, приёмка | **Lead Architect** `@lead-architect` | `lead-architect.mdc` · `CODER_PROMPT.md` |
 | **Дизайн UI** (исполнение) | **Designer** (новый чат) | `@designer` (или `@.cursor/rules/designer.mdc`) |
 | **Фича / код** | **Coder** (новый чат) | `@coder` (или `@.cursor/rules/coder.mdc`) |
-| **Поломка** | **Mechanic** `@mechanic` | `@mechanic` + `@docs/problems/…` |
-| Brainstorm | **Gemini** → итог → нужный Lead | — |
+| **Поломка / регресс** | **Mechanic** `@mechanic` | `@mechanic` + `@docs/problems/…` · модель **Gemini 2.5 (2M)** |
+| Brainstorm / черновик | **Gemini** (браузер) → итог → Lead | — |
+| **Плановая фича** | **Coder** `@coder` | `@coder` · `CODER_PROMPT.md` |
 
 ### Правила Cursor — не путать
 
@@ -58,11 +59,13 @@
 | **Lead Architect** | инженерия, Coder-промпт | `@lead-architect` |
 | **Designer** | есть `DESIGNER_PROMPT.md` | `@designer` |
 | **Coder** | есть `CODER_PROMPT.md` | `@coder` |
-| **Mechanic** | тикет `docs/problems/` | `@mechanic` |
+| **Mechanic** | тикет `docs/problems/` · **Gemini 2.5** | `@mechanic` + тикет |
 
 **Lead-* не кодят.** Внедрение — ты + Coder/Designer по их PROMPT-файлам.
 
-**После Mechanic:** Lead — «тикет закрыт, обнови FOR_YOU».
+**Coder vs Mechanic:** поломка «сейчас» → Mechanic (тикет). Задача в `CODER_PROMPT` → Coder. Не оба на одном §. Канон: [`team/architect/LEAD.md`](../architect/LEAD.md) § «Coder vs Mechanic».
+
+**После Mechanic:** Lead — тикет «решено», при необходимости `FOR_YOU` / `CODER_PROMPT`.
 
 ---
 
@@ -87,10 +90,10 @@
 | Итог сессии в `STATUS.md` | «Напомни что мы делали вчера» в новом чате |
 | Факты только из файлов repo | AI «помнит» то, чего нет в docs |
 
-**Gemini:** черновики, «а что если 5 вариантов», обучение.  
+**Gemini (браузер):** черновики, «5 вариантов», обучение → итог в Lead.  
 **Cursor Lead:** зафиксировать решение в `docs/`.  
-**Cursor Coder:** фичи по `CODER_PROMPT.md`.  
-**Cursor Mechanic:** починка по `docs/problems/*.md`.
+**Cursor Coder:** фичи по `CODER_PROMPT.md` (узкое чтение).  
+**Cursor Mechanic + Gemini 2.5 (2M):** починка по `docs/problems/*.md`; при жёстком баге — весь проект в контексте.
 
 ---
 

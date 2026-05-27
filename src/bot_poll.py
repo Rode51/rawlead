@@ -11,20 +11,20 @@ if sys.platform == "win32":
 else:
     msvcrt = None  # type: ignore
 
-from config import Config
+from config import Config, radar_lock_path
 from storage import ProjectStorage
 from telegram_control import poll_commands
-
-_LOCK_PATH = Path(__file__).resolve().parent.parent / "data" / ".bot_poll.lock"
 
 
 def try_poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
     """
     getUpdates только если удалось взять lock (иначе второй процесс молчит).
     """
-    _LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("RADAR_PROFILE", cfg.radar_profile)
+    lock_path = radar_lock_path("bot_poll")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        fh = open(_LOCK_PATH, "a+b")
+        fh = open(lock_path, "a+b")
     except OSError:
         return poll_commands(cfg, storage)
 

@@ -11,12 +11,19 @@ from pathlib import Path
 
 import requests
 
-from config import Config, _PROJECT_ROOT, load_config, radar_timestamp, telegram_requests_proxies
+from config import (
+    Config,
+    _PROJECT_ROOT,
+    load_config,
+    load_radar_env,
+    radar_lock_path,
+    radar_timestamp,
+    telegram_requests_proxies,
+)
 from storage import ProjectStorage
 
 _DEFAULT_CHECK_MIN = 15
 _DEFAULT_ALERT_COOLDOWN_MIN = 60
-_TG_MAIN_LOCK = _PROJECT_ROOT / "data" / ".tg_main.lock"
 _TG_MONITOR_PULSE_KEY = "tg_monitor_last_pulse"
 _TG_MONITOR_START_KEY = "tg_monitor_started_at"
 # tg_main: пульс раз в 120 с; порог = 2× интервал + запас
@@ -52,9 +59,15 @@ def _alert_cooldown_sec() -> int:
         return _DEFAULT_ALERT_COOLDOWN_MIN * 60
 
 
+def _tg_main_lock_path() -> Path:
+    load_radar_env()
+    return radar_lock_path("tg_main")
+
+
 def is_tg_monitor_active() -> bool:
     """Окно tg_main держит lock-файл — вторая сессия Telethon даст database is locked."""
-    if not _TG_MAIN_LOCK.is_file():
+    lock_path = _tg_main_lock_path()
+    if not lock_path.is_file():
         return False
     if sys.platform != "win32":
         return True
@@ -63,7 +76,7 @@ def is_tg_monitor_active() -> bool:
     except ImportError:
         return True
     try:
-        fh = open(_TG_MAIN_LOCK, "a+b")
+        fh = open(lock_path, "a+b")
     except OSError:
         return False
     try:
@@ -134,7 +147,7 @@ def try_release_stale_tg_main_lock() -> bool:
     if is_tg_monitor_active():
         return False
     try:
-        _TG_MAIN_LOCK.unlink(missing_ok=True)
+        _tg_main_lock_path().unlink(missing_ok=True)
         return True
     except OSError:
         return False

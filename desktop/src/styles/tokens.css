@@ -56,3 +56,33 @@
   --height-compact: 560px;
   --height-expanded: 760px;
 }
+
+/* Legacy — тёплый «инструментальный» пульт (§ PULT-THEME) */
+[data-profile="legacy"] {
+  --color-bg-app: #faf6f0;
+  --color-bg-surface: #f3ebe0;
+  --color-bg-log: #f0e8dc;
+  --color-border: #e0d4c4;
+  --color-text: #292018;
+  --color-text-body: #4a3f32;
+  --color-text-muted: #7a6b5c;
+  --color-cta: #b45309;
+  --color-accent: #d97706;
+  --color-accent-glow: rgba(217, 119, 6, 0.24);
+  --color-hero-on: #fffbf5;
+  --color-log-text: #92400e;
+  --bg-app: linear-gradient(165deg, #fef9f0 0%, #f5ebe0 48%, #e8ddd0 100%);
+  --metal-shine: linear-gradient(
+    118deg,
+    rgba(255, 252, 245, 0.78) 0%,
+    rgba(255, 248, 235, 0.16) 28%,
+    transparent 52%,
+    rgba(180, 150, 110, 0.08) 78%,
+    rgba(255, 250, 240, 0.22) 100%
+  );
+  --metal-edge: linear-gradient(
+    180deg,
+    rgba(255, 250, 240, 0.6) 0%,
+    transparent 12%
+  );
+}

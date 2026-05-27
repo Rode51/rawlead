@@ -11,7 +11,7 @@
 | `@lead-designer` | `lead-designer.mdc` | `team/design/LEAD_DESIGN_PROMPT` → `DESIGNER_PROMPT` |
 | `@coder` | `coder.mdc` | **`CODER_PROMPT.md`** только (без vision) |
 | `@designer` | `designer.mdc` | **`team/design/DESIGNER_PROMPT.md`** |
-| `@mechanic` | `mechanic.mdc` | **`docs/problems/<тикет>.md`** |
+| `@mechanic` | `mechanic.mdc` | **`docs/problems/<тикет>.md`** · **Gemini 2.5 (2M, OpenRouter)** · **редко**, когда застряли |
 | `@owner` | `owner.mdc` | **`docs/FOR_YOU.md`** |
 
 Папки: `docs/team/common/` · `architect/` · `product/` · `design/`

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -21,23 +22,44 @@ if sys.platform == "win32":
     import msvcrt
 
     CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    fcntl = None  # type: ignore
 else:
     msvcrt = None  # type: ignore
     CREATE_NO_WINDOW = 0
+    try:
+        import fcntl
+    except ImportError:
+        fcntl = None  # type: ignore
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-_LOCK_PATH = _ROOT / "data" / ".radar_desktop.lock"
-_OPS_LOCK_PATH = _ROOT / "data" / ".radar_ops.lock"
 _PYTHON = _ROOT / ".venv" / "Scripts" / "python.exe"
-_LOG_RADAR = _ROOT / "data" / "radar.log"
 _LOG_JOIN = _ROOT / "data" / "tg_join.log"
 _TAIL_LINES = 800
 _DEFAULT_PORT = 18765
+_WORKER_LOG_MAX_BYTES = 5 * 1024 * 1024
+_LOCK_PATH: Path | None = None
+_OPS_LOCK_PATH: Path | None = None
+_LOG_RADAR: Path | None = None
+_RADAR_PROFILE = "legacy"
+
+
+def _init_profile_paths() -> None:
+    global _LOCK_PATH, _OPS_LOCK_PATH, _LOG_RADAR, _RADAR_PROFILE
+    from config import apply_profile_argv, load_config, load_radar_env, radar_lock_path
+
+    apply_profile_argv()
+    _RADAR_PROFILE = load_radar_env()
+    _LOCK_PATH = radar_lock_path("radar_desktop")
+    _OPS_LOCK_PATH = radar_lock_path("radar_ops")
+    _LOG_RADAR = load_config().radar_log_path
+
 
 from process_guard import (
     count_radar_workers,
+    expand_spawn_keep_pids,
+    kill_all_radar_control,
     kill_duplicate_radar_workers,
     kill_non_venv_radar_workers,
     wait_radar_workers_stopped,
@@ -47,17 +69,49 @@ _lock_fh = None
 _ops_lock_fh = None
 
 
+def _cors_allowed_origins() -> list[str]:
+    raw = os.environ.get("RADAR_CORS_ORIGINS", "").strip()
+    if not raw:
+        return []
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+def _try_file_lock(fh, *, non_blocking: bool = True) -> bool:
+    if msvcrt is not None:
+        fh.seek(0)
+        msvcrt.locking(
+            fh.fileno(),
+            msvcrt.LK_NBLCK if non_blocking else msvcrt.LK_LOCK,
+            1,
+        )
+        return True
+    if fcntl is not None:
+        flags = fcntl.LOCK_EX
+        if non_blocking:
+            flags |= fcntl.LOCK_NB
+        fcntl.flock(fh.fileno(), flags)
+        return True
+    return True
+
+
+def _try_file_unlock(fh) -> None:
+    if msvcrt is not None:
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+    elif fcntl is not None:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+
+
 @contextmanager
 def _radar_ops_lock():
     """Межпроцессный lock: два radar_control не гоняют /start (4 воркера)."""
     global _ops_lock_fh
+    assert _OPS_LOCK_PATH is not None
     _OPS_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     fh = None
     try:
         fh = open(_OPS_LOCK_PATH, "a+b")
-        if msvcrt is not None:
-            fh.seek(0)
-            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        _try_file_lock(fh)
         _ops_lock_fh = fh
         yield True
     except OSError:
@@ -65,9 +119,7 @@ def _radar_ops_lock():
     finally:
         if fh is not None:
             try:
-                if msvcrt is not None:
-                    fh.seek(0)
-                    msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                _try_file_unlock(fh)
             except OSError:
                 pass
             fh.close()
@@ -76,15 +128,16 @@ def _radar_ops_lock():
 
 def _acquire_single_instance() -> bool:
     global _lock_fh
+    assert _LOCK_PATH is not None
     _LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
         fh = open(_LOCK_PATH, "a+b")
     except OSError:
         return False
-    if msvcrt is not None:
+    if msvcrt is not None or fcntl is not None:
         try:
             fh.seek(0)
-            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            _try_file_lock(fh)
         except OSError:
             fh.close()
             return False
@@ -96,21 +149,41 @@ def _release_lock() -> None:
     global _lock_fh
     if _lock_fh is not None:
         try:
-            if msvcrt is not None:
-                _lock_fh.seek(0)
-                msvcrt.locking(_lock_fh.fileno(), msvcrt.LK_UNLCK, 1)
+            _try_file_unlock(_lock_fh)
         except OSError:
             pass
         _lock_fh.close()
         _lock_fh = None
 
 
-def _hidden_popen(args: list[str], cwd: Path) -> subprocess.Popen:
-    kwargs: dict = {
-        "cwd": str(cwd),
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
-    }
+def _rotate_worker_log(path: Path) -> None:
+    try:
+        if path.is_file() and path.stat().st_size > _WORKER_LOG_MAX_BYTES:
+            backup = path.with_suffix(path.suffix + ".1")
+            if backup.is_file():
+                backup.unlink()
+            path.rename(backup)
+    except OSError:
+        pass
+
+
+def _worker_log_path(log_key: str) -> Path:
+    base = _LOG_RADAR or (_ROOT / "data" / "radar.log")
+    return base.with_name(f"{base.stem}_{log_key}{base.suffix}")
+
+
+def _hidden_popen(args: list[str], cwd: Path, *, log_key: str = "worker") -> subprocess.Popen:
+    log_path = _worker_log_path(log_key)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    _rotate_worker_log(log_path)
+    kwargs: dict = {"cwd": str(cwd)}
+    try:
+        log_fh = open(log_path, "a", encoding="utf-8", buffering=1)
+        kwargs["stdout"] = log_fh
+        kwargs["stderr"] = log_fh
+    except OSError:
+        kwargs["stdout"] = subprocess.DEVNULL
+        kwargs["stderr"] = subprocess.DEVNULL
     if sys.platform == "win32":
         si = subprocess.STARTUPINFO()
         si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -162,17 +235,77 @@ class RadarController:
     _ever_started: bool = False
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
+    def _tg_enabled(self) -> bool:
+        from config import radar_tg_enabled
+
+        return radar_tg_enabled()
+
+    def _exchanges_enabled(self) -> bool:
+        from config import radar_exchanges_enabled
+
+        return radar_exchanges_enabled()
+
+    def _neon_consumer_enabled(self) -> bool:
+        from config import legacy_neon_consumer_enabled
+
+        return legacy_neon_consumer_enabled()
+
+    def _expected_workers(self) -> tuple[int, int]:
+        """(main|neon_consumer, tg_main) — site: (1,1); legacy: (1,0) consumer."""
+        exp_main = 0
+        if self._exchanges_enabled():
+            exp_main = 1
+        elif self._neon_consumer_enabled():
+            exp_main = 1
+        exp_tg = 1 if self._tg_enabled() else 0
+        return exp_main, exp_tg
+
+    def _spawn_children(self) -> list[ChildSpec]:
+        specs: list[ChildSpec] = []
+        if self._exchanges_enabled():
+            specs.append(ChildSpec("exchanges", "Биржи", "src/main.py"))
+        elif self._neon_consumer_enabled():
+            specs.append(
+                ChildSpec("exchanges", "Neon", "src/neon_legacy_consumer.py")
+            )
+        if self._tg_enabled():
+            specs.append(ChildSpec("tg", "TG", "scripts/tg_main.py"))
+        return specs
+
+    def _lamp_specs(self) -> list[ChildSpec]:
+        specs = list(self.children)
+        if not any(s.key == "exchanges" for s in specs):
+            if self._exchanges_enabled():
+                specs.insert(
+                    0, ChildSpec("exchanges", "Биржи", "src/main.py")
+                )
+            elif self._neon_consumer_enabled():
+                specs.insert(
+                    0,
+                    ChildSpec("exchanges", "Neon", "src/neon_legacy_consumer.py"),
+                )
+        if not any(s.key == "tg" for s in specs):
+            specs.append(ChildSpec("tg", "TG", "scripts/tg_main.py"))
+        return specs
+
+    def _spawn_keep_pids(self) -> set[int]:
+        keep: set[int] = set()
+        for spec in self.children:
+            if spec.popen is not None and spec.popen.poll() is None:
+                keep.add(spec.popen.pid)
+        return expand_spawn_keep_pids(keep)
+
     def __post_init__(self) -> None:
         if not self.children:
-            self.children = [
-                ChildSpec("exchanges", "Биржи", "src/main.py"),
-                ChildSpec("tg", "TG", "scripts/tg_main.py"),
-            ]
+            self.children = self._spawn_children()
 
     def _is_alive(self, spec: ChildSpec) -> bool:
+        if spec.key == "exchanges" and not self._exchanges_enabled():
+            if not self._neon_consumer_enabled():
+                return False
         if spec.popen is not None and spec.popen.poll() is None:
             return True
-        mc, tc = count_radar_workers()
+        mc, tc = count_radar_workers(_RADAR_PROFILE)
         if spec.key == "exchanges":
             return mc > 0
         if spec.key == "tg":
@@ -199,34 +332,39 @@ class RadarController:
                         "error": "no_venv",
                         "detail": f"Нет Python: {_PYTHON}",
                     }
-                mc, tc = count_radar_workers()
+                self.children = self._spawn_children()
+                exp_main, exp_tg = self._expected_workers()
+                mc, tc = count_radar_workers(_RADAR_PROFILE)
                 popens_ok = all(
                     s.popen is not None and s.popen.poll() is None
                     for s in self.children
                 )
-                if popens_ok and mc >= 1 and tc >= 1:
+                if popens_ok and mc >= exp_main and tc >= exp_tg:
                     return {"ok": False, "error": "already_running"}
                 self._starting = True
                 self._ever_started = True
                 errors: list[str] = []
                 try:
-                    try:
-                        from config import load_config, telethon_monitor_accounts
-                        from radar_status import reset_tg_session_stats
-                        from storage import storage_from_config
+                    if self._tg_enabled():
+                        try:
+                            from config import load_config, telethon_monitor_accounts
+                            from radar_status import reset_tg_session_stats
+                            from storage import storage_from_config
 
-                        reset_tg_session_stats(
-                            storage_from_config(load_config()),
-                            telethon_monitor_accounts(),
-                        )
-                    except Exception:
-                        pass
+                            reset_tg_session_stats(
+                                storage_from_config(load_config()),
+                                telethon_monitor_accounts(),
+                            )
+                        except Exception:
+                            pass
                     self._stop_unlocked(sweep_orphans=True)
                     kill_duplicate_radar_workers(
-                        log_source="radar_control:pre_spawn"
+                        log_source="radar_control:pre_spawn",
+                        profile=_RADAR_PROFILE,
                     )
                     kill_non_venv_radar_workers(
-                        log_source="radar_control:pre_spawn"
+                        log_source="radar_control:pre_spawn",
+                        profile=_RADAR_PROFILE,
                     )
                     for spec in self.children:
                         script = spec.script_path()
@@ -235,8 +373,15 @@ class RadarController:
                             continue
                         try:
                             spec.popen = _hidden_popen(
-                                [str(_PYTHON), "-u", str(script)],
+                                [
+                                    str(_PYTHON),
+                                    "-u",
+                                    str(script),
+                                    "--profile",
+                                    _RADAR_PROFILE,
+                                ],
                                 _ROOT,
+                                log_key=spec.key,
                             )
                         except OSError as exc:
                             errors.append(f"{spec.label}: {exc}")
@@ -256,17 +401,33 @@ class RadarController:
                                 spawn_failed = True
                         if spawn_failed:
                             break
-                        mc, tc = count_radar_workers()
-                        if mc == 1 and tc == 1:
+                        mc, tc = count_radar_workers(_RADAR_PROFILE)
+                        if mc == exp_main and tc == exp_tg:
                             break
                         time.sleep(0.25)
                     else:
                         if not spawn_failed:
                             errors.append(
-                                f"воркеры main={mc} tg={tc} (ожидалось 1/1)"
+                                f"воркеры main={mc} tg={tc} "
+                                f"(ожидалось {exp_main}/{exp_tg})"
                             )
                             spawn_failed = True
-                    if spawn_failed or mc != 1 or tc != 1:
+                    if not spawn_failed and (mc != exp_main or tc != exp_tg):
+                        spawn_failed = True
+                    if not spawn_failed:
+                        kill_non_venv_radar_workers(
+                            keep_pids=self._spawn_keep_pids(),
+                            log_source="radar_control:post_spawn",
+                            profile=_RADAR_PROFILE,
+                        )
+                        mc, tc = count_radar_workers(_RADAR_PROFILE)
+                        if mc != exp_main or tc != exp_tg:
+                            errors.append(
+                                f"после post_spawn main={mc} tg={tc} "
+                                f"(ожидалось {exp_main}/{exp_tg})"
+                            )
+                            spawn_failed = True
+                    if spawn_failed or mc != exp_main or tc != exp_tg:
                         self._stop_unlocked(sweep_orphans=True)
                     self._ui_expanded = False
                     return {"ok": len(errors) == 0, "errors": errors}
@@ -283,7 +444,9 @@ class RadarController:
                     pass
             spec.popen = None
         if sweep_orphans:
-            kill_duplicate_radar_workers(log_source="radar_control:stop")
+            kill_duplicate_radar_workers(
+                log_source="radar_control:stop", profile=_RADAR_PROFILE
+            )
             wait_radar_workers_stopped()
             _release_stale_tg_lock()
         self._ui_expanded = False
@@ -310,6 +473,18 @@ class RadarController:
                     self._notify_goodbye()
                 return result
 
+    def shutdown(self) -> dict:
+        """Стоп воркеров + завершить API этого профиля (закрытие пульта ✕)."""
+        result = self.stop(silent=True)
+        profile = _RADAR_PROFILE
+
+        def _kill_api() -> None:
+            time.sleep(0.35)
+            kill_all_radar_control(profile=profile)
+
+        threading.Thread(target=_kill_api, daemon=True).start()
+        return {**result, "shutting_down": True, "profile": profile}
+
     def lamp_state(self, spec: ChildSpec, workers_active: bool) -> str:
         if self._is_alive(spec):
             return "ok"
@@ -327,7 +502,31 @@ class RadarController:
                 self._ui_expanded = False
             lamps = []
             storage = None
-            for spec in self.children:
+            tg_enabled = self._tg_enabled()
+            exchanges_enabled = self._exchanges_enabled()
+            for spec in self._lamp_specs():
+                if spec.key == "exchanges" and not exchanges_enabled and not self._neon_consumer_enabled():
+                    lamps.append(
+                        {
+                            "key": "exchanges",
+                            "label": spec.label,
+                            "state": "idle",
+                            "caption": "выкл",
+                            "disabled": True,
+                        }
+                    )
+                    continue
+                if spec.key == "tg" and not tg_enabled:
+                    lamps.append(
+                        {
+                            "key": "tg",
+                            "label": "TG",
+                            "state": "idle",
+                            "caption": "выкл",
+                            "disabled": True,
+                        }
+                    )
+                    continue
                 alive = self._is_alive(spec)
                 if spec.key == "tg":
                     if alive:
@@ -366,6 +565,9 @@ class RadarController:
                 "running": workers,
                 "ever_started": self._ever_started,
                 "ui_expanded": self._ui_expanded,
+                "tg_enabled": tg_enabled,
+                "exchanges_enabled": exchanges_enabled,
+                "profile": _RADAR_PROFILE,
                 "lamps": lamps,
             }
             try:
@@ -398,7 +600,8 @@ class RadarController:
 
     def log_content(self, name: str) -> tuple[int, str]:
         if name in ("radar.log", "radar"):
-            return 200, _tail_utf8(_LOG_RADAR, _TAIL_LINES)
+            log_path = _LOG_RADAR or (_ROOT / "data" / "radar.log")
+            return 200, _tail_utf8(log_path, _TAIL_LINES)
         if name in ("tg_join.log", "tg_join"):
             return 200, _tail_utf8(_LOG_JOIN, _TAIL_LINES)
         return 404, f"Unknown log: {name}\n"
@@ -414,7 +617,15 @@ class _Handler(BaseHTTPRequestHandler):
         pass
 
     def _cors(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin", "")
+        allowed = _cors_allowed_origins()
+        if allowed:
+            if origin and origin in allowed:
+                self.send_header("Access-Control-Allow-Origin", origin)
+            else:
+                self.send_header("Access-Control-Allow-Origin", allowed[0])
+        else:
+            self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
@@ -452,6 +663,10 @@ class _Handler(BaseHTTPRequestHandler):
             result = _controller.stop()
             self._send_json(200, result)
             return
+        if path == "/shutdown":
+            result = _controller.shutdown()
+            self._send_json(200, result)
+            return
         if path == "/ui-expanded":
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length) if length else b"{}"
@@ -484,20 +699,41 @@ class _Handler(BaseHTTPRequestHandler):
         self._send_json(404, {"ok": False, "error": "not_found"})
 
 
+def _boot_sweep_disabled_exchanges() -> None:
+    """Site без бирж: убрать зомби main.py до отдачи /status."""
+    from config import radar_exchanges_enabled
+    from process_guard import kill_duplicate_radar_workers
+
+    if radar_exchanges_enabled():
+        return
+    kill_duplicate_radar_workers(
+        profile=_RADAR_PROFILE,
+        role="main",
+        log_source="radar_control:boot_no_exchanges",
+    )
+
+
 def main() -> int:
     import os
 
+    _init_profile_paths()
     if not _acquire_single_instance():
+        lock_name = _LOCK_PATH.name if _LOCK_PATH else "radar_desktop.lock"
         print(
-            "Уже запущен radar_control (или другой пульт).\n"
-            "Закройте его или удалите data\\.radar_desktop.lock после сбоя.",
+            f"Уже запущен radar_control [{_RADAR_PROFILE}] (или другой пульт).\n"
+            f"Закройте его или удалите data\\{lock_name} после сбоя.",
             file=sys.stderr,
         )
         return 1
 
+    _boot_sweep_disabled_exchanges()
+
     port = int(os.environ.get("RADAR_CONTROL_PORT", _DEFAULT_PORT))
     server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
-    print(f"radar_control http://127.0.0.1:{port}", flush=True)
+    print(
+        f"radar_control [{_RADAR_PROFILE}] http://127.0.0.1:{port}",
+        flush=True,
+    )
 
     try:
         server.serve_forever()

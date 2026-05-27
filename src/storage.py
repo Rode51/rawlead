@@ -280,6 +280,28 @@ class ProjectStorage:
 
             return row is not None
 
+    def list_project_ids(self, sources: list[str]) -> list[tuple[str, int]]:
+        """Все (source, project_id) из SQLite для указанных источников."""
+        if not sources:
+            return []
+        placeholders = ",".join("?" * len(sources))
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT source, project_id FROM projects
+                WHERE source IN ({placeholders})
+                ORDER BY source, project_id
+                """,
+                tuple(sources),
+            ).fetchall()
+        out: list[tuple[str, int]] = []
+        for row in rows:
+            try:
+                out.append((str(row["source"]), int(row["project_id"])))
+            except (TypeError, ValueError):
+                continue
+        return out
+
 
 
     def try_record_new(self, source: str, project_id: int) -> bool:

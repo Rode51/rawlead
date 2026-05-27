@@ -14,10 +14,16 @@ else:
     msvcrt = None  # type: ignore
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_MAIN_LOCK = _PROJECT_ROOT / "data" / ".main.lock"
 _main_lock_fh = None
 
-from config import Config, load_config, radar_timestamp
+from config import (
+    Config,
+    apply_profile_argv,
+    load_config,
+    load_radar_env,
+    radar_lock_path,
+    radar_timestamp,
+)
 from filters import ListingWordFilter, default_listing_filter
 from fl_parser import FlListingError, fetch_listing_projects
 from freelancehunt_parser import (
@@ -35,7 +41,7 @@ from vc_ru_parser import VcRuListingError, fetch_listing_projects as fetch_vc_ru
 from lead_pipeline import process_new_listing, short_err
 from listing import ListingProject
 from pg_storage import NeonLeadStorage, pg_storage_from_config
-from radar_cycle_log import CycleSummary, SourceCycleStats, record_cycle_summary
+from radar_cycle_log import CycleSummary, SourceCycleStats, record_cycle_summary, reset_neon_cycle_counters
 from storage import ProjectStorage, storage_from_config
 
 from bot_poll import try_poll_commands
@@ -60,8 +66,15 @@ _P1_WEB_SOURCES: tuple[tuple[str, Callable[[Config], list[ListingProject]]], ...
 )
 
 
+def _main_lock_path() -> Path:
+    apply_profile_argv()
+    load_radar_env()
+    return radar_lock_path("main")
+
+
 def _release_main_lock() -> None:
     global _main_lock_fh
+    lock_path = _main_lock_path()
     if _main_lock_fh is not None:
         try:
             if msvcrt is not None:
@@ -75,16 +88,17 @@ def _release_main_lock() -> None:
             pass
         _main_lock_fh = None
     try:
-        _MAIN_LOCK.unlink(missing_ok=True)
+        lock_path.unlink(missing_ok=True)
     except OSError:
         pass
 
 
 def _acquire_main_lock() -> bool:
     global _main_lock_fh
-    _MAIN_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = _main_lock_path()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        fh = open(_MAIN_LOCK, "a+b")
+        fh = open(lock_path, "a+b")
     except OSError:
         return False
     if msvcrt is not None:
@@ -218,6 +232,7 @@ def run_cycle(
     from ai_analyze import reset_cycle_ai_counters
 
     reset_cycle_ai_counters()
+    reset_neon_cycle_counters()
     ts = radar_timestamp()
     errors: list[str] = []
     summary = CycleSummary(ts=ts)
@@ -302,6 +317,7 @@ def run_cycle(
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
     _collect_misc_errors(errors, summary)
+    summary.sync_neon_from_globals()
     record_cycle_summary(storage, summary)
 
     _append_log_line(cfg.radar_log_path, summary.format_footer(), echo=True)
@@ -377,13 +393,29 @@ def _log_failed_cycle(
 
 
 def main() -> None:
+    from config import radar_exchanges_enabled
+
+    apply_profile_argv()
+    load_radar_env()
+    if not radar_exchanges_enabled():
+        print(
+            "main.py: RADAR_EXCHANGES_ENABLED=0 — биржи крутит Site; "
+            "legacy использует neon_legacy_consumer.py",
+            flush=True,
+        )
+        raise SystemExit(0)
+
     cfg = load_config()
     storage = storage_from_config(cfg)
     pg = pg_storage_from_config(cfg)
     word_filter = default_listing_filter()
     interval_sec = max(1, cfg.poll_interval_minutes * 60)
-    _echo(f"=== RawLead запущен ({radar_timestamp()}, Иркутск) ===")
+    _echo(f"=== RawLead [{cfg.radar_profile}] ({radar_timestamp()}, Иркутск) ===")
     _echo(f"Лог: {cfg.radar_log_path.resolve()}")
+    _echo(
+        f"Профиль: {cfg.radar_profile} | ИИ: "
+        f"{'L1/L2' if cfg.ai_uses_l1_l2 else 'legacy (один разбор)'}"
+    )
     _echo(
         f"Интервал: {cfg.poll_interval_minutes} мин | "
         f"ИИ: {'вкл' if cfg.ai_active else 'выкл'} | "

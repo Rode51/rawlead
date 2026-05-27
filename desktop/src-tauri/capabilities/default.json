@@ -12,13 +12,22 @@
     "core:window:allow-set-size",
     "core:window:allow-start-dragging",
     "core:window:allow-set-shadow",
+    "allow-radar-env",
     {
       "identifier": "http:default",
       "allow": [
         { "url": "http://127.0.0.1:18765" },
         { "url": "http://127.0.0.1:18765/*" },
         { "url": "http://localhost:18765" },
-        { "url": "http://localhost:18765/*" }
+        { "url": "http://localhost:18765/*" },
+        { "url": "http://127.0.0.1:18775" },
+        { "url": "http://127.0.0.1:18775/*" },
+        { "url": "http://localhost:18775" },
+        { "url": "http://localhost:18775/*" },
+        { "url": "http://127.0.0.1:18766" },
+        { "url": "http://127.0.0.1:18766/*" },
+        { "url": "http://localhost:18766" },
+        { "url": "http://localhost:18766/*" }
       ]
     }
   ]
