@@ -51,7 +51,7 @@
 
 ## 3. `GET /v1/feed` (открытая, §3g)
 
-**Query:** `limit`, `offset`, `min_score`, `skills` (comma-separated), `sort` (`time` | `match`, default `time`).
+**Query:** `limit`, `offset`, `min_score`, `skills` (comma-separated), `category` (`dev,design` — OR), `sort` (`time` | `match`, default `time`).
 
 | `sort` | ORDER BY | `min_score` применяется к |
 |--------|----------|---------------------------|
@@ -66,7 +66,9 @@
 
 ## 3a. `GET /v1/skills/catalog` (§3g)
 
-**Response:** `{"skills":[{"tag":"python","count":12},…]}` — топ 50 тегов из `lead_tags` лидов с `notified_at IS NOT NULL`, по частоте.
+**Query:** `category` (optional, `dev,design`) — только группы выбранных специализаций.
+
+**Response:** `{"groups":[…],"skills":[{"tag":"python","count":12},…]}` — топ тегов из `lead_tags` видимых лидов (`is_visible=true`).
 
 ---
 

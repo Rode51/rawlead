@@ -92,8 +92,12 @@ def _should_notify_bot_legacy(
     ai_unavailable: bool,
 ) -> bool:
     """LEGACY: один полный разбор; «Пропустить»/«Мимо» не шлём (кроме AI_NOTIFY_SKIP)."""
-    if not cfg.ai_active or ai_unavailable or analysis is None:
+    if not cfg.ai_active:
         return True
+    if ai_unavailable or analysis is None:
+        return False
+    if not (analysis.reply_draft or "").strip():
+        return False
     if analysis.is_skip_verdict() and not cfg.ai_notify_skip:
         return False
     return True
@@ -410,7 +414,12 @@ def plan_new_listing(
             if not _should_notify_bot_legacy(
                 cfg, full_analysis, ai_unavailable=ai_unavailable
             ):
-                reason = f"skip:ai:{full_analysis.verdict}"
+                if ai_unavailable or full_analysis is None:
+                    reason = "skip:ai_unavailable_no_draft"
+                elif not (full_analysis.reply_draft or "").strip():
+                    reason = "skip:ai:no_reply_draft"
+                else:
+                    reason = f"skip:ai:{full_analysis.verdict}"
                 errors.append(f"{project.source}:id={project.project_id} {reason}")
                 if stats is not None:
                     stats.note_skip(reason)
@@ -447,6 +456,20 @@ def send_listing_notification(
 
     premium = plan.analysis
     task_text = plan.task_fallback_text
+
+    if cfg.radar_profile == "legacy":
+        # Legacy @FLPARSINGBOT: never send a card without reply_draft.
+        if plan.ai_unavailable or premium is None:
+            errors.append(
+                f"{project.source}:id={project.project_id} "
+                "skip:ai_unavailable_no_draft"
+            )
+            return False
+        if not (premium.reply_draft or "").strip():
+            errors.append(
+                f"{project.source}:id={project.project_id} skip:ai:no_reply_draft"
+            )
+            return False
 
     if cfg.ai_active and premium is None and cfg.ai_uses_l1_l2:
         log_prefix = f"{project.source}:id={project.project_id} "
@@ -487,6 +510,8 @@ def send_listing_notification(
             tg_acc_label=plan.tg_acc_label,
         )
         if pg is not None:
+            if premium is not None:
+                pg.update_after_premium(project, premium=premium, errors=errors)
             pg.mark_notified(project, errors=errors)
         return True
     except TelegramNotifyError as exc:
@@ -576,20 +601,36 @@ def process_legacy_neon_listing(
         )
         if full_analysis is None:
             ai_unavailable = True
+            errors.append(
+                f"{project.source}:id={project.project_id} "
+                "skip:ai_unavailable_no_draft"
+            )
+            return True, False
         elif full_analysis.is_skip_verdict():
             errors.append(
                 f"{project.source}:id={project.project_id} "
                 f"skip:ai:{full_analysis.verdict}"
             )
             return True, False
+        elif not (full_analysis.reply_draft or "").strip():
+            errors.append(
+                f"{project.source}:id={project.project_id} skip:ai:no_reply_draft"
+            )
+            return True, False
 
         if not _should_notify_bot_legacy(
             cfg, full_analysis, ai_unavailable=ai_unavailable
         ):
-            errors.append(
-                f"{project.source}:id={project.project_id} "
-                f"skip:ai:{full_analysis.verdict if full_analysis else 'skip'}"
+            reason = (
+                "skip:ai_unavailable_no_draft"
+                if ai_unavailable or full_analysis is None
+                else (
+                    "skip:ai:no_reply_draft"
+                    if not (full_analysis.reply_draft or "").strip()
+                    else f"skip:ai:{full_analysis.verdict}"
+                )
             )
+            errors.append(f"{project.source}:id={project.project_id} {reason}")
             return True, False
 
     plan = ListingNotifyPlan(

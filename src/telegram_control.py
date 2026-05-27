@@ -330,7 +330,9 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
     Возвращает список коротких строк для лога (без токена).
     """
     errors: list[str] = []
-    offset = storage.get_tg_update_offset()
+    bot_token = cfg.telegram_bot_token.strip()
+    offset_initialized = storage.has_tg_update_offset_key(bot_token)
+    offset = storage.get_tg_update_offset(bot_token=bot_token)
     proxies = telegram_requests_proxies(cfg)
     api_url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/getUpdates"
 
@@ -374,6 +376,20 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
         if isinstance(update_id, int):
             next_offset = max(next_offset, update_id + 1)
 
+    if not offset_initialized:
+        storage.set_tg_update_offset(next_offset, bot_token=bot_token)
+        if updates:
+            bot_id = bot_token.split(":", 1)[0]
+            errors.append(
+                f"тг:offset:bootstrap bot={bot_id} offset={next_offset} skipped={len(updates)}"
+            )
+            return errors
+
+    for upd in updates:
+        if not isinstance(upd, dict):
+            continue
+        update_id = upd.get("update_id")
+
         message = upd.get("message")
         if not isinstance(message, dict):
             continue
@@ -401,9 +417,15 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
         except Exception as exc:
             errors.append(f"тг:бот:{_mask_token(type(exc).__name__)}:{str(exc)[:120]}")
         else:
-            errors.append(f"тг:команда:{_ACTION_LOG_RU[action]}")
+            if action == _ACTION_STATUS and isinstance(update_id, int):
+                storage.set_tg_update_offset(update_id + 1, bot_token=bot_token)
+                errors.append(f"тг:команда:статус update_id={update_id}")
+            else:
+                errors.append(f"тг:команда:{_ACTION_LOG_RU[action]}")
+            if isinstance(update_id, int):
+                next_offset = max(next_offset, update_id + 1)
 
     if next_offset > offset:
-        storage.set_tg_update_offset(next_offset)
+        storage.set_tg_update_offset(next_offset, bot_token=bot_token)
 
     return errors

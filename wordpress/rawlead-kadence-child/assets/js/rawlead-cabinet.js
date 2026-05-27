@@ -29,6 +29,163 @@
   var appEl = document.getElementById("rl-cabinet-app");
 
   var loginHintEl = document.getElementById("rl-cabinet-login-hint");
+  var loginStateEl = document.getElementById("rl-cabinet-login-state");
+  var fallbackEl = document.getElementById("rl-cabinet-login-fallback");
+  var fallbackLinkEl = document.getElementById("rl-cabinet-fallback-link");
+  var widgetTimeoutMs = 3000;
+  var hasWidgetAuthCompleted = false;
+
+  function setLoginState(level, text) {
+    if (!loginStateEl) {
+      return;
+    }
+    loginStateEl.classList.remove(
+      "rl-cabinet-login__state--info",
+      "rl-cabinet-login__state--warn",
+      "rl-cabinet-login__state--error",
+      "rl-cabinet-login__state--ok"
+    );
+    loginStateEl.classList.add("rl-cabinet-login__state--" + (level || "info"));
+    loginStateEl.textContent = text || "";
+  }
+
+  function showFallback(show, reasonText) {
+    if (fallbackEl) {
+      fallbackEl.hidden = !show;
+    }
+    if (!fallbackLinkEl) {
+      return;
+    }
+    if (cfg.tgBotId || cfg.tgLoginFallbackUrl) {
+      fallbackLinkEl.href = cfg.tgLoginFallbackUrl || "#";
+      fallbackLinkEl.classList.remove("is-disabled");
+      fallbackLinkEl.setAttribute("aria-disabled", "false");
+      if (show && reasonText) {
+        setLoginState("warn", reasonText);
+      }
+      return;
+    }
+    fallbackLinkEl.href = "#";
+    fallbackLinkEl.classList.add("is-disabled");
+    fallbackLinkEl.setAttribute("aria-disabled", "true");
+    if (show) {
+      setLoginState(
+        "error",
+        "Fallback URL не задан. Добавьте RAWLEAD_TG_LOGIN_FALLBACK_URL в wp-config.php."
+      );
+    }
+  }
+
+  function authPayloadFromAny(raw) {
+    if (!raw) {
+      return null;
+    }
+    if (typeof raw === "object" && raw.id && raw.auth_date && raw.hash) {
+      return raw;
+    }
+    if (typeof raw !== "string") {
+      return null;
+    }
+    var s = raw.trim();
+    if (!s) {
+      return null;
+    }
+    try {
+      var obj = JSON.parse(s);
+      if (obj && obj.id && obj.auth_date && obj.hash) {
+        return obj;
+      }
+    } catch (e) {
+      // keep trying other formats
+    }
+    var query = s;
+    if (query.indexOf("?") >= 0) {
+      query = query.split("?")[1];
+    }
+    if (query.indexOf("#") >= 0) {
+      query = query.split("#")[1];
+    }
+    var p = parseAuthFromParams(new URLSearchParams(query));
+    return p || null;
+  }
+
+  function normalizeTelegramAuthPayload(raw) {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+    var payload = {
+      id: parseInt(raw.id, 10),
+      first_name: raw.first_name || "",
+      last_name: raw.last_name || "",
+      username: raw.username || "",
+      photo_url: raw.photo_url || "",
+      auth_date: parseInt(raw.auth_date, 10),
+      hash: raw.hash || "",
+    };
+    if (!payload.id || !payload.auth_date || !payload.hash) {
+      return null;
+    }
+    return payload;
+  }
+
+  window.addEventListener("message", function (event) {
+    var origin = String(event.origin || "");
+    if (origin.indexOf("telegram.org") < 0 && origin.indexOf("oauth.telegram.org") < 0) {
+      return;
+    }
+    var payload = authPayloadFromAny(event.data);
+    if (!payload) {
+      return;
+    }
+    payload = normalizeTelegramAuthPayload(payload);
+    if (!payload) {
+      return;
+    }
+    setLoginState("info", "Получили auth из Telegram popup. Проверяем...");
+    completeTelegramAuth(payload);
+  });
+
+  if (fallbackLinkEl) {
+    fallbackLinkEl.addEventListener("click", function (e) {
+      if (!cfg.tgBotId && !cfg.tgLoginFallbackUrl) {
+        return;
+      }
+      e.preventDefault();
+      if (window.Telegram && window.Telegram.Login && cfg.tgBotId) {
+        setLoginState("info", "Открываем Telegram Login popup...");
+        window.Telegram.Login.auth(
+          { bot_id: Number(cfg.tgBotId), request_access: "write" },
+          function (data) {
+            if (!data) {
+              setLoginState("error", "Telegram popup закрыт без авторизации.");
+              return;
+            }
+            var payload = data;
+            if (data.user && data.auth_date && data.hash) {
+              payload = Object.assign({}, data.user, {
+                auth_date: data.auth_date,
+                hash: data.hash,
+              });
+            }
+            payload = normalizeTelegramAuthPayload(payload);
+            if (!payload) {
+              setLoginState("error", "Telegram вернул неполные auth-данные.");
+              return;
+            }
+            setLoginState("info", "Получили auth из popup. Проверяем...");
+            completeTelegramAuth(payload);
+          }
+        );
+        return;
+      }
+      if (cfg.tgLoginFallbackUrl) {
+        setLoginState("info", "Переходим в Telegram fallback и ждём возврат в /cabinet/...");
+        window.location.href = cfg.tgLoginFallbackUrl;
+        return;
+      }
+      setLoginState("error", "Telegram popup API недоступен.");
+    });
+  }
 
   function getToken() {
 
@@ -125,6 +282,8 @@
     }
 
     box.innerHTML = "";
+    showFallback(!!cfg.tgLoginFallbackUrl);
+    setLoginState("info", "Загружаем Telegram Widget...");
 
     if (location.hostname !== "127.0.0.1") {
 
@@ -142,6 +301,8 @@
 
       }
 
+      return;
+
     }
 
     if (!cfg.tgBotUsername) {
@@ -152,7 +313,7 @@
 
         loginHintEl.textContent =
 
-          "Добавьте в wp-config.php: define('RAWLEAD_TG_BOT_USERNAME', 'FLPARSINGBOT');";
+          "Добавьте в wp-config.php: define('RAWLEAD_TG_BOT_USERNAME', 'rawlead_bot');";
 
       }
 
@@ -176,9 +337,33 @@
 
     box.appendChild(script);
 
+    setTimeout(function () {
+      if (hasWidgetAuthCompleted) {
+        return;
+      }
+
+      var hasWidget = box.querySelector("iframe, .telegram-login-button");
+
+      if (!hasWidget && loginHintEl) {
+
+        loginHintEl.hidden = false;
+
+        loginHintEl.textContent =
+
+          "Виджет Telegram не загрузился. Обновите страницу (Ctrl+F5), отключите блокировщик/anti-tracker и откройте /cabinet/ только на 127.0.0.1.";
+        showFallback(true, "Widget не загрузился. Используйте fallback-вход в новом окне.");
+      } else {
+        setLoginState("ok", "Widget загружен. Подтвердите вход в Telegram.");
+        showFallback(true);
+
+      }
+
+    }, widgetTimeoutMs);
+
   }
 
-  window.onTelegramAuth = function (user) {
+  function completeTelegramAuth(user) {
+    setLoginState("info", "Проверяем Telegram auth...");
 
     fetch(cfg.restAuth, {
 
@@ -193,18 +378,25 @@
     })
 
       .then(function (res) {
-
-        if (!res.ok) {
-
-          throw new Error("HTTP " + res.status);
-
-        }
-
-        return res.json();
+        return res.json().catch(function () {
+          return {};
+        }).then(function (data) {
+          if (!res.ok) {
+            var msg = "";
+            if (data && typeof data.message === "string" && data.message) {
+              msg = data.message;
+            } else if (data && typeof data.detail === "string" && data.detail) {
+              msg = data.detail;
+            }
+            throw new Error(msg || ("HTTP " + res.status));
+          }
+          return data;
+        });
 
       })
 
       .then(function (data) {
+        hasWidgetAuthCompleted = true;
 
         if (!data.access_token) {
 
@@ -212,7 +404,13 @@
 
         }
 
-        setToken(data.access_token);
+        setLoginState("info", "Сохраняем access_token...");
+        try {
+          setToken(data.access_token);
+        } catch (err) {
+          throw new Error("token save failed");
+        }
+        setLoginState("ok", "Вход выполнен. Загружаем кабинет...");
 
         showApp();
 
@@ -220,19 +418,67 @@
 
       })
 
-      .catch(function () {
+      .catch(function (err) {
 
         if (loginHintEl) {
 
           loginHintEl.hidden = false;
-
-          loginHintEl.textContent = "Не удалось войти. Попробуйте снова.";
+          var msg = err && err.message ? err.message : "Попробуйте снова.";
+          if (msg === "token save failed") {
+            loginHintEl.textContent = "Не удалось сохранить access_token. Проверьте режим приватности браузера.";
+            setLoginState("error", "Ошибка сохранения токена.");
+          } else {
+            loginHintEl.textContent = "Не удалось войти: " + msg;
+            setLoginState("error", "Ошибка проверки Telegram auth.");
+          }
 
         }
+        showFallback(true, "Fallback доступен: откройте вход в новом окне.");
 
       });
 
+  }
+
+  window.onTelegramAuth = function (user) {
+    completeTelegramAuth(user);
   };
+
+  function parseAuthFromParams(params) {
+    if (!params || !params.get("id") || !params.get("auth_date") || !params.get("hash")) {
+      return null;
+    }
+    return {
+      id: parseInt(params.get("id"), 10),
+      first_name: params.get("first_name") || "",
+      last_name: params.get("last_name") || "",
+      username: params.get("username") || "",
+      photo_url: params.get("photo_url") || "",
+      auth_date: parseInt(params.get("auth_date"), 10),
+      hash: params.get("hash") || "",
+    };
+  }
+
+  function consumeDeepLinkAuth() {
+    var queryPayload = parseAuthFromParams(new URLSearchParams(window.location.search || ""));
+    var hashPayload = null;
+    if (!queryPayload && window.location.hash) {
+      var rawHash = window.location.hash.replace(/^#/, "");
+      if (rawHash.indexOf("?") >= 0) {
+        rawHash = rawHash.split("?")[1];
+      }
+      hashPayload = parseAuthFromParams(new URLSearchParams(rawHash));
+    }
+    var payload = queryPayload || hashPayload;
+    if (!payload || !payload.id || !payload.auth_date || !payload.hash) {
+      return false;
+    }
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    setLoginState("info", "Получили fallback auth. Проверяем...");
+    completeTelegramAuth(payload);
+    return true;
+  }
 
   var tagsEl = document.getElementById("rl-cabinet-tags");
 
@@ -270,7 +516,9 @@
 
     source: "",
 
-    category: "",
+    draftCategories: [],
+
+    appliedCategories: [],
 
     loading: false,
 
@@ -434,6 +682,22 @@
 
     var html = "";
 
+    if (item.title) {
+
+      html +=
+
+        '<div class="rl-feed-card__section">' +
+
+        '<h4 class="rl-feed-card__section-title">Полное название</h4>' +
+
+        '<p class="rl-feed-card__task">' +
+
+        escapeHtml(item.title) +
+
+        "</p></div>";
+
+    }
+
     if (task) {
 
       html +=
@@ -456,13 +720,75 @@
 
     }
 
-    html += '<p class="rl-feed-card__agent">🤖 Рыночная цена: скоро</p>';
+    var tools = item.tools_required || [];
 
-    html +=
+    if (tools.length) {
 
-      '<div class="rl-feed-card__actions">' +
+      html +=
 
-      '<button type="button" class="rl-btn rl-btn--primary rl-btn--soon" disabled title="Скоро">Сгенерировать отклик</button>';
+        '<div class="rl-feed-card__section">' +
+
+        '<h4 class="rl-feed-card__section-title">Инструменты</h4>' +
+
+        '<ul class="rl-feed-card__tools">' +
+
+        tools
+
+          .map(function (tool) {
+
+            return "<li>" + escapeHtml(tool) + "</li>";
+
+          })
+
+          .join("") +
+
+        "</ul></div>";
+
+    } else {
+
+      html +=
+
+        '<div class="rl-feed-card__section">' +
+
+        '<h4 class="rl-feed-card__section-title">Инструменты</h4>' +
+
+        '<p class="rl-feed-card__text rl-feed-card__muted">Список инструментов появится после premium-разбора.</p>' +
+
+        "</div>";
+
+    }
+
+    var reply = (item.reply_draft || "").trim();
+
+    if (reply) {
+
+      html +=
+
+        '<div class="rl-feed-card__section">' +
+
+        '<h4 class="rl-feed-card__section-title">Черновик отклика</h4>' +
+
+        '<p class="rl-feed-card__reply">' +
+
+        escapeHtml(reply) +
+
+        "</p></div>";
+
+    } else {
+
+      html +=
+
+        '<div class="rl-feed-card__section">' +
+
+        '<h4 class="rl-feed-card__section-title">Черновик отклика</h4>' +
+
+        '<p class="rl-feed-card__text rl-feed-card__muted">Черновик отклика появится после premium-разбора.</p>' +
+
+        "</div>";
+
+    }
+
+    html += '<div class="rl-feed-card__actions">';
 
     if (item.url) {
 
@@ -521,26 +847,6 @@
     }
 
     return sourceLabel(item.source).key === filter;
-
-  }
-
-
-
-  function verdictChip(score, verdict) {
-
-    if (verdict === "take" || (score !== null && score >= 85)) {
-
-      return { text: "Брать ✓", cls: "take" };
-
-    }
-
-    if (score !== null && score >= 70) {
-
-      return { text: "Брать", cls: "take" };
-
-    }
-
-    return { text: "Сомнительно", cls: "maybe" };
 
   }
 
@@ -858,8 +1164,6 @@
 
     var rank = item.final_rank != null ? item.final_rank : 0;
 
-    var chip = verdictChip(item.ai_score, item.ai_verdict);
-
     var budget = item.budget_text || "—";
 
     var expanded = state.expandedId === item.id;
@@ -900,7 +1204,15 @@
 
       '<h3 class="rl-lead-card__title">' +
 
+      '<span title="' +
+
       escapeHtml(item.title || "Без названия") +
+
+      '">' +
+
+      escapeHtml(item.title || "Без названия") +
+
+      "</span>" +
 
       "</h3>" +
 
@@ -941,16 +1253,6 @@
       "</div>" +
 
       '<div class="rl-chips">' +
-
-      '<span class="rl-chip rl-chip--' +
-
-      chip.cls +
-
-      '">' +
-
-      escapeHtml(chip.text) +
-
-      "</span>" +
 
       renderTagChips(item.lead_tags) +
 
@@ -1026,6 +1328,34 @@
 
 
 
+  function readCategoriesFrom(root) {
+
+    var box = root || sidebar;
+
+    if (!box) {
+
+      return [];
+
+    }
+
+    var cats = [];
+
+    box.querySelectorAll('input[name="category"]:checked').forEach(function (inp) {
+
+      if (inp.value) {
+
+        cats.push(inp.value);
+
+      }
+
+    });
+
+    return cats;
+
+  }
+
+
+
   function readFilters() {
 
     if (!sidebar) {
@@ -1036,17 +1366,17 @@
 
     var src = sidebar.querySelector('input[name="source"]:checked');
 
-    var cat = sidebar.querySelector('input[name="category"]:checked');
-
     var score = sidebar.querySelector('input[name="min_score"]:checked');
 
     state.source = src ? src.value : "";
 
-    state.category = cat ? cat.value : "";
+    state.appliedCategories = readCategoriesFrom();
 
     state.minScore = score ? parseInt(score.value, 10) || 0 : 0;
 
-    var dirty = state.source !== "" || state.category !== "" || state.minScore !== 0;
+    var dirty =
+
+      state.source !== "" || state.appliedCategories.length > 0 || state.minScore !== 0;
 
     if (resetBtn) {
 
@@ -1154,9 +1484,9 @@
 
     };
 
-    if (state.category) {
+    if (state.appliedCategories.length) {
 
-      params.category = state.category;
+      params.category = state.appliedCategories.join(",");
 
     }
 
@@ -1358,9 +1688,71 @@
 
 
 
+  function bindCategoryFilters(root) {
+
+    if (!root) {
+
+      return;
+
+    }
+
+    var allInp = root.querySelector('input[name="category"][value=""]');
+
+    root.querySelectorAll('input[name="category"]').forEach(function (inp) {
+
+      inp.addEventListener("change", function () {
+
+        if (inp.value === "" && inp.checked) {
+
+          root.querySelectorAll('input[name="category"]').forEach(function (other) {
+
+            if (other !== inp && other.value) {
+
+              other.checked = false;
+
+            }
+
+          });
+
+        } else if (inp.value && inp.checked && allInp) {
+
+          allInp.checked = false;
+
+        }
+
+        state.draftCategories = readCategoriesFrom(root);
+
+        syncChips();
+
+      });
+
+    });
+
+  }
+
+
+
   if (sidebar) {
 
-    sidebar.addEventListener("change", function () {
+    bindCategoryFilters(sidebar);
+
+    sidebar.addEventListener("change", function (e) {
+
+      var name = e.target && e.target.getAttribute("name");
+
+      if (name === "category") {
+
+        state.appliedCategories = readCategoriesFrom();
+
+        syncChips();
+
+        readFilters();
+
+        resetAndLoad();
+
+        return;
+
+      }
 
       syncChips();
 
@@ -1376,9 +1768,17 @@
 
         sidebar.querySelector('input[name="source"][value=""]').checked = true;
 
-        sidebar.querySelector('input[name="category"][value=""]').checked = true;
+        sidebar.querySelectorAll('input[name="category"]').forEach(function (inp) {
+
+          inp.checked = inp.value === "";
+
+        });
 
         sidebar.querySelector('input[name="min_score"][value="0"]').checked = true;
+
+        state.draftCategories = [];
+
+        state.appliedCategories = [];
 
         syncChips();
 
@@ -1510,6 +1910,10 @@
 
     syncChips();
 
+    state.draftCategories = readCategoriesFrom();
+
+    state.appliedCategories = state.draftCategories.slice();
+
     readFilters();
 
     loadTags()
@@ -1533,6 +1937,11 @@
     setToken("");
 
     showLogin();
+
+    if (consumeDeepLinkAuth()) {
+      showFallback(true);
+      return;
+    }
 
     mountTelegramWidget();
 

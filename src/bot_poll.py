@@ -11,7 +11,7 @@ if sys.platform == "win32":
 else:
     msvcrt = None  # type: ignore
 
-from config import Config, radar_lock_path
+from config import Config, bot_poll_lock_path
 from storage import ProjectStorage
 from telegram_control import poll_commands
 
@@ -19,9 +19,10 @@ from telegram_control import poll_commands
 def try_poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
     """
     getUpdates только если удалось взять lock (иначе второй процесс молчит).
+    Lock — на bot token, не на RADAR_PROFILE (Site/Legacy — разные боты).
     """
     os.environ.setdefault("RADAR_PROFILE", cfg.radar_profile)
-    lock_path = radar_lock_path("bot_poll")
+    lock_path = bot_poll_lock_path(cfg.telegram_bot_token)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         fh = open(lock_path, "a+b")

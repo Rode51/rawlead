@@ -22,8 +22,9 @@ _ROLE_MATCH = {
 }
 # Пульт /stop и kill без role — все воркеры радара
 _ALL_MATCH = (
-    r"(?:uisness[\\/].*)?(?:src[\\/]main\.py|scripts[\\/]tg_main\.py|"
-    r"scripts[\\/]tg_join_daemon\.py|scripts[\\/]tg_join_queue)"
+    r"(?:uisness[\\/].*)?(?:src[\\/](?:main|neon_legacy_consumer)\.py|"
+    r"scripts[\\/]tg_main\.py|scripts[\\/]tg_join_daemon\.py|"
+    r"scripts[\\/]tg_join_queue)"
 )
 # CommandLine без полного пути (system pythonw + scripts\radar_control.py)
 _RADAR_CONTROL_MATCH = r"radar_control\.py"

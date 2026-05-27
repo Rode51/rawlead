@@ -72,11 +72,15 @@ function rawlead_tg_login_bot_username(): string {
 
     if (defined('RAWLEAD_TG_BOT_USERNAME')) {
 
-        return trim((string) RAWLEAD_TG_BOT_USERNAME);
+        $value = trim((string) RAWLEAD_TG_BOT_USERNAME);
+        $normalized = ltrim(strtolower($value), '@');
+        if ($normalized === 'rawlead_bot') {
+            return 'rawlead_bot';
+        }
 
     }
 
-    return '';
+    return 'rawlead_bot';
 
 }
 
@@ -497,9 +501,19 @@ add_action('rest_api_init', static function (): void {
 
         'permission_callback' => '__return_true',
 
-        'callback'            => static function (): WP_REST_Response|WP_Error {
+        'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
 
-            $data = rawlead_api_get('/v1/skills/catalog');
+            $query = [];
+
+            $category = trim((string) $request->get_param('category'));
+
+            if ($category !== '') {
+
+                $query['category'] = $category;
+
+            }
+
+            $data = rawlead_api_get('/v1/skills/catalog', $query);
 
             if (is_wp_error($data)) {
 

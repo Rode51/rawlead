@@ -26,35 +26,29 @@ rawlead_get_part('header');
 				<fieldset class="rl-feed-filter rl-feed-filter--category">
 					<legend><?php esc_html_e('Категория', 'rawlead-kadence-child'); ?></legend>
 					<label class="rl-feed-chip is-active" id="filter-category-all">
-						<input type="radio" name="category" value="" checked>
+						<input type="checkbox" name="category" value="" checked>
 						<?php esc_html_e('Все', 'rawlead-kadence-child'); ?>
 					</label>
 					<label class="rl-feed-chip" id="filter-category-dev">
-						<input type="radio" name="category" value="dev">
+						<input type="checkbox" name="category" value="dev">
 						<span class="rl-feed-chip__label rl-feed-chip__label--full"><?php esc_html_e('Код', 'rawlead-kadence-child'); ?></span>
 						<span class="rl-feed-chip__label rl-feed-chip__label--short"><?php esc_html_e('Код', 'rawlead-kadence-child'); ?></span>
 					</label>
 					<label class="rl-feed-chip" id="filter-category-design">
-						<input type="radio" name="category" value="design">
+						<input type="checkbox" name="category" value="design">
 						<span class="rl-feed-chip__label rl-feed-chip__label--full"><?php esc_html_e('Дизайн', 'rawlead-kadence-child'); ?></span>
 						<span class="rl-feed-chip__label rl-feed-chip__label--short"><?php esc_html_e('Дизайн', 'rawlead-kadence-child'); ?></span>
 					</label>
 					<label class="rl-feed-chip" id="filter-category-marketing">
-						<input type="radio" name="category" value="marketing">
+						<input type="checkbox" name="category" value="marketing">
 						<span class="rl-feed-chip__label rl-feed-chip__label--full"><?php esc_html_e('Маркетинг', 'rawlead-kadence-child'); ?></span>
 						<span class="rl-feed-chip__label rl-feed-chip__label--short"><?php esc_html_e('SMM', 'rawlead-kadence-child'); ?></span>
 					</label>
 					<label class="rl-feed-chip" id="filter-category-text">
-						<input type="radio" name="category" value="text">
+						<input type="checkbox" name="category" value="text">
 						<span class="rl-feed-chip__label rl-feed-chip__label--full"><?php esc_html_e('Тексты', 'rawlead-kadence-child'); ?></span>
 						<span class="rl-feed-chip__label rl-feed-chip__label--short"><?php esc_html_e('Тексты', 'rawlead-kadence-child'); ?></span>
 					</label>
-				</fieldset>
-				<fieldset class="rl-feed-filter">
-					<legend><?php esc_html_e('ИИ-оценка', 'rawlead-kadence-child'); ?></legend>
-					<label class="rl-feed-chip is-active"><input type="radio" name="min_score" value="0" checked> <?php esc_html_e('Любая', 'rawlead-kadence-child'); ?></label>
-					<label class="rl-feed-chip"><input type="radio" name="min_score" value="70"> <?php esc_html_e('Брать (≥70 / digital ≥55)', 'rawlead-kadence-child'); ?></label>
-					<label class="rl-feed-chip"><input type="radio" name="min_score" value="85"> <?php esc_html_e('Уверенно (≥85)', 'rawlead-kadence-child'); ?></label>
 				</fieldset>
 				<details class="rl-feed-filter rl-feed-skills-dd">
 					<summary class="rl-feed-skills-dd__trigger">
@@ -63,6 +57,7 @@ rawlead_get_part('header');
 					</summary>
 					<div class="rl-feed-skills-dd__panel" id="rl-feed-skills-panel">
 						<p class="rl-feed-skills__lead"><?php esc_html_e('Отметьте, что умеете — лента подстроится', 'rawlead-kadence-child'); ?></p>
+						<button type="button" class="rl-feed-skills-clear" id="rl-feed-skills-clear"><?php esc_html_e('Сбросить всё', 'rawlead-kadence-child'); ?></button>
 						<div class="rl-feed-skills" id="rl-feed-skills" aria-live="polite"></div>
 						<p class="rl-feed-skills__hint" id="rl-feed-skills-hint" hidden><?php esc_html_e('Выберите навыки и нажмите Применить', 'rawlead-kadence-child'); ?></p>
 					</div>

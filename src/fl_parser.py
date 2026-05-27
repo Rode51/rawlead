@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from urllib.parse import urljoin, urlparse, urlunparse
 
@@ -13,7 +14,13 @@ from lead_category import category_from_fl_listing_url
 from listing import SOURCE_FL, ListingProject
 
 # Сколько страниц ленты запрашивать за один цикл (см. docs/SOURCES.md).
-FL_LISTING_MAX_PAGES = 3
+def _fl_listing_max_pages() -> int:
+    raw = os.environ.get("FL_LISTING_MAX_PAGES", "3").strip()
+    try:
+        n = int(raw)
+    except ValueError:
+        n = 3
+    return max(1, min(5, n))
 
 _PAGE_PATH_RE = re.compile(r"/page-\d+/?")
 
@@ -137,7 +144,7 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
     merged: list[ListingProject] = []
     seen: set[int] = set()
 
-    for page in range(1, FL_LISTING_MAX_PAGES + 1):
+    for page in range(1, _fl_listing_max_pages() + 1):
         page_url = _fl_listing_page_url(cfg.fl_projects_url, page)
         html = _fetch_listing_html(page_url, cfg, timeout_sec=timeout_sec)
         batch = _parse_items(html, page_url)

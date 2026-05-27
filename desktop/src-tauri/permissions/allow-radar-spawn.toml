@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-radar-spawn"
+description = "Запуск radar_control.py из пульта (pythonw, detached)."
+commands.allow = ["spawn_radar_api"]

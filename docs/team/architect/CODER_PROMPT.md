@@ -7,7 +7,15 @@
 **Порядок (жёстко):** **P1** → **D1** (после Design) → **P4** → **P5** только после «едем на прод».  
 **⏸ P5** пока ворота не закрыты. **⏸** 25 источников / §3f без ТЗ.
 
-**→ Сейчас @coder (порядок):**
+**→ Сейчас @coder (порядок до выхода):**
+
+**✅ § STOP-STATUS-SPAM** — принято владельцем 2026-05-27
+
+**🟠 § PRE-LAUNCH** — **A → B → C → D** (владелец 2026-05-27, до хостинга)
+
+**⏸ § PRE-LAUNCH-UX** — **после** функционала § PRE-LAUNCH → **@lead-designer** → @coder (см. § внизу)
+
+**🔴 § STOP-STATUS-SPAM (детали)** — после `stop-radar-desktop-full` в TG 100+ «📊 Статус радара». **Причина:** `kill_all_radar_control` / `_ALL_MATCH` **не** убивают `neon_legacy_consumer.py`; 2× consumer + опрос getUpdates ~каждые 2 с. Тикет: [`docs/problems/2026-05-27-status-spam-after-stop.md`](../problems/2026-05-27-status-spam-after-stop.md).
 
 **✅ § PULT-MIN** — Lead hotfix 2026-05-27, владелец OK. Канон: `docs/ops/DESKTOP_LAUNCH.md` § антирегресс · `docs/problems/2026-05-27-pult-start-killed-api.md`. **Не ломать** `radar_spawn_workers.py` / `/start` без ▶-теста.
 
@@ -190,7 +198,126 @@ LEGACY pipeline (один ИИ) не трогать без задачи влад
 
 ---
 
-# § POST-RESTART-CHECK + WP/TG/PROXY + UX (**→ сейчас**, владелец 2026-05-27)
+# § STOP-STATUS-SPAM — стоп не гасит consumer (**→ P0**, 2026-05-27)
+
+**Симптом:** 100+ «📊 Статус радара» в @FLPARSINGBOT после стопа пульта / VBS.
+
+**Причина (код):** `neon_legacy_consumer.py` остаётся жить; опрос `getUpdates` + ответ на «ℹ Статус»; дубли venv+system усиливают эффект.
+
+**Тикет:** [`docs/problems/2026-05-27-status-spam-after-stop.md`](../problems/2026-05-27-status-spam-after-stop.md)
+
+| # | Готово когда |
+|---|----------------|
+| s1 | Полный стоп убивает `neon_legacy_consumer` (см. тикет) |
+| s2 | После VBS 30 с — 0 процессов uisness radar; в TG нет автоспама без кнопки |
+
+---
+
+# § PRE-LAUNCH — до хостинга (**→ @coder**, владелец 2026-05-27)
+
+**Решение владельца:** лента = **совместимость %** по навыкам пользователя; **без** фильтра «Брать / Сомнительно» и **без** отдельной «оценки лида» в UI. Платный ИИ = инструменты + короткий человечный отклик. **UI/тексты** — § **PRE-LAUNCH-UX** (Design **перед** выкладкой).
+
+## A — Лента: только match % (без вердиктов)
+
+| # | Готово когда |
+|---|----------------|
+| a1 | `/lenta/` + `/cabinet/`: убрать чипы/фильтры **Брать · Не брать · Сомнительно** и пороги `min_score` по вердикту |
+| a2 | Главная метрика карточки: **«Совместимость N%»** = `final_rank` / match по **выбранным навыкам** (`PUT /v1/me/tags`, `sort=match`); без подписи «Оценка ИИ» как основной |
+| a3 | API: не требовать `ai_verdict` для отображения ленты; `is_visible` + skills match достаточно (сверка с § FEED-DECOUPLE) |
+| a4 | Убрать с карточки отдельную **оценку лида** (score как «вердикт заказа») — только % совпадения + теги/источник |
+
+**Файлы:** `rawlead-feed.js`, `rawlead-cabinet.js`, `rawlead.css`, `page-lenta.php`, `page-cabinet.php`, `src/api_server.py`, `src/pg_storage.py` (read path)
+
+## B — Специализации: чипы работают + мульти + навыки
+
+| # | Готово когда |
+|---|----------------|
+| b1 | Чипы **Категория/специализация** на `/lenta/` и `/cabinet/` реально фильтруют: `GET /v1/feed?category=…` / `me/feed` — Network 200, лента меняется |
+| b2 | **Несколько специализаций** одновременно (OR): UI multi-select + API `?category=dev,design` или повторяемый param — согласовать с `TZ_API.md` |
+| b3 | Навыки в панели **зависят от выбранных специализаций**: каталог `/v1/skills/catalog` — секции `groups` только для активных category; смена category → сброс/фильтр skill-чипов |
+| b4 | «Применить» → `offset=0`, лента пересчитана; пустой результат — понятный empty state (не молчаливый баг) |
+
+**Файлы:** `page-lenta.php`, `page-cabinet.php`, `rawlead-feed.js`, `rawlead-cabinet.js`, `src/api_server.py`, `src/lead_category.py`, `docs/team/architect/TZ_API.md` (если меняется контракт — одна строка в § API)
+
+**Проверка:** Ctrl+F5 `/lenta/` → 2 специализации → список навыков сузился → 3 навыка → «Применить» → порядок и % изменились.
+
+## C — ИИ для платных подписчиков (L2 premium)
+
+| # | Готово когда |
+|---|----------------|
+| c1 | [`AI.md`](AI.md) § L2 premium (подписчик): **краткое описание задачи**, **методы/инструменты** для выполнения, **короткий отклик** — разговорный, без воды и лишней вежливости, «как ты решишь» |
+| c2 | `analyze_premium` / JSON: поля `tools_required[]` (или в `approach`), `reply_draft` — обязательные; не дублировать L1 `task_summary` |
+| c2b | **Neon:** выполнить [`sql/005_premium_subscriber.sql`](../../sql/005_premium_subscriber.sql) — иначе `GET /v1/feed` **500** `tools_required does not exist`; в `RUN.md` / сдаче — одна строка владельцу |
+| c3 | Выдача в кабинете/TG подписчику (когда JWT/me): блоки «Инструменты» + «Черновик отклика»; legacy @FLPARSINGBOT pipeline **не** ломать |
+| c4 | **Legacy @FLPARSINGBOT:** не слать карточку без `reply_draft`. Если ИИ недоступен/пустой черновик — `skip:ai_unavailable_no_draft` в лог и `в бот 0` (лучше пропуск, чем «сырой» MVP без отклика) |
+| c5 | Лог причины для владельца: `neon:skip ... skip:ai_unavailable_no_draft` / `skip:ai:no_reply_draft` (чтобы видно было, почему не пришло) |
+| c6 | **/cabinet/ login fallback:** если Telegram Widget не загрузился/битый iframe — альтернативный вход без widget (одноразовый код через бота или deep-link). Тикет: [`docs/problems/2026-05-27-cabinet-telegram-widget-login-fails.md`](../../problems/2026-05-27-cabinet-telegram-widget-login-fails.md) |
+| c7 | **Персонализация L2 до P5:** при генерации `reply_draft` учитывать профиль пользователя (его `user_tags`/ниша) как минимум для владельца (`user_id=#1`) и зафиксировать это в `AI.md`; в сдаче показать 3 примера «один лид → разные профили = разные черновики» |
+
+**Согласование текста промпта:** владелец + **@lead-product** (короткий § в `AI.md`) → потом Coder в код.
+
+**Файлы:** `docs/team/architect/AI.md`, `src/ai_analyze.py`, `src/lead_pipeline.py`, `src/telegram_notify.py`, `wordpress/.../rawlead-cabinet.js` (раскрытие карточки)
+
+## D — Быстрее парсинг
+
+| # | Готово когда |
+|---|----------------|
+| d1 | Замер: один цикл FL+Kwork в `radar_site.log` — время от `── Цикл ──` до `Итого` (baseline в STATUS) |
+| d2 | Безопасные ускорения: меньше лишних fetch/retry; параллель только если не ломает SQLite lock; не резать L1 без флага |
+| d3 | Опц. env `POLL_INTERVAL_MINUTES` / лимиты источников — документ в `.env.example`; цель: цикл бирж **≤ ~N мин** (N согласовать с владельцем после замера) |
+
+**Файлы:** `src/main.py`, `src/fl_parser.py`, `src/kwork_parser.py`, `src/public_feed.py`, `.env.example`
+
+## D2 — Добив по приёмке владельца (2026-05-27, обязательно до P5)
+
+**Факт:** PRE-LAUNCH A/B/C частично в коде, но приёмка владельца **не пройдена**.
+
+| # | Готово когда |
+|---|----------------|
+| d2-1 | Заголовок карточки: при hover есть полный title (tooltip/атрибут), при раскрытии карточки title читается полностью (не обрезан) |
+| d2-2 | Категории реально переключают выдачу: клик по category меняет карточки (`/v1/feed`/`/v1/me/feed`), не косметика |
+| d2-3 | Навыки зависят от category и есть явная кнопка **«Сбросить всё»** у навыков |
+| d2-4 | Убрать пустые «дырки» в сетке ленты (стабильный layout, без лишнего пустого блока) |
+| d2-5 | Раскрытие карточек: одновременно открыта только **одна** карточка; соседние не раскрываются каскадом |
+| d2-6 | `/cabinet/` доступен и понятен сценарий L2: вход работает, в раскрытии видны `tools_required` + `reply_draft` (если данных нет — понятный placeholder, не «пусто») |
+| d2-7 | В сдаче: короткий чек-лист «как владелец проверяет за 5 минут» + где смотреть Network (`/v1/feed`, `category`, `skills`) |
+| d2-8 | При пустом Telegram Widget в `/cabinet/`: fallback вход работает и не блокирует приёмку (см. тикет `2026-05-27-cabinet-telegram-widget-login-fails.md`) |
+| d2-9 | Проверка персонализации: при смене навыков владельца в ЛК (`PUT /v1/me/tags`) и повторной генерации L2 текст `reply_draft` меняется под профиль (не только сортировка ленты) |
+| d2-10 | Сетка карточек в `/lenta/` и `/cabinet/` рендерится **построчно** (row-major): `1 2 / 3 4 / 5 6`, без «колоночного добора» вида `1 5 / 2 6`. Нужен обычный grid/flex layout, не masonry/columns |
+
+**Файлы:** `wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js`, `wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js`, `wordpress/rawlead-kadence-child/assets/css/rawlead.css`, `wordpress/rawlead-kadence-child/page-lenta.php`, `wordpress/rawlead-kadence-child/page-cabinet.php`, `src/api_server.py`, `docs/team/common/STATUS.md`
+
+## E — Не в этом спринте (→ Design/Product)
+
+| Тема | Кто | Когда |
+|------|-----|--------|
+| UI/UX панели фильтров, mobile, визуал % | **@lead-designer** → @coder | § **PRE-LAUNCH-UX**, **перед** P5 |
+| Копирайт кнопок, подсказки | **@lead-product** | вместе с Design |
+
+**Не делать в § PRE-LAUNCH:** полный биллинг; 25 источников; редизайн лендинга.
+
+---
+
+# § PRE-LAUNCH-UX — UI перед хостингом (**⏸ E3→E5**, после research + ЛК)
+
+**Порядок (владелец 2026-05-27):** E0 Coder A–D → E1 ЛК → **E2 SKILLS-TOOLS-RESEARCH** (Product) → **E3 Design** (спор до идеала) → **E4 Product copy** → **E5 Coder вёрстка** → P5/stress.
+
+**Не начинать u2 до:** `LEAD_PRODUCT_PROMPT` § SKILLS-TOOLS-RESEARCH r1–r5 + согласованный макет `LEAD_DESIGN_PROMPT` § PRE-LAUNCH-UX v2.
+
+| # | Готово когда |
+|---|----------------|
+| u0 | → Product § SKILLS-TOOLS-RESEARCH (каталог навыков/инструментов; импорт в API/UI — отдельная задача после каталога) |
+| u1 | Lead Design: [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § PRE-LAUNCH-UX v2 — горизонтальная filter-bar, воздух у «Лента заказов», контакты без early-access, report bug, mobile |
+| u2 | @lead-product: копирайт § PRE-LAUNCH-UX copy |
+| u3 | @coder: WP/CSS/JS по макету + `feed-cabinet-mvp.md` addendum |
+| u4 | `POST` или форма **«Сообщить об ошибке»** (endpoint + WP UI по Design; без спама, rate limit) |
+| u5 | Каталог навыков в UI из research-артефакта (не только динамический top-50 из Neon) |
+
+**Промпт Design:** [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § PRE-LAUNCH-UX v2.
+
+---
+
+# § POST-RESTART-CHECK + WP/TG/PROXY (**→ @coder**, часть в § PRE-LAUNCH)
 
 **Контекст владельца:** после перезапуска Site проверить живые логи/уведомления и донастроить продуктовую подачу.
 
@@ -200,9 +327,9 @@ LEGACY pipeline (один ИИ) не трогать без задачи влад
 |---|----------------|
 | c1 | Проверка `radar_site.log` после перезапуска: есть циклы бирж, нет критических ошибок, отдельно отчёт по TG (`join/listen/send`) с причиной, если уведомлений нет |
 | c2 | TG-каналы: подтвердить, что подписка и listen идут по актуальному allowlist/queue; если нет уведомлений — указать точку обрыва (не подписались / нет chat_id / фильтр / send) и дать фикс |
-| c3 | WP/TG ИИ-подача: для платного сценария в L2 оставить «инструменты для выполнения + человеческий отклик» как обязательные поля выдачи |
-| c4 | Убрать текстовые ярлыки `Брать/Не брать/Сомнительно` из UI ленты и кабинета; оставить числовой score + сортировку по навыкам как главную механику |
-| c5 | UX фильтров: предложить и внедрить v1 улучшение панели фильтров (структура, видимость активных фильтров, mobile/desktop), чтобы сценарий использования был понятен без обучения |
+| c3 | → **§ PRE-LAUNCH C** (L2 подписчик: инструменты + отклик) |
+| c4 | → **§ PRE-LAUNCH A** (без Брать/Сомнительно; только match %) |
+| c5 | → **§ PRE-LAUNCH-UX** (Design перед хостингом; не блокер A–D) |
 | c6 | Прокси для бирж: включить ротацию по спискам прокси (`FL_PROXY_URLS`, `KWORK_PROXY_URLS`) с переключением между IP по циклу/ошибкам и понятным логом «какой прокси выбран» (без секретов) |
 | c7 | Обновить `STATUS.md`: коротко «что было не так после перезапуска», «что исправлено», «как проверить владельцу за 10 минут» |
 
@@ -900,9 +1027,43 @@ CSS: сетка 4 карточки desktop (2×2), mobile 1 col — соглас
 
 ---
 
+# § PRE-PROD-STRESS — стресс на хосте перед трафиком (**→ после § P5**, владелец 2026-05-27)
+
+**Канон ворот:** [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) § PRE-PROD-STRESS (S1–S5).
+
+**Когда:** деплой на VPS/хостинг **готов**, URL открывается, **рекламы ещё нет**.
+
+## Задачи
+
+| # | Готово когда |
+|---|----------------|
+| t1 | `scripts/preprod_ai_matrix.py` — фикстуры по 4 category (≥3 на нишу) → `analyze_lite` + `analyze_premium` → JSON `data/preprod_ai_report.json` (без TG, без парсера) |
+| t2 | `scripts/preprod_k6_feed.js` (или `.py` Locust) — 50–100 VU, 5 мин: `GET /health`, `GET /v1/feed?limit=20`, `GET /v1/skills/catalog`; отчёт p50/p95, % ошибок |
+| t3 | `scripts/preprod_playwright/` или один spec — prod `BASE_URL`: лента, multi-category, навыки «Применить», `/cabinet/` (smoke login stub ok) |
+| t4 | На VPS: Site ▶ 2–4 цикла — в `radar_site.log` время цикла + `ИИ L1=`; в STATUS одна строка baseline |
+| t5 | `docs/ops/PREPROD_STRESS_RUN.md` — как запустить t1–t4, пороги S1–S5, красные флаги |
+
+## Файлы (ожидаемые)
+
+| Путь |
+|------|
+| `scripts/preprod_ai_matrix.py` |
+| `scripts/preprod_k6_feed.js` (или `tests/load/…`) |
+| `scripts/preprod_playwright/` |
+| `docs/ops/PREPROD_STRESS_RUN.md` |
+| `docs/team/common/STATUS.md` (блок сдачи) |
+
+**Не делать:** DDoS; 1000× premium OpenRouter; стресс на Legacy consumer без задачи.
+
+**Проверка владельца:** 15 мин `/lenta/` на prod URL; подписать S5 в чат Lead.
+
+---
+
 # § P5 — Деплой бюджет 24/7 (WP shared + VPS API+радар)
 
 **Канон:** [`docs/ops/DEPLOY_BUDGET.md`](../../ops/DEPLOY_BUDGET.md) · владелец: **без ПК**, минимум денег.
+
+**После P5:** § **PRE-PROD-STRESS** (обязательно до трафика).
 
 | # | Готово когда |
 |---|----------------|

@@ -388,21 +388,29 @@ def take_threshold_for_category(category: str) -> int:
 
 def build_skills_groups(
     rows: list[tuple[str, int]],
+    *,
+    categories: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Группы для /v1/skills/catalog + плоский skills для совместимости."""
+    active = categories or []
+    cat_filter = set(active) if active else None
     buckets: dict[str, list[dict[str, Any]]] = {c: [] for c in CATEGORIES}
     flat: list[dict[str, Any]] = []
     for tag, cnt in rows:
         cat = categorize_tag(tag)
+        if cat_filter is not None and cat not in cat_filter:
+            continue
         item = {"tag": tag, "count": cnt, "category": cat}
         flat.append(item)
         buckets[cat].append({"tag": tag, "count": cnt})
+    group_cats = [c for c in CATEGORIES if cat_filter is None or c in cat_filter]
     groups = [
         {
             "category": cat,
             "title": CATEGORY_TITLES[cat],
             "skills": buckets[cat],
         }
-        for cat in CATEGORIES
+        for cat in group_cats
+        if buckets[cat]
     ]
     return groups, flat

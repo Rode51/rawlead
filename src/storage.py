@@ -244,23 +244,42 @@ class ProjectStorage:
 
 
 
-    def get_tg_update_offset(self) -> int:
+    @staticmethod
+    def tg_update_offset_key(bot_token: str) -> str:
+        token = (bot_token or "").strip()
+        bot_id = token.split(":", 1)[0] if token else ""
+        if bot_id.isdigit():
+            return f"tg_update_offset:{bot_id}"
+        return "tg_update_offset:unknown"
 
-        raw = self.get_setting("tg_update_offset", "0")
+    def has_tg_update_offset_key(self, bot_token: str) -> bool:
+        key = self.tg_update_offset_key(bot_token)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM settings WHERE key = ? LIMIT 1",
+                (key,),
+            ).fetchone()
+            return row is not None
 
+    def get_tg_update_offset(self, *, bot_token: str) -> int:
+        key = self.tg_update_offset_key(bot_token)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key = ? LIMIT 1",
+                (key,),
+            ).fetchone()
+            if row is not None:
+                raw = str(row["value"])
+            else:
+                raw = self.get_setting("tg_update_offset", "0")
         try:
-
             return max(0, int(raw))
-
         except ValueError:
-
             return 0
 
-
-
-    def set_tg_update_offset(self, offset: int) -> None:
-
-        self.set_setting("tg_update_offset", str(max(0, offset)))
+    def set_tg_update_offset(self, offset: int, *, bot_token: str) -> None:
+        key = self.tg_update_offset_key(bot_token)
+        self.set_setting(key, str(max(0, offset)))
 
 
 

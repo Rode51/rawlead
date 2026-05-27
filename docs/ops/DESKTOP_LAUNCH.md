@@ -58,7 +58,7 @@ Exe: `desktop\src-tauri\target\release\` (имя по `productName` в `tauri.co
 
 Пауза радара FL/Kwork — только в Telegram-боте (кнопка ℹ), в пульте строки про бота **нет**.
 
-Перед повторным стартом: **Stop** в пульте или **`stop-radar-desktop-full.vbs`** (убивает API + lock). `stop-radar.bat` — только воркеры, **без** `radar_control`.
+Перед повторным стартом: **`stop-radar-desktop-full.vbs`** — site+legacy: API, `main`, `neon_legacy_consumer`, `tg_main`, join. `stop-radar.bat` — воркеры без API (в т.ч. consumer).
 
 ### Антирегресс: пульт / API / ▶ (2026-05-27)
 

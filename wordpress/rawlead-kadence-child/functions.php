@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.7.1');
+define('RAWLEAD_CHILD_VERSION', '1.7.4');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -28,6 +28,42 @@ function rawlead_page_url(string $slug): string {
         return (string) get_permalink($page);
     }
     return home_url('/' . $slug . '/');
+}
+
+/**
+ * Optional deep-link fallback URL for Telegram auth (without iframe widget).
+ *
+ * wp-config.php:
+ *   define('RAWLEAD_TG_LOGIN_FALLBACK_URL', 'https://oauth.telegram.org/auth?...');
+ */
+function rawlead_tg_login_fallback_url(): string {
+    if (defined('RAWLEAD_TG_LOGIN_FALLBACK_URL')) {
+        return trim((string) RAWLEAD_TG_LOGIN_FALLBACK_URL);
+    }
+    if (defined('RAWLEAD_TG_LOGIN_URL')) {
+        return trim((string) RAWLEAD_TG_LOGIN_URL);
+    }
+    return '';
+}
+
+/**
+ * Telegram Login bot id (preferred for JS popup fallback).
+ */
+function rawlead_tg_login_bot_id(): int {
+    if (defined('RAWLEAD_TG_BOT_ID')) {
+        return max(0, (int) RAWLEAD_TG_BOT_ID);
+    }
+    $fallback = rawlead_tg_login_fallback_url();
+    if ($fallback !== '') {
+        $parts = wp_parse_url($fallback);
+        if (is_array($parts) && !empty($parts['query'])) {
+            parse_str((string) $parts['query'], $query);
+            if (!empty($query['bot_id'])) {
+                return max(0, (int) $query['bot_id']);
+            }
+        }
+    }
+    return 0;
 }
 
 add_action('after_setup_theme', static function (): void {
@@ -104,6 +140,8 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restTags'       => esc_url_raw(rest_url('rawlead/v1/me/tags')),
             'restAuth'       => esc_url_raw(rest_url('rawlead/v1/auth/telegram')),
             'tgBotUsername'  => rawlead_tg_login_bot_username(),
+            'tgBotId'        => rawlead_tg_login_bot_id(),
+            'tgLoginFallbackUrl' => rawlead_tg_login_fallback_url(),
             'localPort'      => defined('RAWLEAD_LOCAL_SITE_PORT') ? (string) RAWLEAD_LOCAL_SITE_PORT : '10007',
             'loginUrl'       => 'http://127.0.0.1:' . (defined('RAWLEAD_LOCAL_SITE_PORT') ? (string) RAWLEAD_LOCAL_SITE_PORT : '10007') . '/cabinet/',
             'nonce'          => wp_create_nonce('wp_rest'),

@@ -22,15 +22,16 @@
   var skillsBadgeEl = document.getElementById("rl-feed-skills-badge");
   var skillsHintEl = document.getElementById("rl-feed-skills-hint");
   var skillsApplyBtn = document.getElementById("rl-feed-skills-apply");
+  var skillsClearBtn = document.getElementById("rl-feed-skills-clear");
   var skillsPanelEl = document.getElementById("rl-feed-skills-panel");
   var sidebarScroll = document.getElementById("rl-feed-sidebar-scroll");
 
   var state = {
     offset: 0,
     limit: 20,
-    minScore: 0,
     source: "",
-    category: "",
+    draftCategories: [],
+    appliedCategories: [],
     sort: "time",
     draftTags: [],
     appliedTags: [],
@@ -67,24 +68,6 @@
       return true;
     }
     return sourceLabel(item.source).key === filter;
-  }
-
-  function takeThreshold(category) {
-    if (category === "design" || category === "marketing" || category === "text") {
-      return 55;
-    }
-    return 70;
-  }
-
-  function verdictChip(score, verdict, category) {
-    var takeAt = takeThreshold(category || "dev");
-    if (verdict === "take" || (score !== null && score >= 85)) {
-      return { text: "Брать ✓", cls: "take" };
-    }
-    if (score !== null && score >= takeAt) {
-      return { text: "Брать", cls: "take" };
-    }
-    return { text: "Сомнительно", cls: "maybe" };
   }
 
   function formatTime(iso) {
@@ -176,6 +159,14 @@
   function renderExpandedBody(item) {
     var task = taskBodyText(item);
     var html = "";
+    if (item.title) {
+      html +=
+        '<div class="rl-feed-card__section">' +
+        '<h4 class="rl-feed-card__section-title">Полное название</h4>' +
+        '<p class="rl-feed-card__task">' +
+        escapeHtml(item.title) +
+        "</p></div>";
+    }
     if (task) {
       html +=
         '<div class="rl-feed-card__section">' +
@@ -212,10 +203,7 @@
 
   function renderCard(item) {
     var src = sourceLabel(item.source);
-    var hasSkills = state.appliedTags.length > 0;
-    var rank = item.final_rank != null ? item.final_rank : item.ai_score || 0;
-    var matchLabel = hasSkills ? "Совместимость" : "Оценка ИИ";
-    var chip = verdictChip(item.ai_score, item.ai_verdict, item.category);
+    var rank = item.final_rank != null ? item.final_rank : 0;
     var budget = item.budget_text || "—";
     var expanded = state.expandedId === item.id;
 
@@ -236,16 +224,18 @@
       "</span>" +
       "</div>" +
       '<h3 class="rl-lead-card__title">' +
+      '<span title="' +
       escapeHtml(item.title || "Без названия") +
+      '">' +
+      escapeHtml(item.title || "Без названия") +
+      "</span>" +
       "</h3>" +
       '<p class="rl-lead-card__budget">Бюджет: ' +
       escapeHtml(budget) +
       "</p>" +
       '<div class="rl-match">' +
       '<div class="rl-match__label">' +
-      "<span>" +
-      escapeHtml(matchLabel) +
-      "</span>" +
+      "<span>Совместимость</span>" +
       "<span><strong>" +
       rank +
       "%</strong></span>" +
@@ -259,11 +249,6 @@
       "</div>" +
       "</div>" +
       '<div class="rl-chips">' +
-      '<span class="rl-chip rl-chip--' +
-      chip.cls +
-      '">' +
-      escapeHtml(chip.text) +
-      "</span>" +
       renderTagChips(item.lead_tags) +
       "</div>" +
       '<div class="rl-feed-card__body">' +
@@ -309,24 +294,42 @@
         : "";
   }
 
+  function readCategoriesFrom(root) {
+    var box = root || sidebar;
+    if (!box) {
+      return [];
+    }
+    var cats = [];
+    box.querySelectorAll('input[name="category"]:checked').forEach(function (inp) {
+      if (inp.value) {
+        cats.push(inp.value);
+      }
+    });
+    return cats;
+  }
+
+  function categoriesEqual(a, b) {
+    return tagsEqual(a, b);
+  }
+
+  function cloneCategories(cats) {
+    return (cats || []).slice();
+  }
+
   function readFilters() {
     if (!sidebar) {
       return;
     }
     var src = sidebar.querySelector('input[name="source"]:checked');
-    var cat = sidebar.querySelector('input[name="category"]:checked');
-    var score = sidebar.querySelector('input[name="min_score"]:checked');
     var sortInp = sidebar.querySelector('input[name="sort"]:checked');
     state.source = src ? src.value : "";
-    state.category = cat ? cat.value : "";
-    state.minScore = score ? parseInt(score.value, 10) || 0 : 0;
     state.sort = sortInp ? sortInp.value : "time";
     var dirty =
       state.source !== "" ||
-      state.category !== "" ||
-      state.minScore !== 0 ||
+      state.appliedCategories.length > 0 ||
       state.appliedTags.length > 0 ||
-      state.sort !== "time";
+      state.sort !== "time" ||
+      !categoriesEqual(state.draftCategories, state.appliedCategories);
     if (resetBtn) {
       resetBtn.hidden = !dirty;
     }
@@ -377,7 +380,9 @@
   }
 
   function updateSkillsDraftUi() {
-    var dirty = !tagsEqual(state.draftTags, state.appliedTags);
+    var dirty =
+      !tagsEqual(state.draftTags, state.appliedTags) ||
+      !categoriesEqual(state.draftCategories, state.appliedCategories);
     var hints = [skillsHintEl];
     var applyBtns = [skillsApplyBtn];
     var sheet = document.getElementById("rl-feed-sheet");
@@ -419,6 +424,16 @@
         : state.draftTags.concat([tag]);
     renderSkillsCatalog();
     updateSkillsDraftUi();
+  }
+
+  function clearSkills() {
+    state.draftTags = [];
+    renderSkillsCatalog();
+    updateSkillsDraftUi();
+    if (!state.appliedTags.length) {
+      return;
+    }
+    persistTags([], { reload: true });
   }
 
   function bindSkillButtons(container) {
@@ -553,11 +568,39 @@
       });
   }
 
-  function applyDraftTags() {
-    if (tagsEqual(state.draftTags, state.appliedTags)) {
+  function pruneDraftTagsForCategories() {
+    if (!state.draftCategories.length || !state.catalogGroups.length) {
       return;
     }
-    persistTags(cloneTags(state.draftTags), { setSortMatch: true, reload: true });
+    var allowed = {};
+    state.catalogGroups.forEach(function (group) {
+      if (state.draftCategories.indexOf(group.category) < 0) {
+        return;
+      }
+      (group.skills || []).forEach(function (row) {
+        if (row.tag) {
+          allowed[row.tag] = true;
+        }
+      });
+    });
+    state.draftTags = state.draftTags.filter(function (tag) {
+      return allowed[tag];
+    });
+  }
+
+  function applyDraftTags() {
+    var tagsDirty = !tagsEqual(state.draftTags, state.appliedTags);
+    var catsDirty = !categoriesEqual(state.draftCategories, state.appliedCategories);
+    if (!tagsDirty && !catsDirty) {
+      return;
+    }
+    state.appliedCategories = cloneCategories(state.draftCategories);
+    if (tagsDirty) {
+      persistTags(cloneTags(state.draftTags), { setSortMatch: true, reload: true });
+      return;
+    }
+    readFilters();
+    resetAndLoad();
   }
 
   function loadTags() {
@@ -582,7 +625,16 @@
     if (!cfg.restSkills) {
       return Promise.resolve();
     }
-    return fetch(cfg.restSkills, { credentials: "same-origin" })
+    var url = cfg.restSkills;
+    if (state.draftCategories.length) {
+      var sep = url.indexOf("?") >= 0 ? "&" : "?";
+      url =
+        url +
+        sep +
+        "category=" +
+        encodeURIComponent(state.draftCategories.join(","));
+    }
+    return fetch(url, { credentials: "same-origin" })
       .then(function (res) {
         return res.ok ? res.json() : { skills: [] };
       })
@@ -630,14 +682,14 @@
     var params = {
       limit: state.limit,
       offset: state.offset,
-      min_score: state.minScore,
+      min_score: 0,
       sort: state.sort,
     };
     if (state.appliedTags.length) {
       params.skills = state.appliedTags.join(",");
     }
-    if (state.category) {
-      params.category = state.category;
+    if (state.appliedCategories.length) {
+      params.category = state.appliedCategories.join(",");
     }
     var url = apiUrl(params);
 
@@ -658,7 +710,9 @@
         if (items.length === 0 && state.offset === 0) {
           listEl.innerHTML =
             '<p class="rl-feed-empty">' +
-            (state.source || state.category || state.minScore
+            (state.source ||
+            state.appliedCategories.length ||
+            state.appliedTags.length
               ? "По выбранным фильтрам ничего не найдено."
               : "Заказов пока нет. Попробуйте позже.") +
             "</p>";
@@ -702,7 +756,10 @@
         return;
       }
       card.dataset.bound = "1";
-      card.addEventListener("click", function () {
+      card.addEventListener("click", function (e) {
+        if (e.target.closest(".rl-feed-card__link")) {
+          return;
+        }
         var id = parseInt(card.getAttribute("data-id"), 10);
         if (state.expandedId === id) {
           state.expandedId = null;
@@ -759,9 +816,67 @@
   if (skillsApplyBtn) {
     skillsApplyBtn.addEventListener("click", applyDraftTags);
   }
+  if (skillsClearBtn) {
+    skillsClearBtn.addEventListener("click", clearSkills);
+  }
+
+  function syncCategoryInputs(fromRoot, toRoot) {
+    if (!fromRoot || !toRoot) {
+      return;
+    }
+    fromRoot.querySelectorAll('input[name="category"]').forEach(function (inp) {
+      var val = inp.getAttribute("value");
+      var peer = toRoot.querySelector('input[name="category"][value="' + val + '"]');
+      if (peer) {
+        peer.checked = inp.checked;
+      }
+    });
+    toRoot.querySelectorAll(".rl-feed-chip").forEach(function (label) {
+      var input = label.querySelector("input");
+      label.classList.toggle("is-active", input && input.checked);
+    });
+  }
+
+  function bindCategoryFilters(root) {
+    if (!root) {
+      return;
+    }
+    var peer = root === sidebar ? document.getElementById("rl-feed-sheet-body") : sidebar;
+    var allInp = root.querySelector('input[name="category"][value=""]');
+    root.querySelectorAll('input[name="category"]').forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        if (inp.value === "" && inp.checked) {
+          root.querySelectorAll('input[name="category"]').forEach(function (other) {
+            if (other !== inp && other.value) {
+              other.checked = false;
+            }
+          });
+        } else if (inp.value && inp.checked && allInp) {
+          allInp.checked = false;
+        }
+        if (peer) {
+          syncCategoryInputs(root, peer);
+        }
+        state.draftCategories = readCategoriesFrom(root);
+        state.appliedCategories = cloneCategories(state.draftCategories);
+        pruneDraftTagsForCategories();
+        renderSkillsCatalog();
+        loadCatalog();
+        readFilters();
+        updateSkillsDraftUi();
+        syncChips();
+        resetAndLoad();
+      });
+    });
+  }
 
   if (sidebar) {
-    sidebar.addEventListener("change", function () {
+    bindCategoryFilters(sidebar);
+    sidebar.addEventListener("change", function (e) {
+      var name = e.target && e.target.getAttribute("name");
+      if (name === "category") {
+        return;
+      }
       syncChips();
       readFilters();
       resetAndLoad();
@@ -769,11 +884,15 @@
     if (resetBtn) {
       resetBtn.addEventListener("click", function () {
         sidebar.querySelector('input[name="source"][value=""]').checked = true;
-        sidebar.querySelector('input[name="category"][value=""]').checked = true;
-        sidebar.querySelector('input[name="min_score"][value="0"]').checked = true;
+        sidebar.querySelectorAll('input[name="category"]').forEach(function (inp) {
+          inp.checked = inp.value === "";
+        });
         sidebar.querySelector('input[name="sort"][value="time"]').checked = true;
+        state.draftCategories = [];
+        state.appliedCategories = [];
         state.draftTags = [];
         syncChips();
+        loadCatalog();
         persistTags([], { reload: true });
       });
     }
@@ -802,6 +921,9 @@
       sheetBody.querySelectorAll(".rl-feed-chip").forEach(function (label) {
         var input = label.querySelector("input");
         label.classList.toggle("is-active", input && input.checked);
+        if (!input || input.name === "category") {
+          return;
+        }
         label.addEventListener("click", function () {
           sheetBody.querySelectorAll('input[name="' + input.name + '"]').forEach(function (r) {
             r.checked = false;
@@ -811,9 +933,13 @@
           label.classList.add("is-active");
         });
       });
+      bindCategoryFilters(sheetBody);
       bindSkillButtons(sheetBody.querySelector(".rl-feed-skills"));
       sheetBody.querySelectorAll(".rl-feed-skills-apply").forEach(function (btn) {
         btn.addEventListener("click", applyDraftTags);
+      });
+      sheetBody.querySelectorAll(".rl-feed-skills-clear").forEach(function (btn) {
+        btn.addEventListener("click", clearSkills);
       });
       bindSkillsPanels(sheetBody);
       updateSkillsBadge();
@@ -831,9 +957,15 @@
           live.checked = inp.checked;
         }
       });
+      state.draftCategories = readCategoriesFrom(sidebar);
       syncChips();
       readFilters();
       closeSheet();
+      if (!tagsEqual(state.draftTags, state.appliedTags)) {
+        applyDraftTags();
+        return;
+      }
+      state.appliedCategories = cloneCategories(state.draftCategories);
       resetAndLoad();
     });
     document.getElementById("rl-feed-sheet-reset").addEventListener("click", function () {
@@ -863,6 +995,8 @@
   }
 
   Promise.all([loadTags(), loadCatalog()]).then(function () {
+    state.draftCategories = readCategoriesFrom();
+    state.appliedCategories = cloneCategories(state.draftCategories);
     renderSkillsCatalog();
     syncChips();
     readFilters();

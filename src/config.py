@@ -165,6 +165,15 @@ def radar_lock_path(name: str) -> Path:
     return _PROJECT_ROOT / "data" / f".{name}_{profile}.lock"
 
 
+def bot_poll_lock_path(bot_token: str) -> Path:
+    """Lock getUpdates — один poller на bot token (Site/Legacy не делят offset и poll)."""
+    token = (bot_token or "").strip()
+    bot_id = token.split(":", 1)[0] if token else ""
+    if not bot_id.isdigit():
+        bot_id = "0"
+    return _PROJECT_ROOT / "data" / f".bot_poll_{bot_id}.lock"
+
+
 def _parse_ai_mode(raw: str | None, *, profile: str) -> str:
     if raw is None or not str(raw).strip():
         return _PROFILE_DEFAULTS[profile]["AI_MODE"]

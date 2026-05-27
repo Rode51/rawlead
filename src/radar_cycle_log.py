@@ -162,12 +162,14 @@ class CycleSummary:
         self.neon_dup_skip = sk
         self.neon_sqlite_resync = resync
 
-    def format_footer(self) -> str:
+    def format_footer(self, *, elapsed_sec: float | None = None) -> str:
         from ai_analyze import cycle_ai_counts
 
         self.sync_neon_from_globals()
         l1, l2 = cycle_ai_counts()
         parts = [f"Итого в бот: {self.total_to_bot}"]
+        if elapsed_sec is not None and elapsed_sec >= 0:
+            parts.append(f"цикл: {elapsed_sec:.1f}с")
         if (
             self.neon_insert
             or self.neon_replay

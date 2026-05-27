@@ -9,6 +9,55 @@
 **PM ✅** · split legacy/site ✅ · **Neon dup-replay L1** ✅ код · приёмка владельцем ⏳.  
 **Роли:** Coder = `CODER_PROMPT` · Mechanic = `docs/problems/` + **Gemini 2.5 (2M)** · канон [`LEAD.md`](../architect/LEAD.md) § «Coder vs Mechanic».
 
+### STOP-STATUS-SPAM (§ P0, 2026-05-27) — **✅ принято владельцем**
+
+| | |
+|--|--|
+| **Симптом** | После стопа 100+ «📊 Статус радара» в @FLPARSINGBOT |
+| **Фикс** | consumer в kill; offset per bot; poll lock по token |
+| **Приёмка** | владелец 2026-05-27 — **спама нет** |
+
+### § PRE-LAUNCH A→D (Coder 2026-05-27) — **⚠️ частично, приёмка не пройдена**
+
+| § | Что |
+|---|-----|
+| **A** | `/lenta/` + `/cabinet/`: без чипов Брать/Сомнительно и фильтра «ИИ-оценка»; карточка — **Совместимость N%** |
+| **B** | Multi category + `GET …/skills/catalog?category=`; навыки по специализациям; «Применить» |
+| **C** | L2: `tools_required` + `reply_draft`; TG; Neon + кабинет (раскрытие) |
+| **D** | Параллельный fetch FL+Kwork; футер `цикл: N.Nс`; `FL_LISTING_MAX_PAGES` |
+
+**Neon:** `sql/005_premium_subscriber.sql` — **✅ применено** (Coder, проект `parser`, 2026-05-27): `tools_required`, `reply_draft` в `leads`.
+
+**Факт владельца (2026-05-27 вечер):** D2 по UI/кабинету **не принят** (часть пунктов работает нестабильно), плюс в legacy @FLPARSINGBOT пришла карточка без черновика отклика.  
+Доп. требование по ленте: порядок карточек должен быть построчный `1 2 / 3 4 / 5 6` (row-major), не «колонки вниз» `1 5 / 2 6`.
+**Добив (2026-05-27, @coder):** `/cabinet/` Telegram Login default bot = `rawlead_bot` (в т.ч. hint), legacy отправка ужесточена: без `reply_draft` всегда `skip:ai_unavailable_no_draft`/`skip:ai:no_reply_draft`, без отправки карточки.
+
+**Блокер до P5:** добить [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) § PRE-LAUNCH D2 + C4/C5 (legacy без `reply_draft` не шлём; логируем skip-причину) + **CABINET-LOGIN-FALLBACK** (вход при битом Telegram Widget).
+
+**Новый P0-блокер (2026-05-27):** `/cabinet/` Telegram Login widget в WP-контексте может не завершать вход (серый/битый placeholder).  
+Тикет: [`2026-05-27-cabinet-telegram-widget-login-fails.md`](../problems/2026-05-27-cabinet-telegram-widget-login-fails.md) → fallback без iframe (одноразовый код/ deep-link) обязателен для локальной приёмки.
+
+### → Сейчас: @coder (E0) → ЛК (E1) → research навыков (E2) → Design+Product UX (E3–E4) → Coder polish (E5) → P5/stress
+
+**Дорожная карта этапов:** [`TASKS.md`](TASKS.md) § «Поэтапно до трафика».  
+**UX-бриф владельца (фильтры, контакты, feedback, mobile):** [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § PRE-LAUNCH-UX v2 — **после** research, **спор с владельцем до идеала**.
+
+### ЛК и подписка — честный статус (2026-05-27)
+
+| Готово в коде/БД | Ещё не «прод для каждого подписчика» |
+|------------------|--------------------------------------|
+| Схема `users`, `user_tags`, `subscriptions`; JWT + `/v1/me/*` | Вход `/cabinet/` **блокер** (widget → fallback в работе) |
+| `GET /v1/me/feed` — match % по **тегам пользователя** | `/v1/me/subscription` — **заглушка** `free` (биллинга нет) |
+| L2 поля в Neon: `tools_required`, `reply_draft`; UI в раскрытии кабинета | Нет gate «только paid видит L2» на API |
+| L1 `task_summary` на ленте | Каталог навыков ≈ top-теги из лидов, не полный research-список |
+| | Push ИИ-агента в TG **на пользователя** — фаза 3f, не сейчас |
+
+**Вывод:** скелет ЛК и персональный **match по навыкам** — да; **полный продукт «каждый платный получает свой ИИ-разбор под навыки»** — после login + каталог + подписка + приёмка L2.
+
+### → Дальше: приёмка PRE-LAUNCH · UX (Design) · P5 · **PRE-PROD-STRESS** · трафик
+
+**Ворота трафика:** [`PRE_PROD_GATE.md`](../architect/PRE_PROD_GATE.md) — после P5 на хосте § **PRE-PROD-STRESS** (S1–S5), затем «едем на прод».
+
 ### PULT-MIN hotfix (Lead 2026-05-27) — **✅ verify**
 
 | | |
@@ -700,6 +749,7 @@
 | **FEED-DECOUPLE + SITE-AI-FALLBACK** | ✅ код · owner-проверка: `/v1/feed` при `notified_at IS NULL` и отсутствие TG-спама при `ai_unavailable` |
 | **Neon dup без L1 → лента пустая** | ✅ код · владелец: replay + Site ▶ 30 мин |
 | **Site-бот `chat not found`** | владелец · `.env.site` `TELEGRAM_CHAT_ID` |
+| **`/cabinet/` Telegram Widget битый/пустой** | **@coder (P0)** · fallback login по тикету [`2026-05-27-cabinet-telegram-widget-login-fails.md`](../problems/2026-05-27-cabinet-telegram-widget-login-fails.md) |
 | Пульт «Нет связи с API» | Mechanic · [`2026-05-24-pult-no-api-connection.md`](../problems/2026-05-24-pult-no-api-connection.md) |
 | 2× `main.py` | Mechanic · [`2026-05-24-duplicate-python-processes.md`](../problems/2026-05-24-duplicate-python-processes.md) |
 | TG relay+card (если снова сломается) | prompt-test · [`2026-05-24-tg-forward-not-via-bot.md`](../problems/2026-05-24-tg-forward-not-via-bot.md) |

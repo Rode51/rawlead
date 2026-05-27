@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Callable
 from pathlib import Path
 
@@ -185,6 +186,33 @@ def _process_listings(
     return new_ids, notifications
 
 
+def _fetch_listings_parallel(
+    cfg: Config,
+    enabled_sources: set[str],
+    errors: list[str],
+) -> dict[str, list[ListingProject] | None]:
+    """Параллельный fetch FL + Kwork (только сеть, без SQLite)."""
+    tasks: dict[str, Callable[[], list[ListingProject]]] = {}
+    if "fl" in enabled_sources:
+        tasks["fl"] = lambda: fetch_listing_projects(cfg)
+    if "kwork" in enabled_sources and cfg.kwork_projects_url:
+        tasks["kwork"] = lambda: fetch_kwork_listing_projects(cfg)
+    out: dict[str, list[ListingProject] | None] = {k: None for k in tasks}
+    if not tasks:
+        return out
+    with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
+        future_map = {pool.submit(fn): label for label, fn in tasks.items()}
+        for future in as_completed(future_map):
+            label = future_map[future]
+            try:
+                out[label] = future.result()
+            except (FlListingError, KworkListingError) as exc:
+                errors.append(f"{label}:fetch:{short_err(exc)}")
+            except Exception as exc:
+                errors.append(f"{label}:fetch:{short_err(exc)}")
+    return out
+
+
 def _fetch_source(
     label: str,
     fetch_fn: Callable[[Config], list[ListingProject]],
@@ -234,18 +262,23 @@ def run_cycle(
     reset_cycle_ai_counters()
     reset_neon_cycle_counters()
     ts = radar_timestamp()
+    cycle_t0 = time.monotonic()
     errors: list[str] = []
     summary = CycleSummary(ts=ts)
-    enabled_sources = public_feed_sources()
+    enabled_sources = set(public_feed_sources())
 
     _append_log_line(cfg.radar_log_path, summary.format_header(), echo=True)
 
     tg_poll_state: dict[str, float] = {"last": 0.0}
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
+    prefetched = _fetch_listings_parallel(cfg, enabled_sources, errors)
+
     if "fl" in enabled_sources:
         stats_fl = summary.ensure("fl")
-        fl_projects = _fetch_source("fl", fetch_listing_projects, cfg, errors, stats_fl)
+        fl_projects = prefetched.get("fl")
+        if fl_projects is None and not any(e.startswith("fl:fetch:") for e in errors):
+            fl_projects = _fetch_source("fl", fetch_listing_projects, cfg, errors, stats_fl)
         _tg_poll_if_due(cfg, storage, tg_poll_state)
         if fl_projects is not None:
             stats_fl.downloaded = len(fl_projects)
@@ -269,9 +302,13 @@ def run_cycle(
     if "kwork" in enabled_sources:
         stats_kwork = summary.ensure("kwork")
         if cfg.kwork_projects_url:
-            kwork_projects = _fetch_source(
-                "kwork", fetch_kwork_listing_projects, cfg, errors, stats_kwork
-            )
+            kwork_projects = prefetched.get("kwork")
+            if kwork_projects is None and not any(
+                e.startswith("kwork:fetch:") for e in errors
+            ):
+                kwork_projects = _fetch_source(
+                    "kwork", fetch_kwork_listing_projects, cfg, errors, stats_kwork
+                )
             if kwork_projects is not None:
                 stats_kwork.downloaded = len(kwork_projects)
                 n, notify = _process_listings(
@@ -320,7 +357,11 @@ def run_cycle(
     summary.sync_neon_from_globals()
     record_cycle_summary(storage, summary)
 
-    _append_log_line(cfg.radar_log_path, summary.format_footer(), echo=True)
+    _append_log_line(
+        cfg.radar_log_path,
+        summary.format_footer(elapsed_sec=time.monotonic() - cycle_t0),
+        echo=True,
+    )
     if summary.misc_errors:
         _append_log_line(
             cfg.radar_log_path,

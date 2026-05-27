@@ -106,6 +106,14 @@ Swagger: [http://localhost:18766/docs](http://localhost:18766/docs)
 
 **Кабинет (`/cabinet/`):** WP REST `wp-json/rawlead/v1/me/feed` и `…/me/tags` → FastAPI `/v1/me/*` с заголовком `X-RawLead-User-Id: 00000000-0000-0000-0000-000000000001` (owner #1). Теги: `PUT` с телом `{"tags":["wordpress","python"]}` — затем персональная лента с `final_rank` (совместимость), сортировка иначе, чем на `/lenta/`.
 
+**Fallback логин без iframe Telegram Widget:** если widget в `/cabinet/` пустой/битый, задай в `wp-config.php`:
+
+```php
+define('RAWLEAD_TG_LOGIN_FALLBACK_URL', 'https://oauth.telegram.org/auth?...return_to=http://127.0.0.1:10007/cabinet/');
+```
+
+После этого на странице появится кнопка **«Войти через Telegram (fallback)»**: вход идет через deep-link в новом окне, при возврате на `/cabinet/` access_token сохраняется автоматически.
+
 Проверка API кабинета (PowerShell):
 
 ```powershell

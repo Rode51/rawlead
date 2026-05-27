@@ -404,6 +404,43 @@ class NeonLeadStorage:
             logger.warning("%s", msg)
             errors.append(msg)
 
+    def update_after_premium(
+        self,
+        project: ListingProject,
+        *,
+        premium: AiAnalysis,
+        errors: list[str],
+    ) -> None:
+        """После L2: инструменты и черновик отклика для кабинета подписчика."""
+        if not self.enabled:
+            return
+        tools_json = json.dumps(list(premium.tools_required), ensure_ascii=False)
+        reply = (premium.reply_draft or "").strip()
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE leads
+                        SET tools_required = %s::jsonb,
+                            reply_draft = COALESCE(NULLIF(%s, ''), reply_draft)
+                        WHERE source = %s AND external_id = %s
+                        """,
+                        (
+                            tools_json,
+                            reply,
+                            project.source,
+                            str(project.project_id),
+                        ),
+                    )
+        except Exception as exc:
+            msg = (
+                f"pg:premium:{project.source}:id={project.project_id}:"
+                f"{_short_pg_err(exc)}"
+            )
+            logger.warning("%s", msg)
+            errors.append(msg)
+
     def fetch_exchange_leads_after(
         self,
         after_id: int,

@@ -215,17 +215,25 @@ def format_ai_message(
         else [f"🔗 {project.url.strip()}"]
     )
     draft = _esc(analysis.reply_draft, html_mode=html_mode)
+    tools = analysis.tools_required
+    tools_block = ""
+    if tools:
+        tools_block = (
+            f"🛠 Инструменты:\n"
+            + "\n".join(f"• {_esc(t, html_mode=html_mode)}" for t in tools)
+            + "\n\n"
+        )
     tail = (
         f"———\n"
         f"🤖 Разбор\n\n"
-        f"Вердикт: {_esc(analysis.verdict, html_mode=html_mode)}\n"
-        f"Техника (Cursor): {_esc(analysis.difficulty, html_mode=html_mode)}\n"
+        f"{tools_block}"
+        f"Техника: {_esc(analysis.difficulty, html_mode=html_mode)}\n"
         f"Как сделаем: {_esc(analysis.approach, html_mode=html_mode)}\n"
         f"Срок заказчику: {_esc(analysis.time_for_client, html_mode=html_mode)}\n"
         f"Деньги: {_esc(analysis.money, html_mode=html_mode)}\n"
         f"Риски: {_esc(analysis.risks, html_mode=html_mode)}\n\n"
         f"———\n"
-        f"✍️ Черновик отклика (подправь под себя):\n\n"
+        f"✍️ Черновик отклика:\n\n"
         f"{draft}\n\n"
         f"———\n"
         f"{chr(10).join(link_lines)}"

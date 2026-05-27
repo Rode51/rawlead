@@ -19,10 +19,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
+from src.config import load_radar_env
 
 from src.lead_category import (
     build_skills_groups,
@@ -45,7 +45,11 @@ from src.rank import (
 )
 from src.telegram_login import login_bot_token, verify_telegram_login
 
-load_dotenv()
+# /cabinet/ login and /v1/me/* are site-product endpoints.
+# Force site profile to avoid accidental legacy token verification
+# when uvicorn inherits RADAR_PROFILE=legacy from another shell.
+os.environ["RADAR_PROFILE"] = "site"
+load_radar_env()
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +99,8 @@ def _row_to_item(
         created_at,
         stored_category,
         task_summary,
+        tools_required,
+        reply_draft,
     ) = row
     tags = parse_lead_tags(lead_tags)
     km = keyword_match_val
@@ -102,6 +108,9 @@ def _row_to_item(
     if fr is None:
         fr = open_rank(ai_score)
     category = resolve_lead_category(stored_category, title or "", body or "", tags)
+    tools: list[str] = []
+    if isinstance(tools_required, list):
+        tools = [str(t).strip() for t in tools_required if str(t).strip()]
     return {
         "id": lead_id,
         "source": source,
@@ -118,13 +127,15 @@ def _row_to_item(
         "keyword_match": km,
         "category": category,
         "created_at": created_at.isoformat() if created_at else None,
+        "tools_required": tools,
+        "reply_draft": (reply_draft or "").strip(),
     }
 
 
 _SELECT_COLS = """
     id, source, title, body, url, budget_text,
     ai_score, ai_verdict, lead_tags, ai_reasons, created_at, category,
-    task_summary
+    task_summary, tools_required, reply_draft
 """
 
 
@@ -467,8 +478,10 @@ def health() -> dict[str, str]:
 @app.get("/v1/skills/catalog")
 def skills_catalog(
     limit: int = Query(default=_SKILLS_CATALOG_LIMIT, ge=1, le=100),
+    category: str = Query(default=""),
 ) -> dict[str, Any]:
     """Топ навыков из lead_tags лидов, уже ушедших в бот."""
+    category_list = parse_category_param(category)
     try:
         feed_where, feed_params = _feed_where_sql()
         with psycopg.connect(_db_url()) as conn:
@@ -486,7 +499,7 @@ def skills_catalog(
                     (*feed_params, limit),
                 )
                 rows = cur.fetchall()
-                groups, skills = build_skills_groups(rows)
+                groups, skills = build_skills_groups(rows, categories=category_list)
     except Exception as exc:
         logger.error("skills_catalog: %s", exc)
         raise HTTPException(status_code=500, detail="db error")

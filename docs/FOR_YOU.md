@@ -10,6 +10,7 @@
 | **План Product** | [`team/product/LEAD_PRODUCT_PROMPT.md`](team/product/LEAD_PRODUCT_PROMPT.md) |
 | **Запуск** | [`ops/RUN.md`](ops/RUN.md) |
 | **Пульт** | [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
+| **Перед продом (стресс на хосте)** | [`team/architect/PRE_PROD_GATE.md`](team/architect/PRE_PROD_GATE.md) § PRE-PROD-STRESS |
 | **TG acc + @FLPARSINGBOT** | [`ops/TELEGRAM_ACCOUNTS.md`](ops/TELEGRAM_ACCOUNTS.md) |
 | **Схема (картинка)** | [`design/rawlead/project-map-owner.png`](design/rawlead/project-map-owner.png) |
 
@@ -122,6 +123,12 @@
 
 **@rawlead_bot /start** — на проде, полный путь регистрации как пользователь.
 
+**Если в `/cabinet/` пустой Telegram Widget (серый блок):**
+
+1. В `wp-config.php` добавь `RAWLEAD_TG_LOGIN_FALLBACK_URL` (прямой Telegram OAuth/deep-link URL для `rawlead_bot` с возвратом на `http://127.0.0.1:10007/cabinet/`).
+2. Открой `/cabinet/` на `127.0.0.1` и нажми **«Войти через Telegram (fallback)»**.
+3. После возврата на `/cabinet/` токен сохранится автоматически, и откроется кабинет.
+
 **Join в новые 19 каналов (Site ▶):** как в [`ops/TG_JOIN_SCHEDULE.md`](ops/TG_JOIN_SCHEDULE.md) — до **4 в час** на acc, пауза **15–20 мин**, **ночью 02:00–07:00 Irkutsk join не идёт**. Очередь: `TG_JOIN_QUEUE_v2.csv` (`pending` → `done` автоматически в `tg_main`).
 
 ## Если пульт не ответил («API не отвечает»)
@@ -155,25 +162,33 @@ cd C:\Users\hramo\uisness
 
 **Как не сломать снова:** [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) § «Антирегресс: пульт / API / ▶» · тикет [`problems/2026-05-27-pult-start-killed-api.md`](problems/2026-05-27-pult-start-killed-api.md).
 
-## Остановить радар / спам «Статус» (сейчас)
+## Остановить радар / спам «Статус» в Telegram (сейчас)
 
-**Полный стоп (всё гасит, токены OpenRouter тоже):**
+**Полный стоп (канон):**
 
-```text
-scripts\stop-radar-desktop-full.vbs
+1. `scripts\stop-radar-desktop-full.vbs` — гасит site + legacy: `radar_control`, `main`, `neon_legacy_consumer`, `tg_main`, join.
+2. Закрой окна пульта (✕). Проверка: в `data\radar_site.log` и `data\radar_legacy.log` **нет** новых строк с текущим временем; в диспетчере задач **нет** `neon_legacy_consumer` / `main.py` / `tg_main`.
+
+**Если процессы остались** — PowerShell из корня `uisness`:
+
+```powershell
+Get-CimInstance Win32_Process | Where-Object {
+  ($_.Name -eq 'python.exe' -or $_.Name -eq 'pythonw.exe') -and $_.CommandLine -like '*uisness*'
+} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 ```
 
-Закрой окна пульта (✕). Проверка: в `data\radar_site.log` **нет** новых строк с текущим временем.
+**Если спам в TG не прекращается за 1–2 мин:**
 
-**Только пауза (API можно оставить):** в пульте **■ Стоп** (Site и/или Legacy) — воркеры `main`/`tg`/`neon` остановятся.
+1. **Заглуши** чат @FLPARSINGBOT (Mute 8 ч).
+2. **Не жми ▶** и **не открывай** ярлыки Site/Legacy — пульт снова поднимет consumer.
+3. PowerShell (ещё раз, см. выше).
+4. Дождись тишины в TG, затем один VBS → один ▶.
 
-**Спам вкладки «Статус» в пульте** — это не баг радара: открытая панель логов **обновляет `/status-text` каждые ~1.5 с**. Чтобы не мелькало:
+**Только пауза ■ в пульте** — воркеры стоп, но **не** полный kill API/consumer; для тишины в TG — `stop-radar-desktop-full.vbs`.
 
-- сверни лог (стрелка вниз) или закрой окно пульта;
-- смотри **`radar_site.log`**, не вкладку «Статус» в UI;
-- **Legacy ▶** не нужен, пока смотришь только Site/ленту — иначе `neon:цикл` в `radar_legacy.log` крутится часто.
+**Спам вкладки «Статус» в пульте** (не Telegram): открытая панель логов дергает `/status-text` каждые ~1.5 с — сверни лог или закрой пульт.
 
-**Не жми** ℹ «Статус» в @rawlead_bot без нужды — бот пришлёт сводку в ЛС.
+**Не жми** ℹ «Статус» в боте без нужды — каждое нажатие = одна простыня в ЛС.
 
 ---
 
@@ -193,16 +208,26 @@ scripts\stop-radar-desktop-full.vbs
 
 ## Твои шаги дальше — по порядку (2026-05-27)
 
-**Пульт ✅** · дальше — **воронка в Neon**, не отладка запуска.
+**Полная лестница:** [`team/common/TASKS.md`](team/common/TASKS.md) § «Поэтапно до трафика».
 
-1. **Стоп** (выше), если крутится лишнее → снова **только Site** VBS → ▶ **один раз**.
-2. **`.env.site`:** `PUBLIC_FEED_SOURCES=fl,kwork` (без freelancehunt).
-3. **15–30 мин** Site ▶ → в логе: `neon_insert` > 0 или `neon_replay` · открыть `/lenta/`.
-4. Если лента пустая — **@coder** § NEON-DEDUP-REPLAY / LOG-NEON-CYCLE (не трогать bat/пульт).
-5. **Legacy ▶** — только когда нужны карточки в @FLPARSINGBOT, отдельно от ленты.
-6. **Прод P5** — после п.3–4 + «едем на прод».
+### Сейчас (ждём @coder)
 
-**Не прод:** Neon/лента пустые при живом цикле FL/Kwork в логе.
+1. **Стоп** (выше), если крутится лишнее → **только Site** VBS → ▶ один раз.
+2. Приёмка **PRE-LAUNCH** + **вход в `/cabinet/`** (fallback login, когда сдадут).
+3. **Legacy ▶** — только для @FLPARSINGBOT, отдельно от ленты.
+
+### Потом по шагам (не параллельить UX раньше research)
+
+| Шаг | Ты / роли |
+|-----|-----------|
+| **ЛК** | Зайти, навыки, L2 в карточке — когда login ок |
+| **Research** | С @lead-product: [`team/product/SKILLS_TOOLS_RESEARCH_PROMPT.md`](team/product/SKILLS_TOOLS_RESEARCH_PROMPT.md) (**до** дизайна) |
+| **Дизайн** | @lead-designer — фильтры сверху, воздух, контакты, «сообщить об ошибке», mobile (**спорься до идеала**) |
+| **Тексты** | @lead-product — копирайт по макету |
+| **Код сайта** | @coder — последняя вёрстка |
+| **Прод** | P5 + stress + «едем на прод» |
+
+**Не прод:** пустая лента при живом Site в логе · нельзя войти в кабинет · UX не согласован.
 
 Neon ✅ · dogfood бот — как был.
 
