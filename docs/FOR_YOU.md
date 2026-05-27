@@ -126,10 +126,34 @@
 
 ## Если пульт не ответил («API не отвечает»)
 
+**После `stop-radar-desktop-full.vbs` порт пустой — это норма.** `Invoke-WebRequest …/health` сразу после стопа **всегда** «не соединиться». Сначала подними API (п.3–4), **потом** health.
+
 1. Закрой пульт (✕).
 2. **Полный стоп** — `scripts\stop-radar-desktop-full.vbs`. `stop-radar.bat` один — **недостаточно**.
 3. Удали lock: `data\.radar_desktop_legacy.lock` / `data\.radar_desktop_site.lock` (если есть).
-4. Ярлык **только .vbs** → подождать 5 с → ▶.
+4. Ярлык **только .vbs** → подожди **8 с** → проверь health → ▶ **один раз**.
+
+**Обход** (PowerShell из `uisness`, если VBS не поднял API):
+
+```powershell
+$wd = (Get-Location).Path
+Start-Process "$wd\.venv\Scripts\pythonw.exe" -ArgumentList "$wd\scripts\radar_control.py","--profile","site" -WorkingDirectory $wd -WindowStyle Hidden
+Start-Process "$wd\.venv\Scripts\pythonw.exe" -ArgumentList "$wd\scripts\radar_control.py","--profile","legacy" -WorkingDirectory $wd -WindowStyle Hidden
+Start-Sleep 5
+Invoke-WebRequest http://127.0.0.1:18775/health -UseBasicParsing
+Invoke-WebRequest http://127.0.0.1:18765/health -UseBasicParsing
+```
+
+Оба `{"ok": true}` → открой пульты (VBS) → ▶.
+
+**Аварийный старт воркеров** (если ▶ красный, API жив):
+
+```powershell
+cd C:\Users\hramo\uisness
+.\.venv\Scripts\python.exe scripts\radar_spawn_workers.py --profile site
+```
+
+**Как не сломать снова:** [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) § «Антирегресс: пульт / API / ▶» · тикет [`problems/2026-05-27-pult-start-killed-api.md`](problems/2026-05-27-pult-start-killed-api.md).
 
 ## Твои шаги сейчас — к прод (2026-05-27)
 

@@ -22,6 +22,7 @@ if sys.platform == "win32":
     import msvcrt
 
     CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
     fcntl = None  # type: ignore
 else:
     msvcrt = None  # type: ignore
@@ -189,8 +190,21 @@ def _hidden_popen(args: list[str], cwd: Path, *, log_key: str = "worker") -> sub
         si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         si.wShowWindow = subprocess.SW_HIDE
         kwargs["startupinfo"] = si
-        kwargs["creationflags"] = CREATE_NO_WINDOW
+        kwargs["creationflags"] = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
     return subprocess.Popen(args, **kwargs)
+
+
+def _log_start_failure(exc: BaseException) -> None:
+    import traceback
+
+    path = _ROOT / "data" / "radar_control_start.log"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} [{_RADAR_PROFILE}] ---\n")
+            fh.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+    except OSError:
+        pass
 
 
 def _release_stale_tg_lock() -> None:
@@ -359,10 +373,12 @@ class RadarController:
                             pass
                     self._stop_unlocked(sweep_orphans=True)
                     kill_duplicate_radar_workers(
+                        role="main",
                         log_source="radar_control:pre_spawn",
                         profile=_RADAR_PROFILE,
                     )
-                    kill_non_venv_radar_workers(
+                    kill_duplicate_radar_workers(
+                        role="tg_main",
                         log_source="radar_control:pre_spawn",
                         profile=_RADAR_PROFILE,
                     )
@@ -387,7 +403,7 @@ class RadarController:
                             errors.append(f"{spec.label}: {exc}")
                             spec.popen = None
                     mc, tc = 0, 0
-                    deadline = time.monotonic() + 5.0
+                    deadline = time.monotonic() + 15.0
                     spawn_failed = False
                     while time.monotonic() < deadline:
                         for spec in self.children:
@@ -414,23 +430,19 @@ class RadarController:
                             spawn_failed = True
                     if not spawn_failed and (mc != exp_main or tc != exp_tg):
                         spawn_failed = True
-                    if not spawn_failed:
-                        kill_non_venv_radar_workers(
-                            keep_pids=self._spawn_keep_pids(),
-                            log_source="radar_control:post_spawn",
-                            profile=_RADAR_PROFILE,
-                        )
-                        mc, tc = count_radar_workers(_RADAR_PROFILE)
-                        if mc != exp_main or tc != exp_tg:
-                            errors.append(
-                                f"после post_spawn main={mc} tg={tc} "
-                                f"(ожидалось {exp_main}/{exp_tg})"
-                            )
-                            spawn_failed = True
+                    # post_spawn kill убран: убивал только что поднятые venv-воркеры (регресс 2026-05-26)
                     if spawn_failed or mc != exp_main or tc != exp_tg:
                         self._stop_unlocked(sweep_orphans=True)
                     self._ui_expanded = False
                     return {"ok": len(errors) == 0, "errors": errors}
+                except Exception as exc:
+                    _log_start_failure(exc)
+                    self._stop_unlocked(sweep_orphans=True)
+                    return {
+                        "ok": False,
+                        "errors": [str(exc)],
+                        "error": "start_exception",
+                    }
                 finally:
                     self._starting = False
 
@@ -655,7 +667,46 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = urlparse(self.path).path
         if path == "/start":
-            result = _controller.start()
+            try:
+                proc = subprocess.run(
+                    [
+                        str(_PYTHON),
+                        str(_ROOT / "scripts" / "radar_spawn_workers.py"),
+                        "--profile",
+                        _RADAR_PROFILE,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                    cwd=str(_ROOT),
+                    env=os.environ.copy(),
+                )
+                lines = [ln for ln in (proc.stdout or "").splitlines() if ln.strip()]
+                if lines:
+                    result = json.loads(lines[-1])
+                else:
+                    result = {
+                        "ok": False,
+                        "errors": [
+                            (proc.stderr or "spawn_start_empty").strip()[:500]
+                        ],
+                    }
+                if proc.returncode not in (0, 1) and result.get("ok"):
+                    result = {
+                        "ok": False,
+                        "errors": result.get("errors", [])
+                        + [f"spawn exit {proc.returncode}"],
+                    }
+            except subprocess.TimeoutExpired:
+                self._send_json(504, {"ok": False, "error": "start_timeout"})
+                return
+            except Exception as exc:
+                _log_start_failure(exc)
+                self._send_json(
+                    500,
+                    {"ok": False, "error": "start_exception", "detail": str(exc)},
+                )
+                return
             code = 200 if result.get("ok") else 400
             self._send_json(code, result)
             return
@@ -713,6 +764,25 @@ def _boot_sweep_disabled_exchanges() -> None:
     )
 
 
+def _run_start_cli() -> int:
+    """Отдельный процесс для /start — API не падает при spawn воркеров (Windows)."""
+    _init_profile_paths()
+    try:
+        result = _controller.start()
+        print(json.dumps(result, ensure_ascii=False), flush=True)
+        return 0 if result.get("ok") else 1
+    except Exception as exc:
+        _log_start_failure(exc)
+        print(
+            json.dumps(
+                {"ok": False, "errors": [str(exc)], "error": "start_exception"},
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+        return 1
+
+
 def main() -> int:
     import os
 
@@ -747,4 +817,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if "--do-start-only" in sys.argv:
+        raise SystemExit(_run_start_cli())
     raise SystemExit(main())

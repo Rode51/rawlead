@@ -7,24 +7,35 @@ set "RADAR_PROFILE=legacy"
 set "RADAR_CONTROL_PORT=18765"
 set "VITE_RADAR_API=http://127.0.0.1:18765"
 
-REM API уже жив — не убивать radar_control (двойной клик по ярлыку)
-"%RADAR_ROOT%\.venv\Scripts\python.exe" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18765/health', timeout=2)" >nul 2>&1
-if not errorlevel 1 goto desktop_only
+if exist "%RADAR_ROOT%\data\.radar_desktop_legacy.lock" del /f /q "%RADAR_ROOT%\data\.radar_desktop_legacy.lock" >nul 2>&1
+if exist "%RADAR_ROOT%\data\.radar_ops_legacy.lock" del /f /q "%RADAR_ROOT%\data\.radar_ops_legacy.lock" >nul 2>&1
 
-REM Python API — убить все radar_control (venv + system), потом запустить чистый
+"%RADAR_ROOT%\.venv\Scripts\python.exe" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18765/health', timeout=2)" >nul 2>&1
+if not errorlevel 1 goto :desktop_only
+
 "%RADAR_ROOT%\.venv\Scripts\python.exe" -c "import sys; sys.path.insert(0,r'%RADAR_ROOT%\src'); from process_guard import kill_all_radar_control; kill_all_radar_control(profile='legacy')" >nul 2>&1
-timeout /t 1 /nobreak >nul
+ping -n 2 127.0.0.1 >nul
+
 set "RADAR_PYW=%RADAR_ROOT%\.venv\Scripts\pythonw.exe"
 if not exist "%RADAR_PYW%" (
   echo Oshibka: net pythonw: %RADAR_PYW%
   pause & exit /b 1
 )
 set "PYTHONPATH=%RADAR_ROOT%\.venv\Lib\site-packages"
-start "" /B "%RADAR_PYW%" "%RADAR_ROOT%\scripts\radar_control.py" --profile legacy
-timeout /t 2 /nobreak >nul
+cd /d "%RADAR_ROOT%"
+start "" /MIN "%RADAR_PYW%" "%RADAR_ROOT%\scripts\radar_control.py" --profile legacy
+ping -n 9 127.0.0.1 >nul
+call :check_api_health
+if errorlevel 1 (
+  ping -n 4 127.0.0.1 >nul
+  call :check_api_health
+)
+if errorlevel 1 (
+  call :msgbox_api_fail "API legacy ne podnyalsya na :18765. Sm. data\radar_legacy.log"
+  exit /b 1
+)
 
 :desktop_only
-REM Второй ярлык при живом API: убрать system-python воркеры, не трогая venv API
 "%RADAR_ROOT%\.venv\Scripts\python.exe" -c "import sys; sys.path.insert(0,r'%RADAR_ROOT%\src'); from process_guard import kill_non_venv_radar_workers; kill_non_venv_radar_workers(profile='legacy')" >nul 2>&1
 cd /d "%RADAR_ROOT%\desktop"
 if not exist "node_modules\" (
@@ -64,3 +75,11 @@ echo Nuzhen Rust: https://www.rust-lang.org/tools/install
 call npm run tauri dev
 if errorlevel 1 pause
 exit /b %errorlevel%
+
+:check_api_health
+"%RADAR_ROOT%\.venv\Scripts\python.exe" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18765/health', timeout=5)" >nul 2>&1
+exit /b %errorlevel%
+
+:msgbox_api_fail
+mshta "javascript:var s=new ActiveXObject('WScript.Shell'); s.Popup('%1',0,'RawLead Legacy',16);close()"
+exit /b 0

@@ -9,6 +9,15 @@
 **PM ✅** · split legacy/site ✅ · **Neon dup-replay L1** ✅ код · приёмка владельцем ⏳.  
 **Роли:** Coder = `CODER_PROMPT` · Mechanic = `docs/problems/` + **Gemini 2.5 (2M)** · канон [`LEAD.md`](../architect/LEAD.md) § «Coder vs Mechanic».
 
+### PULT-MIN hotfix (Lead 2026-05-27) — **✅ verify**
+
+| | |
+|--|--|
+| **Корень** | `kill_non_venv` при ▶ убивал **venv** `radar_control` (API) → пульт «error /start», воркеры не стартовали |
+| **Фикс** | `/start` → `scripts/radar_spawn_workers.py`; pre-kill только `main`/`tg_main`; bat: lock + `/MIN`; убран post_spawn |
+| **Verify** | `POST /start` → `200 {"ok":true}`; `/health` жив; `running=true` |
+| **Владелец** | `stop-radar-desktop-full.vbs` → `start-radar-desktop-site.vbs` → ▶ → `radar_site.log` свежие строки |
+
 ### SQLite → Neon (§ SQLITE-NEON-SYNC, 2026-05-27)
 
 | | |

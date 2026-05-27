@@ -19,6 +19,7 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 · план Pro
 
 | # | § | Статус |
 |---|-----|--------|
+| **0** | **PULT-MIN** — API/▶/lock/spawn_workers | ✅ владелец 2026-05-27 |
 | **0** | **SITE-BAT-VENV** — дубли system/venv (b4–b10) | ✅ Lead verify 2026-05-27 |
 | **0a** | **BOT-NOTIFY-SPLIT** — два бота | ✅ Lead verify 2026-05-27 |
 | **0b** | **SQLITE-NEON-SYNC** — resync (s7–s12) | ✅ Lead verify 2026-05-27 (footer `neon_insert: 17`) |

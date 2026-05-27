@@ -58,7 +58,33 @@ Exe: `desktop\src-tauri\target\release\` (имя по `productName` в `tauri.co
 
 Пауза радара FL/Kwork — только в Telegram-боте (кнопка ℹ), в пульте строки про бота **нет**.
 
-Перед повторным стартом: **Stop** в пульте или **`stop-radar-desktop-full.vbs`** (убивает API). `stop-radar.bat` — только воркеры, без `radar_control`.
+Перед повторным стартом: **Stop** в пульте или **`stop-radar-desktop-full.vbs`** (убивает API + lock). `stop-radar.bat` — только воркеры, **без** `radar_control`.
+
+### Антирегресс: пульт / API / ▶ (2026-05-27)
+
+**Симптом:** `health ok`, но ▶ → `error /start`, боты молчат, лог не обновляется.
+
+| Причина | Как не повторить |
+|---------|------------------|
+| **`health` ≠ радар работает** | `health` = только `radar_control`. Воркеры — после **▶** (`POST /start`). |
+| **`kill_non_venv` при ▶** | Убивал **venv** `radar_control`. **Не** вызывать `kill_non_venv` в цепочке `/start` — только `kill_duplicate` по роли `main` / `tg_main`. |
+| **`post_spawn` kill** | Убивал только что поднятые воркеры. **Не** возвращать без теста ▶. |
+| **`start /B` API в bat** | API умирал с закрытием cmd/VBS. Только **`start /MIN`**, ждать `/health` 8+3 с. |
+| **Зомби-lock** | После сбоя — `data\.radar_desktop_site.lock` / `_legacy.lock`. Сбрасывает **full stop** и bat. |
+| **Ярлык на `desktop.exe`** | Bat не запускается → нет API. Ярлык **только** на `start-radar-desktop-*-.vbs`. |
+| **Проверка health сразу после full stop** | Порт **пустой** — норма. Сначала VBS или `Start-Process pythonw radar_control`. |
+
+**Канон запуска (владелец):**
+
+1. `stop-radar-desktop-full.vbs` → пауза 3 с  
+2. `start-radar-desktop-site.vbs` (и при необходимости Legacy) → дождаться **без** красного баннера  
+3. **▶ один раз** на профиль  
+4. `data\radar_site.log` — свежие `радар:старт` / `тг:пульс`
+
+**Аварийно** (API жив, ▶ красный):  
+`.venv\Scripts\python.exe scripts\radar_spawn_workers.py --profile site`
+
+**Coder:** не трогать `radar_spawn_workers.py` / `/start` без приёмки ▶ + `/health` после ▶. Тикет: [`problems/2026-05-27-pult-start-killed-api.md`](../problems/2026-05-27-pult-start-killed-api.md).
 
 ---
 
