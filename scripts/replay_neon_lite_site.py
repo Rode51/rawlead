@@ -8,9 +8,13 @@
 
   .venv\\Scripts\\python.exe scripts\\replay_neon_lite_site.py --profile site --limit 20
 
+  .venv\\Scripts\\python.exe scripts\\replay_neon_lite_site.py --profile site --tg-replay --limit 200
+
   .venv\\Scripts\\python.exe scripts\\replay_neon_lite_site.py --profile site --backfill-missing --dry-run
 
   .venv\\Scripts\\python.exe scripts\\replay_neon_lite_site.py --profile site --backfill-missing --limit 30
+
+  .venv\\Scripts\\python.exe scripts\\replay_neon_lite_site.py --profile site --fresh-l1 --limit 200
 
 """
 
@@ -62,7 +66,7 @@ from listing import ListingProject
 
 from listing_dedup import listing_content_hash
 
-from pg_storage import pg_storage_from_config
+from pg_storage import NeonLeadRow, pg_storage_from_config
 
 from public_feed import public_feed_sources
 
@@ -79,6 +83,138 @@ _LIVE_FETCHERS: dict[str, object] = {
     "freelancehunt": fetch_freelancehunt_listing,
 
 }
+
+
+def _normalize_tg_source(source: str) -> str:
+    s = (source or "").strip()
+    if not s.startswith("tg:"):
+        return s
+    try:
+        n = int(s[3:])
+        if n > 0:
+            return f"tg:-100{n}"
+    except ValueError:
+        pass
+    return s
+
+
+def _listing_from_row(row: NeonLeadRow) -> ListingProject:
+    project = row.to_listing()
+    norm = _normalize_tg_source(project.source)
+    if norm == project.source:
+        return project
+    return ListingProject(
+        project_id=project.project_id,
+        title=project.title,
+        budget_text=project.budget_text,
+        url=project.url,
+        published_at=project.published_at,
+        listing_snippet=project.listing_snippet,
+        source=norm,
+        listing_category=project.listing_category,
+        chat_invite_url=project.chat_invite_url,
+        chat_title=project.chat_title,
+    )
+
+
+def _fetch_tg_replay_rows(
+    pg,
+    *,
+    limit: int,
+    errors: list[str],
+) -> list[NeonLeadRow]:
+    """TG в Neon: без L1 или is_visible=false (one-shot после PUBLIC_FEED_SOURCES)."""
+    lim = max(1, min(int(limit), 500))
+    try:
+        with pg.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, source, external_id, title, body, url,
+                           budget_text, COALESCE(category, '')
+                    FROM leads
+                    WHERE source LIKE 'tg:%%'
+                      AND (
+                        (ai_verdict IS NULL AND ai_score IS NULL)
+                        OR is_visible = FALSE
+                      )
+                    ORDER BY id DESC
+                    LIMIT %s
+                    """,
+                    (lim,),
+                )
+                rows = cur.fetchall()
+        return [
+            NeonLeadRow(
+                lead_id=int(r[0]),
+                source=str(r[1]),
+                external_id=str(r[2]),
+                title=str(r[3] or ""),
+                body=str(r[4] or ""),
+                url=str(r[5] or ""),
+                budget_text=str(r[6] or ""),
+                category=str(r[7] or ""),
+            )
+            for r in rows
+        ]
+    except Exception as exc:
+        errors.append(f"tg_replay:fetch:{exc}")
+        return []
+
+
+def _run_l1_replay(
+    args,
+    cfg,
+    pg,
+    rows: list[NeonLeadRow],
+    errors: list[str],
+    *,
+    label: str,
+) -> int:
+    print(f"{label}: {len(rows)} (limit={args.limit})")
+    if errors:
+        for e in errors:
+            print(f"  err: {e}")
+
+    if args.dry_run:
+        for row in rows[:10]:
+            print(f"  id={row.lead_id} {row.source}:{row.external_id} {row.title[:60]}")
+        if len(rows) > 10:
+            print(f"  … ещё {len(rows) - 10}")
+        return 0
+
+    word_filter = default_listing_filter()
+    ok = 0
+    skipped = 0
+    for row in rows:
+        project = _listing_from_row(row)
+        snippet = (project.listing_snippet or project.title or "").strip()
+        if not word_filter.accepts_listing(project, wide=cfg.filter_wide):
+            skipped += 1
+            print(f"  skip:filter {row.source}:{row.external_id}")
+            continue
+        log_prefix = f"{row.source}:id={row.external_id} replay:"
+        lite = analyze_lite(
+            cfg,
+            title=project.title,
+            budget_text=project.budget_text,
+            snippet=snippet,
+            url=project.url,
+            errors=errors,
+            log_prefix=log_prefix,
+        )
+        pg.update_after_lite(
+            project,
+            lite=lite,
+            errors=errors,
+            body_snippet=snippet,
+        )
+        ok += 1
+        verdict = lite.verdict if lite else "?"
+        print(f"  L1 {row.source}:{row.external_id} → {verdict}")
+
+    print(f"Готово: L1={ok} filter_skip={skipped} errors={len(errors)}")
+    return 0 if not errors else 1
 
 
 
@@ -348,7 +484,7 @@ def _run_backfill_missing(args, cfg, pg, errors: list[str]) -> int:
 
 
 
-    word_filter = default_listing_filter(cfg)
+    word_filter = default_listing_filter()
 
     ok = 0
 
@@ -390,6 +526,18 @@ def main() -> int:
 
         help="Живая лента ∪ sqlite-only → INSERT Neon + L1",
 
+    )
+
+    parser.add_argument(
+        "--tg-replay",
+        action="store_true",
+        help="TG source LIKE tg:%% — L1 + is_visible (one-shot § TG-FEED-SOURCES)",
+    )
+
+    parser.add_argument(
+        "--fresh-l1",
+        action="store_true",
+        help="L1 для последних N id DESC (§ FEED-FRESHNESS one-shot)",
     )
 
     parser.add_argument("--profile", default="", help="legacy|site (default: env)")
@@ -438,95 +586,24 @@ def main() -> int:
 
 
 
-    rows = pg.fetch_leads_missing_l1(limit=args.limit, errors=errors)
+    if args.tg_replay:
+        rows = _fetch_tg_replay_rows(pg, limit=args.limit, errors=errors)
+        return _run_l1_replay(args, cfg, pg, rows, errors, label="TG replay")
 
-    print(f"Найдено без L1: {len(rows)} (limit={args.limit})")
-
-    if errors:
-
-        for e in errors:
-
-            print(f"  err: {e}")
-
-
-
-    if args.dry_run:
-
-        for row in rows[:10]:
-
-            print(f"  id={row.lead_id} {row.source}:{row.external_id} {row.title[:60]}")
-
-        if len(rows) > 10:
-
-            print(f"  … ещё {len(rows) - 10}")
-
-        return 0
-
-
-
-    word_filter = default_listing_filter(cfg)
-
-    ok = 0
-
-    skipped = 0
-
-    for row in rows:
-
-        project = row.to_listing()
-
-        snippet = (project.listing_snippet or project.title or "").strip()
-
-        if not word_filter.accepts_listing(project, wide=cfg.filter_wide):
-
-            skipped += 1
-
-            print(f"  skip:filter {row.source}:{row.external_id}")
-
-            continue
-
-        log_prefix = f"{row.source}:id={row.external_id} replay:"
-
-        lite = analyze_lite(
-
-            cfg,
-
-            title=project.title,
-
-            budget_text=project.budget_text,
-
-            snippet=snippet,
-
-            url=project.url,
-
-            errors=errors,
-
-            log_prefix=log_prefix,
-
+    if args.fresh_l1:
+        backlog = pg.count_leads_missing_l1(errors=errors)
+        print(f"Очередь без L1: {backlog}")
+        rows = pg.fetch_leads_missing_l1(
+            limit=args.limit, order_desc=True, errors=errors
+        )
+        return _run_l1_replay(
+            args, cfg, pg, rows, errors, label="Fresh L1 (id DESC)"
         )
 
-        pg.update_after_lite(
-
-            project,
-
-            lite=lite,
-
-            errors=errors,
-
-            body_snippet=snippet,
-
-        )
-
-        ok += 1
-
-        verdict = lite.verdict if lite else "?"
-
-        print(f"  L1 {row.source}:{row.external_id} → {verdict}")
-
-
-
-    print(f"Готово: L1={ok} filter_skip={skipped} errors={len(errors)}")
-
-    return 0 if not errors else 1
+    rows = pg.fetch_leads_missing_l1(
+        limit=args.limit, order_desc=True, errors=errors
+    )
+    return _run_l1_replay(args, cfg, pg, rows, errors, label="Найдено без L1")
 
 
 

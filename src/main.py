@@ -27,10 +27,6 @@ from config import (
 )
 from filters import ListingWordFilter, default_listing_filter
 from fl_parser import FlListingError, fetch_listing_projects
-from freelancehunt_parser import (
-    FreelancehuntListingError,
-    fetch_listing_projects as fetch_freelancehunt_listing,
-)
 from habr_career_parser import (
     HabrCareerListingError,
     fetch_listing_projects as fetch_habr_career_listing,
@@ -39,10 +35,20 @@ from kwork_parser import KworkListingError, fetch_listing_projects as fetch_kwor
 from public_feed import public_feed_sources
 from vc_ru_parser import VcRuListingError, fetch_listing_projects as fetch_vc_ru_listing
 
-from lead_pipeline import process_new_listing, short_err
+from lead_pipeline import drain_l1_backlog, process_new_listing, short_err
 from listing import ListingProject
 from pg_storage import NeonLeadStorage, pg_storage_from_config
-from radar_cycle_log import CycleSummary, SourceCycleStats, record_cycle_summary, reset_neon_cycle_counters
+from radar_cycle_log import (
+    CycleSummary,
+    SourceCycleStats,
+    begin_site_rollup_cycle,
+    commit_site_rollup_cycle,
+    emit_site_rollup_line,
+    record_cycle_summary,
+    reset_neon_cycle_counters,
+    reset_site_rollup_emit_clock,
+    site_rollup_emit_due,
+)
 from storage import ProjectStorage, storage_from_config
 
 from bot_poll import try_poll_commands
@@ -56,13 +62,11 @@ _LISTING_ERRORS = (
     FlListingError,
     KworkListingError,
     VcRuListingError,
-    FreelancehuntListingError,
     HabrCareerListingError,
 )
 
 _P1_WEB_SOURCES: tuple[tuple[str, Callable[[Config], list[ListingProject]]], ...] = (
     ("vc_ru", fetch_vc_ru_listing),
-    ("freelancehunt", fetch_freelancehunt_listing),
     ("habr_career", fetch_habr_career_listing),
 )
 
@@ -177,6 +181,8 @@ def _process_listings(
             errors=errors,
             pg=pg,
             stats=stats,
+            defer_l1=cfg.radar_conveyor
+            and project.source not in ("fl", "kwork"),
         )
         if was_new:
             new_ids += 1
@@ -261,6 +267,8 @@ def run_cycle(
 
     reset_cycle_ai_counters()
     reset_neon_cycle_counters()
+    if cfg.radar_profile == "site":
+        begin_site_rollup_cycle()
     ts = radar_timestamp()
     cycle_t0 = time.monotonic()
     errors: list[str] = []
@@ -353,8 +361,32 @@ def run_cycle(
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
+    if cfg.radar_conveyor and pg is not None and cfg.ai_active:
+        backlog = pg.count_leads_missing_l1(errors=errors)
+        if backlog > 100:
+            _append_log_line(
+                cfg.radar_log_path,
+                f"конвейер:backlog={backlog}",
+                echo=True,
+            )
+        l1_n = drain_l1_backlog(
+            cfg,
+            pg,
+            word_filter,
+            errors=errors,
+            limit=cfg.l1_batch_per_cycle,
+        )
+        if l1_n > 0:
+            _append_log_line(
+                cfg.radar_log_path,
+                f"конвейер:L1={l1_n} (batch≤{cfg.l1_batch_per_cycle})",
+                echo=True,
+            )
+
     _collect_misc_errors(errors, summary)
     summary.sync_neon_from_globals()
+    if cfg.radar_profile == "site":
+        commit_site_rollup_cycle(summary)
     record_cycle_summary(storage, summary)
 
     _append_log_line(
@@ -368,6 +400,8 @@ def run_cycle(
             f"Прочее: {'; '.join(summary.misc_errors[:5])}",
             echo=True,
         )
+    if cfg.radar_profile == "site":
+        _maybe_log_site_rollup(cfg, storage)
 
 
 def _poll_and_log_tg_commands(cfg: Config, storage: ProjectStorage) -> None:
@@ -396,6 +430,13 @@ def _tg_poll_if_due(
         state["last"] = now
 
 
+def _maybe_log_site_rollup(cfg: Config, storage: ProjectStorage) -> None:
+    if cfg.radar_profile != "site" or not site_rollup_emit_due():
+        return
+    line = emit_site_rollup_line(storage)
+    _append_log_line(cfg.radar_log_path, line, echo=True)
+
+
 def _sleep_with_tg_poll(
     cfg: Config,
     storage: ProjectStorage,
@@ -403,10 +444,12 @@ def _sleep_with_tg_poll(
     *,
     chunk_sec: int = _TG_POLL_INTERVAL_SEC,
 ) -> None:
-    """Между циклами: сначала getUpdates, затем короткий sleep (не один раз на POLL_INTERVAL)."""
+    """Между циклами: сначала getUpdates, затем корочный sleep (не один раз на POLL_INTERVAL)."""
     deadline = time.monotonic() + max(0.0, float(total_sec))
     while True:
         _poll_and_log_tg_commands(cfg, storage)
+        if cfg.radar_profile == "site":
+            _maybe_log_site_rollup(cfg, storage)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             break
@@ -459,6 +502,7 @@ def main() -> None:
     )
     _echo(
         f"Интервал: {cfg.poll_interval_minutes} мин | "
+        f"Конвейер: {'вкл' if cfg.radar_conveyor else 'выкл'} | "
         f"ИИ: {'вкл' if cfg.ai_active else 'выкл'} | "
         f"Фильтр: {'широкий' if cfg.filter_wide else 'узкий'} | "
         f"Пауза: {'да' if storage.is_radar_paused() else 'нет'} | "
@@ -470,6 +514,8 @@ def main() -> None:
 
     ts0 = radar_timestamp()
     _append_log_line(cfg.radar_log_path, f"{ts0} радар:старт", echo=True)
+    if cfg.radar_profile == "site":
+        reset_site_rollup_emit_clock()
 
     try:
         send_control_panel(cfg)

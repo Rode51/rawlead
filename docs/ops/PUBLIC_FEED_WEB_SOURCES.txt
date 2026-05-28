@@ -8,13 +8,13 @@
 # -------------------------------------|----------------------------------|---------------
 fl                                   | https://www.fl.ru/projects/          | ✅ активен
 kwork                                | https://kwork.ru/projects            | ✅ активен
-freelancehunt                        | https://freelancehunt.com/projects   | ✅ активен
+freelancehunt                        | https://freelancehunt.com/projects   | ⏸ отключён 2026-05-28
 vc_ru                                | https://vc.ru/jobs                   | ⏸ отложен (job-лента)
 habr_career                          | https://career.habr.com/vacancies    | ⏸ отложен (вакансии)
 # habr_freelance — HTTP 410 (сайт закрыт), не в PUBLIC_FEED_SOURCES
 #
 # Env для публички (пример):
-# PUBLIC_FEED_SOURCES=fl,kwork,freelancehunt
+# PUBLIC_FEED_SOURCES=fl,kwork  (+ tg:-100… из build_public_feed_sources.py)
 #
 # Парсеры vc_ru / habr_career — оставить в src/, не вызывать если source_id нет в env.
 # Включить снова — добавить в PUBLIC_FEED_SOURCES + отдельное ТЗ (вакансии).

@@ -367,6 +367,8 @@ class NeonLeadStorage:
             snippet=snippet,
         )
         is_visible = _is_visible_lite(lite, category) and is_public_feed_source(project.source)
+        if lite is not None and lite.pending_tags:
+            self.record_pending_tags(list(lite.pending_tags), category=category)
         try:
             with self.connection() as conn:
                 with conn.cursor() as cur:
@@ -403,6 +405,36 @@ class NeonLeadStorage:
             )
             logger.warning("%s", msg)
             errors.append(msg)
+
+    def record_pending_tags(
+        self,
+        tags: list[str],
+        *,
+        category: str | None = None,
+    ) -> None:
+        """Теги L1 вне canonical pool → очередь review (не в UI)."""
+        if not self.enabled or not tags:
+            return
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    for tag in tags:
+                        t = str(tag).strip().lower().lstrip("#")
+                        if not t:
+                            continue
+                        cur.execute(
+                            """
+                            INSERT INTO pending_tags (tag, category, seen_count)
+                            VALUES (%s, %s, 1)
+                            ON CONFLICT (tag) DO UPDATE SET
+                                seen_count = pending_tags.seen_count + 1,
+                                category = COALESCE(EXCLUDED.category, pending_tags.category)
+                            """,
+                            (t, category),
+                        )
+        except Exception as exc:
+            msg = f"pg:pending_tags:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
 
     def update_after_premium(
         self,
@@ -493,9 +525,10 @@ class NeonLeadStorage:
         self,
         *,
         limit: int = 50,
+        order_desc: bool = True,
         errors: list[str] | None = None,
     ) -> list[NeonLeadRow]:
-        """Site replay: строки без L1 из PUBLIC_FEED_SOURCES."""
+        """Site replay / конвейер: строки без L1 из PUBLIC_FEED_SOURCES."""
         if not self.enabled:
             return []
         sources = sorted(public_feed_sources())
@@ -503,18 +536,19 @@ class NeonLeadStorage:
             return []
         err = errors if errors is not None else []
         lim = max(1, min(int(limit), 500))
+        order_sql = "DESC" if order_desc else "ASC"
         try:
             with self.connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        """
+                        f"""
                         SELECT id, source, external_id, title, body, url,
                                budget_text, COALESCE(category, '')
                         FROM leads
                         WHERE ai_verdict IS NULL
                           AND ai_score IS NULL
                           AND source = ANY(%s)
-                        ORDER BY id ASC
+                        ORDER BY id {order_sql}
                         LIMIT %s
                         """,
                         (sources, lim),
@@ -539,6 +573,177 @@ class NeonLeadStorage:
             err.append(msg)
             return []
 
+    def count_leads_missing_l1(self, errors: list[str] | None = None) -> int:
+        """Очередь без L1 (PUBLIC_FEED_SOURCES) — для § FEED-FRESHNESS."""
+        if not self.enabled:
+            return 0
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return 0
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM leads
+                        WHERE ai_verdict IS NULL
+                          AND ai_score IS NULL
+                          AND source = ANY(%s)
+                        """,
+                        (sources,),
+                    )
+                    row = cur.fetchone()
+                    return int(row[0]) if row else 0
+        except Exception as exc:
+            msg = f"pg:count_missing_l1:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return 0
+
+    def clear_l1_backlog_tail(
+        self,
+        *,
+        hours_protect: int = 48,
+        top_ids_protect: int = 100,
+        dry_run: bool = True,
+        errors: list[str] | None = None,
+    ) -> dict[str, int]:
+        """§ BACKLOG-CLEAR: пометить старый хвост без L1 без вызова ИИ."""
+        if not self.enabled:
+            return {
+                "missing_before": 0,
+                "protected": 0,
+                "to_clear": 0,
+                "cleared": 0,
+                "missing_after": 0,
+            }
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return {
+                "missing_before": 0,
+                "protected": 0,
+                "to_clear": 0,
+                "cleared": 0,
+                "missing_after": 0,
+            }
+        err = errors if errors is not None else []
+        reasons_json = json.dumps(["backlog_cleared"], ensure_ascii=False)
+        stats = {
+            "missing_before": 0,
+            "protected": 0,
+            "to_clear": 0,
+            "cleared": 0,
+            "missing_after": 0,
+        }
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM leads
+                        WHERE ai_verdict IS NULL
+                          AND ai_score IS NULL
+                          AND source = ANY(%s)
+                        """,
+                        (sources,),
+                    )
+                    row = cur.fetchone()
+                    stats["missing_before"] = int(row[0]) if row else 0
+
+                    cur.execute(
+                        """
+                        WITH missing AS (
+                            SELECT id, created_at
+                            FROM leads
+                            WHERE ai_verdict IS NULL
+                              AND ai_score IS NULL
+                              AND source = ANY(%s)
+                        ),
+                        protected AS (
+                            SELECT id FROM missing
+                            WHERE created_at >= NOW() - make_interval(hours => %s)
+                            UNION
+                            SELECT id FROM (
+                                SELECT id FROM missing
+                                ORDER BY id DESC
+                                LIMIT %s
+                            ) recent_top
+                        ),
+                        to_clear AS (
+                            SELECT id FROM missing
+                            WHERE id NOT IN (SELECT id FROM protected)
+                        )
+                        SELECT
+                            (SELECT COUNT(*) FROM protected),
+                            (SELECT COUNT(*) FROM to_clear)
+                        """,
+                        (sources, int(hours_protect), int(top_ids_protect)),
+                    )
+                    prow = cur.fetchone()
+                    stats["protected"] = int(prow[0]) if prow else 0
+                    stats["to_clear"] = int(prow[1]) if prow else 0
+
+                    if not dry_run and stats["to_clear"] > 0:
+                        cur.execute(
+                            """
+                            WITH missing AS (
+                                SELECT id, created_at
+                                FROM leads
+                                WHERE ai_verdict IS NULL
+                                  AND ai_score IS NULL
+                                  AND source = ANY(%s)
+                            ),
+                            protected AS (
+                                SELECT id FROM missing
+                                WHERE created_at >= NOW() - make_interval(hours => %s)
+                                UNION
+                                SELECT id FROM (
+                                    SELECT id FROM missing
+                                    ORDER BY id DESC
+                                    LIMIT %s
+                                ) recent_top
+                            )
+                            UPDATE leads
+                            SET ai_verdict = 'Пропущено',
+                                ai_score = 0,
+                                is_visible = FALSE,
+                                ai_reasons = %s::jsonb
+                            WHERE id IN (
+                                SELECT id FROM missing
+                                WHERE id NOT IN (SELECT id FROM protected)
+                            )
+                            """,
+                            (
+                                sources,
+                                int(hours_protect),
+                                int(top_ids_protect),
+                                reasons_json,
+                            ),
+                        )
+                        stats["cleared"] = cur.rowcount
+
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM leads
+                        WHERE ai_verdict IS NULL
+                          AND ai_score IS NULL
+                          AND source = ANY(%s)
+                        """,
+                        (sources,),
+                    )
+                    row = cur.fetchone()
+                    stats["missing_after"] = int(row[0]) if row else 0
+            return stats
+        except Exception as exc:
+            msg = f"pg:clear_l1_backlog:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return stats
+
     def max_lead_id(self, errors: list[str] | None = None) -> int:
         if not self.enabled:
             return 0
@@ -554,6 +759,36 @@ class NeonLeadStorage:
             logger.warning("%s", msg)
             err.append(msg)
             return 0
+
+    def last_visible_created_at(self, errors: list[str] | None = None) -> str | None:
+        """MAX(created_at) для is_visible=true — свежесть ленты."""
+        if not self.enabled:
+            return None
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT MAX(created_at)
+                        FROM leads
+                        WHERE is_visible = TRUE
+                        """
+                    )
+                    row = cur.fetchone()
+                    if not row or row[0] is None:
+                        return None
+                    ts = row[0]
+                    if isinstance(ts, datetime):
+                        if ts.tzinfo is None:
+                            ts = ts.replace(tzinfo=timezone.utc)
+                        return ts.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+                    return str(ts)
+        except Exception as exc:
+            msg = f"pg:last_visible:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return None
 
     def mark_notified(
         self,

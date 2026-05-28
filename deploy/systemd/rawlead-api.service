@@ -1,0 +1,22 @@
+[Unit]
+Description=RawLead FastAPI (uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rawlead
+Group=rawlead
+WorkingDirectory=/opt/rawlead
+EnvironmentFile=/opt/rawlead/.env
+EnvironmentFile=-/opt/rawlead/.env.site
+Environment=RADAR_PROFILE=site
+Environment=PYTHONPATH=/opt/rawlead/src
+ExecStart=/opt/rawlead/.venv/bin/uvicorn src.api_server:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=10
+# 1 GB VPS: не держать лишние воркеры uvicorn
+Environment=WEB_CONCURRENCY=1
+
+[Install]
+WantedBy=multi-user.target

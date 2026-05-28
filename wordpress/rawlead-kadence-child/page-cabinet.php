@@ -58,7 +58,7 @@ $rawlead_cabinet_login_url = 'http://127.0.0.1:' . $rawlead_cabinet_port . '/cab
 				</label>
 				<label class="rl-feed-chip" id="filter-category-dev">
 					<input type="checkbox" name="category" value="dev">
-					<span class="rl-feed-chip__label rl-feed-chip__label--full"><?php esc_html_e('Код', 'rawlead-kadence-child'); ?></span>
+					<span class="rl-feed-chip__label rl-feed-chip__label--full"><?php esc_html_e('Разработка', 'rawlead-kadence-child'); ?></span>
 					<span class="rl-feed-chip__label rl-feed-chip__label--short"><?php esc_html_e('Код', 'rawlead-kadence-child'); ?></span>
 				</label>
 				<label class="rl-feed-chip" id="filter-category-design">
@@ -91,7 +91,7 @@ $rawlead_cabinet_login_url = 'http://127.0.0.1:' . $rawlead_cabinet_port . '/cab
 				<p class="rl-cabinet-head__label"><?php esc_html_e('Ваши теги:', 'rawlead-kadence-child'); ?></p>
 				<div class="rl-cabinet-tags" id="rl-cabinet-tags" role="list" aria-live="polite"></div>
 				<p class="rl-cabinet-head__hint rl-cabinet-head__hint--empty" id="rl-cabinet-tags-hint" hidden>
-					<?php esc_html_e('Добавьте теги, чтобы мы подбирали заказы под вас.', 'rawlead-kadence-child'); ?>
+					<?php esc_html_e('Добавьте навыки — ИИ покажет подходящие заказы', 'rawlead-kadence-child'); ?>
 				</p>
 			</header>
 			<header class="rl-feed-head rl-cabinet-feed-head">
@@ -102,18 +102,16 @@ $rawlead_cabinet_login_url = 'http://127.0.0.1:' . $rawlead_cabinet_port . '/cab
 			</header>
 			<div class="rl-feed-banner" id="rl-cabinet-error" role="alert" hidden></div>
 			<div class="rl-cabinet-empty rl-cabinet-empty--no-tags" id="rl-cabinet-no-tags" hidden>
-				<p><?php esc_html_e('Добавьте теги профиля, чтобы видеть персональную ленту.', 'rawlead-kadence-child'); ?></p>
-				<button type="button" class="rl-btn rl-btn--primary" id="rl-cabinet-add-first"><?php esc_html_e('Добавить тег', 'rawlead-kadence-child'); ?></button>
+				<p><?php esc_html_e('Добавьте навыки — ИИ покажет подходящие заказы', 'rawlead-kadence-child'); ?></p>
+				<button type="button" class="rl-btn rl-btn--primary" id="rl-cabinet-add-first"><?php esc_html_e('Добавить навык', 'rawlead-kadence-child'); ?></button>
 			</div>
 			<div class="rl-cabinet-empty rl-cabinet-empty--no-match" id="rl-cabinet-no-match" hidden>
-				<p><?php esc_html_e('Подходящих заказов пока нет. Попробуйте расширить теги или проверьте позже.', 'rawlead-kadence-child'); ?></p>
-				<a class="rl-btn rl-btn--ghost" href="<?php echo esc_url(rawlead_page_url('lenta')); ?>">
-					<?php esc_html_e('Смотреть открытую ленту', 'rawlead-kadence-child'); ?>
-				</a>
+				<p><?php esc_html_e('Пока нет заказов по вашим навыкам. Попробуйте расширить профиль.', 'rawlead-kadence-child'); ?></p>
+				<button type="button" class="rl-btn rl-btn--ghost" id="rl-cabinet-change-skills"><?php esc_html_e('Изменить навыки', 'rawlead-kadence-child'); ?></button>
 			</div>
 			<div class="rl-feed-list" id="rl-cabinet-list" aria-live="polite"></div>
 			<div class="rl-feed-sentinel" id="rl-cabinet-sentinel" aria-hidden="true"></div>
-			<p class="rl-feed-end" id="rl-cabinet-end" hidden><?php esc_html_e('Все заказы загружены', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-feed-end" id="rl-cabinet-end" hidden><?php esc_html_e('Все заказы показаны', 'rawlead-kadence-child'); ?></p>
 		</div>
 	</div>
 	<div class="rl-feed-sheet" id="rl-cabinet-sheet" hidden>

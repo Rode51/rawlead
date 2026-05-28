@@ -36,7 +36,17 @@ interface LastCyclePayload {
   ts: string;
   sources: Record<string, LastCycleSource>;
   total_to_bot: number;
+  neon_insert?: number;
+  is_visible?: number;
   misc_errors: string[];
+}
+
+interface NeonConsumerStats {
+  cycle_at: string | null;
+  last_sample: number;
+  last_new: number;
+  last_to_bot: number;
+  session_to_bot: number;
 }
 
 interface StatusPayload {
@@ -44,7 +54,24 @@ interface StatusPayload {
   ever_started: boolean;
   ui_expanded: boolean;
   lamps: LampInfo[];
+  profile?: string;
+  profile_label?: string;
+  bot_label?: string;
+  telegram_chat_id?: string;
+  poll_min?: number;
+  conveyor?: boolean;
+  paused?: boolean;
+  log_file?: string;
+  control_port?: number;
+  bot_start_ok?: boolean | null;
+  site_rollup_10m?: string | null;
+  last_visible_at?: string | null;
+  l1_backlog?: number | null;
   last_cycle?: LastCyclePayload;
+  neon_consumer_stats?: NeonConsumerStats;
+  tg_monitor?: { ok: boolean; detail: string };
+  tg_enabled?: boolean;
+  neon_consumer?: boolean;
 }
 
 const profileBadge = document.getElementById("profile-badge");
@@ -518,14 +545,143 @@ function renderStatusHtml(text: string): string {
   }).join("");
 }
 
+function statusRow(key: string, value: string, indent = false): string {
+  const indentClass = indent ? " status-line--indent" : "";
+  return (
+    `<div class="status-line${indentClass}">` +
+    `<span class="status-line__key">${escapeHtml(key)}</span>` +
+    `<span class="status-line__value">${escapeHtml(value)}</span>` +
+    `</div>`
+  );
+}
+
+function statusSection(title: string): string {
+  return `<div class="status-line status-line--full status-card__title">${escapeHtml(title)}</div>`;
+}
+
+function renderStatusFromPayload(data: StatusPayload): string {
+  const parts: string[] = [];
+  parts.push(
+    `<div class="status-card">` +
+      statusSection("📊 Статус радара") +
+      statusRow(
+        "Профиль",
+        `${data.profile_label ?? data.profile ?? "?"} · ${data.bot_label ?? "?"}`,
+      ) +
+      statusRow("Chat ID", data.telegram_chat_id ?? "—") +
+      statusRow(
+        "Лог / пульт",
+        `${data.log_file ?? "radar.log"} :${data.control_port ?? "?"}`,
+      ),
+  );
+  if (data.profile === "site") {
+    parts.push(
+      statusRow(
+        "Конвейер",
+        `${data.conveyor ? "вкл" : "выкл"} · опрос ${data.poll_min ?? "?"} мин · ${
+          data.paused ? "⏸ пауза" : "▶ активен"
+        }`,
+      ),
+    );
+  } else {
+    parts.push(
+      statusRow(
+        "Режим",
+        `${data.neon_consumer ? "Neon consumer" : "биржи"} · опрос ${
+          data.poll_min ?? "?"
+        } мин · ${data.paused ? "⏸ пауза" : "▶ активен"}`,
+      ),
+    );
+  }
+  if (data.bot_start_ok === true) {
+    parts.push(statusRow("Бот /start", `да · ${data.bot_label ?? ""}`));
+  } else if (data.bot_start_ok === false) {
+    parts.push(statusRow("Бот /start", `нет · ${data.bot_label ?? ""}`));
+  }
+  parts.push(`</div>`);
+
+  if (data.profile === "site") {
+    parts.push(`<div class="status-card">`);
+    parts.push(statusSection("Лента / Neon"));
+    parts.push(
+      statusRow("Сводка 10 мин", data.site_rollup_10m ?? "ещё не было"),
+    );
+    if (data.last_visible_at) {
+      parts.push(statusRow("Последний visible", data.last_visible_at));
+    }
+    if (data.l1_backlog != null && data.l1_backlog > 0) {
+      parts.push(statusRow("Очередь без L1", String(data.l1_backlog)));
+    }
+    const lc = data.last_cycle;
+    if (lc?.ts) {
+      parts.push(statusRow("Последний цикл", lc.ts));
+      for (const [sid, st] of Object.entries(lc.sources ?? {})) {
+        const label =
+          sid === "fl"
+            ? "FL.ru"
+            : sid === "kwork"
+              ? "Kwork"
+              : sid;
+        const bits = [
+          `скачано ${st.downloaded}`,
+          `новых ${st.new_ids}`,
+          `neon_insert ${lc.neon_insert ?? 0}`,
+        ];
+        if (lc.is_visible) bits.push(`is_visible ${lc.is_visible}`);
+        if (st.to_bot) bits.push(`в бот ${st.to_bot}`);
+        parts.push(statusRow(label, bits.join(" · "), true));
+      }
+    }
+    parts.push(`</div>`);
+  } else if (data.neon_consumer_stats) {
+    const nc = data.neon_consumer_stats;
+    parts.push(`<div class="status-card">`);
+    parts.push(statusSection("Dogfood / Neon"));
+    parts.push(
+      statusRow(
+        "Consumer",
+        nc.cycle_at
+          ? `${nc.cycle_at} · выборка ${nc.last_sample} · новых ${nc.last_new} · в бот ${nc.last_to_bot}`
+          : "ещё не было",
+      ),
+    );
+    parts.push(statusRow("В бот за сессию", String(nc.session_to_bot)));
+    parts.push(`</div>`);
+  }
+
+  if (data.tg_enabled && data.tg_monitor) {
+    const icon = data.tg_monitor.ok ? "🟢" : "🔴";
+    parts.push(`<div class="status-card">`);
+    parts.push(
+      statusSection(`Telegram ${icon} ${data.tg_monitor.detail}`),
+    );
+    parts.push(`</div>`);
+  } else if (data.profile === "legacy") {
+    parts.push(`<div class="status-card">`);
+    parts.push(statusSection("Telegram-монитор: выкл"));
+    parts.push(`</div>`);
+  }
+
+  return parts.join("");
+}
+
 async function refreshActiveLog(): Promise<void> {
   if (!logsOpen || logsCollapsed || pollPaused) return;
   const follow = logFollowBottom;
-  const savedScrollTop = logView.scrollTop;
+  /** Дистанция от низа — стабильнее, чем scrollTop, при смене innerHTML (вкладка «Статус»). */
+  const savedBottomGap = Math.max(
+    0,
+    logView.scrollHeight - logView.scrollTop - logView.clientHeight,
+  );
   try {
     if (activeTab === "status") {
-      const text = trimLogText(await apiGet<string>("/status-text"));
-      logView.innerHTML = renderStatusHtml(text);
+      try {
+        const payload = await apiGet<StatusPayload>("/status");
+        logView.innerHTML = renderStatusFromPayload(payload);
+      } catch {
+        const text = trimLogText(await apiGet<string>("/status-text"));
+        logView.innerHTML = renderStatusHtml(text);
+      }
       logView.classList.add("log-view--status");
     } else {
       const text = trimLogText(await apiGet<string>(`/logs/${activeTab}`));
@@ -535,10 +691,7 @@ async function refreshActiveLog(): Promise<void> {
     if (follow) {
       scrollLogToBottom();
     } else {
-      requestAnimationFrame(() => {
-        const maxTop = Math.max(0, logView.scrollHeight - logView.clientHeight);
-        logView.scrollTop = Math.min(savedScrollTop, maxTop);
-      });
+      restoreLogScrollGap(savedBottomGap);
     }
   } catch (err) {
     if (isCanceledError(err)) return;
@@ -546,12 +699,16 @@ async function refreshActiveLog(): Promise<void> {
     if (follow) {
       scrollLogToBottom();
     } else {
-      requestAnimationFrame(() => {
-        const maxTop = Math.max(0, logView.scrollHeight - logView.clientHeight);
-        logView.scrollTop = Math.min(savedScrollTop, maxTop);
-      });
+      restoreLogScrollGap(savedBottomGap);
     }
   }
+}
+
+function restoreLogScrollGap(bottomGap: number): void {
+  requestAnimationFrame(() => {
+    const maxTop = Math.max(0, logView.scrollHeight - logView.clientHeight);
+    logView.scrollTop = Math.max(0, Math.min(maxTop, maxTop - bottomGap));
+  });
 }
 
 async function pollStatus(): Promise<void> {
@@ -672,7 +829,7 @@ function onTabClick(btn: HTMLButtonElement): void {
     b.setAttribute("aria-selected", b === btn ? "true" : "false");
   });
   activeTab = btn.dataset.tab ?? "radar.log";
-  logFollowBottom = true;
+  logFollowBottom = isLogNearBottom();
   void refreshActiveLog();
 }
 

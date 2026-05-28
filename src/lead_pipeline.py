@@ -17,8 +17,9 @@ from config import Config
 from filters import ListingWordFilter
 from fl_parser import fetch_project_description
 from listing import SOURCE_FL, ListingProject
+from lead_category import category_for_listing
 from listing_dedup import listing_content_hash
-from pg_storage import NeonLeadStorage
+from pg_storage import NeonLeadRow, NeonLeadStorage
 from public_feed import is_public_feed_source
 from storage import ProjectStorage
 from radar_cycle_log import (
@@ -27,6 +28,7 @@ from radar_cycle_log import (
     note_neon_insert,
     note_neon_replay,
     note_neon_sqlite_resync,
+    note_site_rollup_after_lite,
 )
 from telegram_notify import TelegramNotifyError, send_project_notification_from_config
 
@@ -137,6 +139,28 @@ def _neon_resync_tag(project: ListingProject, tag: str) -> str:
     return f"{project.source}:id={project.project_id} {tag}"
 
 
+def _rollup_after_lite(
+    cfg: Config,
+    project: ListingProject,
+    lite: AiLiteAnalysis | None,
+    *,
+    ingest_snippet: str,
+) -> None:
+    if cfg.radar_profile != "site":
+        return
+    category = category_for_listing(
+        project.source,
+        listing_category=project.listing_category,
+        title=project.title,
+        snippet=ingest_snippet,
+    )
+    note_site_rollup_after_lite(
+        lite,
+        category=category,
+        source_public=is_public_feed_source(project.source),
+    )
+
+
 def _neon_dup_skip_return(
     project: ListingProject,
     *,
@@ -161,6 +185,7 @@ def plan_new_listing(
     errors: list[str],
     pg: NeonLeadStorage | None = None,
     stats: SourceCycleStats | None = None,
+    defer_l1: bool = False,
 ) -> tuple[bool, ListingNotifyPlan | None]:
     """Возвращает (was_new, plan). plan — только если нужно слать уведомление."""
     try:
@@ -324,6 +349,9 @@ def plan_new_listing(
         else:
             note_neon_insert()
 
+    if defer_l1:
+        return inserted or neon_replay or neon_sqlite_resync, None
+
     lite_analysis: AiLiteAnalysis | None = None
     full_analysis: AiAnalysis | None = None
     ai_unavailable = False
@@ -363,6 +391,9 @@ def plan_new_listing(
                         errors=errors,
                         body_snippet=ingest_snippet,
                     )
+                    _rollup_after_lite(
+                        cfg, project, lite_analysis, ingest_snippet=ingest_snippet
+                    )
                 return inserted or neon_replay or neon_sqlite_resync, None
 
             if pg is not None:
@@ -371,6 +402,9 @@ def plan_new_listing(
                     lite=lite_analysis,
                     errors=errors,
                     body_snippet=ingest_snippet,
+                )
+                _rollup_after_lite(
+                    cfg, project, lite_analysis, ingest_snippet=ingest_snippet
                 )
 
             if not _should_notify_bot_lite(
@@ -536,14 +570,79 @@ def process_new_listing(
     errors: list[str],
     pg: NeonLeadStorage | None = None,
     stats: SourceCycleStats | None = None,
+    defer_l1: bool = False,
 ) -> tuple[bool, bool]:
     """Возвращает (was_new, notified). Дубликат в SQLite → (False, False)."""
     was_new, plan = plan_new_listing(
-        project, storage, word_filter, cfg, errors=errors, pg=pg, stats=stats
+        project,
+        storage,
+        word_filter,
+        cfg,
+        errors=errors,
+        pg=pg,
+        stats=stats,
+        defer_l1=defer_l1,
     )
     if plan is None:
         return was_new, False
     return was_new, send_listing_notification(plan, cfg, errors=errors, pg=pg)
+
+
+def _listing_from_neon_row(row: NeonLeadRow) -> ListingProject:
+    pid = int(row.external_id) if str(row.external_id).isdigit() else hash(row.external_id) % (2**31)
+    return ListingProject(
+        project_id=pid,
+        title=row.title,
+        budget_text=row.budget_text,
+        url=row.url,
+        published_at="",
+        listing_snippet=(row.body or row.title or "").strip(),
+        source=row.source,
+        listing_category=row.category or "",
+    )
+
+
+def drain_l1_backlog(
+    cfg: Config,
+    pg: NeonLeadStorage,
+    word_filter: ListingWordFilter,
+    *,
+    errors: list[str],
+    limit: int = 40,
+) -> int:
+    """Конвейер: L1 для строк Neon без ai_verdict (свежие id первыми)."""
+    if not cfg.ai_active or not pg.enabled:
+        return 0
+    rows = pg.fetch_leads_missing_l1(limit=limit, order_desc=True, errors=errors)
+    if not rows:
+        return 0
+    from ai_analyze import analyze_lite
+
+    done = 0
+    for row in rows:
+        project = _listing_from_neon_row(row)
+        snippet = (project.listing_snippet or project.title or "").strip()
+        if not word_filter.accepts_listing(project, wide=cfg.filter_wide):
+            errors.append(f"{row.source}:id={row.external_id} skip:filter:backlog")
+            continue
+        log_prefix = f"{row.source}:id={row.external_id} conveyor:"
+        lite = analyze_lite(
+            cfg,
+            title=project.title,
+            budget_text=project.budget_text,
+            snippet=snippet,
+            url=project.url,
+            errors=errors,
+            log_prefix=log_prefix,
+        )
+        pg.update_after_lite(
+            project,
+            lite=lite,
+            errors=errors,
+            body_snippet=snippet,
+        )
+        done += 1
+    return done
 
 
 def process_legacy_neon_listing(

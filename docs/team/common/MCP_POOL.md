@@ -112,9 +112,10 @@ Chrome: `claude --chrome` или в сессии `/chrome` → Enabled.
 
 ## Чеклист владельца
 
-- [ ] Node.js 18+ (`node -v`)
-- [ ] Скопирован [`mcp.pool.example.json`](mcp.pool.example.json) → `%USERPROFILE%\.cursor\mcp.json`
-- [ ] Ключи Perplexity / Firecrawl / Glif (по необходимости)
+- [x] Node.js 18+ (`node -v`)
+- [x] `perplexity` + `firecrawl` добавлены в `%USERPROFILE%\.cursor\mcp.json` (2026-05-28) · Neon сохранён
+- [ ] **Подставить ключи** вместо `PASTE_…` (см. ниже) → перезапуск Cursor
+- [ ] Glif / Playwright (по необходимости)
 - [ ] Playwright: `npx @playwright/mcp@latest` один раз отработал без ошибки
 - [ ] Claude Code: при необходимости `claude --chrome` + расширение
 - [ ] В чате агенту: «смотри `docs/team/common/MCP_POOL.md`»

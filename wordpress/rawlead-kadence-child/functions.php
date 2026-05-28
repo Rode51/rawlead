@@ -233,8 +233,9 @@ add_filter('the_content', static function (string $content): string {
             esc_url($pricing)
         ),
         'pricing' => sprintf(
-            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">Ранний доступ</a></p>',
-            esc_url($contact)
+            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">%s</a></p>',
+            esc_url(rawlead_page_url('lenta')),
+            esc_html__('Смотреть ленту', 'rawlead-kadence-child')
         ),
         'faq' => sprintf(
             '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">Контакты</a></p>',

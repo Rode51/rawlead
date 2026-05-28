@@ -1,15 +1,12 @@
-# RawLead — WordPress сайт · утверждённый референс
+# RawLead — WordPress сайт · дизайн-референс
 
-**Статус:** v2 · согласовано Lead Designer + владелец · 2026-05-25  
-**Направление:** E — editorial / Pitch / Framer (светлый, типографика, сетка)  
-**Поверхности:** лендинг (главная) · `/feed` (открытая лента) · `/cabinet` (кабинет)  
-**Не использовать:** тёмный вариант A (Linear-dark), пульт Tauri, play/stop, терминал логов
+**Статус:** v3 · REVOLUTION · 2026-05-28  
+**Направление:** «Рабочий инструмент» — тёплый, прямой, для фрилансера 25–35  
+**Поверхности:** лендинг `/` · `/lenta/` (лента) · `/cabinet/` (кабинет) · `/how` · `/faq` · `/contact`  
+**Отменено (v2):** editorial B2B cold, Unbounded, манифест-полоса, кубики-анимация «источников», «Для кого» 4 карточки
 
-Файл-референс: [`bold-editorial-saas-full-page-landing-page-ui-mock.png`](bold-editorial-saas-full-page-landing-page-ui-mock.png) · приёмка владельца 2026-05-23.
-
-Спека `/feed` и `/cabinet`: [`feed-cabinet-mvp.md`](feed-cabinet-mvp.md)
-
-Скелет контента: [`../../archive/wp-skeleton/`](../../archive/wp-skeleton/) · установка: [`../../ops/WP_LOCAL_SKELETON.md`](../../ops/WP_LOCAL_SKELETON.md)
+Токены: [`../../team/design/DESIGN_SYSTEM.md`](../../team/design/DESIGN_SYSTEM.md) § WordPress REVOLUTION  
+Спека `/lenta/` + `/cabinet/`: [`feed-cabinet-mvp.md`](feed-cabinet-mvp.md)
 
 ---
 
@@ -17,256 +14,291 @@
 
 | Принцип | Решение |
 |---------|---------|
-| Первое впечатление | Крупная типографика, много воздуха, **чёрно-белая** база |
-| Акцент | Только функционально: полоса match %, тонкие рамки источников (синий / оранж / голубой) |
-| Тон | Уверенный B2B, без неона и «киберпанка» |
-| Отличие от конкурентов | Блок **источники → стрелка → карточка лида** (биржи + TG в одном потоке) |
-| Реализация WP | Kadence или Astra + блоки Cover / Columns / Group — макет **собирается вручную по сетке**, не вставлять PNG как сайт |
+| Атмосфера | Инструмент, не маркетинг. Тёплый белый, чистые отступы |
+| Аудитория | Фрилансер в телефоне: большие зоны касания, thumb-zone |
+| Акцент | **Один:** `#4F46E5` Indigo — кнопки, match-bar, активные чипы |
+| Шрифт | **Только Manrope** 800 display / 400–600 body |
+| Карточки | Тень `0 2px 12px rgba(0,0,0,0.07)` + `radius 20px` — как мессенджер-карточка |
+| Фон | `#FAFAF8` тёплый белый; секции `#F3F3EF`; footer `#1A1A2E` |
+| Mobile | **Mobile-first** — всё работает в одну руку на телефоне |
+| Голос | Активный залог, без !; кнопка = конкретное действие |
 
 ---
 
-## 2. Токены (v1 — под референс)
+## 2. Токены (сводка — полные в DESIGN_SYSTEM.md § WP REVOLUTION)
 
-| Token | Значение | Использование |
-|-------|----------|---------------|
-| `color/bg/page` | `#FFFFFF` | фон страницы |
-| `color/bg/section` | `#F5F5F7` | чередующие секции (опционально) |
-| `color/bg/inverse` | `#0A0A0A` | полоса-цитата, footer |
-| `color/text/primary` | `#0A0A0A` | заголовки, лого |
-| `color/text/body` | `#3D3D3D` | подзаголовки, body |
-| `color/text/muted` | `#6B6B6B` | подписи, вторичный текст |
-| `color/text/inverse` | `#FFFFFF` | текст на тёмной полосе |
-| `color/border` | `#E8E8EC` | карточки, тарифы |
-| `color/cta/primary` | `#0A0A0A` | кнопки «Смотреть тарифы», «Начать» |
-| `color/cta/primary-text` | `#FFFFFF` | текст на primary |
-| `color/cta/secondary` | transparent | «Как это работает» — текст + стрелка |
-| `color/source/fl` | `#00A65A` | рамка/акцент FL.ru (бренд-зелёный) |
-| `color/source/kwork` | `#EA580C` | рамка/акцент Kwork |
-| `color/source/tg` | `#0088CC` | рамка/акцент Telegram (официальный) |
-| `color/match/bar` | `#2563EB` | прогресс «совпадение %» |
-| `color/status/success` | `#16A34A` | только чипы «Брать» (не вся палитра) |
-| `radius/card` | `16px` | карточки источников, лид, тарифы |
-| `radius/button` | `999px` | pill-кнопки |
-| `space/unit` | `8px` | baseline grid |
-| `space/section-y` | `96px` desktop / `64px` mobile | между секциями |
-| `font/display` | **Unbounded** 700–900 | заголовки H1–H3 |
-| `font/body` | **Manrope** 400–700 | body, UI, подписи |
-| `font/hero` | 56–72px / 700 / −0.02em | H1 «Лиды без шума» |
-| `font/h2` | 32–40px / 700 | секции |
-| `font/body` | 16–18px / 400 / 1.5 | абзацы |
-| `font/ghost-num` | 120px / 200 / `#E8E8EC` | 01, 02, 03 в «Функции» |
-| `container/max` | `1120px` | контент, центр |
-
-Статусы радара (зелёный/красный) — **только** в будущем кабинете/админке, не на маркетинговой главной.
+| Назначение | Токен | Значение |
+|------------|-------|----------|
+| Фон страницы | `color/bg/page` | `#FAFAF8` |
+| Фон секции | `color/bg/section` | `#F3F3EF` |
+| Тёмный inverse | `color/bg/inverse` | `#1A1A2E` |
+| Основной текст | `color/text/primary` | `#18181B` |
+| Body текст | `color/text/body` | `#3F3F46` |
+| Muted | `color/text/muted` | `#71717A` |
+| Акцент / CTA | `color/cta/primary` | `#4F46E5` |
+| CTA hover | `color/cta/primary-hover` | `#4338CA` |
+| Match-bar | `color/match/bar` | `#4F46E5` |
+| Граница | `color/border` | `#E4E4E7` |
+| Тень карточки | `shadow/card` | `0 2px 12px rgba(0,0,0,0.07)` |
+| Тень hover | `shadow/card-hover` | `0 8px 28px rgba(0,0,0,0.12)` |
+| Radius карточки | `radius/card` | `20px` |
 
 ---
 
-## 3. Структура главной (сверху вниз)
+## 3. Структура страниц
 
-### 3.1 Header (sticky, светлый)
+### 3.1 Header (sticky, все страницы)
 
-- Слева: **RawLead** (wordmark, без иконки на MVP) → `/` (логотип = home, пункт «Главная» убран)
-- Справа: **Лента** · **Как работает** · **Тарифы** · **FAQ** · **Контакты**
-- «Лента» → `/lenta/` (открытая лента заказов без регистрации)
-- CTA в шапке: pill **«Попробовать»** → `/lenta/`
+**Лендинг `/`:**
+```
+[RawLead]   Лента · Тарифы · Контакты   [Войти в кабинет]
+```
+- Фон `#FAFAF8`, border-bottom `1px solid #E4E4E7` при скролле
+- Логотип «RawLead» — Manrope 800, `#18181B`, → `/`
+- CTA «Войти в кабинет» — outline pill, `#4F46E5` border+текст
+- Мобайл: гамбургер справа; меню — drawer слева (не bottom sheet)
 
-### 3.2 Hero
+**Продуктовые страницы `/lenta/`, `/cabinet/`:**
+```
+[RawLead]                                [Войти в кабинет]
+```
+- Тонкий, минимальный — не отвлекает от контента
+- На `/cabinet/`: «Войти в кабинет» → иконка профиля / «Выйти»
 
-- **H1:** «Лиды без шума»
-- **Подзаголовок** (из [`home.md`](../../archive/wp-skeleton/home.md)): FL.ru, Kwork, Telegram — фильтры, ИИ, без спама
-- **Primary:** «Смотреть ленту» → `/lenta/` (бесплатный вход, продукт вперёд)
-- **Secondary:** «Смотреть тарифы ↓» → `#pricing-preview` (якорь-скролл на главной, не `/pricing`)
-- Справа/ниже на mobile — не обязательно в первом MVP; главный акцент — типографика
+### 3.2 Лендинг `/`
 
-### 3.3 Блок «Поток» (ключевой визуал референса)
+```
+Header (sticky)
 
-Слева направо (на mobile — колонка):
+Hero (min-height: 100svh mobile)
+  H1: «Лиды без шума»
+  Подзаголовок: «Биржи и Telegram — в одной ленте. ИИ убирает мусор до тебя.»
+  CTA primary: [Смотреть ленту →]   (indigo pill, 18px/600, padding 16px 32px)
+  CTA secondary: [Смотреть тарифы ↓]  (ghost link + ↓)
 
-1. Три мини-карточки: **FL.ru** · **Kwork** · **Telegram** (тонкая цветная рамка)
-2. Стрелка → (иконка или CSS)
-3. Карточка **отфильтрованного лида:**
-   - заголовок заказа (пример)
-   - строка бюджета
-   - полоса **«Совпадение 88%»** (синяя)
-   - чип ИИ: «Брать» / «Сомнительно»
-   - кнопка-ghost «Откликнуться» (на сайте = «вы сами в TG», не автоклик)
+Live Preview Feed (3–4 реальных карточки из /v1/feed)
+  Фон: #F3F3EF
+  Карточки — новый стиль (тень, radius 20px)
+  Подпись: «Последние заказы из ленты»
+  [Открыть все →] → /lenta/
 
-Текст под блоком (мелко): «Биржи и чаты в одном потоке».
+Блок «Как это работает» (3 пункта, без нумерации 01-02-03)
+  Layout: 3 col desktop / 1 col mobile, gap 32px
+  Каждый пункт: иконка 32px + заголовок Manrope 18/700 + 2 строки текста
+  Пункты: «Биржи в одном потоке» · «ИИ убирает шум» · «Ты откликаешься сам»
 
-### 3.4 Полоса-манифест (тёмная)
+Тарифы (якорь id="pricing-preview")
+  Одна карточка «ИИ-агент»
+  shadow/card, radius 20px, фон #FFFFFF на `#F3F3EF` фоне
+  Цена: «от 300 ₽/мес» · Badge «Скоро» (серый)
+  CTA: [Узнать первым →] → /contact
 
-Полная ширина, фон `#0A0A0A`, белый текст, крупная кавычка:
-
-> **«Не сидите на бирже. Решайте по карточке в телефоне.»**
-
-Альтернатива из продукта: «Мы не пишем заказчикам за вас.»
-
-### 3.5 Функции (01 · 02 · 03)
-
-| № | Заголовок | Смысл |
-|---|-----------|--------|
-| 01 | Один поток | FL + Kwork + TG без переключения вкладок |
-| 02 | ИИ-разбор | брать / сомнительно / пропустить |
-| 03 | Вы решаете | пуш в Telegram, отклик вручную |
-
-Большие серые цифры на фоне, как на референсе.
-
-### 3.6 Для кого
-
-Три карточки (из скелета): разработчик · WordPress · устал мониторить чаты.
-
-### 3.7 Тарифы (превью на главной или только `/pricing`)
-
-**Якорь блока:** `id="pricing-preview"` — hero CTA «Смотреть тарифы ↓» скроллит сюда.
-
-**Одна карточка** — ИИ-агент (Product Vision v0.9, один тариф):
-
-| Поле | Значение |
-|------|----------|
-| Название | **ИИ-агент** |
-| Цена | **от 300 ₽/мес** (точная — после MVP) |
-| Что включено | Match по тегам · рыночная цена · черновик отклика · push в TG при новом матче |
-| CTA | pill «Ранний доступ» → `/contact` |
-| Badge | «Скоро» (серый, правый верхний угол карточки) |
-
-Под карточкой: ссылка «Узнать первым →` → `/contact` или форма email-листа.
-
-**Не делать:** 3 колонки Старт/Про/Команда — устарело (v0.8), отменено.
-
-### 3.8 Footer
-
-Тёмный `#0A0A0A`, лого, ссылки, **Telegram**, © RawLead.
-
----
-
-## 4. Остальные страницы (тот же язык)
-
-| Страница | Особенности |
-|----------|-------------|
-| **Как работает** | 5 шагов из [`how.md`](../../archive/wp-skeleton/how.md); timeline вертикальный, те же pill-кнопки |
-| **Тарифы** | полная сетка 3 колонок + FAQ-якорь |
-| **FAQ** | аккордеон, светлый фон, без тёмной «админки» |
-| **Контакты** | форма CF7 + кнопка Telegram; одна primary CTA |
-
----
-
-## 5. Компоненты (handoff Coder / владелец WP)
-
-| Компонент | default | hover | disabled |
-|-----------|---------|-------|----------|
-| Button primary | bg `#0A0A0A`, text white | opacity 0.9 | opacity 0.4 |
-| Button secondary | border 1px, bg white | border dark | — |
-| Link arrow | text + → | underline | — |
-| Card | border `#E8E8EC`, radius 16px | border чуть темнее | — |
-| Pricing featured | ribbon «Популярный», primary CTA | — | «Скоро» серый |
-
-**a11y:** контраст текста на белом ≥ 4.5:1; match % дублировать числом, не только полосой.
-
----
-
-## 6. Анимации (согласовано 2026-05-25)
-
-**Принцип:** «Живой» стиль (Framer/Raycast). Только CSS transform + opacity — нулевая нагрузка на GPU, без layout reflow. IntersectionObserver для scroll-триггеров.
-
-### 6.1 Появление элементов при скролле
-
-```css
-/* Базовое состояние — невидим, смещён вниз */
-.rl-reveal { opacity: 0; transform: translateY(20px); }
-/* После входа в viewport */
-.rl-reveal.is-visible { opacity: 1; transform: none; transition: opacity 240ms ease-out, transform 240ms ease-out; }
+Footer (фон #1A1A2E, текст #FFFFFF)
+  RawLead | Лента · Тарифы · Контакты | Telegram
+  © 2026 RawLead
 ```
 
-### 6.2 Stagger карточек (feed / features / audience)
+**Убрать с лендинга:** манифест-полоса «Не сидите на бирже» (театрально), кубики-анимация источников (трудозатратно), «Для кого» 4 карточки (заменяет live feed).
 
-Карточки появляются по очереди: задержка `40ms` между каждой через `transition-delay`.
+### 3.3 Лента `/lenta/`
+
+Детальная спека: [`feed-cabinet-mvp.md`](feed-cabinet-mvp.md)
+
+Ключевые принципы:
+- **Mobile-first:** 1 колонка на мобайле, 2 колонки на десктопе (max-width 900px по центру)
+- Filter bar горизонтальная sticky под header (не боковой sidebar)
+- Карточки — shadow-based, без жёсткой рамки
+- Infinite scroll
+
+### 3.4 Кабинет `/cabinet/`
+
+Детальная спека: [`feed-cabinet-mvp.md`](feed-cabinet-mvp.md)
+
+Ключевые принципы:
+- Навыки пользователя — редактируемые chips sticky под header
+- Тот же filter bar что на `/lenta/`
+- Match-bar `#4F46E5`, width = match%
+
+### 3.5 `/how` — Как работает
+
+```
+Header
+
+H1: «Как работает RawLead»
+
+4 шага (карточки 2×2 desktop / 1 col mobile):
+  Каждая: иконка line 28px + Manrope 16/700 + 2 строки
+
+Шаги:
+  1. «Подключаешь биржи» — выбираешь FL, Kwork, Telegram-чаты
+  2. «Радар парсит» — новые заказы каждые ~15 минут
+  3. «ИИ фильтрует» — оставляет только релевантные тебе
+  4. «Ты видишь в ленте» — без рекламы и мусора
+
+CTA: [Смотреть ленту →]
+Footer
+```
+
+Убрать: timeline вертикальный, нумерацию 01-02-03 (шрифтовой артефакт v2).
+
+### 3.6 `/faq` — Частые вопросы
+
+```
+Header
+
+H1: «Частые вопросы»
+
+Аккордеон (Manrope, фон #FAFAF8):
+  - каждый item: border-bottom #E4E4E7, padding 20px 0
+  - открытый: плавное expand (300ms ease-out)
+  - стрелка → вращается 180° при открытии
+
+Убрать: «закрытое тестирование», «ранний доступ», «по приглашению»
+
+Footer
+```
+
+### 3.7 `/contact` — Контакты
+
+```
+Header
+
+H1: «Связаться»
+
+Форма (CF7, primary):
+  Имя (input)
+  Email (input)
+  Сообщение (textarea, min 3 строки)
+  [Отправить] (primary pill indigo)
+
+Под формой:
+  «Или напишите напрямую →» [Telegram] (ghost link)
+
+Убрать: «заявка на ранний доступ», «закрытое тестирование», «по приглашению»
+Оставить: простую форму без полей «Тариф», «Тип аккаунта» и т.п.
+
+Footer
+```
+
+---
+
+## 4. Компоненты
+
+| Компонент | Спека |
+|-----------|-------|
+| **Кнопка primary** | bg `#4F46E5`, text `#FFFFFF`, radius `999px`, hover bg `#4338CA`, active scale 0.97 |
+| **Кнопка secondary** | border `1px solid #4F46E5`, text `#4F46E5`, прозрачный фон, hover bg `#EEF2FF` |
+| **Кнопка ghost** | только текст + → без рамки, `#4F46E5` color |
+| **Карточка лида** | bg `#FFFFFF`, shadow `0 2px 12px rgba(0,0,0,0.07)`, radius `20px`, padding `20px 24px`; hover: shadow↑ + translateY(-2px) |
+| **Chip категории** | active: bg `#4F46E5` + text `#FFFFFF`; inactive: bg `#F3F3EF` + border `#E4E4E7` + text `#3F3F46` |
+| **Chip навыка** | active: bg `#EEF2FF` + text `#4F46E5`; inactive: bg `#F3F3EF` + border `#E4E4E7` |
+| **Match-bar** | bg `#E4E4E7`, fill `#4F46E5`, height `4px`, radius `2px`; animate width 600ms при входе в viewport |
+| **Source badge** | dot 8px + label 12px/600: FL `#00A65A` · Kwork `#EA580C` · TG `#0088CC` |
+| **AI-чип «Брать»** | bg `#DCFCE7`, text `#16A34A`, radius `999px` |
+| **AI-чип «Сомнительно»** | bg `#F3F4F6`, text `#6B7280` |
+| **Report bug FAB** | `?` round 40px, bg `#FFFFFF`, border `1px solid #E4E4E7`, shadow, `#4F46E5` text; bottom-right fixed |
+| **Иконки категорий** | line-stroke 20px: `</>` dev · `✦` design · `◎` marketing · `Aa` text |
+| **Skeleton-карточка** | bg linear-gradient пульс `#F3F3EF → #E4E4E7 → #F3F3EF`, radius `20px` |
+
+---
+
+## 5. Голос (из Product-канона)
+
+- Активный залог: «ИИ убрал мусор», не «заказы были отфильтрованы»
+- Без восклицательных знаков
+- Кнопки = конкретное действие: «Смотреть ленту», «Войти в кабинет»
+- Mobile: короткие метки — «Дизайн» не «Дизайн & Видео»
+- Пустые состояния: человечные — «Пока нет заказов по этим навыкам — попробуй шире»
+- Контакты: без «заявки» / «раннего доступа» — просто «напишите нам»
+
+---
+
+## 6. Анимации
+
+**Принцип:** только `transform` + `opacity` — нулевая нагрузка на GPU. IntersectionObserver, unobserve после первого срабатывания.
+
+### 6.1 Появление при скролле
+
+```css
+.rl-reveal { opacity: 0; transform: translateY(20px); }
+.rl-reveal.is-visible {
+  opacity: 1; transform: none;
+  transition: opacity 240ms ease-out, transform 240ms ease-out;
+}
+```
+
+### 6.2 Stagger карточек
 
 ```css
 .rl-card:nth-child(1) { transition-delay: 0ms; }
 .rl-card:nth-child(2) { transition-delay: 40ms; }
 .rl-card:nth-child(3) { transition-delay: 80ms; }
-/* и т.д. */
 ```
 
 ### 6.3 Hover карточки
 
 ```css
-.rl-lead-card, .rl-price-card {
-  transition: transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out;
+.rl-lead-card {
+  transition: transform 150ms ease-out, box-shadow 150ms ease-out;
 }
-.rl-lead-card:hover, .rl-price-card:hover {
+.rl-lead-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
-  border-color: #C8C8D0;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.12);
 }
 ```
 
-### 6.4 Match-bar (fill on viewport entry)
-
-Полоса совпадения начинает анимироваться от 0% до реального значения при первом появлении в viewport:
+### 6.4 Match-bar fill
 
 ```css
 .rl-match__fill { width: 0; transition: width 600ms ease-out; }
-.is-visible .rl-match__fill { width: var(--match-value); /* задаётся inline */ }
+.is-visible .rl-match__fill { width: var(--match-value); }
 ```
 
-### 6.5 Micro-press на кнопках
+### 6.5 Micro-press
 
 ```css
 .rl-btn:active { transform: scale(0.97); transition: transform 80ms ease-out; }
 ```
 
-### 6.6 Кубики источников — сборка при скролле
+### 6.6 Bottom sheet mobile (filters)
 
-На главной: кубики FL.ru / Kwork / Telegram при входе в viewport анимируются из горизонтального ряда в вертикальную стопку.
-
-**Начальное состояние (inline style на каждом кубике):**
 ```css
-/* Все три — в строку (translateX разные) */
-.rl-source-cube:nth-child(1) { transform: translateX(-80px) translateY(40px) rotate(-8deg); opacity: 0; }
-.rl-source-cube:nth-child(2) { transform: translateX(0px)   translateY(60px) rotate(4deg);  opacity: 0; }
-.rl-source-cube:nth-child(3) { transform: translateX(80px)  translateY(40px) rotate(-6deg); opacity: 0; }
+.rl-sheet { transform: translateY(100%); transition: transform 300ms ease-out; }
+.rl-sheet.is-open { transform: translateY(0); }
 ```
 
-**Финальное состояние (is-visible на родителе):**
-```css
-.rl-flow__sources.is-visible .rl-source-cube:nth-child(1) { transform: none; opacity: 1; transition: all 400ms ease-out 0ms; }
-.rl-flow__sources.is-visible .rl-source-cube:nth-child(2) { transform: none; opacity: 1; transition: all 400ms ease-out 80ms; }
-.rl-flow__sources.is-visible .rl-source-cube:nth-child(3) { transform: none; opacity: 1; transition: all 400ms ease-out 160ms; }
-```
-
-### 6.7 IntersectionObserver — один скрипт
+### 6.7 IntersectionObserver
 
 ```js
 const io = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+  entries.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+  });
 }, { threshold: 0.15 });
-document.querySelectorAll('.rl-reveal, .rl-flow__sources').forEach(el => io.observe(el));
+document.querySelectorAll('.rl-reveal').forEach(el => io.observe(el));
 ```
-
-**Производительность:** только transform + opacity (GPU), unobserve после первого срабатывания. Не влияет на FCP/LCP.
 
 ---
 
-## 7. Что не переносить с референса буквально
+## 7. Что не делать
 
-- Искажённый/английский мелкий текст с картинки — брать тексты из **wp-skeleton**
-- Кнопка «Apply» → **«Откликнуться сами»** или убрать (мы не биржа)
-- Логотипы FL/Kwork/TG — **текстовые плашки** или generic icons (без нарушения TM)
-- PNG Recraft — только **картинка в hero** опционально; вёрстка — блоки темы
+- **Не возвращать** Unbounded, манифест-полосу, нумерацию 01/02/03, кубики-анимацию источников
+- **Не копировать** холодный B2B стиль (Linear/Notion feel) — это был v2, отменён
+- **Не делать** sidebar для фильтров — только горизонтальная filter bar
+- **Не ставить** `#0A0A0A` как primary CTA — только Indigo `#4F46E5`
+- **Не использовать** восклицательные знаки в текстах
+- **Не упоминать** «ранний доступ», «закрытое тестирование», «по приглашению» — продукт открыт
 
 ---
 
 ## 8. Статус
 
-| Кто | Действие |
-|-----|----------|
-| **Designer** | ✅ REFERENCE E + bold type (Unbounded/Manrope) |
-| **Coder** | ✅ `wordpress/rawlead-kadence-child/` · [`WP_KADENCE_INSTALL.md`](../../ops/WP_KADENCE_INSTALL.md) |
-| **Владелец** | Local `radarzakaz.local` · Primary menu RawLead |
-
-Следующий продуктовый шаг: **match %** в боте — [`PRODUCT_VISION.md`](../../team/product/PRODUCT_VISION.md) §0.
+| Кто | Что |
+|-----|-----|
+| **Lead Designer** | ✅ REVOLUTION: токены, страницы, компоненты, голос — этот файл |
+| **Designer** | → `DESIGNER_PROMPT.md` — CSS REVOLUTION |
+| **Coder** | → `CODER_PROMPT.md` § PRE-LAUNCH-UX — PHP/JS после дизайна |
 
 ---
 
-_Утверждённый референс: editorial light, Recraft 2026-05-23._
+_Lead Designer · REVOLUTION · 2026-05-28_

@@ -577,6 +577,26 @@ body {
   min-width: 0;
   font-family: Consolas, "Courier New", monospace;
   font-size: 11px;
+}
+
+.status-card {
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(180, 186, 198, 0.35);
+}
+
+.status-card:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.status-card__title .status-line__value {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.log-view--status .status-line__value {
   line-height: 1.45;
   word-break: break-word;
 }

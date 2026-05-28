@@ -2,7 +2,7 @@
 
 **Решение владельца 2026-05-25:** не туннель с ПК, а **прод 24/7** при минимальных расходах.
 
-Связано: [`PORTFOLIO_SPRINT.md`](../team/architect/PORTFOLIO_SPRINT.md) · [`WP_OWNER_STEPS.md`](../archive/WP_OWNER_STEPS.md) · [`TZ_WP.md`](../team/architect/TZ_WP.md)
+Связано: [`ROADMAP.md`](../team/architect/ROADMAP.md) · [`TASKS.md`](../team/common/TASKS.md) · [`WP_OWNER_STEPS.md`](../archive/WP_OWNER_STEPS.md) · [`TZ_WP.md`](../team/architect/TZ_WP.md)
 
 ---
 

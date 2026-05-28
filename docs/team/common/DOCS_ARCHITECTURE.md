@@ -36,6 +36,7 @@
 |------|------|
 | **Навигация AI** | `team/common/PROJECT_MAP.md` |
 | Фазы (из vision) | `team/architect/ROADMAP.md` — **Lead Architect** |
+| **Мысли / решения владельца** (handoff Lead) | `team/architect/OWNER_INTENT.md` — **Lead Architect** · § Бэклог владельца (triage) |
 | Vision продукта | `team/product/PRODUCT_VISION.md` — **Lead Product** |
 | Шаги владельца | `FOR_YOU.md` |
 | Как устроено | `KAK_ETO_RABOTAET.md` |
@@ -43,6 +44,7 @@
 | Снимок | `team/common/STATUS.md` |
 | Coder ТЗ | `team/architect/CODER_PROMPT.md` |
 | Product план | `team/product/LEAD_PRODUCT_PROMPT.md` |
+| Конкурентная разведка + пивот | `team/product/MARKET_INTEL.md` |
 | Design план | `team/design/LEAD_DESIGN_PROMPT.md` |
 | Product регламент | `team/product/LEAD_PRODUCT.md` |
 | Design регламент | `team/design/LEAD_DESIGN.md` |
@@ -64,6 +66,7 @@
 | `team/*.md` в корне team | `common/` · `architect/` · `product/` · `design/` |
 | `ops/SOURCES.md` | `archive/SOURCES.md` |
 | `ops/SOURCES_SAAS.md` | `archive/SOURCES_SAAS.md` + stub в `ops/` |
+| `architect/PORTFOLIO_SPRINT.md` | `team/archive/PORTFOLIO_SPRINT.md` (2026-05-28) |
 
 ---
 

@@ -19,7 +19,13 @@ else:
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-_PYTHON = _ROOT / ".venv" / "Scripts" / "python.exe"
+def _venv_python(root: Path) -> Path:
+    if sys.platform == "win32":
+        return root / ".venv" / "Scripts" / "python.exe"
+    return root / ".venv" / "bin" / "python"
+
+
+_PYTHON = _venv_python(_ROOT)
 
 
 def _spawn_one(script: Path, profile: str) -> str | None:

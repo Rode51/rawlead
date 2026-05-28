@@ -1,0 +1,261 @@
+# Деплой на VPS — один сервер (WP + API + радар)
+
+**Решение владельца 2026-05-28:** один VPS, домен **rawlead.ru**.
+
+| Компонент | URL / порт |
+|-----------|------------|
+| WordPress | `https://rawlead.ru` — nginx :80/:443 |
+| FastAPI (внутри) | `127.0.0.1:8000` — uvicorn, **не** открывать :8000 наружу |
+| API наружу | `https://api.rawlead.ru` — nginx → :8000 |
+| CORS | `https://rawlead.ru` (`RADAR_CORS_ORIGINS`) |
+
+**IP, SSH, пароли, `.env`** — только у владельца в чате, **не в git**.
+
+### Автодеплой E1 с ПК (Windows)
+
+**Вариант A — пароль root (проще на Beget):** в `.env` (локально, не в git):
+
+```env
+VPS_SSH_HOST=62.113.103.231
+VPS_SSH_USER=root
+VPS_SSH_PASSWORD=пароль_из_письма_Beget
+VPS_SSH_KEY=C:/Users/hramo/.ssh/id_rawlead_vps
+```
+
+Затем: `.venv\Scripts\pip install paramiko` и `.venv\Scripts\python scripts\deploy-vps-e1.py`
+
+**Вариант B — SSH-ключ:** в панели Beget → Облако → терминал → `authorized_keys` (см. выше в чате) или ключ при создании VPS.
+
+1. В `.env`: `VPS_SSH_HOST`, `VPS_SSH_USER`, `VPS_SSH_KEY`.
+2. `scripts\deploy-vps-e1.py` — apt, clone, env, `rawlead-api`, nginx.
+
+Связано: [`DEPLOY_BUDGET.md`](DEPLOY_BUDGET.md) · [`TELEGRAM_ACCOUNTS.md`](TELEGRAM_ACCOUNTS.md) · [`RUN.md`](RUN.md)
+
+---
+
+## Схема
+
+```text
+Посетитель → https://rawlead.ru (WP + тема rawlead-kadence-child)
+                 ↓ wp_remote_get (127.0.0.1:8000 или api.rawlead.ru)
+            FastAPI :8000 (systemd rawlead-api)
+                 ↓
+            Neon Postgres
+                 ↑ ingest
+            main.py + tg_main.py (systemd rawlead-radar, profile site)
+
+ПК владельца (E2): Site ▶ и Legacy ▶ **выключить** — иначе дубли TG-сессий
+
+E2b (решение владельца 2026-05-28): **dogfood на VPS** — `neon_legacy_consumer` + управление **@FLPARSINGBOT** (/status, /pause, кнопки). Site — отдельный unit + @rawlead_bot.
+```
+
+---
+
+## 0. Подготовка VPS (Ubuntu 22.04+, 1 GB RAM)
+
+```bash
+sudo apt update && sudo apt install -y git python3 python3-venv python3-pip nginx certbot python3-certbot-nginx
+sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+sudo adduser --disabled-password --gecos "" rawlead
+sudo usermod -aG www-data rawlead
+```
+
+DNS (у регистратора):
+
+| Запись | Значение |
+|--------|----------|
+| `@` / `www` | A → IP VPS |
+| `api` | A → IP VPS |
+
+---
+
+## 1. Клон и venv
+
+```bash
+sudo mkdir -p /opt/rawlead && sudo chown rawlead:rawlead /opt/rawlead
+sudo -u rawlead git clone <URL_ПРИВАТНОГО_REPO> /opt/rawlead
+cd /opt/rawlead
+sudo -u rawlead python3 -m venv .venv
+sudo -u rawlead .venv/bin/pip install -r requirements.txt
+sudo -u rawlead .venv/bin/playwright install chromium
+chmod +x deploy/run-radar-site.sh
+```
+
+---
+
+## 2. Секреты (scp с ПК, не коммитить)
+
+Скопировать на VPS в `/opt/rawlead/`:
+
+| Файл | Откуда |
+|------|--------|
+| `.env` | общие ключи: `DATABASE_URL`, Telethon, FL/Kwork, прокси |
+| `.env.site` | `@rawlead_bot`, OpenRouter site, `RADAR_PROFILE=site` |
+
+**Прод `.env.site` (минимум):**
+
+```env
+RADAR_PROFILE=site
+RADAR_CORS_ORIGINS=https://rawlead.ru
+SITE_NOTIFY_OWNER=0
+RADAR_EXCHANGES_ENABLED=1
+RADAR_TG_ENABLED=1
+```
+
+Права: `chmod 600 .env .env.site`
+
+### Telethon-сессии (E2)
+
+С ПК скопировать **без git**:
+
+```bash
+scp user@pc:/path/to/+66953964608_telethon.session rawlead@vps:/opt/rawlead/data/sessions/
+scp user@pc:/path/to/+66967716330_telethon.session rawlead@vps:/opt/rawlead/data/sessions/
+# acc3/acc4 по docs/ops/TELEGRAM_ACCOUNTS.md
+```
+
+В `.env` на VPS — **Linux-пути**:
+
+```env
+TELETHON_SESSION_ACC1=/opt/rawlead/data/sessions/+66953964608_telethon
+TELETHON_PROXY_ACC1=http://host:port:user:pass
+TELETHON_SESSION_ACC2=/opt/rawlead/data/sessions/+66967716330_telethon
+```
+
+Также при необходимости: `data/projects.db`, `data/tg_join_state.json`, `data/telethon_chat_ids.txt`.
+
+---
+
+## 3. systemd
+
+```bash
+sudo cp /opt/rawlead/deploy/systemd/rawlead-api.service /etc/systemd/system/
+sudo cp /opt/rawlead/deploy/systemd/rawlead-radar.service /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+
+### E1 — только API (радар ещё на ПК)
+
+```bash
+sudo systemctl enable --now rawlead-api
+sudo systemctl status rawlead-api
+curl -s http://127.0.0.1:8000/health
+```
+
+`rawlead-radar` **не** включать — Site ▶ на ПК качает биржи в Neon.
+
+### E2 — радар на VPS
+
+1. На ПК: **остановить** Site (`stop-radar-desktop-full.bat` или пульт ■).
+2. На VPS:
+
+```bash
+sudo systemctl enable --now rawlead-radar
+sudo systemctl status rawlead-radar
+tail -f /opt/rawlead/data/radar_site.log
+```
+
+**Важно:** два радара (ПК + VPS) = дубли TG и бан acc. После E2 — только VPS.
+
+### E2b — Legacy dogfood на VPS (@FLPARSINGBOT)
+
+**Уже в коде:** `neon_legacy_consumer.py` крутит `poll_commands` → `/status`, `/pause`, `/стоп`, кнопки панели; карточки из Neon → твой чат. **Не** парсит биржи (это Site `main`).
+
+1. На VPS: `.env.legacy` (бот FLPARSING, `FILTERS_LEGACY`, свой OpenRouter, `RADAR_LOG_PATH=data/radar_legacy.log`).
+2. `systemctl enable --now rawlead-radar-legacy` (unit — § Coder `deploy/systemd/rawlead-radar-legacy.service`).
+3. На ПК: **не** ▶ Legacy, **не** ▶ Site.
+
+| Unit | Процессы | Бот управления |
+|------|----------|----------------|
+| `rawlead-radar` | `main.py` + `tg_main.py` | @rawlead_bot (опц.) |
+| `rawlead-radar-legacy` | `neon_legacy_consumer.py` | **@FLPARSINGBOT** — стоп/старт/статус |
+
+**Пауза:** сейчас флаг `radar_paused` в SQLite — если Site и Legacy **один** `SQLITE_PATH`, `/pause` в FLPARSING **может** остановить и Site. Coder § P5-E2: раздельный `SQLITE_PATH` для legacy **или** `radar_paused_legacy` / `radar_paused_site`.
+
+**Telethon:** только в unit Site (listen чатов). Legacy на VPS **без** acc-сессий, только Bot API.
+
+---
+
+## 4. nginx — API
+
+```bash
+sudo ln -sf /opt/rawlead/deploy/nginx/api.rawlead.ru.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d api.rawlead.ru
+curl -s https://api.rawlead.ru/health
+```
+
+Альтернатива: [`deploy/Caddyfile`](../deploy/Caddyfile) (если API отдаёт Caddy, не nginx).
+
+`:8000` снаружи **не** открывать в firewall — только 80/443.
+
+---
+
+## 5. WordPress + тема
+
+WP на **том же VPS** (nginx vhost `rawlead.ru` — настраивает владелец / панель).
+
+### wp-config.php
+
+```php
+define('RAWLEAD_API_URL', 'http://127.0.0.1:8000');
+define('RAWLEAD_TG_BOT_USERNAME', 'rawlead_bot');
+```
+
+WP на том же хосте — лучше `127.0.0.1:8000` (без лишнего TLS). Браузер ходит в WP REST same-origin; CORS нужен для `/docs` и отладки.
+
+### Тема
+
+```bash
+cd /opt/rawlead
+sudo rsync -a wordpress/rawlead-kadence-child/ /var/www/rawlead.ru/wp-content/themes/rawlead-kadence-child/
+# Kadence parent — через WP Admin → Themes → Install
+sudo -u www-data wp theme activate rawlead-kadence-child --path=/var/www/rawlead.ru
+```
+
+Страницы `/lenta/`, `/cabinet/` — по [`TZ_WP.md`](../team/architect/TZ_WP.md).
+
+---
+
+## 6. Приёмка (E1 + E2)
+
+| # | Проверка | Ожидание |
+|---|----------|----------|
+| 1 | `https://api.rawlead.ru/health` | `{"status":"ok"}` |
+| 2 | `https://rawlead.ru/lenta/` | карточки заказов |
+| 3 | E2: ПК выключен, 30 мин | новый лид в Neon / боте |
+| 4 | `systemctl status rawlead-api rawlead-radar` | active |
+| 5 | `radar_site.log` | циклы FL/Kwork, `site:сводка` |
+| 6 | E2b: `rawlead-radar-legacy` active | `radar_legacy.log` · `/status` в @FLPARSINGBOT отвечает |
+
+**Стоп-трафик:** пустая лента · API 5xx · CORS блок · два радара одновременно.
+
+---
+
+## 7. Обновление кода
+
+```bash
+cd /opt/rawlead
+sudo -u rawlead git pull
+sudo -u rawlead .venv/bin/pip install -r requirements.txt
+sudo systemctl restart rawlead-api
+sudo systemctl restart rawlead-radar   # только если E2
+sudo rsync -a wordpress/rawlead-kadence-child/ /var/www/rawlead.ru/wp-content/themes/rawlead-kadence-child/
+```
+
+---
+
+## 8. ПК после E2
+
+| Действие | Зачем |
+|----------|-------|
+| Не запускать Site ▶ 24/7 | дубли ingest + TG |
+| **Не** ▶ Site / Legacy на ПК | только VPS systemd |
+| @FLPARSINGBOT | стоп/статус/карточки dogfood (E2b) |
+| Пульт Tauri | не нужен 24/7; опц. SSH + `journalctl` |
+| `radarzakaz.local` | локальная вёрстка |
+
+---
+
+_Coder § P5 · 2026-05-28 · без IP/секретов в git_

@@ -1,45 +1,53 @@
 # Дорожная карта
 
-**Канон vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.10** · [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) §0i
+**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11** · [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § MARKET-INTEL-B
 
-**Аудитория:** **Digital-специалисты** — 4 категории (не «все фрилансеры»).
-
-**Ставка B:** `/lenta` + `/cabinet` + ИИ-агент; dogfood — TG-бот владельца.
+**Снимок / очередь:** [`STATUS.md`](../common/STATUS.md) · [`TASKS.md`](../common/TASKS.md)
 
 ---
 
-## Сейчас (2026-05-26) — Vision v0.10
+## Сейчас (2026-05-28)
 
-| # | Что | Кто |
-|---|-----|-----|
-| **V10.1** | FILTERS §0i в коде | `@coder` |
-| **V10.2** | PROFILE пороги ai_score по категории | `@coder` |
-| **V10.3** | Skills catalog — 4 группы в `/lenta/` | `@coder` |
-| **V10.4** | Лендинг «Для кого» — 4 карточки | `@coder` |
-| — | P3a приёмка W2 | владелец |
-| — | P7 `leads.category` + API | после V10 |
-| — | P5 деплой 24/7 | [`DEPLOY_BUDGET.md`](../../ops/DEPLOY_BUDGET.md) |
-| — | 3f ИИ-агент | после V10 |
+| # | Что | Кто | Статус |
+|---|-----|-----|--------|
+| **P5 E1** | WP + API на VPS | — | ✅ |
+| **P5 E2** | Site+Legacy радары на VPS; ПК не 24/7 | @coder | **→** |
+| **E-polish** | B1 навыки · A1 счётчик · C1 mobile | @coder + @designer | после E2 |
+| **3f** | ИИ-агент «Написать отклик» | @coder | после polish |
+| **PRE-PROD-STRESS** | S1–S6 | @coder → владелец | **после** polish + VPS (O1) |
+| **3h** | Биллинг 590–990 ₽ | @coder | после 1-го юзера |
 
-**⏸ отменено как приоритет:** ingest «все специальности», 25 источников сразу, § P1.3 без категорий.
+**Не возвращаем:** Freelancehunt · contour owner/saas · stress до polish.
 
 ---
 
-## Фазы (сводка)
+## Фазы (сводка vision §4)
 
 | Фаза | Статус | Суть |
 |------|--------|------|
-| **0** FL + Kwork + TG | ✅ | dogfood |
-| **3b–3d** Neon + API + WP | ✅ | `/lenta`, `/cabinet` |
-| **P3a** UX лента | ✅ | accordion, «Задача» |
-| **V10** 4 категории Digital | **→** | FILTERS, PROFILE, skills, копирайт |
-| **3f** ИИ-агент | → | |
-| **3i** Агрегаторы | волнами | только релевантные категории |
-| **3k** TG raw owner-only | → | |
-| **3g–3h** Auth + биллинг | потом | |
+| **0** Радар ПК | ✅ | FL, Kwork, TG, пульт, legacy/site |
+| **3b–3d** Neon + API + WP | ✅ | `/lenta/`, `/cabinet/` |
+| **E0–E5** PRE-LAUNCH-UX | ✅ | фильтры, каталог, REVOLUTION UI |
+| **3x** «Горячий» | ✅ | badge &lt; 5 мин |
+| **P5 E2** VPS радары | **→** | 24/7 без ПК |
+| **3f** ИИ-агент | → | черновик + цена + push |
+| **3g–3h** Auth + биллинг | → | один тариф |
+| **3p–3q** Retention | потом | пауза · freemium |
+| **4–5** Аналитика · портфолио | потом | после метрик |
 
-Блокеры: [`STATUS.md`](../common/STATUS.md) · [`TASKS.md`](../common/TASKS.md) · Coder [`CODER_PROMPT.md`](CODER_PROMPT.md) § V10
+Coder ТЗ: [`CODER_PROMPT.md`](CODER_PROMPT.md) · решения владельца: [`OWNER_INTENT.md`](OWNER_INTENT.md).
 
 ---
 
-_Lead Architect · 2026-05-26 · v0.10_
+## Отменено / не приоритет
+
+| Было | Решение |
+|------|---------|
+| Ставка A «только портфолио» | Plan B (2026-05-24) |
+| Цена «от 300 ₽» | **590–990 ₽** (2026-05-28) |
+| Freelancehunt | снят навсегда (O3) |
+| 25 источников сразу | волнами после MVP |
+
+---
+
+_Lead Architect · 2026-05-28_

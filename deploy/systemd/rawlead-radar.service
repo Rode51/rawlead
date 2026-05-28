@@ -1,0 +1,20 @@
+[Unit]
+Description=RawLead Site radar (main.py + tg_main.py)
+After=network-online.target rawlead-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rawlead
+Group=rawlead
+WorkingDirectory=/opt/rawlead
+EnvironmentFile=/opt/rawlead/.env
+EnvironmentFile=-/opt/rawlead/.env.site
+Environment=RADAR_PROFILE=site
+Environment=PYTHONPATH=/opt/rawlead/src
+ExecStart=/opt/rawlead/deploy/run-radar-site.sh
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

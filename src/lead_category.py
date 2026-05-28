@@ -120,6 +120,15 @@ _CATEGORY_HINTS: dict[str, tuple[str, ...]] = {
         "дизайн",
         "баннер",
         "логотип",
+        "blender",
+        "блендер",
+        "3d-модел",
+        "3d модел",
+        "текстур",
+        "texturing",
+        "texture",
+        "cinema 4d",
+        "substance",
     ),
     "marketing": (
         "таргет",
@@ -148,6 +157,8 @@ _CATEGORY_HINTS: dict[str, tuple[str, ...]] = {
         "перевод",
         "статья",
         "текст",
+        "тексты",
+        "текстов",
         "наполнение",
     ),
 }
@@ -159,10 +170,19 @@ def _haystack(title: str, body: str, tags: list[str] | tuple[str, ...]) -> str:
     return "\n".join(parts).casefold()
 
 
+def _hint_matches(hay: str, hint: str) -> bool:
+    """Подстрока с границами слова — «текст» не в «текстур*» и «контекст*»."""
+    h = hint.casefold()
+    if not h or h not in hay:
+        return False
+    pattern = rf"(?<![\wа-яё]){re.escape(h)}(?![\wа-яё])"
+    return re.search(pattern, hay, re.IGNORECASE) is not None
+
+
 def _score_category(hay: str, category: str) -> int:
     score = 0
     for hint in _CATEGORY_HINTS.get(category, ()):
-        if hint.casefold() in hay:
+        if _hint_matches(hay, hint):
             score += 1
     return score
 
@@ -249,8 +269,10 @@ def category_from_label(label: str) -> str | None:
         return "marketing"
     if any(
         x in hay
-        for x in ("текст", "копирайт", "перевод", "редактур", "стать")
+        for x in ("копирайт", "перевод", "редактур", "стать", "рерайт", "локализац")
     ):
+        return "text"
+    if _hint_matches(hay, "текст"):
         return "text"
     return None
 
@@ -284,11 +306,19 @@ def resolve_lead_category(
     body: str = "",
     tags: list[str] | tuple[str, ...] | None = None,
 ) -> str:
-    """Read API: колонка Neon или эвристика."""
+    """Read API: колонка Neon или эвристика; при явном конфликте — эвристика."""
     cat = normalize_category(stored or "")
-    if cat and cat != OTHER_CATEGORY:
+    inferred = infer_lead_category(title, body, tags)
+    if not cat or cat == OTHER_CATEGORY:
+        return inferred
+    if cat == inferred:
         return cat
-    return infer_lead_category(title, body, tags)
+    hay = _haystack(title, body, tags or ())
+    stored_score = _score_category(hay, cat)
+    inferred_score = _score_category(hay, inferred)
+    if inferred_score > stored_score:
+        return inferred
+    return cat
 
 
 def parse_category_param(category: str) -> list[str]:
@@ -329,6 +359,16 @@ def categorize_tag(tag: str) -> str:
     t = (tag or "").strip()
     if not t:
         return "dev"
+    try:
+        from skills_catalog import category_for_canonical_tag, resolve_canonical_tag
+
+        canonical = resolve_canonical_tag(t)
+        if canonical:
+            cat = category_for_canonical_tag(canonical)
+            if cat:
+                return cat
+    except ImportError:
+        pass
     hay = t.casefold()
     scores = {cat: _score_category(hay, cat) for cat in CATEGORIES}
     best = max(scores.values())

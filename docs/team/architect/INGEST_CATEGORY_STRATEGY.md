@@ -1,7 +1,7 @@
 # Категории заказов + экономия ИИ (2026-05-25)
 
 **Триггер:** приёмка портфолио — фильтры по вакансиям, 0 ₽ классификация, дешёвые модели.  
-**Связано:** [`INGEST_SOURCES_PLAN.md`](INGEST_SOURCES_PLAN.md) · [`PORTFOLIO_SPRINT.md`](PORTFOLIO_SPRINT.md) · [`AI.md`](AI.md)
+**Связано:** [`INGEST_SOURCES_PLAN.md`](INGEST_SOURCES_PLAN.md) · [`ROADMAP.md`](ROADMAP.md) · [`AI.md`](AI.md)
 
 ---
 

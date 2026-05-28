@@ -1,13 +1,438 @@
-# Coder — **§ P1 → D1 → P4 → P5** · V10/P7 ✅
+# Coder — **→ § P5-E2-VPS**
 
-**Ворота прод:** [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) — портфолио = продукт для людей, не только лендинг.
+**Ворота прод:** [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) · бюджет: [`docs/ops/DEPLOY_BUDGET.md`](../../ops/DEPLOY_BUDGET.md).
 
-**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.10** §0i.
+**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11**.
 
-**Порядок (жёстко):** **P1** → **D1** (после Design) → **P4** → **P5** только после «едем на прод».  
-**⏸ P5** пока ворота не закрыты. **⏸** 25 источников / §3f без ТЗ.
+**Порядок (владелец 2026-05-28):** **P5-E2-VPS** → **E-polish** (B1/A1/C1) → **§ 3f-OWNER-BETA** → **§ PRE-PROD-STRESS**.
 
-**→ Сейчас @coder (порядок до выхода):**
+**→ Сейчас @coder:** **§ P5-E2-VPS** · затем E-polish по [`OWNER_INTENT.md`](OWNER_INTENT.md).
+
+**✅ Архив (не трогать без § в шапке):** SITE-POLISH, FEED-FRESHNESS, 3x-HOT-BADGE, BACKLOG-CLEAR, LEGACY-SELF-STOP, HOTFIX-POST-PULT и др. — см. [`STATUS.md`](../common/STATUS.md).
+
+# § LEGACY-SELF-STOP — ▶ гасится через ~15 с (**владелец 2026-05-28**)
+
+**Симптом:** Legacy ▶ → лампа «Neon» зелёная секунды → снова **■**; `radar_legacy.log` — пачка `neon:старт`, мало `neon:цикл`.
+
+| # | Задача |
+|---|--------|
+| ls1 | `radar_control.start`: если `popen` жив, **не** вызывать `_stop_unlocked` только из‑за `count_radar_workers==0` (Windows lag) — **Lead 2026-05-28** черновик в `scripts/radar_control.py`, verify |
+| ls2 | `neon_legacy_consumer._sleep_with_tg_poll`: не `time.sleep(negative)`; при `sleep_sec==0` — min 0.05 с — **Lead 2026-05-28** |
+| **ls0** | **Корень 2026-05-28:** `NameError: process_legacy_neon_listing` / `short_err` не импортированы в `neon_legacy_consumer.py` → consumer падает на 1-м цикле → пульт ■ — **✅ import** `lead_pipeline` |
+| ls3 | Ошибки воркера → красный баннер пульта (`errors` из `/start`) + хвост `data/radar_legacy_exchanges.log` |
+| ls4 | Приёмка: ▶ 2 мин — `neon:цикл` в логе, ■ не сам; `rebuild-pult.bat` после правок desktop |
+
+**Проверка:** `data\radar_legacy_exchanges.log` — нет Traceback; ▶ 120 с — пульт **■** не сам.
+
+# § PULT-LOG-SCROLL-STICK — логи/статус не прыгают (**владелец 2026-05-28**)
+
+**Симптом:** читаешь лог или вкладку «Статус» наверху — при автообновлении уезжает вниз.
+
+| # | Задача |
+|---|--------|
+| ps1 | `logFollowBottom` только если ползунок **у низа** (порог ~32px) — уже есть; **не** сбрасывать в `true` при смене вкладки — **Lead 2026-05-28** `desktop/src/main.ts` |
+| ps2 | При обновлении «Статус» (innerHTML) восстанавливать **gap от низа**, не `scrollTop` |
+| ps3 | `scripts\rebuild-pult.bat` — владелец после сдачи |
+
+# § P5-E2-VPS — Site + Legacy dogfood на VPS (**владелец 2026-05-28**)
+
+**Решение:** парсер + TG listen + **dogfood** на **одном VPS**; владелец управляет **@FLPARSINGBOT** (/status, /pause, кнопки — уже в `telegram_control` + `neon_legacy_consumer`). Пульт на ПК **не** 24/7.
+
+**До деплоя:** если ▶ Legacy на ПК — не должен сам гаситься (§ LEGACY-SELF-STOP). Канон: [`OWNER_INTENT.md`](OWNER_INTENT.md).
+
+| # | Задача |
+|---|--------|
+| e1 | `deploy/run-radar-site.sh` + `rawlead-radar.service` — уже есть; приёмка E2 |
+| e2 | **Новый** `deploy/run-radar-legacy.sh` + `deploy/systemd/rawlead-radar-legacy.service` → `neon_legacy_consumer.py --profile legacy` |
+| e3 | `DEPLOY_VPS.md` § E2b — `.env.legacy` на VPS, scp **не** нужны Telethon для legacy |
+| e4 | **Пауза раздельно:** `SQLITE_PATH` в `.env.legacy` ≠ site **или** `radar_paused_site` / `radar_paused_legacy` — чтобы /pause в FLPARSING **не** гасил Site ingest |
+| e5 | После деплоя: на ПК `stop-radar-desktop-full` — проверка **нет** дублей TG listen |
+| e6 | @rawlead_bot: hotfix `load_site_rollup_line` import — статус Site-бота |
+
+**Не делать:** второй VPS; Freelancehunt на VPS.
+
+**Приёмка владельца:**
+
+1. ПК: оба пульта **■**, скрипт stop full.
+2. VPS: `rawlead-radar` + `rawlead-radar-legacy` active.
+3. `/lenta/` обновляется без ПК.
+4. @FLPARSINGBOT: `/status`, `/pause` → `/старт` — карточки dogfood; **Site** на паузе только если e4 сделан (иначе общая пауза — предупредить в статусе).
+
+| # | Задача |
+|---|--------|
+| e1 | `deploy/run-radar-site.sh` + `rawlead-radar.service` — уже есть; приёмка E2 |
+| e2 | **Новый** `deploy/run-radar-legacy.sh` + `deploy/systemd/rawlead-radar-legacy.service` → `neon_legacy_consumer.py --profile legacy` |
+| e3 | `DEPLOY_VPS.md` § E2b — `.env.legacy` на VPS, scp **не** нужны Telethon для legacy |
+| e4 | **Пауза раздельно:** `SQLITE_PATH` в `.env.legacy` ≠ site **или** `radar_paused_site` / `radar_paused_legacy` — чтобы /pause в FLPARSING **не** гасил Site ingest |
+| e5 | После деплоя: на ПК `stop-radar-desktop-full` — проверка **нет** дублей TG listen |
+| e6 | @rawlead_bot: hotfix `load_site_rollup_line` import — статус Site-бота |
+
+**Не делать:** второй VPS; Freelancehunt на VPS.
+
+**Приёмка владельца:**
+
+1. ПК: оба пульта **■**, скрипт stop full.
+2. VPS: `rawlead-radar` + `rawlead-radar-legacy` active.
+3. `/lenta/` обновляется без ПК.
+4. @FLPARSINGBOT: `/status`, `/pause` → `/старт` — карточки dogfood; **Site** на паузе только если e4 сделан (иначе общая пауза — предупредить в статусе).
+
+# § BACKLOG-CLEAR — сброс хвоста L1 без OpenRouter (**→ сейчас**, владелец)
+
+**Запрос:** очистить очередь ~1253 без L1; **новые** заказы в ленту; **не грузить** OpenRouter всем хвостом.
+
+**Факт Neon (2026-05-28):** без L1 **1253**; из них **~55 за 24 ч** — остальное **старый хвост** (конвейер + wide ingest + replay TG).
+
+| # | Задача |
+|---|--------|
+| b1 | Скрипт `scripts/clear_l1_backlog.py` (или флаг replay): `--dry-run` / `--apply` |
+| b2 | **По умолчанию:** пометить хвост **без вызова ИИ**: `created_at < NOW() - INTERVAL '48 hours'` (или `id < max_id - 100`) → `ai_verdict='Пропущено'`, `ai_score=0`, `is_visible=false`, `ai_reasons=['backlog_cleared']` |
+| b3 | **Не трогать** последние 48 ч / top 100 id DESC — их L1 как сейчас (DESC батч) |
+| b4 | Лог: сколько строк cleared vs сколько осталось без L1 |
+| b5 | После apply: `count_leads_missing_l1` < 100; Site ▶ — новые fl/kwork с L1 в приоритете |
+
+**Владелец:** Stop не нужен; после apply — Site ▶, смотреть `/lenta/` (верх < 15 мин).
+
+**Не делать:** DELETE FROM leads; L1 на все 1253 подряд.
+
+---
+
+# § NEON-AUDIT-FILTERS — выборка отказов ИИ (**→ после b2**)
+
+**Факт (Neon, fl/kwork с L1):** МИМО ~261 · Сомнительно ~186 · Брать ~77 · `is_visible=true` ~256 · false ~230.
+
+**Топ `ai_reasons` у МИМО:** «не относится к разработке, дизайну, маркетингу или текстам» · «общий/физический труд» — **похоже на задуманный scope §0i**, не баг фильтра.
+
+| # | Задача |
+|---|--------|
+| a1 | SQL/скрипт отчёт: 20 случайных **Брать** + 20 **МИМО** за 7 дней — title + reasons + score → `docs/team/common/` или вывод в STATUS § NEON-AUDIT |
+| a2 | Сверка: сколько отсечено **до L1** (`skip:filter` в логе) vs **на L1** — если filter режет «Брать» кандидатов, примеры в тикет |
+| a3 | Опционально: 5 спорных карточек владельцу в чат (без автоправки FILTERS без Product) |
+
+**→ Сейчас @coder:** **§ BACKLOG-CLEAR** · **§ HOTFIX-POST-PULT**.
+
+# § HOTFIX-POST-PULT — приёмка владельца 2026-05-28 (**→ сейчас**)
+
+| # | Симптом | Фикс |
+|---|---------|------|
+| h1 | **@rawlead_bot** не отвечает на «Статус» | `radar_site.log`: `тг:бот:NameError:name 'load_site_rollup_line' is not defined` → **import** в `radar_status.py` из `radar_cycle_log` |
+| h2 | **Legacy-пульт** сам гасится, **@FLPARSINGBOT** шлёт привет | `radar_legacy.log`: куча `neon:старт` без стабильного цикла — consumer падает/рестарт; **Stop** не убивает orphan `neon_legacy_consumer` / `pythonw` → `stop-radar-desktop-full.vbs` + `kill_duplicate_radar_workers(profile=legacy)`; при **Stop** в `radar_control` гарантировать kill consumer |
+| h3 | Очередь L1 огромная — откуда | см. ниже § «Почему backlog» — не баг «одной ночи», накопление wide ingest + конвейер |
+
+**Проверка h1:** `/status` в @rawlead_bot → текст без Traceback; пульт Site вкладка «Статус» 200.
+
+**Проверка h2:** Legacy ■ → 30 с тишина в @FLPARSINGBOT на новые карточки; `neon:старт` не сыпется без ▶.
+
+**Почему backlog 1000+ (для STATUS):** Site `neon_ingest_wide` пишет fl/kwork/tg в Neon **до L1**; при `RADAR_CONVEYOR=1` L1 только батчем; раньше `ORDER BY id ASC` гонял **старые** id — свежие не попадали в ленту; replay TG + долгие прогоны без L1 (401/падения) → тысячи строк `ai_verdict IS NULL`. После фикса DESC очередь **уходит**, но полное обнуление = часы или one-shot replay.
+
+**→ Сейчас @coder (было):** **§ DROP-FREELANCEHUNT** · **§ PULT-STATUS-LOGS** · **§ FEED-FRESHNESS** · **§ SITE-POLISH** (stress не трогать).
+
+**✅ 2026-05-28 FILTERS L2:** `FILTERS_SITE` + sync `FILTERS.md` / `FILTERS_LEGACY` + `filters.py` marketing — cloudflare/капча → только L4; убраны `есть заказ`/`пиши`; агрегатор — длинные маркеры.
+
+**✅ 2026-05-28 env:** `PUBLIC_FEED_SOURCES` — `fl,kwork` + **21× `tg:-100…`** (без freelancehunt — решение владельца). (peer id, не CSV `chat_id` без префикса). Пересборка: `python scripts/build_public_feed_sources.py`.
+
+---
+
+# § SITE-POLISH — довести прод до stress (**→ сейчас**, владелец 2026-05-28)
+
+**Цель:** [rawlead.ru](https://rawlead.ru) не «голый деплой», а **нормальный продукт**: лента свежая, ЛК, вход, UX, тексты. **PRE-PROD-STRESS — после приёмки этого блока.**
+
+| # | Трек | Готово когда |
+|---|------|----------------|
+| **p1** | **§ FEED-FRESHNESS** — свежие FL/Kwork в `/lenta/` (не 40+ мин при работающем Site ▶) | владелец: верх ленты &lt; 15 мин в часы активности бирж |
+| **p2** | **§ feed-source-filter** — `GET /v1/feed?source=tg|fl|kwork` + WP фильтр «Telegram» не пустой | см. ниже |
+| **p3** | **ЛК `/cabinet/`** — навыки, match, L2 «Написать отклик», пустые состояния, mobile | § 3f-OWNER-BETA фаза A |
+| **p4** | **Регистрация** — TG Login Widget на prod + fallback; `user_id` в Neon; ошибки понятные | `CABINET-LOGIN-FALLBACK` довести на `https://rawlead.ru` |
+| **p5** | **UX** — E5/REVOLUTION хвосты на прод-URL, «Горячий» §3x, permalink `/lenta/` | @designer макет → Coder CSS |
+| **p6** | **Тексты** — Product c1–c4 на WP prod (не «ранний доступ») | сверка с `LEAD_PRODUCT_PROMPT` |
+
+**Не в polish:** биллинг 3h (после 3f-A), stress k6, acc2 join (ops).
+
+**Сдача:** `STATUS.md` § SITE-POLISH · владелец чеклист в `FOR_YOU.md`.
+
+---
+
+# § DROP-FREELANCEHUNT — убрать FH из продукта (**→ сейчас**, владелец 2026-05-28)
+
+**Решение:** от **Freelancehunt** отказались; в `.env` / `.env.site` уже без `freelancehunt` в `PUBLIC_FEED_SOURCES`.
+
+| # | Готово когда |
+|---|----------------|
+| fh1 | **Не вызывать** в цикле Site: убрать из `_P1_WEB_SOURCES` / `enabled_sources` по умолчанию — только `fl`, `kwork` (+ tg из env) |
+| fh2 | Дефолты: `public_feed.py`, `build_public_feed_sources.py`, `.env.example` → `fl,kwork` (без fh). **`build_public_feed_sources`:** пропускать строки с `⏸` / `отложен` / `отключён` / `❌` (сейчас «отключён» без ⏸ — FH снова в выводе) |
+| fh3 | Доки: `PUBLIC_FEED_WEB_SOURCES.txt` ✅, `RADAR_LOG.md`, `KAK_ETO`, `STATUS` § TG — без fh в примерах |
+| fh4 | `radar_cycle_log.py` — не печатать строку Freelancehunt; порядок источников FL + Kwork |
+| fh5 | Парсер `freelancehunt_parser.py` — **оставить в repo**, не импортировать из `main` (⏸ отложен, как vc_ru) |
+| fh6 | WP/feed: подпись источника fh не нужна в MVP; preprod fixtures — ок оставить |
+
+**Владелец:** удалить `FREELANCEHUNT_API_TOKEN` из `.env.site` (не обязателен).
+
+**Проверка:** Site ▶ 15 мин → в `radar_site.log` **нет** строки `Freelancehunt │`; `python scripts/build_public_feed_sources.py` — в строке нет `freelancehunt`.
+
+---
+
+# § PULT-STATUS-LOGS — подробные логи и статусы пультов + оба бота (**→ сейчас**)
+
+**Запрос владельца:** нормальные **подробные** вкладки «Статус» / лампы Legacy + Site; понятный статус **двух ботов** (@rawlead_bot Site, @FLPARSINGBOT Legacy).
+
+**Сейчас:** один `format_status_message` без профиля; Site rollup в payload, но текст статуса бедный; боты — только «Бот /start: да/нет» per acc, без имени бота.
+
+| # | Задача |
+|---|--------|
+| pl1 | **`format_status_message`:** шапка `Профиль: SITE|LEGACY` · бот **`@rawlead_bot`** (site) / **`@FLPARSINGBOT`** (legacy) · `TELEGRAM_CHAT_ID` · конвейер вкл/выкл · пауза |
+| pl2 | **Site:** блок «Лента / Neon» — `site:сводка` 10 мин (из SQLite), последний цикл (FL/Kwork: скачано/новых/neon_insert/is_visible), **время последней visible** в Neon (1 SQL) |
+| pl3 | **Legacy:** блок «Dogfood» — карточек в бот за сессию / последний neon consumer (если есть счётчик в логе или SQLite) |
+| pl4 | **TG acc:** без изменения логики listen; ясные подписи acc1/acc2/acc3 + join pending |
+| pl5 | **`/status` JSON (пульт):** поля `bot_label`, `bot_start_ok`, `conveyor`, `poll_min`, `profile`, `site_rollup_10m`, `last_visible_at` — desktop может рисовать карточки |
+| pl6 | **Desktop `main.ts`:** вкладка «Статус» — рендер JSON-блоков (не только plain text), ошибка config с подсказкой `RADAR_CONVEYOR=1` |
+| pl7 | **Два пульта:** Legacy `:18765` + `radar_legacy.log` · Site `:18775` + `radar_site.log` — в статусе **имя лог-файла** |
+| pl8 | **Кнопка «Статус» в TG-боте** (`telegram_control.py`): тот же текст, что `/status-text` пульта **для этого профиля** (site-бот не путать с legacy) |
+| pl9 | `docs/ops/RADAR_LOG.md` § «Статус пульта» — расшифровка полей |
+
+**Не делать:** stress k6; новые фичи ленты.
+
+**Приёмка владельца:**
+
+1. Site-пульт → «Статус» — видно @rawlead_bot, FL+Kwork, сводка 10 мин, нет Freelancehunt.
+2. Legacy-пульт → «Статус» — @FLPARSINGBOT, Neon consumer, TG выкл или отдельно.
+3. `/status` в @rawlead_bot и в @FLPARSINGBOT — осмысленные разные тексты (не один шаблон без профиля).
+
+**Сдача:** `STATUS.md` § PULT-STATUS-LOGS · `FOR_YOU.md` одна строка.
+
+---
+
+# § PULT-POLL-STATUS — «POLL_INTERVAL минимум 10, получено: 1» (**шаг 0, владелец**)
+
+**Симптом:** Site-пульт, вкладка «Статус»: `Не удалось загрузить статус: POLL_INTERVAL_MINUTES: минимум 10 мин, получено: 1`.
+
+**Причина:** в `config.py` интервал **1 мин** разрешён только при `RADAR_PROFILE=site` **и** `RADAR_CONVEYOR=1` в `.env.site`. Иначе `load_config()` падает на `/status-text` (радар при этом может работать).
+
+**Владелец:** `.env.site` — обе строки → `stop-radar-desktop-full.vbs` → ярлык **RawLead Site** → проверка:
+
+```powershell
+.venv\Scripts\python.exe -c "import sys; sys.argv=['','--profile','site']; from config import load_config; c=load_config(); print(c.radar_profile, c.poll_interval_minutes, c.radar_conveyor)"
+```
+
+Ожидание: `site 1 True`.
+
+**Coder (если не помогло):** понятная ошибка + `RUN.md` про конвейер.
+
+---
+
+# § FEED-FRESHNESS — «последний заказ 40 мин назад» (**после шага 0**)
+
+**Симптом:** на [ленте](https://rawlead.ru/?page_id=5) верхняя карточка **~40 мин** и старее; владелец ожидает поток FL/Kwork.
+
+**Что видно в `radar_site.log` (Lead 2026-05-28 ~16:00):**
+
+| Факт | Вывод |
+|------|--------|
+| TG listen жив (`тг:пульс`, `тг:сообщ`) | TG не причина «тишины» на биржах |
+| FL «новых 2», Kwork «новых 4», FH «новых 10» | Парсер **качает**, но мало **новых id** (dup) |
+| Полный footer цикла / `site:сводка` / `конвейер:L1=` **редко в логе** | Подозрение: `main` **долго в цикле** или L1 backlog не догоняет |
+| `в бот 0` на Site | Норма — в ленту только `is_visible` после L1 |
+
+**Диагностика Lead 2026-05-28 (Neon, факт):**
+
+| Метрика | Значение |
+|---------|----------|
+| Последняя **видимая** в ленте (`is_visible`) | **~57 мин** назад |
+| Новые fl/kwork в Neon (insert) | **6–11 мин** назад, но `is_visible=false`, **L1 нет** |
+| Очередь **без L1** (fl/kwork) | **1252** строки |
+| `fetch_leads_missing_l1` | **`ORDER BY id ASC`** — батч 40/цикл жрёт **старые**, свежие ждут часы |
+
+**Корень:** конвейер (`defer_l1`) + L1 backlog **сначала старьё** → лента не «мгновенная», даже при живом парсере.
+
+**Лог:** после `── Цикл … ──` часто **нет** footer FL/Kwork — цикл `main` не завершается или L1 batch не логируется (отдельно от `тг:пульс`).
+
+| # | Задача |
+|---|--------|
+| f1 | **`drain_l1_backlog` / `fetch_leads_missing_l1`:** приоритет **свежих** — `ORDER BY id DESC` или два прохода (N новых DESC + M старых ASC) |
+| f2 | Порог: backlog &gt; 100 → лог `конвейер:backlog=1252` + в пульте «Статус» |
+| f3 | Опция: для fl/kwork **L1 сразу** на ingest (конвейер только для догона старых) — продукт «мгновенно в ленту» |
+| f4 | One-shot: догнать L1 для последних 200 id DESC (скрипт или флаг replay) |
+| f5 | Footer цикла + `site:сводка` каждые 10 мин |
+| f6 | Prod API — тот же Neon; не блокер если f1–f3 ок |
+
+**Приёмка:** Site ▶ 30 мин в дневное время → верх `https://rawlead.ru` ленты — FL/Kwork **&lt; 15 мин** (если биржа даёт заказы).
+
+---
+
+# § feed-source-filter — фильтр источника в API (**внутри SITE-POLISH**)
+
+**Симптом:** фильтр «Telegram» на `/lenta/` пустой — клиент режет 20 карточек без `tg:`.
+
+| # | Готово когда |
+|---|----------------|
+| s1 | `GET /v1/feed?source=tg` (и `fl`, `kwork`) — фильтр **в SQL**, не в JS |
+| s2 | `rawlead-feed.js` — передаёт `source` в REST-прокси |
+| s3 | Replay TG только по 21 peer из `build_public_feed_sources.py` (опц. флаг `--whitelist-only`) |
+
+---
+
+# § REPLAY-TG-FIX — replay `--tg-replay` падает (**✅ код 2026-05-28**)
+
+**Симптом:** `replay_neon_lite_site.py --profile site --tg-replay --limit 200` печатает `TG replay: 200`, затем **Traceback** — в Neon/`/lenta/` ничего не меняется.
+
+**Причина:** `default_listing_filter(cfg)` — в `filters.py` сигнатура **без аргументов** (`default_listing_filter()`). То же в строке ~485 того же скрипта.
+
+**Фикс:** заменить на `default_listing_filter()` (2 места в `scripts/replay_neon_lite_site.py`).
+
+**Проверка владельца после фикса:**
+```text
+.venv\Scripts\python.exe scripts\replay_neon_lite_site.py --profile site --tg-replay --limit 200
+```
+Ожидание: строки `L1 tg:… → Брать|Сомнительно|МИМО`, в конце `Готово: L1=N` (N > 0). Затем `/lenta/` — фильтр «Все» или источник TG; не все 200 станут видимыми (МИМО/filter — норма).
+
+**Не блокер если уже есть:** `PUBLIC_FEED_SOURCES` с `tg:-100…` в `.env.site` (строка ~96) — у владельца есть.
+
+---
+
+# § 3f-OWNER-BETA — ты = первый платный подписчик (тест без реальных денег сначала)
+
+**Запрос владельца (2026-05-28):** нормальный `/cabinet/`, L2-бот с черновиком отклика, потом платежи; **владелец** гоняет сценарий до внешних юзеров.
+
+**Канон продукта:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) Direction D · §0d acceptance #5 · цена **590–990 ₽/мес** (3h).
+
+**Уже есть в коде (не переделывать):** `/cabinet/`, TG Login fallback, `/v1/me/feed`, `reply_draft` в `rawlead-cabinet.js`, `subscriptions` в Neon, @rawlead_bot.
+
+| Фаза | # | Готово когда |
+|------|---|----------------|
+| **A. Обкатка без оплаты** | a1 | Владелец: `/start` @rawlead_bot → вход в `/cabinet/` (widget или fallback) → `user_id` в Neon |
+| | a2 | `/cabinet/`: лента только match по `user_tags`; кнопка **«Написать отклик»** → L2 → `reply_draft` виден и копируется |
+| | a3 | **§ P4b:** два набора `user_tags` у одного лида → **разные** черновики (smoke в `preprod_ai_matrix` расширить) |
+| | a4 | Опционально: push в TG владельцу при новом match (`telegram_chat_id` в профиле) — флаг env |
+| **B. Кабинет UX** | b1 | Lead Design: § в `DESIGNER_PROMPT` — кабинет «подписка», тариф, пауза (макет) |
+| | b2 | Coder: страницы тариф/статус подписки в child theme; `subs.is_active` / `paused_until` в API |
+| **C. Оплата (3h)** | c1 | ЮKassa / Robokassa / T-Bank — **один** провайдер, один тариф «ИИ-агент», webhook → `subscriptions` |
+| | c2 | После оплаты: `is_active=true`, L2 без ручного «включения» |
+| | c3 | Пауза подписки (`subs.paused_until`) — UI + крон (vision 3p, можно вместе с c1) |
+
+**Не в этой задаче:** multi-user маркетинг, freemium 3q, несколько тарифов, оферта/ИП (владелец).
+
+**Проверка владельца (A):** Site ▶ + API ▶ → зайти на `/cabinet/` → выбрать навыки → увидеть match → «Написать отклик» → черновик ≠ пустой.
+
+**Сдача:** `STATUS.md` § 3f-OWNER-BETA · Product сверяет copy тарифа.
+
+---
+
+# § EXCHANGE-CONVEYOR — fetch 1 мин + прокси + L1 батч (**база в коде 2026-05-28**)
+
+**Запрос владельца:** парсить биржи **каждую минуту**, не ждать 10 мин; FL/Kwork через **ротацию прокси**; не блокировать fetch долгим L1.
+
+**Сделано (база):**
+
+| Компонент | Файл |
+|-----------|------|
+| `RADAR_CONVEYOR=1` — ingest без L1 в hot path, L1 в конце цикла батчем | `lead_pipeline.py`, `main.py` |
+| `POLL_INTERVAL_MINUTES=1` (min 1 при conveyor+site) | `config.py` |
+| `FL_PROXY_URLS` / `KWORK_PROXY_URLS` round-robin | `exchange_proxy.py`, `fl_parser.py`, `kwork_parser.py` |
+| `L1_BATCH_PER_CYCLE=40` | `config.py`, `.env.site` |
+
+| # | Доработка / приёмка |
+|---|---------------------|
+| e1 | Лог цикла: `конвейер:вкл` при старте; `fetch:fl proxy=host:port` (без пароля) |
+| e2 | При 429/timeout FL/Kwork — **следующий** прокси из списка в том же цикле (retry 1×) |
+| e3 | TG **не** в conveyor defer — `process_new_listing_from_tg` L1 inline как сейчас |
+| e4 | `docs/ops/RUN.md` — схема конвейера (fetch → Neon → L1 batch) |
+| e5 | Замер: цикл fetch ≤2 мин при conveyor; L1 догоняет backlog, не копится бесконечно |
+
+**Риски (не скрывать):** FL может банить частый crawl даже с прокси; OpenRouter $ при `L1_BATCH=40` каждую минуту.
+
+**Проверка:** `.env.site`: `RADAR_CONVEYOR=1`, `POLL_INTERVAL_MINUTES=1`, прокси заданы → Site ▶ → в логе каждые ~1 мин заголовок цикла + `конвейер:L1=N`; FL/Kwork `скачано` без паузы 10 мин.
+
+**Сдача:** `STATUS.md` § EXCHANGE-CONVEYOR
+
+---
+
+# § TG-FEED-SOURCES — TG в `/lenta/` и legacy consumer (**✅ код 2026-05-28**)
+
+**Симптом:** Site `tg_main` слушает v2-чаты, но **TG нет** в `/lenta/` и в @FLPARSINGBOT — только FL/Kwork.
+
+**Причина:** `is_visible` и `GET /v1/feed` требуют `source ∈ PUBLIC_FEED_SOURCES`. Ключ в Neon: **`tg:{peer_id}`** (напр. `tg:-1001199102856`), не `tg:1199102856` из CSV.
+
+**Владелец / Lead:** `.env` уже обновлён (21 каналов done ∩ allowlist). После сдачи Coder — **перезапуск Site ▶** (и legacy consumer, если нужен TG в FLPARSING).
+
+| # | Готово когда |
+|---|----------------|
+| t1 | `scripts/build_public_feed_sources.py` — печатает строку для `.env` (биржи из `PUBLIC_FEED_WEB_SOURCES.txt` + tg peers) |
+| t2 | Док [`docs/ops/RADAR_LOG.md`](../../ops/RADAR_LOG.md) или `FOR_YOU.md` — одна строка: «после join done → `python scripts/build_public_feed_sources.py` → вставить в `.env` → рестарт Site» |
+| t3 | **One-shot:** `scripts/replay_neon_lite_site.py --limit 200` — пересчитать L1 + `is_visible` для строк `source LIKE 'tg:%'` уже в Neon (без re-ingest) |
+| t4 | **acc2:** в `radar_site.log` не `0 из 25 чатов` — join pending из `TG_JOIN_QUEUE_v2` (perezvonyu, webfrl, …) |
+| t5 | Проверка: Neon `SELECT source, COUNT(*) FROM leads WHERE source LIKE 'tg:%' GROUP BY 1`; `/v1/feed` — есть `source` с префиксом `tg:`; legacy consumer — опц. карточки TG в FLPARSING (тот же whitelist) |
+
+**Файлы:** `scripts/build_public_feed_sources.py`, `scripts/replay_neon_lite_site.py`, `docs/ops/RADAR_LOG.md` или `FOR_YOU.md`
+
+**Не трогать:** split Legacy/Site, `FILTERS_*` содержимое
+
+**Проверка:** Site ▶ 30 мин → новый пост в @distantsiya или replay → `/lenta/` фильтр «Все» — карточка с источником TG; `radar_site.log` — `is_visible` > 0 в `site:сводка` при годном L1
+
+**Сдача:** `STATUS.md` § TG-FEED-SOURCES · не коммитить
+
+---
+
+# § SITE-LOG-ROLLUP — сводка Site за 10 мин
+
+**Запрос владельца:** понятные логи **Site-контура** (парсер → L1 → Neon → лента), не путать с @FLPARSINGBOT.
+
+**Канон:** парсит **`main.py --profile site`** + `tg_main`; пишет **`data/radar_site.log`**. @rawlead_bot — уведомления подписчикам (биржи владельцу по умолчанию **не** шлёт, `SITE_NOTIFY_OWNER=0`).
+
+| # | Готово когда |
+|---|----------------|
+| r1 | Каждые **10 мин** (или в футере каждого цикла + отдельная строка раз в 10 мин) в `radar_site.log`: |
+| | `site:сводка │ 10мин │ скачано N │ новых_sqlite M │ neon_insert K │ neon_replay R │ l1 L1 │ l2 L2 │ is_visible V │ filter F │ мимо X` |
+| r2 | Счётчики **скользящее окно 10 мин** (не только последний цикл ~15 мин) — ring buffer в памяти процесса `main` или агрегация по timestamp строк |
+| r3 | В пульте Site вкладка **radar** / **Статус** — та же сводка (если уже tail log — достаточно явной строки `site:сводка`) |
+| r4 | [`docs/ops/RADAR_LOG.md`](../../ops/RADAR_LOG.md) — таблица расшифровки новой строки |
+| r5 | Не ломать существующие футеры `Итого в бот` / `neon_insert` per cycle |
+
+**Файлы (можно трогать):** `src/radar_cycle_log.py`, `src/main.py`, `src/lead_pipeline.py` (только note_* hooks если нужно), `scripts/radar_control.py` (опц. status), `docs/ops/RADAR_LOG.md`
+
+**Не трогать:** `neon_legacy_consumer.py`, `FILTERS_LEGACY.md`, legacy AI_MODE
+
+**Проверка:** Site ▶ 20 мин → в `radar_site.log` ≥2 строк `site:сводка │ 10мин` с ненулевым `скачано` или явным `0` + причина в том же цикле
+
+**Сдача:** `STATUS.md` § SITE-LOG-ROLLUP · не коммитить
+
+---
+
+**Архив (3x ✅):** § 3x-HOT-BADGE ниже · P5 после rollup
+
+**Архив задач ниже** — STOP-STATUS-SPAM, PRE-LAUNCH, S-SPLIT и т.д. (**не трогать** без нового § в шапке).
+
+---
+
+# § 3x-HOT-BADGE — Бадж «Горячий» (**✅ 2026-05-28**)
+
+**Канон:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §4 фаза 3x · [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § MARKET-INTEL-B.
+
+**Суть:** если заказ появился **< 5 минут** назад — красный/оранжевый badge «Горячий» на карточке в `/lenta/` и `/cabinet/`.
+
+| # | Готово когда |
+|---|----------------|
+| h1 | `GET /v1/feed` и `/v1/me/feed`: поле `is_hot: bool` **или** отдавать `created_at` ISO и считать на фронте (< 300 с) |
+| h2 | `rawlead-feed.js` / `rawlead-cabinet.js` — рендер badge при hot |
+| h3 | `rawlead.css` — `.rl-badge-hot` (один стиль, REVOLUTION-токены) |
+| h4 | Mobile: badge не ломает filter-bar / карточку |
+
+## Файлы (можно трогать)
+
+- `src/api_server.py` — `is_hot` в items (если на бэкенде)
+- `wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js`
+- `wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js`
+- `wordpress/rawlead-kadence-child/assets/css/rawlead.css`
+
+## Файлы (не трогать)
+
+- `src/ai_analyze.py`, `lead_pipeline.py`, legacy consumer
+- `docs/ops/FILTERS_LEGACY.md`
+
+**Проверка:** `wp_install_rawlead_theme.py` → Ctrl+F5 `/lenta/` → свежий лид (или подставить `created_at` в API) → badge виден; старый лид (>5 мин) — без badge.
+
+**Сдача:** `STATUS.md` § 3x · не коммитить.
+
+---
+
+**→ Ранее @coder (порядок до выхода, архив):**
 
 **✅ § STOP-STATUS-SPAM** — принято владельцем 2026-05-27
 
@@ -291,7 +716,7 @@ LEGACY pipeline (один ИИ) не трогать без задачи влад
 
 **✅ § LEGACY-DRAFT-LEN-SOFTEN** — Lead verify 2026-05-27 (приёмка ⏳). Не терять заказ из‑за счётчика предложений.
 
-**🔴 § CANONICAL-TAGS-E2b (Product E2, 2026-05-27, P0 до E5)** — L1 + API под [`SKILLS_TOOLS_CATALOG.md`](../product/SKILLS_TOOLS_CATALOG.md). Полное ТЗ: `LEAD_PRODUCT_PROMPT.md` § CANONICAL-TAGS.
+**✅ § CANONICAL-TAGS-E2b** — Lead verify 2026-05-28 (миграция Neon ⏳). L1 + API под [`SKILLS_TOOLS_CATALOG.md`](../product/SKILLS_TOOLS_CATALOG.md).
 
 | # | Готово когда |
 |---|--------------|
@@ -327,7 +752,7 @@ LEGACY pipeline (один ИИ) не трогать без задачи влад
 
 ---
 
-# § PRE-LAUNCH-UX — UI перед хостингом (**⏸ E3→E5**, после research + ЛК)
+# § PRE-LAUNCH-UX — UI перед хостингом (**✅ E5 код Lead 2026-05-28 · приёмка ⏳**)
 
 **Порядок (владелец 2026-05-27):** E0 Coder A–D → E1 ЛК → **E2 SKILLS-TOOLS-RESEARCH** (Product) → **E3 Design** (спор до идеала) → **E4 Product copy** → **E5 Coder вёрстка** → P5/stress.
 
@@ -336,13 +761,35 @@ LEGACY pipeline (один ИИ) не трогать без задачи влад
 | # | Готово когда |
 |---|----------------|
 | u0 | ✅ Product § SKILLS-TOOLS-RESEARCH — `SKILLS_TOOLS_CATALOG.md` v0.2 |
-| u1 | Lead Design: [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § PRE-LAUNCH-UX v2 — горизонтальная filter-bar, воздух у «Лента заказов», контакты без early-access, report bug, mobile |
-| u2 | @lead-product: копирайт § PRE-LAUNCH-UX copy |
-| u3 | @coder: WP/CSS/JS по макету + `feed-cabinet-mvp.md` addendum |
-| u4 | `POST` или форма **«Сообщить об ошибке»** (endpoint + WP UI по Design; без спама, rate limit) |
-| u5 | Каталог навыков в UI из research-артефакта (не только динамический top-50 из Neon) |
+| u1 | ✅ Design REVOLUTION — `REFERENCE.md` v3, `feed-cabinet-mvp.md` v2, `DESIGNER_PROMPT.md` |
+| u2 | ✅ Product copy c1–c4 — [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § «Канон строк PRE-LAUNCH-UX copy» |
+| u3 | ✅ REVOLUTION `rawlead.css` + c1–c4 в PHP/JS |
+| u4 | UI modal ✅ · **POST endpoint** — отдельная задача (не блокер приёмки E5) |
+| u5 | ✅ `loadCatalog()` → `/v1/skills/catalog` |
 
 **Промпт Design:** [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § PRE-LAUNCH-UX v2.
+
+---
+
+# § OWNER-UX-POLISH — правки владельца (2026-05-28, **→ @coder**, после E5)
+
+**Контекст:** приёмка E5 — визуальные доработки лендинга + `/lenta/` + `/how/`. Без новых фич.
+
+| # | Задача | Файлы | Готово когда |
+|---|--------|-------|--------------|
+| o1 | **«Для кого» + «Тариф»** — меньше пустоты сверху: уменьшить `padding-top` / `margin-top` у секций (заголовок «Для кого» ближе к карточкам) | `rawlead.css` — `.rl-audience`, `#pricing-preview.rl-section` | визуально плотнее, без лишнего зазора |
+| o2 | **«Как устроено»** — убрать горизонтальный скролл-ленту; статичная **grid** 1 col mobile / 3 col desktop; убрать строку «Свайп влево — следующий шаг» | `features.php`, `rawlead.css` — `.rl-features-scroll`, `.rl-features-track` | всё видно без свайпа, листаешь вниз |
+| o3 | **«Как устроено»** — убрать крупные «призрачные» цифры 01–03 (`.rl-feature__ghost`); текст разбора **меньше** (`font-size` ~0.9–0.95rem) | `features.php` (опц. убрать span ghost), `rawlead.css` | нет дублей/чёрных огромных цифр |
+| o4 | **Кубики FL / Kwork / TG** — при скролле **собираются** (уже есть в `rawlead-scroll.js` + CSS); при **hover** на куб — лёгкое **покачивание** (wiggle, 2–3°) | `rawlead.css` — `.rl-source-cube:hover` | анимация только hover, не ломать reduced-motion |
+| o5 | **Карточка лида** в блоке flow (`.rl-lead-card` рядом с кубиками) — **поднимается** при появлении в viewport (как reveal: `translateY` + тень), не только `:hover` | `rawlead.css`, опц. `rawlead-scroll.js` observe `.rl-lead-card` | карточка «въезжает» при скролле |
+| o6 | **«Для кого»** — если есть горизонтальный скролл — заменить на **grid 2×2** (уже grid в CSS; проверить, нет overflow-x) | `audience.php`, `rawlead.css` | без горизонтального скролла |
+| o7 | **`/lenta/`** — панели **«Навыки»** и **«Сортировка»** раскрываются **поверх** карточек (не обрезаются). Причина: `overflow` на `.rl-filter-bar__inner` / stacking. `z-index` панелей ≥ 500, `overflow: visible` на bar при `[open]` | `rawlead.css`, опц. `page-lenta.php` | dropdown полностью виден |
+| o8 | **`/how/`** — **двойная нумерация**: в `how.html` уже «1. …», CSS добавляет `::before` counter — **убрать** `body.page-how .rl-block-card > h2::before` (или counter в CSS) | `rawlead.css`, опц. `how.html` | один номер шага, без чёрных/дублирующих цифр |
+| o9 | **Бонус:** `rawlead-landing/content/home.html` — убрать «Ранний доступ» (см. E4 c4) | `home.html` | — |
+
+**Не делать:** новый горизонтальный скролл; сложные скрипты свайпа; менять API/радар.
+
+**Приёмка владельца:** `wp_install_rawlead_theme.py` → главная + `/lenta/` + `/how/` Ctrl+F5.
 
 ---
 

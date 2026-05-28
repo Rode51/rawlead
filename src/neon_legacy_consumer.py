@@ -28,6 +28,7 @@ from config import (
 )
 from filters import ListingWordFilter, default_listing_filter
 from lead_pipeline import process_legacy_neon_listing, short_err
+from radar_status import reset_neon_consumer_session, record_neon_consumer_cycle
 from pg_storage import NeonLeadStorage, pg_storage_from_config
 from storage import ProjectStorage, storage_from_config
 
@@ -143,6 +144,7 @@ def _sleep_with_tg_poll(
                 f"{radar_timestamp()} neon:tight-loop — sleep_sec = 0",
                 echo=True,
             )
+            sleep_sec = 0.05
         time.sleep(sleep_sec)
 
 
@@ -185,6 +187,12 @@ def run_neon_cycle(
             to_bot += 1
 
     _save_cursor(max_id)
+    record_neon_consumer_cycle(
+        storage,
+        sample_size=len(rows),
+        new_ids=new_ids,
+        to_bot=to_bot,
+    )
     _append_log_line(
         cfg.radar_log_path,
         f"{ts} neon:цикл │ выборка {len(rows):3d} │ новых {new_ids:3d} │ в бот {to_bot:3d}",
@@ -236,6 +244,7 @@ def main() -> None:
     _echo("---")
 
     ts0 = radar_timestamp()
+    reset_neon_consumer_session(storage)
     _append_log_line(cfg.radar_log_path, f"{ts0} neon:старт", echo=True)
 
     try:

@@ -894,6 +894,66 @@
 
 
 
+  var HOT_MAX_AGE_MS = 300000;
+
+
+
+  function isHot(item) {
+
+    if (!item) {
+
+      return false;
+
+    }
+
+    if (item.is_hot === true) {
+
+      return true;
+
+    }
+
+    if (item.is_hot === false) {
+
+      return false;
+
+    }
+
+    if (!item.created_at) {
+
+      return false;
+
+    }
+
+    var d = new Date(item.created_at);
+
+    if (isNaN(d.getTime())) {
+
+      return false;
+
+    }
+
+    var age = Date.now() - d.getTime();
+
+    return age >= 0 && age < HOT_MAX_AGE_MS;
+
+  }
+
+
+
+  function hotBadgeHtml(item) {
+
+    if (!isHot(item)) {
+
+      return "";
+
+    }
+
+    return '<span class="rl-badge-hot" aria-label="Горячий заказ">Горячий</span>';
+
+  }
+
+
+
   function skeletonHtml(n) {
 
     var html = "";
@@ -1186,6 +1246,8 @@
 
       '<div class="rl-feed-card__head">' +
 
+      '<div class="rl-feed-card__head-start">' +
+
       '<span class="rl-feed-card__source rl-feed-card__source--' +
 
       src.cls +
@@ -1195,6 +1257,10 @@
       escapeHtml(src.label) +
 
       "</span>" +
+
+      hotBadgeHtml(item) +
+
+      "</div>" +
 
       '<span class="rl-feed-card__time">' +
 
@@ -1228,13 +1294,11 @@
 
       '<div class="rl-match__label">' +
 
-      "<span>Совместимость</span>" +
-
-      "<span><strong>" +
+      "<span>Совместимость " +
 
       rank +
 
-      "%</strong></span>" +
+      "%</span>" +
 
       "</div>" +
 
@@ -1570,7 +1634,7 @@
 
             listEl.innerHTML =
 
-              '<p class="rl-feed-empty">По выбранным фильтрам ничего не найдено.</p>';
+              '<p class="rl-feed-empty">В этой нише пока нет заказов — попробуйте «Все»</p>';
 
           }
 
@@ -1642,7 +1706,7 @@
 
         }
 
-        showError("Не удалось загрузить ленту.");
+        showError("Не удалось загрузить");
 
       })
 
@@ -1839,6 +1903,14 @@
   if (addFirst) {
 
     addFirst.addEventListener("click", promptAddTag);
+
+  }
+
+  var changeSkills = document.getElementById("rl-cabinet-change-skills");
+
+  if (changeSkills) {
+
+    changeSkills.addEventListener("click", promptAddTag);
 
   }
 

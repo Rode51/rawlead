@@ -26,10 +26,14 @@ _ALL_MATCH = (
     r"scripts[\\/]tg_main\.py|scripts[\\/]tg_join_daemon\.py|"
     r"scripts[\\/]tg_join_queue)"
 )
+_NEON_CONSUMER_MATCH = r"neon_legacy_consumer\.py"
 # CommandLine без полного пути (system pythonw + scripts\radar_control.py)
 _RADAR_CONTROL_MATCH = r"radar_control\.py"
 # Пульт spawn'ит только .venv\Scripts\python.exe — system/Cursor воркеры = дубль
-_VENV_EXE = re.compile(r"\.venv[\\/]Scripts[\\/]python(?:w)?\.exe", re.IGNORECASE)
+_VENV_EXE = re.compile(
+    r"\.venv[\\/](?:Scripts[\\/]python(?:w)?\.exe|bin/python(?:3(?:\.\d+)?)?)",
+    re.IGNORECASE,
+)
 _PROFILE_ARG = re.compile(r"--profile\s+(legacy|site)", re.IGNORECASE)
 
 
@@ -48,11 +52,15 @@ def _current_profile() -> str:
 
 
 def _iter_python_procs():
-    """Все python/pythonw процессы на Windows."""
+    """Все python/pythonw (Windows) или python/python3 (Linux) процессы."""
+    if sys.platform == "win32":
+        names = frozenset(("python.exe", "pythonw.exe"))
+    else:
+        names = frozenset(("python", "python3"))
     for proc in psutil.process_iter(["pid", "name", "cmdline"]):
         try:
             name = (proc.info["name"] or "").lower()
-            if name in ("python.exe", "pythonw.exe"):
+            if name in names:
                 yield proc
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
@@ -286,6 +294,37 @@ def log_duplicate_kills(
     print(line, flush=True)
 
 
+def kill_neon_legacy_consumers(
+    *,
+    profile: str | None = None,
+    keep_pids: set[int] | None = None,
+    log_path: Path | None = None,
+    log_source: str = "guard:neon_consumer",
+) -> list[int]:
+    """Завершить neon_legacy_consumer (orphan pythonw после Stop). profile=None — все профили."""
+    if sys.platform != "win32":
+        return []
+    keep = set(keep_pids or ())
+    rx = re.compile(_NEON_CONSUMER_MATCH, re.IGNORECASE)
+    killed: list[int] = []
+    for proc in _iter_python_procs():
+        if proc.pid in keep:
+            continue
+        cmd = _cmd_str(proc)
+        if not rx.search(cmd):
+            continue
+        if profile is not None and _profile_from_cmd(cmd) != profile.casefold():
+            continue
+        try:
+            proc.kill()
+            killed.append(proc.pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    if killed:
+        log_duplicate_kills(killed, log_path=log_path, source=log_source)
+    return killed
+
+
 def kill_all_radar_control(*, profile: str | None = None) -> list[int]:
     """Завершить radar_control + main/tg_main/join профиля (любой python.exe)."""
     if sys.platform != "win32":
@@ -319,6 +358,14 @@ def kill_all_radar_control(*, profile: str | None = None) -> list[int]:
             log_source="kill_all:non_venv",
         )
     )
+    if want == "legacy":
+        killed.extend(
+            kill_neon_legacy_consumers(
+                profile=want,
+                keep_pids={-1},
+                log_source="kill_all:neon_consumer",
+            )
+        )
     if killed:
         log_duplicate_kills(killed, source="radar_control:all")
     return killed
@@ -390,10 +437,11 @@ def release_stale_worker_locks() -> None:
     load_radar_env()
     mc, _tc = count_radar_workers()
     if mc == 0:
-        try:
-            radar_lock_path("main").unlink(missing_ok=True)
-        except OSError:
-            pass
+        for lock_name in ("main", "neon_legacy"):
+            try:
+                radar_lock_path(lock_name).unlink(missing_ok=True)
+            except OSError:
+                pass
     try:
         from health_check import try_release_stale_tg_main_lock
 

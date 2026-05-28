@@ -6,7 +6,8 @@
 |--------|------|
 | **Что делать сейчас?** | Ниже «Твои шаги» |
 | **Как это работает?** | [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) |
-| **Фазы / приоритет** | [`team/architect/ROADMAP.md`](team/architect/ROADMAP.md) · vision v0.9 |
+| **Фазы / приоритет** | [`team/architect/ROADMAP.md`](team/architect/ROADMAP.md) · vision **v0.11** (590–990 ₽, Plan B) |
+| **Все твои решения для Lead** | [`team/architect/OWNER_INTENT.md`](team/architect/OWNER_INTENT.md) |
 | **План Product** | [`team/product/LEAD_PRODUCT_PROMPT.md`](team/product/LEAD_PRODUCT_PROMPT.md) |
 | **Запуск** | [`ops/RUN.md`](ops/RUN.md) |
 | **Пульт** | [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
@@ -22,22 +23,24 @@
 
 | Ярлык | Профиль | Бот | Зачем |
 |-------|---------|-----|--------|
-| **Радар Site** (сервер 24/7) | `site` | [@rawlead_bot](https://t.me/rawlead_bot) | **Парсит** биржи + TG → **Neon** → `/lenta/` |
-| **Радар Legacy** (ПК, по желанию) | `legacy` | @FLPARSINGBOT | **Не парсит** биржи — **читает Neon**, `FILTERS_LEGACY` → бот |
+| **Радар Site** (VPS 24/7, E2) | `site` | [@rawlead_bot](https://t.me/rawlead_bot) | **Парсит** биржи + TG → Neon → `/lenta/` |
+| **Dogfood Legacy** (VPS 24/7, E2b) | `legacy` | @FLPARSINGBOT | **Читает Neon** → карточки тебе; **/status /pause** в боте |
 
 - Фильтры **разные файлы**: `FILTERS_SITE.md` (лента) vs `FILTERS_LEGACY.md` (твой бот)
 - **Один парсер** на сервере (Site ▶); Legacy — отбор из той же Neon, SQLite «уже слал»
 - `SITE_NOTIFY_OWNER=0` (по умолчанию): Site **не шлёт** owner-уведомления в TG; биржи владельцу идут только через Legacy consumer
 - OpenRouter: **два ключа** — legacy и site
-- На прод: регистрируешься на сайте → новый бот → тест как платный подписчик
+- **Ты = подписчик #0:** после PRE-PROD — `/start` @rawlead_bot → `/cabinet/` → L2 «Написать отклик» → потом оплата (§ `3f-OWNER-BETA` в `CODER_PROMPT.md`)
 
-Подробно: [`team/common/PROJECT_MAP.md`](team/common/PROJECT_MAP.md) § «Два контура»
+**Legacy ▶ сам гасится?** Это **баг** (не «так надо»): [`OWNER_INTENT.md`](team/architect/OWNER_INTENT.md) § «Legacy сам гасится». После обновления: `rebuild-pult.bat` → full stop → ▶ Legacy 2 мин. Для ленты достаточно **Site ▶**.
+
+Подробно: [`team/common/PROJECT_MAP.md`](team/common/PROJECT_MAP.md) § «Два контура» · **частота и L1/L2:** [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) § «Как часто» / «L1 и L2»
 
 ### Какой `.env` правильный?
 
 | Файл | Когда используется | Что хранить |
 |------|-------------------|-------------|
-| **`.env`** | Всегда (вторым слоем) | **Общее:** Neon `DATABASE_URL`, Telethon acc1–3, FL/Kwork URL, прокси, `FREELANCEHUNT_API_TOKEN` |
+| **`.env`** | Всегда (вторым слоем) | **Общее:** Neon, Telethon, FL/Kwork URL, прокси (**Freelancehunt снят** 2026-05-28) |
 | **`.env.legacy`** | Ярлык **Legacy** / `--profile legacy` | **@FLPARSINGBOT**, `RADAR_*` legacy, `FILTERS_LEGACY`, свой OpenRouter |
 | **`.env.site`** | Ярлык **Site** / `--profile site` | **@rawlead_bot**, `RADAR_*` site, `FILTERS_SITE`, `TG_JOIN_QUEUE_v2`, свой OpenRouter, `RAWLEAD_API_KEY` |
 
@@ -206,42 +209,70 @@ Get-CimInstance Win32_Process | Where-Object {
 
 **Смотреть:** `data\radar_site.log` (вкладка **radar** в пульте или файл) — строки `FL.ru │`, `Итого в бот: 0` на биржах **норма** для Site.
 
+### Как часто (коротко)
+
+| Что | Как часто |
+|-----|-----------|
+| FL + Kwork | **~1 мин** (конвейер в `.env.site`) |
+| TG-чаты | **сразу** при новом посте (не по минутам) |
+| @FLPARSINGBOT | когда Legacy consumer видит новую строку в Neon (не парсит сам) |
+
+**Здоровье:** `site:сводка │ 10мин` в логе · `тг:пульс` раз в ~2 мин.
+
 ---
 
-## Твои шаги дальше — по порядку (2026-05-27)
+## Твои шаги (2026-05-28)
 
-**Полная лестница:** [`team/common/TASKS.md`](team/common/TASKS.md) § «Поэтапно до трафика».
+**Сайт:** [rawlead.ru/lenta](https://rawlead.ru). Волна Coder **принята** — [`STATUS.md`](team/common/STATUS.md). **Stress — после** VPS + polish (O1).
 
-### Сейчас (**Coder ok** 2026-05-27 — фаза 2)
+| Сейчас | Действие |
+|--------|----------|
+| 1 | **Site ▶** на ПК — пока нет P5-E2 на VPS |
+| 2 | **@coder** § **P5-E2-VPS** — радары на сервер |
+| 3 | Polish **B1** → **A1** → **C1** — [`OWNER_INTENT`](team/architect/OWNER_INTENT.md) |
+| 4 | **3f** → stress → трафик |
+| 5 | Новые идеи → Lead в **OWNER_INTENT** |
 
-| Шаг | Кто | Что |
-|-----|-----|-----|
-| 1 | **@lead-designer** | E3: [`LEAD_DESIGN_PROMPT.md`](team/design/LEAD_DESIGN_PROMPT.md) § **PRE-LAUNCH-UX v2** + **DESIGN-DIRECTION** · каталог [`SKILLS_TOOLS_CATALOG.md`](team/product/SKILLS_TOOLS_CATALOG.md) |
-| 1b | **@coder** | E2b: `CODER_PROMPT` § **CANONICAL-TAGS-E2b** (match/L1 — параллельно Design) |
-| 3 | **@lead-product** | E4: копирайт + убрать closed beta / заявки |
-| 4 | **@coder** | E5: вёрстка WP · потом P5 + stress |
+### Пульт Site: «POLL_INTERVAL минимум 10, получено 1»
 
-E0/E1 ✅ — см. [`team/common/STATUS.md`](team/common/STATUS.md).
+**Не паника:** `radar_control.py` обычно **запущен** — ломается только **текст статуса** в вкладке.
 
-### Порядок
+| Шаг | Действие |
+|-----|----------|
+| 1 | `.env.site`: `POLL_INTERVAL_MINUTES=1` **и** `RADAR_CONVEYOR=1` |
+| 2 | `stop-radar-desktop-full.vbs` → ярлык **RawLead Site** → 10 с |
+| 3 | ▶ Site — ошибка в «Статус» должна уйти |
 
-| Принято | Дальше |
-|---------|--------|
-| E0/E1: лента, кабинет, legacy-бот | Product → Design → copy → Coder → P5/stress |
+Дальше — только если лента снова «застыла»: см. «Свежесть ленты» ниже.
 
-Детали: [`team/common/TASKS.md`](team/common/TASKS.md) § «Фаза 1 / Фаза 2».
+### Очередь L1
 
-**Не прод:** пустая лента при живом Site в логе · нельзя войти в кабинет · UX не согласован.
+**✅ BACKLOG-CLEAR apply:** хвост сброшен; без L1 осталось **~100** (не 1200+). Site ▶ — новые идут первыми. Replay `--fresh-l1 --limit 200` — только если нужно подтянуть TG в ленту (см. `CODER_PROMPT` § FEED-FRESHNESS).
 
-Neon ✅ · dogfood бот — как был.
+### Свежесть ленты
 
-С понедельника: отклики **по боту** (вердикт «Брать»), 1–2 сильных в день.
+| Проверка | Ожидание |
+|----------|----------|
+| Пульт Site **▶**, не ■ | `radar_site.log` — FL/Kwork строки каждые ~1–3 мин |
+| Один Site, не два ярлыка | иначе гонки и «застывшая» Neon |
+| В логе | footer / `site:сводка` — если нет, пиши Lead |
+| На сайте | свежие = карточки с **недавним** временем; много новых в логе может быть **МИМО** и не попасть в ленту |
 
-| Блокер | Кто |
-|--------|-----|
-| **`/lenta/` не грузится** | **@mechanic** · [`problems/2026-05-25-wp-lenta-feed-not-loading.md`](problems/2026-05-25-wp-lenta-feed-not-loading.md) |
-| pythonw.exe = launcher (2 процесса) | **@mechanic** |
-| TG relay+card | ✅ acc шлют в бот; при сбое — prompt-test · [`problems/2026-05-24-tg-forward-not-via-bot.md`](problems/2026-05-24-tg-forward-not-via-bot.md) |
+---
+
+### После stress — ты как первый подписчик (#0)
+
+| # | Действие |
+|---|----------|
+| 1 | `/start` в [@rawlead_bot](https://t.me/rawlead_bot) |
+| 2 | Открыть `/cabinet/` на prod → войти через TG |
+| 3 | Выбрать навыки → увидеть match → **«Написать отклик»** → черновик L2 |
+| 4 | Сказать Lead/Product если UX/тексты не ок → `@designer` |
+| 5 | Новые идеи → Lead в **OWNER_INTENT** |
+
+Код: [`team/architect/CODER_PROMPT.md`](team/architect/CODER_PROMPT.md) § **3f-OWNER-BETA**.
+
+Деплой: [`ops/DEPLOY_VPS.md`](ops/DEPLOY_VPS.md) · лестница: [`team/common/TASKS.md`](team/common/TASKS.md).
 
 ---
 

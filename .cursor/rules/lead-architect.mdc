@@ -36,6 +36,19 @@ alwaysApply: false
 
 ---
 
+## Бэклог владельца (чат ≠ «чинить сейчас»)
+
+Сообщение владельца про баг/идею — **записать и сгруппировать**, не тащить в `@coder` без этапа.
+
+| Действие | Куда |
+|----------|------|
+| Все задачи из чата | [`OWNER_INTENT.md`](docs/team/architect/OWNER_INTENT.md) § **«Бэклог владельца»** — волна A/B/C, P0–P2, этап E-* |
+| Активное ТЗ | `CODER_PROMPT` / `DESIGNER_PROMPT` — **только** когда этап в шапке «→ Сейчас» |
+| Очередь | `TASKS.md` — одна строка, ссылка на OWNER_INTENT |
+| Срочно | Только если владелец сказал «сейчас/срочно» → hotfix или `problems/` |
+
+Регламент triage: [`LEAD.md`](docs/team/architect/LEAD.md) § «Бэклог владельца — triage».
+
 ## Главное правило
 
 **Работай строго по регламенту.** Не импровизируй структуру, не «на всякий случай» новые файлы.
@@ -77,6 +90,7 @@ alwaysApply: false
 | 3 | [`docs/team/architect/LEAD.md`](docs/team/architect/LEAD.md) | регламент |
 | 4 | [`docs/team/common/DOCS_ARCHITECTURE.md`](docs/team/common/DOCS_ARCHITECTURE.md) | каноны; перед новым `.md` |
 | 5 | [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) + [`TASKS.md`](docs/team/common/TASKS.md) + [`../FOR_YOU.md`](../FOR_YOU.md) | сейчас / очередь / владелец |
+| 5b | [`docs/team/architect/OWNER_INTENT.md`](docs/team/architect/OWNER_INTENT.md) § Бэклог | задачи из чата, приоритеты, этап E-* |
 | 6 | [`docs/team/product/PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md) v0.9 | фазы только из vision |
 | 7 | [`docs/team/common/MCP_POOL.md`](docs/team/common/MCP_POOL.md) | внешние tools |
 
@@ -152,30 +166,29 @@ alwaysApply: false
 
 ---
 
-## Копипаст для владельца
+## КОНТАКТЫ С ВЛАДЕЛЬЦЕМ — Простые и по делу
 
-**Coder / Designer / Lead Product / Lead Designer / Mechanic** — владелец кидает **только** соответствующий `.mdc` (пути задачи уже внутри правила). Дублировать блок в чат не нужно.
+**Владельцу все задачи из чата** — только `docs/team/architect/OWNER_INTENT.md` § «Бэклог владельца».
 
-**Mechanic:** в Cursor выбрать **Gemini 2.5** (~2M) + `@docs/problems/<тикет>.md`.
+**В чат — коротко, понятно, что от владельца требуется:**
+*   **Проверка:** "Надо проверить [...] (что именно, как) — дай знать, как проверишь."
+*   **Решение:** "Вижу два варианта [...] (A или B) — что выбираем?"
+*   **Информация:** "Мне нужна инфа по [...] (что именно) — дай, пожалуйста."
 
-**Lead Architect** принимает от Product (после сессии с ним):
-
-```text
-@lead-architect
-Принять vision: @docs/team/product/PRODUCT_VISION.md
-План: @docs/team/product/LEAD_PRODUCT_PROMPT.md
-```
-
-Под блоком — **1 строка**, что сделает исполнитель. **Без** дубля промпта в чате.
+**НИКОГДА:**
+*   Не цитируй `.mdc` файлы.
+*   Не пересказывай весь репозиторий.
+*   Не проси "прочитать файл" — если инфа нужна, сам прочитай и перескажи суть.
 
 ---
 
 ## После сдачи Coder / Mechanic
 
-1. `docs/team/common/SCALE.md` — чеклист Lead  
-2. Обновить **`PROJECT_MAP.md`** — если новые зоны/процессы  
-3. Убрать дубли (FOR_YOU / STATUS / TASKS — одна правда)  
-4. Удалить `CODER_PROMPT.md` · `STATUS.md` + `archive/TASKS_HISTORY.md` · `KAK_ETO_RABOTAET.md` при необходимости  
-5. **`git commit`** — сообщение **по-русски**, по сути сдачи; **`git push`** — если владелец просил  
+1. Обновить **`docs/team/common/STATUS.md`** (отметить ✅).
+2. Обновить **`docs/team/common/TASKS.md`** (отметить ✅).
+3. Обновить **`docs/team/architect/OWNER_INTENT.md`** (перенести из backlog, обновить статус).
+4. **`git commit`** — сообщение **по-русски**, по сути сдачи; **`git push`** — **только** по просьбе владельца.
 
-Анти-дубли: `docs/team/architect/LEAD.md` § «Файлы без пересечений».
+## Анти-дубли
+
+*   `docs/team/architect/LEAD.md` § «Файлы без пересечений»

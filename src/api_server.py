@@ -15,17 +15,18 @@ from __future__ import annotations
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from src.config import load_radar_env
 
 from src.lead_category import (
-    build_skills_groups,
     category_for_listing,
     effective_feed_min_score,
     normalize_category,
@@ -33,6 +34,7 @@ from src.lead_category import (
     passes_score_filter,
     resolve_lead_category,
 )
+from src.skills_catalog import build_catalog_groups
 from src.public_feed import is_public_feed_source, public_feed_source_sql
 from src.jwt_auth import decode_access_token, issue_access_token
 from src.rank import (
@@ -58,6 +60,20 @@ _OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
 _ME_FEED_SCAN_LIMIT = 500
 _SKILLS_CATALOG_LIMIT = 50
 _BOT_FEED_WHERE = "is_visible = TRUE"
+_HOT_MAX_AGE_SEC = 300
+
+
+def _lead_is_hot(created_at: Any) -> bool:
+    if not isinstance(created_at, datetime):
+        return False
+    now = datetime.now(timezone.utc)
+    dt = created_at
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    age = (now - dt).total_seconds()
+    return 0 <= age < _HOT_MAX_AGE_SEC
 
 
 def _feed_where_sql() -> tuple[str, list[str]]:
@@ -127,6 +143,7 @@ def _row_to_item(
         "keyword_match": km,
         "category": category,
         "created_at": created_at.isoformat() if created_at else None,
+        "is_hot": _lead_is_hot(created_at),
         "tools_required": tools,
         "reply_draft": (reply_draft or "").strip(),
     }
@@ -206,7 +223,6 @@ def _feed_page_time(
     categories: list[str],
     tag_weights: dict[str, float],
 ) -> tuple[list[dict[str, Any]], int]:
-    extra, extra_params = _skills_sql(skills)
     cat_sql, cat_params = _category_sql(categories)
     sql_min = min_score
     if min_score >= 70:
@@ -218,11 +234,11 @@ def _feed_page_time(
         FROM leads
         WHERE {feed_where}
           AND (ai_score IS NULL OR ai_score >= %s)
-          {extra}{cat_sql}
+          {cat_sql}
         ORDER BY created_at DESC
         LIMIT %s OFFSET %s
         """,
-        (*feed_params, sql_min, *extra_params, *cat_params, limit, offset),
+        (*feed_params, sql_min, *cat_params, limit, offset),
     )
     rows = cur.fetchall()
     items: list[dict[str, Any]] = []
@@ -248,7 +264,6 @@ def _feed_page_match(
     categories: list[str],
     tag_weights: dict[str, float],
 ) -> tuple[list[dict[str, Any]], int]:
-    extra, extra_params = _skills_sql(skills)
     cat_sql, cat_params = _category_sql(categories)
     feed_where, feed_params = _feed_where_sql()
     cur.execute(
@@ -256,11 +271,11 @@ def _feed_page_match(
         SELECT {_SELECT_COLS}
         FROM leads
         WHERE {feed_where}
-          {extra}{cat_sql}
+          {cat_sql}
         ORDER BY created_at DESC
         LIMIT %s
         """,
-        (*feed_params, *extra_params, *cat_params, _ME_FEED_SCAN_LIMIT),
+        (*feed_params, *cat_params, _ME_FEED_SCAN_LIMIT),
     )
     ranked = _rank_feed_rows(
         cur.fetchall(),
@@ -412,6 +427,24 @@ class TelegramAuthPayload(BaseModel):
 app = FastAPI(title="RawLead API", version=_VERSION, docs_url="/docs")
 
 
+def _cors_origins() -> list[str]:
+    raw = os.environ.get("RADAR_CORS_ORIGINS", "").strip()
+    if not raw:
+        return ["*"]
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+_cors = _cors_origins()
+if _cors:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
 @app.post("/v1/auth/telegram")
 def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
     """Login Widget → JWT 7d, upsert users по tg_user_id."""
@@ -480,29 +513,22 @@ def skills_catalog(
     limit: int = Query(default=_SKILLS_CATALOG_LIMIT, ge=1, le=100),
     category: str = Query(default=""),
 ) -> dict[str, Any]:
-    """Топ навыков из lead_tags лидов, уже ушедших в бот."""
+    """Канон навыков из SKILLS_TOOLS_CATALOG (Tier A в UI), не агрегация lead_tags."""
     category_list = parse_category_param(category)
     try:
-        feed_where, feed_params = _feed_where_sql()
-        with psycopg.connect(_db_url()) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    f"""
-                    SELECT tag, COUNT(*) AS cnt
-                    FROM leads,
-                         jsonb_array_elements_text(lead_tags) AS tag
-                    WHERE {feed_where}
-                    GROUP BY tag
-                    ORDER BY cnt DESC, tag ASC
-                    LIMIT %s
-                    """,
-                    (*feed_params, limit),
-                )
-                rows = cur.fetchall()
-                groups, skills = build_skills_groups(rows, categories=category_list)
+        groups, skills = build_catalog_groups(categories=category_list or None, ui_only=True)
+        if limit < len(skills):
+            skills = skills[:limit]
+            allowed = {s["tag"] for s in skills}
+            trimmed_groups: list[dict[str, Any]] = []
+            for group in groups:
+                g_skills = [s for s in group.get("skills", []) if s.get("tag") in allowed]
+                if g_skills:
+                    trimmed_groups.append({**group, "skills": g_skills})
+            groups = trimmed_groups
     except Exception as exc:
         logger.error("skills_catalog: %s", exc)
-        raise HTTPException(status_code=500, detail="db error")
+        raise HTTPException(status_code=500, detail="catalog error")
     return {"groups": groups, "skills": skills}
 
 

@@ -21,7 +21,7 @@ $plan = [
         __('Push в Telegram при новом матче', 'rawlead-kadence-child'),
     ],
     'badge' => __('Скоро', 'rawlead-kadence-child'),
-    'cta'   => __('Ранний доступ', 'rawlead-kadence-child'),
+    'cta'   => __('Узнать первым →', 'rawlead-kadence-child'),
 ];
 ?>
 <section id="pricing-preview" class="rl-section rl-reveal" aria-labelledby="rl-pricing-title">
@@ -46,7 +46,7 @@ $plan = [
 			</article>
 		</div>
 		<p class="rl-pricing__note">
-			<em><?php esc_html_e('Точная цена фиксируется на старте. Участники раннего доступа получают специальные условия.', 'rawlead-kadence-child'); ?></em>
+			<em><?php esc_html_e('Тариф появится при запуске подписки', 'rawlead-kadence-child'); ?></em>
 		</p>
 		<p class="rl-pricing__link">
 			<a class="rl-link-arrow" href="<?php echo esc_url($contact); ?>"><?php esc_html_e('Узнать первым →', 'rawlead-kadence-child'); ?></a>

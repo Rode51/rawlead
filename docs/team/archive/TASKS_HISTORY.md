@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-05-28 — Lead: ревизия docs, волна SITE-POLISH принята
+
+**STATUS** урезан (~80 строк): один снимок «Сейчас» + таблица принятых блоков; детальные § BACKLOG-CLEAR … 3x убраны из STATUS (не дублировать ТЗ).
+
+**TASKS** — только активная очередь (P5-E2 → E-polish → 3f → stress).
+
+**Принято в коде (Lead verify):** E0–E5, 3x HOT-BADGE, BACKLOG-CLEAR, FEED-FRESHNESS, DROP-FH, PULT-STATUS-LOGS, TG-FEED, FILTERS L2, LEGACY-SELF-STOP, HOTFIX-POST-PULT, PRE-PROD scripts, P5 E1 API.
+
+**Открыто:** P5-E2-VPS, E-polish B1/A1/C1, P4b, 3f, stress.
+
+**Архив:** [`PORTFOLIO_SPRINT.md`](PORTFOLIO_SPRINT.md) (устарел, 2026-05-25) перенесён из `architect/`.
+
+---
+
 ## 2026-05-24 — Lead Architect: vision v0.9 принят, docs cleanup
 
 - Product: ставка **A → B** · [`PRODUCT_VISION.md`](../PRODUCT_VISION.md) v0.9 · [`LEAD_PRODUCT_PROMPT.md`](../LEAD_PRODUCT_PROMPT.md)

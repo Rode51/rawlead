@@ -35,7 +35,13 @@ else:
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-_PYTHON = _ROOT / ".venv" / "Scripts" / "python.exe"
+def _venv_python(root: Path) -> Path:
+    if sys.platform == "win32":
+        return root / ".venv" / "Scripts" / "python.exe"
+    return root / ".venv" / "bin" / "python"
+
+
+_PYTHON = _venv_python(_ROOT)
 _LOG_JOIN = _ROOT / "data" / "tg_join.log"
 _TAIL_LINES = 800
 _DEFAULT_PORT = 18765
@@ -62,6 +68,7 @@ from process_guard import (
     expand_spawn_keep_pids,
     kill_all_radar_control,
     kill_duplicate_radar_workers,
+    kill_neon_legacy_consumers,
     kill_non_venv_radar_workers,
     wait_radar_workers_stopped,
 )
@@ -212,6 +219,22 @@ def _release_stale_tg_lock() -> None:
         from process_guard import release_stale_worker_locks
 
         release_stale_worker_locks()
+    except Exception:
+        pass
+
+
+def _release_stale_neon_consumer_lock() -> None:
+    """Снять .neon_legacy_* lock если consumer не бежит (иначе spawn → exit 1 → стоп)."""
+    try:
+        from config import legacy_neon_consumer_enabled, radar_lock_path
+        from process_guard import count_radar_workers
+
+        if not legacy_neon_consumer_enabled():
+            return
+        mc, _ = count_radar_workers(_RADAR_PROFILE)
+        if mc > 0:
+            return
+        radar_lock_path("neon_legacy").unlink(missing_ok=True)
     except Exception:
         pass
 
@@ -371,6 +394,7 @@ class RadarController:
                             )
                         except Exception:
                             pass
+                    _release_stale_neon_consumer_lock()
                     self._stop_unlocked(sweep_orphans=True)
                     kill_duplicate_radar_workers(
                         role="main",
@@ -428,10 +452,23 @@ class RadarController:
                                 f"(ожидалось {exp_main}/{exp_tg})"
                             )
                             spawn_failed = True
-                    if not spawn_failed and (mc != exp_main or tc != exp_tg):
+                    workers_ok = mc == exp_main and tc == exp_tg
+                    if not spawn_failed and not workers_ok:
+                        popen_ok = all(
+                            s.popen is not None and s.popen.poll() is None
+                            for s in self.children
+                        )
+                        # Windows: neon_legacy_consumer жив, но psutil не успел в count
+                        if popen_ok and exp_main >= 1 and mc == 0 and tc == exp_tg:
+                            time.sleep(1.0)
+                            mc, tc = count_radar_workers(_RADAR_PROFILE)
+                            workers_ok = mc == exp_main and tc == exp_tg
+                        if not workers_ok and popen_ok and exp_main == 1 and mc == 0:
+                            workers_ok = True
+                    if not spawn_failed and not workers_ok:
                         spawn_failed = True
                     # post_spawn kill убран: убивал только что поднятые venv-воркеры (регресс 2026-05-26)
-                    if spawn_failed or mc != exp_main or tc != exp_tg:
+                    if spawn_failed or not workers_ok:
                         self._stop_unlocked(sweep_orphans=True)
                     self._ui_expanded = False
                     return {"ok": len(errors) == 0, "errors": errors}
@@ -456,11 +493,26 @@ class RadarController:
                     pass
             spec.popen = None
         if sweep_orphans:
+            keep = {-1}
             kill_duplicate_radar_workers(
-                log_source="radar_control:stop", profile=_RADAR_PROFILE
+                log_source="radar_control:stop",
+                profile=_RADAR_PROFILE,
+                keep_pids=keep,
             )
+            kill_non_venv_radar_workers(
+                log_source="radar_control:stop:non_venv",
+                profile=_RADAR_PROFILE,
+                keep_pids=keep,
+            )
+            if _RADAR_PROFILE == "legacy" or self._neon_consumer_enabled():
+                kill_neon_legacy_consumers(
+                    profile=_RADAR_PROFILE,
+                    keep_pids=keep,
+                    log_source="radar_control:stop:neon_consumer",
+                )
             wait_radar_workers_stopped()
             _release_stale_tg_lock()
+            _release_stale_neon_consumer_lock()
         self._ui_expanded = False
         return {"ok": True}
 
@@ -584,14 +636,21 @@ class RadarController:
             }
             try:
                 from config import load_config
-                from radar_cycle_log import load_cycle_summary
+                from radar_cycle_log import load_cycle_summary, load_site_rollup_line
+                from radar_status import build_status_detail
                 from storage import storage_from_config
 
+                cfg = load_config()
                 if storage is None:
-                    storage = storage_from_config(load_config())
+                    storage = storage_from_config(cfg)
+                detail = build_status_detail(cfg, storage)
+                payload.update(detail)
                 summary = load_cycle_summary(storage)
-                if summary is not None:
+                if summary is not None and "last_cycle" not in payload:
                     payload["last_cycle"] = summary.to_storage_dict()
+                rollup = load_site_rollup_line(storage)
+                if rollup and not payload.get("site_rollup_10m"):
+                    payload["site_rollup_10m"] = rollup
             except Exception:
                 pass
             return payload
@@ -606,7 +665,21 @@ class RadarController:
             storage = storage_from_config(cfg)
             return 200, format_status_message(cfg, storage)
         except SystemExit as exc:
-            return 500, str(exc) or "Ошибка конфигурации (.env)"
+            msg = str(exc) or "Ошибка конфигурации (.env)"
+            if "POLL_INTERVAL_MINUTES" in msg and "минимум" in msg:
+                msg += (
+                    "\n\nПодсказка: для Site с опросом 1 мин нужны "
+                    "RADAR_PROFILE=site и RADAR_CONVEYOR=1 в .env.site"
+                )
+            return 500, msg
+        except ValueError as exc:
+            msg = str(exc)
+            if "POLL_INTERVAL_MINUTES" in msg:
+                msg += (
+                    "\n\nПодсказка: RADAR_CONVEYOR=1 в .env.site "
+                    "(см. docs/ops/RUN.md)"
+                )
+            return 500, f"Не удалось загрузить статус:\n{msg}"
         except Exception as exc:
             return 500, f"Не удалось загрузить статус:\n{exc}"
 

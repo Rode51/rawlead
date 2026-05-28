@@ -9,17 +9,14 @@ declare(strict_types=1);
 
 $items = [
     [
-        'num'   => '01',
         'title' => __('Один поток', 'rawlead-kadence-child'),
         'text'  => __('Биржи, агрегаторы, Telegram-каналы — всё в одной ленте. Не нужно переключаться между вкладками и чатами.', 'rawlead-kadence-child'),
     ],
     [
-        'num'   => '02',
         'title' => __('ИИ-разбор', 'rawlead-kadence-child'),
         'text'  => __('Каждый заказ оценивается до того, как вы его видите. Шлак, спам, реферальные схемы — не доходят до ленты.', 'rawlead-kadence-child'),
     ],
     [
-        'num'   => '03',
         'title' => __('Вы решаете', 'rawlead-kadence-child'),
         'text'  => __('Подходящий заказ — пуш в Telegram. Откликаетесь сами. Мы не пишем заказчикам за вас.', 'rawlead-kadence-child'),
     ],
@@ -29,12 +26,10 @@ $items = [
 	<div class="rl-container">
 		<div class="rl-features-scroll__head">
 			<h2 id="rl-features-title"><?php esc_html_e('Как устроено', 'rawlead-kadence-child'); ?></h2>
-			<p class="rl-features-scroll__hint"><?php esc_html_e('Свайп влево — следующий шаг', 'rawlead-kadence-child'); ?></p>
 		</div>
-		<div class="rl-features-track" tabindex="0" role="region" aria-label="<?php esc_attr_e('Функции 01–03', 'rawlead-kadence-child'); ?>">
+		<div class="rl-features-track">
 			<?php foreach ($items as $item) : ?>
-				<article class="rl-feature rl-feature--slide">
-					<span class="rl-feature__ghost" aria-hidden="true"><?php echo esc_html($item['num']); ?></span>
+				<article class="rl-feature">
 					<h3 class="rl-feature__title"><?php echo esc_html($item['title']); ?></h3>
 					<p class="rl-feature__text"><?php echo esc_html($item['text']); ?></p>
 				</article>

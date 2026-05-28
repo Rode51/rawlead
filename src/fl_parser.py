@@ -9,7 +9,8 @@ from urllib.parse import urljoin, urlparse, urlunparse
 import requests
 from bs4 import BeautifulSoup
 
-from config import DIRECT_REQUESTS_PROXIES, Config
+from config import Config
+from exchange_proxy import proxy_log_hint, requests_proxies_for
 from lead_category import category_from_fl_listing_url
 from listing import SOURCE_FL, ListingProject
 
@@ -124,7 +125,7 @@ def _fetch_listing_html(url: str, cfg: Config, *, timeout_sec: float) -> str:
             url,
             headers=headers,
             timeout=timeout_sec,
-            proxies=DIRECT_REQUESTS_PROXIES,
+            proxies=requests_proxies_for("fl"),
         )
     except requests.RequestException as exc:
         raise FlListingError(f"Сетевой сбой при запросе ленты: {exc}") from exc
@@ -206,7 +207,7 @@ def fetch_project_description(
             url,
             headers=headers,
             timeout=timeout_sec,
-            proxies=DIRECT_REQUESTS_PROXIES,
+            proxies=requests_proxies_for("fl"),
         )
     except requests.RequestException:
         return fallback_snippet, False

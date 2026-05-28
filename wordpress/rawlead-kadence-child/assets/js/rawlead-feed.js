@@ -13,6 +13,7 @@
   var listEl = document.getElementById("rl-feed-list");
   var countEl = document.getElementById("rl-feed-count");
   var sentinelEl = document.getElementById("rl-feed-sentinel");
+  var loadingEl = document.getElementById("rl-feed-loading");
   var endEl = document.getElementById("rl-feed-end");
   var errorEl = document.getElementById("rl-feed-error");
   var sidebar = document.getElementById("rl-feed-sidebar");
@@ -24,6 +25,9 @@
   var skillsApplyBtn = document.getElementById("rl-feed-skills-apply");
   var skillsClearBtn = document.getElementById("rl-feed-skills-clear");
   var skillsPanelEl = document.getElementById("rl-feed-skills-panel");
+  var skillsTriggerEl = document.getElementById("rl-feed-skills-trigger-label");
+  var sortTriggerEl = document.getElementById("rl-feed-sort-trigger");
+  var sortBadgeEl = document.getElementById("rl-feed-sort-badge");
   var sidebarScroll = document.getElementById("rl-feed-sidebar-scroll");
 
   var state = {
@@ -89,6 +93,36 @@
       return hrs + " ч назад";
     }
     return d.toLocaleDateString("ru-RU");
+  }
+
+  var HOT_MAX_AGE_MS = 300000;
+
+  function isHot(item) {
+    if (!item) {
+      return false;
+    }
+    if (item.is_hot === true) {
+      return true;
+    }
+    if (item.is_hot === false) {
+      return false;
+    }
+    if (!item.created_at) {
+      return false;
+    }
+    var d = new Date(item.created_at);
+    if (isNaN(d.getTime())) {
+      return false;
+    }
+    var age = Date.now() - d.getTime();
+    return age >= 0 && age < HOT_MAX_AGE_MS;
+  }
+
+  function hotBadgeHtml(item) {
+    if (!isHot(item)) {
+      return "";
+    }
+    return '<span class="rl-badge-hot" aria-label="Горячий заказ">Горячий</span>';
   }
 
   function escapeHtml(str) {
@@ -160,14 +194,6 @@
   function renderExpandedBody(item) {
     var task = taskBodyText(item);
     var html = "";
-    if (item.title) {
-      html +=
-        '<div class="rl-feed-card__section">' +
-        '<h4 class="rl-feed-card__section-title">Полное название</h4>' +
-        '<p class="rl-feed-card__task">' +
-        escapeHtml(item.title) +
-        "</p></div>";
-    }
     if (task) {
       html +=
         '<div class="rl-feed-card__section">' +
@@ -215,11 +241,14 @@
       item.id +
       '" tabindex="0" role="button">' +
       '<div class="rl-feed-card__head">' +
+      '<div class="rl-feed-card__head-start">' +
       '<span class="rl-feed-card__source rl-feed-card__source--' +
       src.cls +
       '">' +
       escapeHtml(src.label) +
       "</span>" +
+      hotBadgeHtml(item) +
+      "</div>" +
       '<span class="rl-feed-card__time">' +
       formatTime(item.created_at) +
       "</span>" +
@@ -236,10 +265,9 @@
       "</p>" +
       '<div class="rl-match">' +
       '<div class="rl-match__label">' +
-      "<span>Совместимость</span>" +
-      "<span><strong>" +
+      "<span>Совместимость " +
       rank +
-      "%</strong></span>" +
+      "%</span>" +
       "</div>" +
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
       rank +
@@ -289,10 +317,76 @@
     if (!countEl) {
       return;
     }
+    if (state.totalShown <= 0) {
+      countEl.textContent = "";
+      return;
+    }
     countEl.textContent =
-      state.totalShown > 0
-        ? state.totalShown + " заказов в ленте"
-        : "";
+      state.appliedTags.length > 0
+        ? state.totalShown + " лидов · по совместимости"
+        : state.totalShown + " лидов за 7 дней";
+  }
+
+  function categoryEmptyMessage() {
+    return (
+      '<p class="rl-feed-empty">В этой нише пока нет заказов — попробуйте «Все»</p>' +
+      '<button type="button" class="rl-btn rl-btn--ghost rl-feed-empty__cta">Сбросить фильтры</button>'
+    );
+  }
+
+  function bindEmptyCta() {
+    if (!listEl) {
+      return;
+    }
+    var btn = listEl.querySelector(".rl-feed-empty__cta");
+    if (btn && resetBtn) {
+      btn.addEventListener("click", function () {
+        resetBtn.click();
+      });
+    }
+  }
+
+  function updateFilterBarUi() {
+    if (skillsTriggerEl) {
+      var skillsLabel =
+        state.appliedTags.length > 0
+          ? "Навыки · " + state.appliedTags.length + " ▾"
+          : "Навыки ▾";
+      skillsTriggerEl.textContent = skillsLabel;
+      var triggerWrap = document.getElementById("rl-feed-skills-trigger");
+      if (triggerWrap) {
+        triggerWrap.classList.toggle("has-selection", state.appliedTags.length > 0);
+      }
+    }
+    if (sortTriggerEl) {
+      var sortLabel =
+        state.sort === "match" ? "По совместимости ▾" : "Сортировка ▾";
+      sortTriggerEl.textContent = sortLabel;
+      sortTriggerEl.classList.toggle("has-selection", state.sort === "match");
+    }
+    if (sortBadgeEl) {
+      sortBadgeEl.hidden = !(state.appliedTags.length > 0 && state.sort === "match");
+    }
+    var sectionEl = document.getElementById("rl-feed-skills-section");
+    if (sectionEl) {
+      var catLabels = {
+        dev: "Разработка",
+        design: "Дизайн",
+        marketing: "Маркетинг",
+        text: "Тексты",
+      };
+      if (state.appliedCategories.length === 1) {
+        var key = state.appliedCategories[0];
+        sectionEl.textContent =
+          "По нише «" + (catLabels[key] || key) + "»:";
+        sectionEl.hidden = false;
+      } else if (state.appliedCategories.length === 0) {
+        sectionEl.textContent = "Популярные навыки:";
+        sectionEl.hidden = false;
+      } else {
+        sectionEl.hidden = true;
+      }
+    }
   }
 
   function readCategoriesFrom(root) {
@@ -450,6 +544,7 @@
 
   function skillChipHtml(row) {
     var tag = row.tag || "";
+    var label = (row.title_ru || tag).trim() || tag;
     var active = state.draftTags.indexOf(tag) >= 0;
     return (
       '<button type="button" class="rl-feed-chip rl-feed-skill' +
@@ -457,7 +552,7 @@
       '" data-tag="' +
       escapeHtml(tag) +
       '">' +
-      escapeHtml(tag) +
+      escapeHtml(label) +
       (row.count ? ' <span class="rl-feed-skill__count">' + row.count + "</span>" : "") +
       "</button>"
     );
@@ -503,6 +598,7 @@
   function renderSkillsCatalog() {
     updateSkillsBadge();
     updateSkillsDraftUi();
+    updateFilterBarUi();
     renderSkillsInto(skillsEl);
     var sheet = document.getElementById("rl-feed-sheet");
     var sheetBody = document.getElementById("rl-feed-sheet-body");
@@ -523,6 +619,7 @@
       sortInp.checked = true;
       state.sort = "match";
       syncChips();
+      updateFilterBarUi();
     }
   }
 
@@ -556,6 +653,7 @@
         }
         renderSkillsCatalog();
         readFilters();
+        updateFilterBarUi();
         if (options.reload !== false) {
           resetAndLoad();
         }
@@ -655,8 +753,12 @@
     if (!sidebar) {
       return;
     }
-    sidebar.querySelectorAll(".rl-feed-chip").forEach(function (label) {
+    sidebar.querySelectorAll(".rl-feed-chip, .rl-cat-chip").forEach(function (label) {
       var input = label.querySelector("input");
+      label.classList.toggle("is-active", input && input.checked);
+    });
+    sidebar.querySelectorAll(".rl-sort-option").forEach(function (label) {
+      var input = label.querySelector('input[name="sort"]');
       label.classList.toggle("is-active", input && input.checked);
     });
   }
@@ -674,6 +776,9 @@
     if (endEl) {
       endEl.hidden = true;
     }
+    if (loadingEl) {
+      loadingEl.hidden = true;
+    }
     loadMore(true);
   }
 
@@ -686,6 +791,12 @@
     }
     var gen = state.loadGeneration;
     state.loading = true;
+    if (!replace && loadingEl) {
+      loadingEl.hidden = false;
+    }
+    if (!replace && endEl) {
+      endEl.hidden = true;
+    }
     var params = {
       limit: state.limit,
       offset: state.offset,
@@ -723,14 +834,20 @@
           listEl.innerHTML = "";
         }
         if (items.length === 0 && state.offset === 0) {
-          listEl.innerHTML =
-            '<p class="rl-feed-empty">' +
-            (state.source ||
+          if (state.appliedCategories.length && !state.source && !state.appliedTags.length) {
+            listEl.innerHTML = categoryEmptyMessage();
+            bindEmptyCta();
+          } else if (
+            state.source ||
             state.appliedCategories.length ||
             state.appliedTags.length
-              ? "По выбранным фильтрам ничего не найдено."
-              : "Заказов пока нет. Попробуйте позже.") +
-            "</p>";
+          ) {
+            listEl.innerHTML =
+              '<p class="rl-feed-empty">В этой нише пока нет заказов — попробуйте «Все»</p>';
+          } else {
+            listEl.innerHTML =
+              '<p class="rl-feed-empty">Пока нет заказов. Биржи обновляются каждые 15 минут.</p>';
+          }
         } else {
           var frag = items.map(renderCard).join("");
           listEl.insertAdjacentHTML("beforeend", frag);
@@ -744,6 +861,7 @@
           }
         }
         updateCount();
+        updateFilterBarUi();
         bindCards();
         requestAnimationFrame(function () {
           document.querySelectorAll(".rl-feed-list .rl-lead-card .rl-match__fill").forEach(function (el) {
@@ -761,11 +879,14 @@
         if (replace && listEl) {
           listEl.innerHTML = "";
         }
-        showError("Не удалось загрузить ленту.");
+        showError("Не удалось загрузить");
       })
       .finally(function () {
         if (gen === state.loadGeneration) {
           state.loading = false;
+          if (loadingEl) {
+            loadingEl.hidden = true;
+          }
         }
       });
   }
@@ -851,7 +972,7 @@
         peer.checked = inp.checked;
       }
     });
-    toRoot.querySelectorAll(".rl-feed-chip").forEach(function (label) {
+    toRoot.querySelectorAll(".rl-feed-chip, .rl-cat-chip, .rl-sort-option").forEach(function (label) {
       var input = label.querySelector("input");
       label.classList.toggle("is-active", input && input.checked);
     });
@@ -899,6 +1020,9 @@
       }
       syncChips();
       readFilters();
+      if (name === "sort") {
+        updateFilterBarUi();
+      }
       resetAndLoad();
     });
     if (resetBtn) {
@@ -1020,6 +1144,58 @@
     renderSkillsCatalog();
     syncChips();
     readFilters();
+    updateFilterBarUi();
     resetAndLoad();
   });
+
+  var bugFab = document.getElementById("rl-bug-fab");
+  var bugModal = document.getElementById("rl-bug-modal");
+  if (bugFab && bugModal) {
+    var bugOverlay = document.getElementById("rl-bug-modal-overlay");
+    var bugUrl = document.getElementById("rl-bug-url");
+    var bugText = document.getElementById("rl-bug-text");
+    var bugSubmit = document.getElementById("rl-bug-submit");
+    var bugSuccess = document.getElementById("rl-bug-success");
+    function openBugModal() {
+      if (bugUrl) {
+        bugUrl.textContent = window.location.href;
+      }
+      if (bugSuccess) {
+        bugSuccess.hidden = true;
+      }
+      if (bugText) {
+        bugText.value = "";
+      }
+      bugModal.hidden = false;
+    }
+    function closeBugModal() {
+      bugModal.hidden = true;
+    }
+    bugFab.addEventListener("click", openBugModal);
+    if (bugOverlay) {
+      bugOverlay.addEventListener("click", closeBugModal);
+    }
+    if (bugSubmit) {
+      bugSubmit.addEventListener("click", function () {
+        if (bugSuccess) {
+          bugSuccess.hidden = false;
+        }
+        if (bugSubmit) {
+          bugSubmit.disabled = true;
+        }
+        window.setTimeout(closeBugModal, 2000);
+      });
+    }
+  }
+
+  var siteHeader = document.querySelector(".rl-header");
+  if (siteHeader) {
+    window.addEventListener(
+      "scroll",
+      function () {
+        siteHeader.classList.toggle("rl-header--scrolled", window.scrollY > 0);
+      },
+      { passive: true }
+    );
+  }
 })();

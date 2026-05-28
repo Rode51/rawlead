@@ -46,7 +46,7 @@ $nav = [
 		</nav>
 		<div class="rl-header__cta">
 			<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($feed); ?>">
-				<?php esc_html_e('Попробовать', 'rawlead-kadence-child'); ?>
+				<?php esc_html_e('Смотреть ленту', 'rawlead-kadence-child'); ?>
 			</a>
 		</div>
 	</div>

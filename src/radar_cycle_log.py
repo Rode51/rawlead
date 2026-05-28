@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import json
+import time
+from collections import deque
 from dataclasses import asdict, dataclass, field
 
 from storage import ProjectStorage
+
+SITE_ROLLUP_WINDOW_SEC = 600
+SITE_ROLLUP_EMIT_SEC = 600
+_STATUS_SITE_ROLLUP = "status_site_rollup_10m"
 
 _STATUS_CYCLE_SUMMARY = "status_cycle_summary"
 
@@ -13,7 +19,6 @@ SOURCE_LABELS: dict[str, str] = {
     "fl": "FL.ru",
     "kwork": "Kwork",
     "vc_ru": "VC.ru",
-    "freelancehunt": "Freelancehunt",
     "habr_career": "Habr Career",
 }
 
@@ -21,7 +26,6 @@ ALL_CYCLE_SOURCES: tuple[str, ...] = (
     "fl",
     "kwork",
     "vc_ru",
-    "freelancehunt",
     "habr_career",
 )
 
@@ -142,6 +146,7 @@ class CycleSummary:
     neon_replay: int = 0
     neon_dup_skip: int = 0
     neon_sqlite_resync: int = 0
+    is_visible: int = 0
     misc_errors: list[str] = field(default_factory=list)
 
     def ensure(self, source_id: str) -> SourceCycleStats:
@@ -211,6 +216,7 @@ class CycleSummary:
             "neon_replay": self.neon_replay,
             "neon_dup_skip": self.neon_dup_skip,
             "neon_sqlite_resync": self.neon_sqlite_resync,
+            "is_visible": self.is_visible,
             "misc_errors": self.misc_errors[:10],
         }
 
@@ -231,6 +237,7 @@ def load_cycle_summary(storage: ProjectStorage) -> CycleSummary | None:
     summary.neon_replay = int(data.get("neon_replay", 0) or 0)
     summary.neon_dup_skip = int(data.get("neon_dup_skip", 0) or 0)
     summary.neon_sqlite_resync = int(data.get("neon_sqlite_resync", 0) or 0)
+    summary.is_visible = int(data.get("is_visible", 0) or 0)
     misc = data.get("misc_errors")
     if isinstance(misc, list):
         summary.misc_errors = [str(x) for x in misc[:10]]
@@ -293,9 +300,216 @@ def format_cycle_status_block(storage: ProjectStorage) -> list[str]:
             footer_bits.append(f"neon_sqlite_resync: {summary.neon_sqlite_resync}")
         if summary.neon_dup_skip:
             footer_bits.append(f"neon_dup_skip: {summary.neon_dup_skip}")
+        if summary.is_visible:
+            footer_bits.append(f"is_visible: {summary.is_visible}")
     lines.append(" │ ".join(footer_bits))
+    rollup_line = load_site_rollup_line(storage)
+    if rollup_line:
+        lines.append(f"Сводка 10 мин: {rollup_line}")
     if summary.misc_errors:
         lines.append("Прочие ошибки:")
         for err in summary.misc_errors[:3]:
             lines.append(f"  · {err[:120]}")
     return lines
+
+
+@dataclass
+class SiteRollupTotals:
+    downloaded: int = 0
+    new_sqlite: int = 0
+    neon_insert: int = 0
+    neon_replay: int = 0
+    l1: int = 0
+    l2: int = 0
+    is_visible: int = 0
+    filter_skip: int = 0
+    mimo_skip: int = 0
+
+
+@dataclass
+class _SiteRollupSlice:
+    ts: float
+    downloaded: int = 0
+    new_sqlite: int = 0
+    neon_insert: int = 0
+    neon_replay: int = 0
+    l1: int = 0
+    l2: int = 0
+    is_visible: int = 0
+    filter_skip: int = 0
+    mimo_skip: int = 0
+
+
+_site_rollup_slices: deque[_SiteRollupSlice] = deque()
+_site_rollup_current: _SiteRollupSlice | None = None
+_site_rollup_last_emit: float = 0.0
+_site_rollup_zero_hint: str = ""
+
+
+def reset_site_rollup_emit_clock() -> None:
+    """Старт процесса: первый emit через SITE_ROLLUP_EMIT_SEC."""
+    global _site_rollup_last_emit
+    _site_rollup_last_emit = time.monotonic()
+
+
+def begin_site_rollup_cycle() -> None:
+    global _site_rollup_current
+    _site_rollup_current = _SiteRollupSlice(ts=time.monotonic())
+
+
+def note_site_rollup_is_visible() -> None:
+    if _site_rollup_current is not None:
+        _site_rollup_current.is_visible += 1
+
+
+def note_site_rollup_after_lite(
+    lite: object | None,
+    *,
+    category: str,
+    source_public: bool,
+) -> None:
+    """Счётчик is_visible — та же логика порога, что Neon update_after_lite."""
+    if not source_public or _site_rollup_current is None:
+        return
+    from ai_analyze import AiLiteAnalysis
+
+    if lite is None or not isinstance(lite, AiLiteAnalysis):
+        note_site_rollup_is_visible()
+        return
+    if lite.is_skip_verdict():
+        return
+    score = {
+        "брать": 85,
+        "брат": 85,
+        "сомнительно": 55,
+        "пропустить": 25,
+        "мимо": 15,
+    }.get(lite.verdict.strip().casefold(), 50)
+    cat = category.strip().casefold()
+    threshold = 50 if cat in ("design", "marketing", "text") else 40
+    if score >= threshold:
+        note_site_rollup_is_visible()
+
+
+def _rollup_zero_hint(summary: CycleSummary) -> str:
+    fetch_errors = [
+        s.fetch_error.strip()
+        for s in summary.sources.values()
+        if s.fetch_error.strip()
+    ]
+    if fetch_errors:
+        return f"fetch: {fetch_errors[0][:80]}"
+    if summary.misc_errors:
+        return summary.misc_errors[0][:80]
+    if not any(s.downloaded for s in summary.sources.values()):
+        return "скачано 0 — биржи без новых карточек или fetch пуст"
+    return ""
+
+
+def commit_site_rollup_cycle(summary: CycleSummary) -> None:
+    """Зафиксировать срез цикла в скользящем окне 10 мин."""
+    global _site_rollup_current, _site_rollup_zero_hint
+    from ai_analyze import cycle_ai_counts
+
+    summary.sync_neon_from_globals()
+    l1, l2 = cycle_ai_counts()
+    downloaded = sum(s.downloaded for s in summary.sources.values())
+    new_sqlite = sum(s.new_ids for s in summary.sources.values())
+    filter_skip = sum(s.filter_skip for s in summary.sources.values())
+    mimo_skip = sum(s.mimo_skip for s in summary.sources.values())
+
+    if _site_rollup_current is None:
+        begin_site_rollup_cycle()
+    assert _site_rollup_current is not None
+    cur = _site_rollup_current
+    cur.downloaded = downloaded
+    cur.new_sqlite = new_sqlite
+    cur.neon_insert = summary.neon_insert
+    cur.neon_replay = summary.neon_replay
+    cur.l1 = l1
+    cur.l2 = l2
+    cur.filter_skip = filter_skip
+    cur.mimo_skip = mimo_skip
+    summary.is_visible = cur.is_visible
+
+    _site_rollup_slices.append(cur)
+    _site_rollup_current = None
+    _prune_site_rollup_slices()
+
+    if downloaded == 0:
+        hint = _rollup_zero_hint(summary)
+        if hint:
+            _site_rollup_zero_hint = hint
+
+
+def _prune_site_rollup_slices(*, now: float | None = None) -> None:
+    cutoff = (now or time.monotonic()) - SITE_ROLLUP_WINDOW_SEC
+    while _site_rollup_slices and _site_rollup_slices[0].ts < cutoff:
+        _site_rollup_slices.popleft()
+
+
+def site_rollup_window_totals() -> SiteRollupTotals:
+    now = time.monotonic()
+    _prune_site_rollup_slices(now=now)
+    totals = SiteRollupTotals()
+    for sl in _site_rollup_slices:
+        totals.downloaded += sl.downloaded
+        totals.new_sqlite += sl.new_sqlite
+        totals.neon_insert += sl.neon_insert
+        totals.neon_replay += sl.neon_replay
+        totals.l1 += sl.l1
+        totals.l2 += sl.l2
+        totals.is_visible += sl.is_visible
+        totals.filter_skip += sl.filter_skip
+        totals.mimo_skip += sl.mimo_skip
+    return totals
+
+
+def format_site_rollup_line(
+    totals: SiteRollupTotals,
+    *,
+    zero_hint: str = "",
+) -> str:
+    line = (
+        f"site:сводка │ 10мин │ скачано {totals.downloaded} │ "
+        f"новых_sqlite {totals.new_sqlite} │ "
+        f"neon_insert {totals.neon_insert} │ neon_replay {totals.neon_replay} │ "
+        f"l1 {totals.l1} │ l2 {totals.l2} │ "
+        f"is_visible {totals.is_visible} │ filter {totals.filter_skip} │ "
+        f"мимо {totals.mimo_skip}"
+    )
+    if totals.downloaded == 0 and zero_hint:
+        line += f" │ {zero_hint}"
+    return line
+
+
+def site_rollup_emit_due() -> bool:
+    return time.monotonic() - _site_rollup_last_emit >= SITE_ROLLUP_EMIT_SEC
+
+
+def emit_site_rollup_line(
+    storage: ProjectStorage | None = None,
+    *,
+    zero_hint: str = "",
+) -> str:
+    """Сформировать строку сводки и обновить часы emit (§ SITE-LOG-ROLLUP)."""
+    global _site_rollup_last_emit, _site_rollup_zero_hint
+    totals = site_rollup_window_totals()
+    hint = zero_hint or (
+        _site_rollup_zero_hint if totals.downloaded == 0 else ""
+    )
+    line = format_site_rollup_line(totals, zero_hint=hint)
+    _site_rollup_last_emit = time.monotonic()
+    if storage is not None:
+        record_site_rollup_line(storage, line)
+    if totals.downloaded > 0:
+        _site_rollup_zero_hint = ""
+    return line
+
+
+def record_site_rollup_line(storage: ProjectStorage, line: str) -> None:
+    storage.set_setting(_STATUS_SITE_ROLLUP, line)
+
+
+def load_site_rollup_line(storage: ProjectStorage) -> str:
+    return storage.get_setting(_STATUS_SITE_ROLLUP, "").strip()

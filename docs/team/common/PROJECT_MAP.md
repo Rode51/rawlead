@@ -19,8 +19,9 @@
 
 | Нужно | Единственный канон | Не дублировать в |
 |-------|-------------------|------------------|
-| Vision / ставка B | [`product/PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) v0.9 | ROADMAP, STATUS, чат |
+| Vision / ставка B | [`product/PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11** | ROADMAP, STATUS, чат |
 | Фазы «сейчас» | [`architect/ROADMAP.md`](../architect/ROADMAP.md) | FOR_YOU, TASKS простынёй |
+| Мысли / решения владельца | [`architect/OWNER_INTENT.md`](../architect/OWNER_INTENT.md) | чат, дубли в FOR_YOU |
 | Активный план Product | [`product/LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) | новый `TZ_*.md` |
 | Задача Coder | [`architect/CODER_PROMPT.md`](../architect/CODER_PROMPT.md) | TASKS, чат (только копипаст) |
 | Задача Designer | [`design/DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) | DESIGN_BRIEF без промпта |

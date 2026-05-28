@@ -1,0 +1,6 @@
+# Альтернатива nginx (если на VPS стоит Caddy, а не nginx для API).
+# Запуск: caddy run --config /opt/rawlead/deploy/Caddyfile
+
+api.rawlead.ru {
+	reverse_proxy 127.0.0.1:8000
+}

@@ -7,7 +7,8 @@ from urllib.parse import urlparse
 
 import requests
 
-from config import DIRECT_REQUESTS_PROXIES, Config
+from config import Config
+from exchange_proxy import requests_proxies_for
 from lead_category import category_from_kwork_listing_url, category_from_kwork_want
 from listing import SOURCE_KWORK, ListingProject
 
@@ -148,7 +149,7 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
             url,
             headers=headers,
             timeout=timeout_sec,
-            proxies=DIRECT_REQUESTS_PROXIES,
+            proxies=requests_proxies_for("kwork"),
         )
     except requests.RequestException as exc:
         raise KworkListingError(f"Сетевой сбой при запросе ленты: {exc}") from exc

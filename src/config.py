@@ -67,6 +67,8 @@ class Config:
     filters_md_path: Path
     site_notify_on_ai_unavailable: bool
     site_notify_owner: bool
+    radar_conveyor: bool
+    l1_batch_per_cycle: int
 
     @property
     def ai_active(self) -> bool:
@@ -203,16 +205,16 @@ def _validate_http_url(url: str, var_name: str) -> None:
         )
 
 
-def _parse_poll_interval_minutes(raw: str) -> int:
+def _parse_poll_interval_minutes(raw: str, *, min_minutes: int = 10) -> int:
     try:
         n = int(raw)
     except ValueError as exc:
         raise ValueError(
             f"POLL_INTERVAL_MINUTES: ожидается целое число минут, получено: {raw!r}"
         ) from exc
-    if n < 10:
+    if n < min_minutes:
         raise ValueError(
-            f"POLL_INTERVAL_MINUTES: по ТЗ минимум 10 минут, получено: {n}"
+            f"POLL_INTERVAL_MINUTES: минимум {min_minutes} мин, получено: {n}"
         )
     return n
 
@@ -751,7 +753,14 @@ def load_config() -> Config:
         _validate_http_url(kwork_url, "KWORK_PROJECTS_URL")
 
     poll_raw = _require_str("POLL_INTERVAL_MINUTES")
-    poll_minutes = _parse_poll_interval_minutes(poll_raw)
+    radar_conveyor = _parse_bool_flag(os.environ.get("RADAR_CONVEYOR"), default=False)
+    min_poll = 1 if profile == "site" and radar_conveyor else 10
+    poll_minutes = _parse_poll_interval_minutes(poll_raw, min_minutes=min_poll)
+    l1_batch_raw = os.environ.get("L1_BATCH_PER_CYCLE", "40").strip()
+    try:
+        l1_batch_per_cycle = max(1, min(500, int(l1_batch_raw)))
+    except ValueError:
+        l1_batch_per_cycle = 40
 
     token = _require_str("TELEGRAM_BOT_TOKEN")
     chat_id = _require_str("TELEGRAM_CHAT_ID")
@@ -836,4 +845,6 @@ def load_config() -> Config:
         filters_md_path=filters_path,
         site_notify_on_ai_unavailable=site_notify_on_ai_unavailable,
         site_notify_owner=site_notify_owner,
+        radar_conveyor=radar_conveyor,
+        l1_batch_per_cycle=l1_batch_per_cycle,
     )
