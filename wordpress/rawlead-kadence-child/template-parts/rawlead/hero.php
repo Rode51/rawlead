@@ -8,6 +8,7 @@
 declare(strict_types=1);
 
 $lenta = rawlead_page_url('lenta');
+$cabinet = rawlead_page_url('cabinet');
 ?>
 <section class="rl-hero rl-section rl-reveal" aria-labelledby="rl-hero-title">
 	<div class="rl-container rl-hero__grid">
@@ -22,6 +23,7 @@ $lenta = rawlead_page_url('lenta');
 			</p>
 			<div class="rl-hero__actions">
 				<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($lenta); ?>"><?php esc_html_e('Смотреть ленту', 'rawlead-kadence-child'); ?></a>
+				<a class="rl-btn rl-btn--ghost" href="<?php echo esc_url($cabinet); ?>"><?php esc_html_e('Вход в ЛК', 'rawlead-kadence-child'); ?></a>
 				<a class="rl-link-arrow" href="#pricing-preview"><?php esc_html_e('Смотреть тарифы ↓', 'rawlead-kadence-child'); ?></a>
 			</div>
 		</div>

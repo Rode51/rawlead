@@ -60,10 +60,12 @@ rawlead_get_part('header');
 					</summary>
 					<div class="rl-skills-panel rl-feed-skills-dd__panel" id="rl-feed-skills-panel">
 						<h3 class="rl-skills-panel__title"><?php esc_html_e('Навыки', 'rawlead-kadence-child'); ?></h3>
-						<p class="rl-feed-skills__section" id="rl-feed-skills-section" hidden></p>
-						<div class="rl-feed-skills" id="rl-feed-skills" aria-live="polite"></div>
-						<button type="button" class="rl-feed-skills-rare" id="rl-feed-skills-rare" hidden><?php esc_html_e('Показать редкие навыки', 'rawlead-kadence-child'); ?></button>
-						<p class="rl-feed-skills__hint" id="rl-feed-skills-hint" hidden><?php esc_html_e('Выберите навыки и нажмите Применить', 'rawlead-kadence-child'); ?></p>
+						<div class="rl-skills-panel__body">
+							<p class="rl-feed-skills__section" id="rl-feed-skills-section" hidden></p>
+							<div class="rl-feed-skills" id="rl-feed-skills" aria-live="polite"></div>
+							<button type="button" class="rl-feed-skills-rare" id="rl-feed-skills-rare" hidden><?php esc_html_e('Показать редкие навыки', 'rawlead-kadence-child'); ?></button>
+							<p class="rl-feed-skills__hint" id="rl-feed-skills-hint" hidden><?php esc_html_e('Выберите навыки и нажмите Применить', 'rawlead-kadence-child'); ?></p>
+						</div>
 						<div class="rl-skills-panel__footer">
 							<button type="button" class="rl-btn rl-btn--primary rl-feed-skills-apply" id="rl-feed-skills-apply" title="<?php esc_attr_e('Порядок изменится. Заказы не исчезнут.', 'rawlead-kadence-child'); ?>"><?php esc_html_e('Применить', 'rawlead-kadence-child'); ?></button>
 							<button type="button" class="rl-feed-skills-clear" id="rl-feed-skills-clear"><?php esc_html_e('Сбросить', 'rawlead-kadence-child'); ?></button>

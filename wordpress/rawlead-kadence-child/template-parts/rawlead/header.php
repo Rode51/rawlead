@@ -18,13 +18,11 @@ if (!is_front_page() && is_page()) {
     }
 }
 
+$cabinet = rawlead_page_url('cabinet');
+
 $nav = [
     'lenta'   => [__('Лента', 'rawlead-kadence-child'), $feed],
-    'how'     => [__('Как работает', 'rawlead-kadence-child'), rawlead_page_url('how')],
     'pricing' => [__('Тарифы', 'rawlead-kadence-child'), rawlead_page_url('pricing')],
-    'faq'     => [__('FAQ', 'rawlead-kadence-child'), rawlead_page_url('faq')],
-    'contact' => [__('Контакты', 'rawlead-kadence-child'), rawlead_page_url('contact')],
-    'cabinet' => [__('Кабинет', 'rawlead-kadence-child'), rawlead_page_url('cabinet')],
 ];
 ?>
 <header class="rl-header" role="banner">
@@ -45,9 +43,25 @@ $nav = [
 			</ul>
 		</nav>
 		<div class="rl-header__cta">
-			<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($feed); ?>">
-				<?php esc_html_e('Смотреть ленту', 'rawlead-kadence-child'); ?>
+			<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($cabinet); ?>" id="rl-header-cta">
+				<?php esc_html_e('Вход в ЛК', 'rawlead-kadence-child'); ?>
 			</a>
 		</div>
 	</div>
 </header>
+<script>
+(function () {
+	var key = "rawlead_access_token";
+	var el = document.getElementById("rl-header-cta");
+	if (!el) {
+		return;
+	}
+	try {
+		if (localStorage.getItem(key)) {
+			el.textContent = "Кабинет";
+		}
+	} catch (e) {
+		/* private mode */
+	}
+})();
+</script>

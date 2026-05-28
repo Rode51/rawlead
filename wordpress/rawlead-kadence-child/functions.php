@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.7.4');
+define('RAWLEAD_CHILD_VERSION', '1.7.7');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -32,18 +32,42 @@ function rawlead_page_url(string $slug): string {
 
 /**
  * Optional deep-link fallback URL for Telegram auth (without iframe widget).
+ * return_to всегда подставляется из rawlead_cabinet_login_url() (prod / local).
  *
  * wp-config.php:
  *   define('RAWLEAD_TG_LOGIN_FALLBACK_URL', 'https://oauth.telegram.org/auth?...');
  */
 function rawlead_tg_login_fallback_url(): string {
+    $base = '';
     if (defined('RAWLEAD_TG_LOGIN_FALLBACK_URL')) {
-        return trim((string) RAWLEAD_TG_LOGIN_FALLBACK_URL);
+        $base = trim((string) RAWLEAD_TG_LOGIN_FALLBACK_URL);
+    } elseif (defined('RAWLEAD_TG_LOGIN_URL')) {
+        $base = trim((string) RAWLEAD_TG_LOGIN_URL);
     }
-    if (defined('RAWLEAD_TG_LOGIN_URL')) {
-        return trim((string) RAWLEAD_TG_LOGIN_URL);
+    if ($base === '') {
+        $bot_id = rawlead_tg_login_bot_id();
+        if ($bot_id <= 0) {
+            return '';
+        }
+        $base = 'https://oauth.telegram.org/auth?bot_id=' . $bot_id
+            . '&origin=' . rawurlencode(home_url('/'));
     }
-    return '';
+    return rawlead_tg_login_fallback_normalize($base);
+}
+
+function rawlead_tg_login_fallback_normalize(string $url): string {
+    $parts = wp_parse_url($url);
+    if (!is_array($parts) || empty($parts['host'])) {
+        return $url;
+    }
+    $query = [];
+    if (!empty($parts['query'])) {
+        parse_str((string) $parts['query'], $query);
+    }
+    $query['return_to'] = rawlead_cabinet_login_url();
+    $scheme = $parts['scheme'] ?? 'https';
+    $path = $parts['path'] ?? '/auth';
+    return $scheme . '://' . $parts['host'] . $path . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
 }
 
 /**
@@ -136,16 +160,18 @@ add_action('wp_enqueue_scripts', static function (): void {
             true
         );
         wp_localize_script('rawlead-cabinet', 'rawleadCabinet', [
-            'restFeed'       => esc_url_raw(rest_url('rawlead/v1/me/feed')),
-            'restTags'       => esc_url_raw(rest_url('rawlead/v1/me/tags')),
-            'restAuth'       => esc_url_raw(rest_url('rawlead/v1/auth/telegram')),
-            'tgBotUsername'  => rawlead_tg_login_bot_username(),
-            'tgBotId'        => rawlead_tg_login_bot_id(),
-            'tgLoginFallbackUrl' => rawlead_tg_login_fallback_url(),
-            'localPort'      => defined('RAWLEAD_LOCAL_SITE_PORT') ? (string) RAWLEAD_LOCAL_SITE_PORT : '10007',
-            'loginUrl'       => 'http://127.0.0.1:' . (defined('RAWLEAD_LOCAL_SITE_PORT') ? (string) RAWLEAD_LOCAL_SITE_PORT : '10007') . '/cabinet/',
-            'nonce'          => wp_create_nonce('wp_rest'),
-            'apiBase'        => rawlead_api_base_url(),
+            'restFeed'             => esc_url_raw(rest_url('rawlead/v1/me/feed')),
+            'restTags'             => esc_url_raw(rest_url('rawlead/v1/me/tags')),
+            'restAuth'             => esc_url_raw(rest_url('rawlead/v1/auth/telegram')),
+            'tgBotUsername'        => rawlead_tg_login_bot_username(),
+            'tgBotId'              => rawlead_tg_login_bot_id(),
+            'tgLoginFallbackUrl'   => rawlead_tg_login_fallback_url(),
+            'tgLoginDev'           => defined('RAWLEAD_TG_LOGIN_DEV') && RAWLEAD_TG_LOGIN_DEV,
+            'tgLoginWidgetAllowed' => rawlead_tg_login_widget_allowed(),
+            'localPort'            => defined('RAWLEAD_LOCAL_SITE_PORT') ? (string) RAWLEAD_LOCAL_SITE_PORT : '10007',
+            'loginUrl'             => rawlead_cabinet_login_url(),
+            'nonce'                => wp_create_nonce('wp_rest'),
+            'apiBase'              => rawlead_api_base_url(),
         ]);
     }
 }, 20);
@@ -233,9 +259,12 @@ add_filter('the_content', static function (string $content): string {
             esc_url($pricing)
         ),
         'pricing' => sprintf(
-            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">%s</a></p>',
+            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">%s</a> '
+            . '<a class="rl-btn rl-btn--ghost" href="%s">%s</a></p>',
             esc_url(rawlead_page_url('lenta')),
-            esc_html__('Смотреть ленту', 'rawlead-kadence-child')
+            esc_html__('Смотреть ленту', 'rawlead-kadence-child'),
+            esc_url(rawlead_page_url('cabinet')),
+            esc_html__('Вход в ЛК', 'rawlead-kadence-child')
         ),
         'faq' => sprintf(
             '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">Контакты</a></p>',

@@ -11,5 +11,7 @@ python-socks[asyncio]>=2.4.0
 telegram-session-converter>=0.1.3
 PyQt6>=6.6.0
 psutil>=5.9.0
+# VPS deploy scripts (deploy_vps_ssh.py, wp-vps-skeleton-pages.py)
+paramiko>=3.0.0
 # P1.3c: fallback HTML при антиботе (после pip install: playwright install chromium)
 playwright>=1.40.0

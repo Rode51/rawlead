@@ -129,13 +129,28 @@ chown -R www-data:www-data /var/www/rawlead.ru
         "wp theme activate rawlead-kadence-child --allow-root 2>/dev/null || true"
     )
 
-    # Pages lenta / cabinet
+    # Plugin skeleton (marketing pages)
+    _PLUGIN = _ROOT / "wordpress" / "rawlead-landing"
+    if _PLUGIN.is_dir():
+        print("upload rawlead-landing plugin...")
+        ssh.sync_project(
+            local_root=_PLUGIN,
+            remote_root="/var/www/rawlead.ru/wp-content/plugins/rawlead-landing",
+        )
+        ssh.run("chown -R www-data:www-data /var/www/rawlead.ru/wp-content/plugins/rawlead-landing")
+
+    # Pages lenta / cabinet + marketing skeleton
     pages = r"""
 cd /var/www/rawlead.ru
-wp post list --post_type=page --name=lenta --field=ID --allow-root 2>/dev/null | grep -q . || \
-  wp post create --post_type=page --post_title='Лента' --post_name=lenta --post_status=publish --allow-root
-wp post list --post_type=page --name=cabinet --field=ID --allow-root 2>/dev/null | grep -q . || \
-  wp post create --post_type=page --post_title='Кабинет' --post_name=cabinet --post_status=publish --allow-root
+PLUGIN=/var/www/rawlead.ru/wp-content/plugins/rawlead-landing
+if [ -d "$PLUGIN" ]; then
+  wp plugin activate rawlead-landing --allow-root 2>/dev/null || true
+else
+  wp post list --post_type=page --name=lenta --field=ID --allow-root 2>/dev/null | grep -q . || \
+    wp post create --post_type=page --post_title='Лента' --post_name=lenta --post_status=publish --allow-root
+  wp post list --post_type=page --name=cabinet --field=ID --allow-root 2>/dev/null | grep -q . || \
+    wp post create --post_type=page --post_title='Кабинет' --post_name=cabinet --post_status=publish --allow-root
+fi
 for slug in lenta cabinet; do
   pid=$(wp post list --post_type=page --name=$slug --field=ID --allow-root 2>/dev/null | head -1)
   [ -n "$pid" ] && wp post meta update $pid _wp_page_template page-$slug.php --allow-root 2>/dev/null || true

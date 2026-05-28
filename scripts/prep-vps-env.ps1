@@ -10,7 +10,7 @@ function Convert-LinuxPaths([string]$text) {
     return $text
 }
 
-$files = @('.env', '.env.site')
+$files = @('.env', '.env.site', '.env.legacy')
 foreach ($name in $files) {
     $src = Join-Path $Root $name
     if (-not (Test-Path $src)) {

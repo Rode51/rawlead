@@ -1,14 +1,121 @@
-# Coder — **→ E-polish (B1)** · после § P5-E2-VPS ✅
+# Coder — **→ CABINET-PROD-LOGIN (L1)** · D1 ✅/приёмка · B1 ✅
 
-**Ворота прод:** [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) · бюджет: [`docs/ops/DEPLOY_BUDGET.md`](../../ops/DEPLOY_BUDGET.md).
+**Порядок (владелец 2026-05-28):** **L1** (вход ЛК prod) → **SITE-PAGES (L2)** → B3 → A1 → **3f** (Stars) → stress.
 
-**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11**.
+**→ Сейчас @coder:** **§ CABINET-PROD-LOGIN** · затем **§ SITE-PAGES**.
 
-**Порядок (владелец 2026-05-28):** **E-polish** (B1 → A1 → C1) → **§ 3f-OWNER-BETA** → **§ PRE-PROD-STRESS**.
+# § CABINET-PROD-LOGIN (L1) — вход на rawlead.ru (**P0, владелец 2026-05-28**)
 
-**→ Сейчас @coder:** **E-polish B1** ([`OWNER_INTENT.md`](OWNER_INTENT.md)) · VPS E2 — **владелец** (`DEPLOY_VPS.md` § E2/E2b).
+**Симптом:** на [rawlead.ru/cabinet/](https://rawlead.ru/cabinet/) виджет TG **не** грузится; подсказка «только 127.0.0.1»; кнопка ведёт на localhost. Локальная вёрстка — отдельно (`radarzakaz.local` / Local).
 
-**✅ Архив (не трогать без § в шапке):** SITE-POLISH, FEED-FRESHNESS, 3x-HOT-BADGE, BACKLOG-CLEAR, LEGACY-SELF-STOP, HOTFIX-POST-PULT и др. — см. [`STATUS.md`](../common/STATUS.md).
+**Корень (Lead verify):**
+
+| Файл | Проблема |
+|------|----------|
+| `assets/js/rawlead-cabinet.js` | `if (location.hostname !== "127.0.0.1") return;` — widget **не монтируется** на prod |
+| `page-cabinet.php` | ссылка «127.0.0.1» захардкожена |
+| `functions.php` | `loginUrl` в `rawleadCabinet` = `http://127.0.0.1:10007/cabinet/` |
+| `functions.php` | `template_redirect` — только `radarzakaz.local` → 127.0.0.1 (ok для dev) |
+
+| # | Задача |
+|---|--------|
+| l1-1 | **Prod:** монтировать Telegram Login Widget на **любом** host из allowlist (`rawlead.ru`, `www`) — убрать блок `hostname !== 127.0.0.1` или gate через `RAWLEAD_TG_LOGIN_DEV=1` |
+| l1-2 | `loginUrl` / fallback return URL = `home_url('/cabinet/')` на prod; localhost — только если `WP_ENVIRONMENT_TYPE=local` или `RAWLEAD_LOCAL_SITE_PORT` |
+| l1-3 | Убрать/скрыть на prod кнопку «Открыть по адресу 127.0.0.1»; dev — оставить |
+| l1-4 | Fallback oauth (`RAWLEAD_TG_LOGIN_FALLBACK_URL`) — `return_to` = prod `/cabinet/`, не localhost |
+| l1-5 | После входа — **остаться** на rawlead.ru, JWT в localStorage, показать кабинет |
+| l1-6 | Док: владельцу — BotFather → @rawlead_bot → **/setdomain** → `rawlead.ru` (ops, `FOR_YOU.md`) |
+
+**Приёмка:** rawlead.ru/cabinet/ → кнопка Telegram → вход → лента в ЛК; **нет** редиректа на 127.0.0.1.
+
+**Ops владельца (до/после):** BotFather `/setdomain` → `rawlead.ru` для @rawlead_bot.
+
+# § SITE-PAGES (L2) — скелет маркeting-страниц (**владелец 2026-05-28**)
+
+**Факт:** в теме только `page-lenta.php`, `page-cabinet.php`; footer/header ссылаются на how/pricing/faq/contact — **страниц на VPS может не быть**.
+
+| # | Задача |
+|---|--------|
+| l2-1 | Шаблоны или паттерны: `/how/`, `/pricing/`, `/faq/`, `/contact/` — контент из copy E5 / `marketing.php` |
+| l2-2 | Скрипт/checklist: создать страницы в WP (slug) или `wp-cli` на VPS |
+| l2-3 | `/pricing/` — заглушка тарифа + «оплата Stars скоро» до § 3f-C-STARS |
+| l2-4 | Главная `/` — не пустая (hero + CTA лента + вход ЛК) |
+
+**Файлы:** `inc/marketing.php`, `template-parts/`, новые `page-*.php` или блоки Kadence.
+
+# § 3f-C-STARS — оплата Telegram Stars (**O12, после 3f-A**)
+
+**Решение владельца 2026-05-28:** касса на старте = **Telegram Stars** (не ЮKassa/Robokassa).
+
+| # | Задача |
+|---|--------|
+| s1 | Bot API: invoice / Stars payment или подписка через @rawlead_bot |
+| s2 | Webhook/pre_checkout → Neon `subscriptions`: `plan`, `is_active`, `active_until` |
+| s3 | После оплаты: L2 + push без ручного флага; gate «paid only» в API |
+| s4 | UI: `/pricing/` + блок в `/cabinet/` «Подписка» — статус, кнопка «Оплатить Stars» |
+| s5 | ЮKassa — **не** делать в этом этапе (backlog) |
+
+**Не в задаче:** несколько тарифов, оферта/ИП (владелец).
+
+# § LENTA-HEADER-UX (D1) — навыки + шапка (**владелец 2026-05-28**)
+
+**Запрос владельца (после B1, отдельно от B3):**
+
+| # | Задача |
+|---|--------|
+| d1-1 | **Навыки — закрытие:** клик мышью **вне** панели навыков закрывает dropdown/sheet; клик **внутри** панели — не закрывает (desktop `details.rl-feed-skills-dd` + mobile sheet) |
+| d1-2 | **«Применить» всегда видна:** footer панели навыков (`rl-skills-panel__footer`) **sticky/fixed внизу** окна навыков; список чипов скроллится между title и footer — не нужно листать до кнопки |
+| d1-3 | **Шапка — меню:** убрать из **верхнего** nav: «Как работает», «FAQ», «Контакты» — они **только в footer** (`template-parts/rawlead/footer.php` уже есть) |
+| d1-4 | **Шапка — CTA справа:** вместо «Смотреть ленту» → **«Вход в ЛК»** (ссылка `/cabinet/`); если уже залогинен (JWT в localStorage) — «Кабинет» или имя |
+
+**Файлы:** `template-parts/rawlead/header.php`, `page-lenta.php`, `assets/css/rawlead.css`, `assets/js/rawlead-feed.js` (close-on-outside, mobile sheet).
+
+**Приёмка:**
+
+1. Открыть навыки → клик по ленте/overlay → панель закрылась.
+2. Длинный список навыков → «Применить» видна без скролла страницы.
+3. Header: только Лента + Тарифы (+ опц. Кабинет); how/faq/contact — **нет** вверху, **есть** внизу.
+4. Справа вверху — вход в ЛК, не «Смотреть ленту».
+
+**Деплой:** `scripts/deploy-wp-theme-vps.py` после сдачи (v1.7.6+).
+
+# § E-polish B1 — навыки на user_id (**✅ 2026-05-28, владелец принял**)
+
+**Сделано:** гость → `localStorage` `rawlead_lenta_skills`; JWT → `PUT/GET …/me/tags`; REST без owner #1 fallback; theme v1.7.5 на VPS.
+
+| # | Задача |
+|---|--------|
+| b1-1 | REST `/v1/me/tags` и WP cabinet — **только** `user_id` из JWT ✅ |
+| b1-2 | Гость vs залогинен — разные ключи ✅ |
+| b1-3 | Приёмка владельца ✅ |
+
+# § BOT-OWNER-CONTROLS (B3) — стоп радара только для владельца (**владелец 2026-05-28**)
+
+**Запрос:** через TG-бот **останавливать процессы** (не только мягкая пауза); кнопки **Пауза/Старт/Статус** — **только владельцу**, подписчикам @rawlead_bot **не показывать**.
+
+**Сейчас:** `/pause` = флаг SQLite (`radar_paused_*`), systemd и процессы **живут**; клавиатура уходит в `send_control_panel` при старте **владельцу** (`TELEGRAM_CHAT_ID`), но команды уже фильтруются `_authorized_chat_id` — проверить, что **/start** и будущие подписчики **не** получают admin-клавиатуру.
+
+| # | Задача |
+|---|--------|
+| b3-1 | **Кто admin:** `TELEGRAM_CHAT_ID` (+ опц. allowlist owner ids) — единый helper `is_radar_admin(user_id, chat_id)` |
+| b3-2 | **Клавиатура:** `ReplyKeyboardMarkup` с ⏸/▶/ℹ — **только** admin; остальным — без клавиатуры или `remove_keyboard` + обычный welcome (подписчик / deep link) |
+| b3-3 | **Команды:** `/pause`, `/стоп`, `/status`, кнопки — **ignore** для не-admin (без ответа или «нет доступа») |
+| b3-4 | **«Стоп процесс» (владелец):** новая кнопка/команда (напр. `/stop-radar` или «🛑 Стоп») — **реально** гасит ingest этого профиля на VPS: минимум — `systemctl stop rawlead-radar` / `rawlead-radar-legacy` через **безопасный** wrapper (`deploy/radar-ctl.sh`, sudoers `rawlead`, **без** shell от произвольного текста); альтернатива — документировать если только расширенная пауза |
+| b3-5 | **«Старт процесс»:** пара к b3-4 — `systemctl start …` или снятие hard-stop флага |
+| b3-6 | **Два бота:** @FLPARSINGBOT (legacy) — dogfood admin; @rawlead_bot (site) — admin только владелец, подписчики позже § 3f без admin UI |
+| b3-7 | **HTTP 409:** один poller на токен — убедиться, что Site bot poll только на VPS (не дубль с локальным API/пультом); зафиксировать в `DEPLOY_VPS.md` § «ПК после E2» |
+| b3-8 | Док: `OWNER_INTENT` / `DEPLOY_VPS` — разница **пауза** (мягкая) vs **стоп** (unit/process) |
+
+**Приёмка:**
+
+1. Владелец (TELEGRAM_CHAT_ID): видит клавиатуру; `/pause` и «🛑 Стоп» работают; после стопа — `systemctl is-active rawlead-radar` = inactive (или эквivalent).
+2. Чужой user_id / другой chat: **нет** клавиатуры; команды не меняют радар.
+3. @FLPARSING `/pause` — по-прежнему **не** гасит Site ingest (e4 ✅).
+4. `/lenta/` после «стоп Site» — новые лиды не появляются; после «старт» — снова качает.
+
+**Файлы (ориентир):** `src/telegram_control.py`, `src/bot_poll.py`, `scripts/tg_main.py`, `deploy/radar-ctl.sh` (новый), `docs/ops/DEPLOY_VPS.md`.
+
+**Не делать:** отдавать root shell в бот; admin-кнопки в WebApp ЛК.
 
 # § LEGACY-SELF-STOP — ▶ гасится через ~15 с (**владелец 2026-05-28**)
 
@@ -287,7 +394,7 @@
 | | a4 | Опционально: push в TG владельцу при новом match (`telegram_chat_id` в профиле) — флаг env |
 | **B. Кабинет UX** | b1 | Lead Design: § в `DESIGNER_PROMPT` — кабинет «подписка», тариф, пауза (макет) |
 | | b2 | Coder: страницы тариф/статус подписки в child theme; `subs.is_active` / `paused_until` в API |
-| **C. Оплата (3h)** | c1 | ЮKassa / Robokassa / T-Bank — **один** провайдер, один тариф «ИИ-агент», webhook → `subscriptions` |
+| **C. Оплата** | c1 | **Telegram Stars** (@rawlead_bot) — см. § **3f-C-STARS** (O12; не ЮKassa на старте) |
 | | c2 | После оплаты: `is_active=true`, L2 без ручного «включения» |
 | | c3 | Пауза подписки (`subs.paused_until`) — UI + крон (vision 3p, можно вместе с c1) |
 

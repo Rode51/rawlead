@@ -271,6 +271,16 @@
 
   }
 
+  function canMountTelegramWidget() {
+    if (cfg.tgLoginDev) {
+      return location.hostname === "127.0.0.1";
+    }
+    if (cfg.tgLoginWidgetAllowed === false) {
+      return false;
+    }
+    return true;
+  }
+
   function mountTelegramWidget() {
 
     var box = document.getElementById("rl-telegram-login-widget");
@@ -285,22 +295,25 @@
     showFallback(!!cfg.tgLoginFallbackUrl);
     setLoginState("info", "Загружаем Telegram Widget...");
 
-    if (location.hostname !== "127.0.0.1") {
+    if (!canMountTelegramWidget()) {
 
       if (loginHintEl) {
 
         loginHintEl.hidden = false;
 
-        loginHintEl.textContent =
-
-          "Кнопка Telegram только на http://127.0.0.1:" +
-
-          (cfg.localPort || "10007") +
-
-          "/cabinet/ — нажмите ссылку ниже.";
+        if (cfg.tgLoginDev) {
+          loginHintEl.textContent =
+            "Кнопка Telegram только на http://127.0.0.1:" +
+            (cfg.localPort || "10007") +
+            "/cabinet/ — нажмите ссылку ниже.";
+        } else {
+          loginHintEl.textContent =
+            "Виджет Telegram доступен на rawlead.ru. Используйте fallback-вход ниже.";
+        }
 
       }
 
+      showFallback(true, "Widget недоступен на этом адресе. Используйте fallback-вход.");
       return;
 
     }
@@ -350,7 +363,7 @@
 
         loginHintEl.textContent =
 
-          "Виджет Telegram не загрузился. Обновите страницу (Ctrl+F5), отключите блокировщик/anti-tracker и откройте /cabinet/ только на 127.0.0.1.";
+          "Виджет Telegram не загрузился. Обновите страницу (Ctrl+F5) и отключите блокировщик для telegram.org.";
         showFallback(true, "Widget не загрузился. Используйте fallback-вход в новом окне.");
       } else {
         setLoginState("ok", "Widget загружен. Подтвердите вход в Telegram.");

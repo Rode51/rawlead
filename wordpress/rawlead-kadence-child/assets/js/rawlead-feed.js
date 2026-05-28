@@ -10,6 +10,8 @@
   }
 
   var cfg = window.rawleadFeed;
+  var TOKEN_KEY = "rawlead_access_token";
+  var GUEST_SKILLS_KEY = "rawlead_lenta_skills";
   var listEl = document.getElementById("rl-feed-list");
   var countEl = document.getElementById("rl-feed-count");
   var sentinelEl = document.getElementById("rl-feed-sentinel");
@@ -52,6 +54,63 @@
   function apiUrl(params) {
     var q = new URLSearchParams(params);
     return cfg.restFeed + (cfg.restFeed.indexOf("?") >= 0 ? "&" : "?") + q.toString();
+  }
+
+  function getToken() {
+    try {
+      return localStorage.getItem(TOKEN_KEY) || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function isLoggedIn() {
+    return !!getToken();
+  }
+
+  function authHeaders() {
+    var h = { "X-WP-Nonce": cfg.nonce || "" };
+    var t = getToken();
+    if (t) {
+      h.Authorization = "Bearer " + t;
+    }
+    return h;
+  }
+
+  function loadGuestTags() {
+    try {
+      var raw = localStorage.getItem(GUEST_SKILLS_KEY);
+      if (!raw) {
+        return [];
+      }
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveGuestTags(tags) {
+    try {
+      localStorage.setItem(GUEST_SKILLS_KEY, JSON.stringify(tags || []));
+    } catch (e) {
+      /* ignore quota / private mode */
+    }
+  }
+
+  function applyPersistedTags(tags, options) {
+    options = options || {};
+    state.appliedTags = tags;
+    state.draftTags = cloneTags(state.appliedTags);
+    if (options.setSortMatch) {
+      setSortMatch();
+    }
+    renderSkillsCatalog();
+    readFilters();
+    updateFilterBarUi();
+    if (options.reload !== false) {
+      resetAndLoad();
+    }
   }
 
   function sourceLabel(source) {
@@ -625,18 +684,30 @@
 
   function persistTags(tags, options) {
     options = options || {};
-    if (!cfg.restTags || state.tagsLoading) {
+    if (state.tagsLoading) {
       return Promise.resolve();
     }
     state.tagsLoading = true;
     updateSkillsDraftUi();
+    if (!isLoggedIn()) {
+      saveGuestTags(tags);
+      applyPersistedTags(tags, options);
+      state.tagsLoading = false;
+      updateSkillsDraftUi();
+      return Promise.resolve();
+    }
+    if (!cfg.restTags) {
+      state.tagsLoading = false;
+      updateSkillsDraftUi();
+      return Promise.resolve();
+    }
     return fetch(cfg.restTags, {
       method: "PUT",
       credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "X-WP-Nonce": cfg.nonce || "",
-      },
+      headers: Object.assign(
+        { "Content-Type": "application/json" },
+        authHeaders()
+      ),
       body: JSON.stringify({ tags: tags }),
     })
       .then(function (res) {
@@ -646,17 +717,7 @@
         return res.json();
       })
       .then(function (data) {
-        state.appliedTags = data.tags || tags;
-        state.draftTags = cloneTags(state.appliedTags);
-        if (options.setSortMatch) {
-          setSortMatch();
-        }
-        renderSkillsCatalog();
-        readFilters();
-        updateFilterBarUi();
-        if (options.reload !== false) {
-          resetAndLoad();
-        }
+        applyPersistedTags(data.tags || tags, options);
       })
       .catch(function () {
         showError("Не удалось сохранить навыки.");
@@ -703,10 +764,15 @@
   }
 
   function loadTags() {
+    if (!isLoggedIn()) {
+      state.appliedTags = loadGuestTags();
+      state.draftTags = cloneTags(state.appliedTags);
+      return Promise.resolve();
+    }
     if (!cfg.restTags) {
       return Promise.resolve();
     }
-    return fetch(cfg.restTags, { credentials: "same-origin" })
+    return fetch(cfg.restTags, { credentials: "same-origin", headers: authHeaders() })
       .then(function (res) {
         return res.ok ? res.json() : { tags: [] };
       })
@@ -944,12 +1010,35 @@
     if (!root) {
       return;
     }
+    root.querySelectorAll(".rl-skills-panel__body").forEach(bindWheelScroll);
     var panel = root.querySelector("#rl-feed-skills-panel");
-    if (panel) {
+    if (panel && !panel.querySelector(".rl-skills-panel__body")) {
       bindWheelScroll(panel);
     }
-    root.querySelectorAll(".rl-feed-skills-dd__panel").forEach(bindWheelScroll);
+    root.querySelectorAll(".rl-feed-skills-dd__panel").forEach(function (el) {
+      if (!el.querySelector(".rl-skills-panel__body")) {
+        bindWheelScroll(el);
+      }
+    });
   }
+
+  function closeSkillsDropdown() {
+    var dd = document.querySelector(".rl-feed-skills-dd");
+    if (dd && dd.open) {
+      dd.open = false;
+    }
+  }
+
+  document.addEventListener("mousedown", function (e) {
+    var dd = document.querySelector(".rl-feed-skills-dd");
+    if (!dd || !dd.open) {
+      return;
+    }
+    if (e.target.closest(".rl-feed-skills-dd")) {
+      return;
+    }
+    dd.open = false;
+  });
 
   bindWheelScroll(sidebarScroll || sidebar);
   bindSkillsPanels(sidebar || document);
@@ -1089,7 +1178,10 @@
       updateSkillsBadge();
       updateSkillsDraftUi();
     });
-    document.getElementById("rl-feed-sheet-overlay").addEventListener("click", closeSheet);
+    document.getElementById("rl-feed-sheet-overlay").addEventListener("click", function () {
+      closeSkillsDropdown();
+      closeSheet();
+    });
     document.getElementById("rl-feed-sheet-apply").addEventListener("click", function () {
       sheetBody.querySelectorAll("input").forEach(function (inp) {
         var name = inp.getAttribute("name");

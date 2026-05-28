@@ -551,6 +551,12 @@ add_action('rest_api_init', static function (): void {
 
         'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
 
+            if (rawlead_api_bearer_from_request($request) === '') {
+
+                return new WP_Error('rawlead_auth', 'Login required', ['status' => 401]);
+
+            }
+
             $query = [
 
                 'limit'     => (int) $request->get_param('limit'),
@@ -591,7 +597,7 @@ add_action('rest_api_init', static function (): void {
 
                 'timeout' => 20,
 
-                'headers' => rawlead_api_user_headers($request, true),
+                'headers' => rawlead_api_user_headers($request, false),
 
             ]);
 
@@ -641,13 +647,19 @@ add_action('rest_api_init', static function (): void {
 
             'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
 
+                if (rawlead_api_bearer_from_request($request) === '') {
+
+                    return new WP_REST_Response(['tags' => []], 200);
+
+                }
+
                 $url = rawlead_api_base_url() . '/v1/me/tags';
 
                 $response = wp_remote_get($url, [
 
                     'timeout' => 20,
 
-                    'headers' => rawlead_api_user_headers($request, true),
+                    'headers' => rawlead_api_user_headers($request, false),
 
                 ]);
 
@@ -685,6 +697,12 @@ add_action('rest_api_init', static function (): void {
 
             'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
 
+                if (rawlead_api_bearer_from_request($request) === '') {
+
+                    return new WP_Error('rawlead_auth', 'Login required to save skills', ['status' => 401]);
+
+                }
+
                 $tags = $request->get_json_params();
 
                 if (!is_array($tags) || !isset($tags['tags']) || !is_array($tags['tags'])) {
@@ -703,7 +721,7 @@ add_action('rest_api_init', static function (): void {
 
                     'headers' => array_merge(
 
-                        rawlead_api_user_headers($request, true),
+                        rawlead_api_user_headers($request, false),
 
                         ['Content-Type' => 'application/json']
 

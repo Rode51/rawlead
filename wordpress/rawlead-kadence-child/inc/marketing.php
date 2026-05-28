@@ -42,10 +42,53 @@ function rawlead_is_inner_shell_page(): bool {
     return rawlead_is_shell_page() && !is_front_page();
 }
 
+/** Local WP / 127.0.0.1 — не prod rawlead.ru. */
+function rawlead_is_local_dev(): bool {
+    if (defined('RAWLEAD_TG_LOGIN_DEV') && RAWLEAD_TG_LOGIN_DEV) {
+        return true;
+    }
+    if (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'local') {
+        return true;
+    }
+    $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    if ($host === 'localhost' || str_starts_with($host, '127.0.0.1')) {
+        return true;
+    }
+    return str_contains($host, 'radarzakaz.local');
+}
+
+/** @return list<string> */
+function rawlead_tg_login_hosts(): array {
+    return ['rawlead.ru', 'www.rawlead.ru'];
+}
+
+/** Можно монтировать Telegram Login Widget на текущем host. */
+function rawlead_tg_login_widget_allowed(): bool {
+    if (defined('RAWLEAD_TG_LOGIN_DEV') && RAWLEAD_TG_LOGIN_DEV) {
+        $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        return str_starts_with($host, '127.0.0.1');
+    }
+    if (rawlead_is_local_dev()) {
+        $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        return str_starts_with($host, '127.0.0.1');
+    }
+    $host = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')));
+    return in_array($host, rawlead_tg_login_hosts(), true);
+}
+
+/** URL страницы входа: prod → /cabinet/, local → 127.0.0.1:port. */
+function rawlead_cabinet_login_url(): string {
+    if (rawlead_is_local_dev()) {
+        $port = defined('RAWLEAD_LOCAL_SITE_PORT') ? (string) RAWLEAD_LOCAL_SITE_PORT : '10007';
+        return 'http://127.0.0.1:' . $port . '/cabinet/';
+    }
+    return home_url('/cabinet/');
+}
+
 function rawlead_inner_page_lead(string $slug): string {
     return match ($slug) {
         'how'     => __('Пять шагов: от навыков до вашего отклика', 'rawlead-kadence-child'),
-        'pricing' => __('Тарифы для соло и команды — оплата скоро', 'rawlead-kadence-child'),
+        'pricing' => __('Тариф ИИ-агент — оплата Telegram Stars скоро', 'rawlead-kadence-child'),
         'faq'     => __('Коротко о RawLead для любой ниши фриланса', 'rawlead-kadence-child'),
         'contact' => __('Свяжитесь с нами — Telegram или форма', 'rawlead-kadence-child'),
         'lenta'   => __('Открытый рынок заказов с бирж и Telegram', 'rawlead-kadence-child'),

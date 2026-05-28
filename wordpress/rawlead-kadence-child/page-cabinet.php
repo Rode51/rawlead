@@ -11,8 +11,8 @@ get_header();
 rawlead_get_part('header');
 ?>
 <?php
-$rawlead_cabinet_port = defined('RAWLEAD_LOCAL_SITE_PORT') ? (string) RAWLEAD_LOCAL_SITE_PORT : '10007';
-$rawlead_cabinet_login_url = 'http://127.0.0.1:' . $rawlead_cabinet_port . '/cabinet/';
+$rawlead_cabinet_is_local = rawlead_is_local_dev();
+$rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 ?>
 <main id="primary" class="rl-app rl-app--cabinet rl-cabinet--gate site-main" data-rl-app="cabinet">
 	<section class="rl-cabinet-login" id="rl-cabinet-login">
@@ -22,9 +22,15 @@ $rawlead_cabinet_login_url = 'http://127.0.0.1:' . $rawlead_cabinet_port . '/cab
 			<div id="rl-telegram-login-widget" class="rl-cabinet-login__widget"></div>
 			<p class="rl-cabinet-login__state rl-cabinet-login__state--info" id="rl-cabinet-login-state" aria-live="polite"></p>
 			<p class="rl-cabinet-login__hint" id="rl-cabinet-login-hint" hidden></p>
+			<?php if ($rawlead_cabinet_is_local) : ?>
 			<p class="rl-cabinet-login__hint">
 				<?php esc_html_e('Если видите серый/битый блок вместо кнопки Telegram — браузер не открывает telegram.org. Откройте кабинет на 127.0.0.1 и включите VPN/прокси или отключите блокировщик для telegram.org.', 'rawlead-kadence-child'); ?>
 			</p>
+			<?php else : ?>
+			<p class="rl-cabinet-login__hint">
+				<?php esc_html_e('Если кнопка Telegram не загрузилась — используйте fallback ниже или отключите блокировщик для telegram.org.', 'rawlead-kadence-child'); ?>
+			</p>
+			<?php endif; ?>
 			<div class="rl-cabinet-login__fallback" id="rl-cabinet-login-fallback" hidden>
 				<p class="rl-cabinet-login__hint"><?php esc_html_e('Fallback вход без iframe: откройте авторизацию в новом окне и вернитесь обратно в /cabinet/.', 'rawlead-kadence-child'); ?></p>
 				<p class="rl-cabinet-login__direct">
@@ -33,11 +39,13 @@ $rawlead_cabinet_login_url = 'http://127.0.0.1:' . $rawlead_cabinet_port . '/cab
 					</a>
 				</p>
 			</div>
+			<?php if ($rawlead_cabinet_is_local) : ?>
 			<p class="rl-cabinet-login__direct">
 				<a class="rl-btn rl-btn--ghost" href="<?php echo esc_url($rawlead_cabinet_login_url); ?>">
 					<?php esc_html_e('Открыть по адресу для Telegram (127.0.0.1)', 'rawlead-kadence-child'); ?>
 				</a>
 			</p>
+			<?php endif; ?>
 		</div>
 	</section>
 	<div class="rl-container rl-app__layout rl-cabinet-app" id="rl-cabinet-app" hidden>

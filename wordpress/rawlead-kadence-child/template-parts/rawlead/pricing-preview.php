@@ -46,7 +46,7 @@ $plan = [
 			</article>
 		</div>
 		<p class="rl-pricing__note">
-			<em><?php esc_html_e('Тариф появится при запуске подписки', 'rawlead-kadence-child'); ?></em>
+			<em><?php esc_html_e('Оплата через Telegram Stars — скоро. Сейчас лента и кабинет бесплатно.', 'rawlead-kadence-child'); ?></em>
 		</p>
 		<p class="rl-pricing__link">
 			<a class="rl-link-arrow" href="<?php echo esc_url($contact); ?>"><?php esc_html_e('Узнать первым →', 'rawlead-kadence-child'); ?></a>
