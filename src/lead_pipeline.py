@@ -617,6 +617,10 @@ def drain_l1_backlog(
     if not rows:
         return 0
     from ai_analyze import analyze_lite
+    from lead_category import category_for_listing
+    from match_push import lead_tags_from_lite, push_match_for_lead
+    from pg_storage import _is_visible_lite
+    from public_feed import is_public_feed_source
 
     done = 0
     for row in rows:
@@ -641,6 +645,26 @@ def drain_l1_backlog(
             errors=errors,
             body_snippet=snippet,
         )
+        category = category_for_listing(
+            project.source,
+            listing_category=project.listing_category,
+            title=project.title,
+            snippet=snippet,
+        )
+        if (
+            cfg.match_push_enabled
+            and lite is not None
+            and _is_visible_lite(lite, category)
+            and is_public_feed_source(project.source)
+        ):
+            push_match_for_lead(
+                cfg,
+                row.lead_id,
+                title=project.title,
+                task_summary=lite.task_summary,
+                lead_tags=lead_tags_from_lite(lite),
+                errors=errors,
+            )
         done += 1
     return done
 

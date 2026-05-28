@@ -1,8 +1,503 @@
-# Coder — **→ CABINET-PROD-LOGIN (L1)** · D1 ✅/приёмка · B1 ✅
+# Coder — **→ MATCH-PUSH-V2-WP-PROXY (O30b)**
 
-**Порядок (владелец 2026-05-28):** **L1** (вход ЛК prod) → **SITE-PAGES (L2)** → B3 → A1 → **3f** (Stars) → stress.
+**O30 backend ✅ Lead verify 2026-05-28** · Neon `010` · VPS API без top-3.
 
-**→ Сейчас @coder:** **§ CABINET-PROD-LOGIN** · затем **§ SITE-PAGES**.
+**→ Сейчас:** § **MATCH-PUSH-V2-WP-PROXY** — REST proxy в `rawlead-api.php` + theme **v1.7.24**.
+
+# § MATCH-PUSH-V2-WP-PROXY — REST proxy (**O30b, P0**)
+
+**Симптом:** `/cabinet/` блок «Уведомления» не грузится — `GET /wp-json/rawlead/v1/me/notification-settings` → **404**.
+
+**Корень:** `functions.php` шлёт `restNotificationSettings`, но **`rawlead-api.php` не регистрирует route** (есть только `/me/subscription`).
+
+**Fix:**
+
+| # | Задача |
+|---|--------|
+| w1 | `register_rest_route` `GET` + `PATCH` `/me/notification-settings` → proxy на `/v1/me/notification-settings` (Bearer) |
+| w2 | Theme **v1.7.24** · deploy |
+
+**Приёмка:** залогинен `/cabinet/` → блок «Уведомления» · смена 60→30 → «Сохранено» · Neon `users.push_min_match` обновился.
+
+---
+
+# § CABINET-SKILLS-PICKER-HOTFIX — «+ Добавить навык» (**P0, prod 2026-05-28**)
+
+**Симптом (скрин, /cabinet/):** при выбранных тегах модалка показывает **только MARKETING & SMM (~6)**. «Ещё навыки» — пусто. После «Очистить теги» — полный каталог.
+
+**Корень (`rawlead-cabinet.js`):** `openSkillsPicker` → `pickerNiche = catalogCategoryForTag(state.tags[0])` (email_marketing → marketing) + `loadCatalog?category=marketing` + «Ещё навыки» = Tier B **той же** ниши.
+
+**Fix:** s1 `pickerNiche = null` при открытии · s2 always `mode=full` без category · s3 вкладки 4 ниш / все группы · s4 не lock по `tags[0]`.
+
+**Workaround:** навыки на `/lenta/` или «Очистить теги» → выбрать заново.
+
+---
+
+# § FEED-SORT-DD-HOTFIX — закрытие сортировки (**P0**)
+
+**Симптом:** «Сортировка ▾» не закрывается кликом вне (у «Навыки» — закрывается).
+
+**Fix:** `mousedown` на `.rl-filter-sort-dd` как у `.rl-feed-skills-dd` · **v1.7.23**.
+
+---
+
+# § DRAFT-403-UX-HOTFIX — лента vs draft (**P0, prod 2026-05-28**)
+
+**Симптом (скрин владельца):** paid → «Написать отклик» на Kwork-видео → **«Не удалось сгенерировать черновик»**. API: `POST /v1/me/leads/6389/draft` → **403**.
+
+**Корень (Lead verify):**
+
+| # | Факт |
+|---|------|
+| 1 | Карточка показывает **«Совместимость N%»** = `final_rank` (ai×0.6 + km×0.4), **не** `keyword_match` — `rawlead-feed.js` `barPct = perfect ? km : rank` |
+| 2 | Лид 6389: tags `video_editing`, `motion_design` · user Neon: `python`, `web_scraping`, `email_marketing` → **km=0**, ai_score=85 → **final_rank=51** |
+| 3 | Draft: `403 no skill overlap` при km≤0 — корректно по API, **ложно** по UI |
+
+**Fix:**
+
+| # | Задача |
+|---|--------|
+| h1 | Полоса/лейбл: **«Совместимость»** = `keyword_match` %; опционально «Рейтинг» = `final_rank` |
+| h2 | Кнопка «Написать отклик» — **только** если `keyword_match > 0` |
+| h3 | `fetchDraft` 403: **«Нет пересечения с вашими навыками»** |
+| h4 | Theme **v1.7.23** · `deploy-wp-theme-vps.py` |
+
+**Приёмка:** лид без overlap → **нет** кнопки · FL-лид с `python` → draft 200 + tools.
+
+**Workaround владельцу:** карточка с вашим тегом (FL «Telegram-бот» + Python) или добавить `video_editing` в навыки.
+
+# § CABINET-INBOX-O23 — лента vs inbox (**P0, владелец 2026-05-28**)
+
+## Модель (канон)
+
+```
+/lenta/  — единственная лента заказов
+  anon / free:  delay 15 мин, без «Написать отклик»
+  paid:         instant, кнопка «Написать отkлик» на карточке
+
+/cabinet/ — профиль + inbox откликов (НЕ match-feed)
+  навыки, подписка, TG-вход
+  список: лиды, где user нажал «Написать отkлик»
+  действие: удалить из своего ЛК (soft-delete)
+```
+
+| # | Задача | Готово когда |
+|---|--------|--------------|
+| o23-1 | **Neon:** `user_lead_replies` (или аналог): `user_id`, `lead_id`, `reply_draft`, `created_at`, `deleted_at` | UNIQUE (user_id, lead_id) |
+| o23-2 | **`GET /v1/feed`:** без `effective_access` (anon **или** free TG) → `created_at <= now()-15min`; **paid** → без delay | JWT без Stars = gate как anon **✅ владелец** |
+| o23-3 | **`/lenta/` UI:** «Написать отkлик» **только** если paid (JWT + subscription) | free/anon кнопки нет |
+| o23-4 | **`POST …/draft`** на ленте → L2 → **INSERT inbox** + показать черновик | см. § L2-REPLY-SCENARIO |
+| o23-5 | **`GET /v1/me/replies`** (или `/me/inbox`) — список inbox, без deleted | `/cabinet/` только это |
+| o23-6 | **`DELETE /v1/me/replies/{lead_id}`** — soft-delete | карточка исчезает из ЛК |
+| o23-7 | **Убрать** из `/cabinet/`: match-feed, sidebar фильтры ленты (sort/min_match/source) → **перенести на `/lenta/`** для paid при необходимости | O22 фильтры живут на **ленте**, не в ЛК |
+| o23-8 | Навыки: picker остаётся в ЛК **или** перенос на ленту — **минимум:** навыки в профиле ЛК, match-sort на `/lenta/` | согласовать с Design |
+
+**Не в волне:** NEO-BRUTALIST CSS.
+
+---
+
+# § L2-REPLY-SCENARIO — промпт отклика (**O23, владелец**)
+
+**Куда:** `analyze_premium` / отдельный system prompt для cabinet draft · [`docs/ops/AI.md`](../../ops/AI.md) § L2 reply.
+
+**System / instruction (канон, править только с Product):**
+
+```text
+Ты — опытный фрилансер. Твоя задача — написать сопроводительное письмо к заказу.
+
+ПРАВИЛА:
+1. Запрещены клише: «Уважаемый заказчик», «Готов взяться», «Качественно и в срок», «Имею большой опыт».
+2. Тон: уверенный, профессиональный, человечный, без лишней лести. Говори с заказчиком как коллега с коллегой.
+3. Структура: сразу к сути проблемы → короткое техническое решение → вопрос по делу в конце.
+4. Максимум 4–5 предложений. Никаких простыней.
+
+Контекст: ниша и навыки пользователя из profile_excerpt; текст заказа из task_summary.
+```
+
+**Примечание Lead:** пример владельца — «разработчик»; в коде подставлять **нишу** (dev/design/marketing/text) из `user_tags` / category лида.
+
+---
+
+# § FEED-DELAY-O11 — gate 15 мин (**часть O23**, на `/lenta/`)
+
+Объединено с **o23-2**. Anon + free → delay; paid → instant на **`/lenta/`**.
+
+---
+
+# § SITE-FUNCTIONS-WAVE (SFW) — все функции, текущий UI (**P0, владелец 2026-05-28**)
+
+**Цель:** каждая страница **работает** (не 404, не пустышка); ЛК + лента + маркeting + подписка + L2 — end-to-end на prod.
+
+**Не в волне:** NEO-BRUTALIST CSS, продающий rewrite copy (→ Lead PM позже), stress k6.
+
+### Страницы (must work on VPS)
+
+| URL | Функция | Статус / задача |
+|-----|---------|-----------------|
+| `/` | hero, CTA → `/lenta/` + `/cabinet/` | sfw-1 проверить plugin/шаблон |
+| `/lenta/` | feed, навыки, фильтры, sort | ✅ · деплoy v1.7.11 |
+| `/cabinet/` | TG-вход, навыки, match-лента, user bar | ✅ · sfw-2 деплoy |
+| `/how/` | схема «радар → лента → отклик» + CTA | sfw-3 контент из `marketing.php`, не lorem |
+| `/pricing/` | тариф(ы), что входит, CTA «В ЛК» / Stars soon | sfw-4 § 3f-B блок в ЛК + pricing |
+| `/faq/` | accordion / якоря, ссылки footer | sfw-5 |
+| `/contact/` | email/TG/form stub + footer | sfw-6 |
+| footer | how/pricing/faq/contact/lenta/cabinet | sfw-7 все 200 |
+
+**Скрипт страниц:** `scripts/wp-vps-skeleton-pages.py` — после правок theme перезапуск.
+
+### Функции продукта (must work)
+
+| # | Функция | Задача |
+|---|---------|--------|
+| sfw-8 | **L2 по клику** «Написать отклик» | ✅ `POST /v1/me/leads/{id}/draft` · v1.7.14 |
+| sfw-9 | **3f-B** подписка в ЛК | ✅ Lead verify · v1.7.13 |
+| sfw-3…7 | how/faq/contact/pricing/footer | ✅ контент + FAQ `<details>` |
+| sfw-10 | **3f-A4** (опц.) | push match в TG после `/start` — env `MATCH_PUSH=1` |
+| sfw-11 | **Stars заглушка** | `/pricing/` + ЛК: «Оплата Stars скоро»; кнопка disabled или deep link заготовка |
+| sfw-12 | **Commit + деплoy** | theme bump, API restart, `wp-vps-skeleton-pages.py` |
+
+### Приёмка владельца (SFW done) — **→ § SITE-ACCEPT-GATE**
+
+Чеклист перенесён в § **SITE-ACCEPT-GATE** (модель O23). **Design/PM — только после ✅ приёмки** (O20).
+
+---
+
+# § SITE-ACCEPT-GATE — полная приёмка функций сайта (**O20, владелец**)
+
+**Когда:** после деплоя **O23** (и опц. sfw-10). **До этого** — @lead-designer и @lead-product **не стартуют**.
+
+**Где проверять:** [rawlead.ru](https://rawlead.ru) prod · VPN для TG-login из РФ.
+
+**Владелец (#0):** TG-login создаёт `plan=free` — для a5–a6 нужен **beta**. Ops: Neon `UPDATE subscriptions SET plan='owner', is_active=TRUE WHERE user_id=(твой uuid)` · см. `FOR_YOU.md` § Owner beta. **Coder:** auto-grant при `tg_user_id=TELEGRAM_CHAT_ID` → § **OWNER-BETA-GRANT**.
+
+| # | Сценарий | OK когда |
+|---|----------|----------|
+| a1 | Страницы | все **200** |
+| a2 | Guest → TG-login | навыки смержились |
+| **a3–a4** | **Free / anon** | delay 15 мин · **нет** кнопки отклика · **можно на free** |
+| **a5–a6** | **Paid/beta** | instant · кнопка · inbox · **нужен plan owner/beta** |
+| a7–a9 | ЛК, подписка, footer | без match-ленты в ЛК |
+
+**Gate можно закрыть частично:** a3–a4 + a7–a9 на free; a5–a6 после owner beta (или Stars).
+
+**✅ Gate закрыт** → handoff **@lead-designer** (NEO + inbox UI) → **@lead-product** (copy) → **@coder** (финал) → PRE-PROD (O21).
+
+**После gate:** NEO-BRUTALIST CSS, продающий rewrite, TWO-SPEEDS copy/UI — **не раньше**.
+
+---
+
+# § TAGS-V0.3 — каталог навыков и picker (**O24, Product ✅ 2026-05-28**)
+
+**Канон Product:** [`SKILLS_TOOLS_CATALOG.md`](../product/SKILLS_TOOLS_CATALOG.md) **v0.3** — **51 canonical** (Dev 15 · Design 13 · Marketing 12 · Text 11).
+
+**Проблема:** v0.2 перегружен; каша `#ai`/`#automation`; L1 и picker не синхроны.
+
+**Решение:** 4 ниши · Tier A **max 6 на нишу** · **max 6** `user_tags` · **max 6** `lead_tags` (L1) · synonyms internal · `llm_integration`.
+
+## Архитектура
+
+```
+L1 → только 51 canonical → lead_tags (max 6)
+unknown → pending_tags
+picker: ниша (1 из 4) → Tier A (≤6) + **«Ещё навыки»** / развёрнуто **«Свернуть»** (Tier B)
+match: resolve_canonical_tag() + merge v0.2→v0.3
+```
+
+## Tier A по нишам (picker default)
+
+| Ниша | Tier A (6) |
+|------|------------|
+| dev | python, javascript, php, wordpress_dev, telegram_bot_dev, api_integration |
+| design | figma, ui_ux, web_design, logo_design, brand_identity, banner_design |
+| marketing | smm, target_ads, yandex_direct, google_ads, seo, email_marketing |
+| text | copywriting, seo_copywriting, article_writing, translation, technical_writing, editing_proofreading |
+
+**Dev subgroups:** Боты · Веб · ИИ — catalog § subgroup. **Merge:** catalog § merge-таблица v0.2→v0.3.
+
+## Задачи Coder
+
+| # | Задача | Файлы |
+|---|--------|-------|
+| t3-1 | 51 тег v0.3 · synonyms · `_L1_MAX_TAGS = 6` | `src/skills_catalog.py` |
+| **t3-2** | **L1 + AI.md v0.3** — см. § **AI.md v0.3** ниже | `docs/team/architect/AI.md` · `ai_analyze.py` |
+| t3-3 | `PUT /v1/me/tags` max 6 | `api_server.py` |
+| t3-4 | Picker: ниша → Tier A + toggle Tier B; copy **«Ещё навыки»** / **«Свернуть»** (не «редкие») | `page-lenta.php`, `rawlead-feed.js`, `rawlead-cabinet.js` |
+| t3-5 | Map старых `user_tags` → v0.3 | merge-таблица |
+| t3-6 | Карточка: без pending; чипы 3–4 + «+N» | feed JS |
+| t3-7 | Smoke L1 → только canonical из 51 | log |
+
+### § AI.md v0.3 — t3-2 (канон → код)
+
+**Источник:** catalog § «Изменения L1-промпта» + § «Правила категоризации».
+
+| # | Изменение |
+|---|-----------|
+| ai-1 | Пул L1 = **51** canonical (таблица v0.3) |
+| ai-2 | `lead_tags` **max 6** (AI.md + `_L1_MAX_TAGS`) |
+| ai-3 | `ai_integration` → **`llm_integration`** |
+| ai-4 | NEW: `aiogram`, `telethon`, `threed_modeling` |
+| ai-5 | Удалить **18** тегов из merge-таблицы (node_js, laravel, vue_js, sql, ppc, …) |
+| ai-6 | **Правила категоризации** в L1 system (копировать из catalog): ниша обязательна · TG dev vs marketing bot · WP dev vs web_design · 3D explainer vs архвиз стоп · llm без api_integration · scraping vs telethon · таргет vs smm · copy vs seo_copy |
+| ai-7 | Инструменты → `tools_required` (L2), **не** `lead_tags` |
+| ai-8 | L2 tags: **max 6** (согласовать с L1) |
+
+**Приёмка t3-2:** ✅ Lead verify 2026-05-28 · t3-2b ✅ synonyms `openai`/`gpt` → `llm_integration`.
+
+**Приёмка волны TAGS-V0.3:** ✅ Lead verify 2026-05-28 — t3-1…t3-7 · OWNER-BETA-GRANT · theme **v1.7.19**.
+
+---
+
+# § FEED-CARD-UX — просмотры + 100% match (**O25–O26, владелец 2026-05-28**)
+
+**Контекст:** до Design/PM (O20 gate). Социальное доказательство на карточке + акцент идеального совпадения.
+
+## O25 — синтетические просмотры (`display_views`)
+
+**Не real analytics.** Детерминированное поле в API, без Neon.
+
+### O25b — пересмотр формулы (**владелец 2026-05-28**)
+
+**Баг v1:** `base=36` + `min=13` → «только что» + 36 просмотров = палево.
+
+**Принцип:** просмотры **только растут с возрастом** лида; свежий = мало; delay-лента чуть выше **при том же age**, не за счёт огромного base.
+
+#### Связка с `formatTime` (JS)
+
+| Возраст `created_at` | Текст в UI | `display_views` (instant) | + delay-бонус |
+|----------------------|------------|---------------------------|---------------|
+| ≤ 1 мин | «только что» | **1–3** (seed `id%3+1`) | +0 (anon не видит) |
+| 2–5 мин | «N мин назад» | **3–8** | — |
+| 15–60 мин | | **12–28** | **+6…+12** (накопилось пока скрыт) |
+| 1–6 ч | | **28–55** | +6…+12 |
+| 6–24 ч | | **55–85** | |
+| 1–7 д | | **85–130** | |
+| 7d+ | | plateau **130–150** | |
+
+#### Формула (Coder)
+
+```
+age_min = floor((now - created_at) / 60s), bucket 5 min
+salt = lead_id % 7          # +0..6, не ломает монотонность
+rate = 0.9 + (lead_id % 13) / 20   # 0.9..1.55 per lead
+
+views = f(age_min) * rate + salt
+if feed_delayed and age_min >= 15:
+    views += 6 + (lead_id % 5) + int(min(age_min, 120) * 0.08)
+
+# Запреты
+- NO min floor 13
+- age_min <= 1 → max(views, 3) cap сверху
+- age_min <= 1 AND instant → views in 1..3
+- monotonic по age (salt constant per lead)
+- cap 150, plateau 7d
+- _avoid_round() — ok, но не поднимать молодые карточки
+```
+
+#### UI (**без слова «просмотров»**)
+
+| Элемент | Деталь |
+|---------|--------|
+| Разметка | `👁` SVG inline или `.rl-feed-card__views-icon` + число |
+| Текст | только **число** (`36`), не «36 просмотров» |
+| a11y | `aria-label="36 просмотров"` на контейнере |
+| Скрыть | если `display_views < 1` — блок не рендерить |
+| CSS | flex row icon+number, 12px `#71717A`, рядом с временем |
+
+**Файлы:** `src/feed_social.py` · `rawlead-feed.js` · `rawlead-cabinet.js` · `rawlead.css` · theme bump.
+
+### O25 (общие правила)
+
+| Правило | Деталь |
+|---------|--------|
+| Поле | `display_views: int` в `/v1/feed`, `/v1/me/feed` |
+| Стабильность | Один `lead_id` → одно число; bucket 5 мин — refresh не дёргает |
+| Delay | `feed_delayed=true` → **бонус только при age≥15m**, не высокий base на t=0 |
+| Instant paid | молодой лид = **1–3** просмотра, не 36 |
+| Реал | не в БД |
+
+## O26 — highlight при `keyword_match === 100`
+
+| Правило | Деталь |
+|---------|--------|
+| Условие | `keyword_match >= 100` **и** у пользователя ≥1 выбранный навык (guest skills на `/lenta/` или `user_tags` в ЛК) |
+| Класс | `rl-lead-card--perfect-match` |
+| UI | Тонкая рамка `#4F46E5` · лёгкая тень · match-bar fill → `#16A34A` (или accent green) · badge **«Точное совпадение»** (11px pill) |
+| Лента | Сейчас bar = `final_rank` — для highlight смотреть **`keyword_match`**, не `final_rank` |
+| Без навыков | Нет highlight (km=0) |
+
+**Файлы:** `rawlead-feed.js`, `rawlead-cabinet.js`, `rawlead.css` · канон: [`feed-cabinet-mvp.md`](../design/wp/feed-cabinet-mvp.md) §3.1.
+
+## Задачи
+
+| # | Задача | Приёмка |
+|---|--------|---------|
+| f1 | `display_views()` + поле в API | anon lenta > instant при одинаковом age; refresh не меняет число |
+| f2 | Render views на карточке `/lenta/` | видно на prod |
+| f3 | `rl-lead-card--perfect-match` при km=100 | 6/6 tags overlap → badge + стиль |
+| f4 | theme bump + deploy note | v1.7.20+ |
+| **f5** | **O25b** формула + eye icon UI | «только что» → 1–3 · 60m > 15m · без текста «просмотров» |
+
+**Приёмка O25–O26 + O25b:** ✅ Lead verify 2026-05-28 (формула + eye icon · theme v1.7.22).
+
+---
+
+# § PRE-DESIGN-BLOCKERS — до Design/PM (**владелец 2026-05-28**)
+
+**Gate:** O20 Design **⏸** пока не закрыты три пункта ниже + SITE-ACCEPT-GATE a1–a9.
+
+## § L2-TOOLS-FIX — инструменты на карточке (**O27**)
+
+**Симптом:** после «Написать отклик» есть **черновик**, блок **«Инструменты»** пустой / placeholder.
+
+**Корень:**
+
+| # | Факт |
+|---|------|
+| 1 | `POST /v1/me/leads/{id}/draft` → только `analyze_cabinet_reply_draft` (reply), **без** `tools_required` |
+| 2 | `leads.tools_required` пишется только в `pg.update_after_premium` (legacy pipeline), Site L1 lite — **не** заполняет |
+| 3 | `rawlead-feed.js` `renderExpandedBody` — **нет** секции инструментов (в `rawlead-cabinet.js` inbox — есть) |
+
+**Fix:**
+
+| # | Задача |
+|---|--------|
+| t1 | На draft: вызвать **L2 premium** (`analyze_premium` или dedicated L2 tools+reply) → `pg.update_after_premium` + `reply_draft` в `user_lead_replies` |
+| t2 | Ответ API draft: `{ reply_draft, tools_required[] }` — UI обновляет карточку без reload |
+| t3 | `rawlead-feed.js` + inbox: секция «Инструменты» как в cabinet (2–5 пунктов, иначе muted hint) |
+| t4 | `/lenta/` paid: показывать tools **после** L2 (не из L1); anon — без tools/reply (канон `AI.md`) |
+
+**Приёмка:** ✅ Lead verify 2026-05-28 — `analyze_premium` · API `{ tools_required }` · feed/cabinet UI.
+
+---
+
+# § MATCH-PUSH-V2 — всем paid по порогу (**O30, владелец 2026-05-28**)
+
+**Решение владельца:** top-3 глобально **убрать** — части подписчиков push **никогда** не придёт.
+
+**Новая модель:**
+
+| # | Правило |
+|---|---------|
+| m1 | **Каждому** paid/beta (`owner` / `agent`+active, не paused) с `tg_chat_id` + `user_tags` |
+| m2 | Push если `keyword_match(user, lead) ≥ push_min_match` пользователя |
+| m3 | **Default** `push_min_match = 60` · диапазон **30–100** (как O22 min_match) |
+| m4 | **Dedupe** `match_push_log` — без изменений (1 push на user+lead) |
+| m5 | UI: блок «Уведомления» в `/cabinet/` — slider/select 30/40/50/60/70/80/90/100 + toggle «Push в Telegram» (default on) |
+
+**Код:**
+
+| # | Задача |
+|---|--------|
+| c1 | Neon: `users.push_min_match INT DEFAULT 60` + `users.push_enabled BOOL DEFAULT TRUE` (или `user_settings` — минимальный diff) |
+| c2 | `match_push.py`: убрать `_MATCH_PUSH_TOP_K` · фильтр `km >= user.push_min_match` · respect `push_enabled` |
+| c3 | `GET/PATCH /v1/me/notification-settings` (или поля в `/me/subscription`) |
+| c4 | `rawlead-cabinet.js` + copy: «Уведомлять от N% совпадения» |
+| c5 | Обновить `PRODUCT_VISION.md` § «Бот» (top-K → per-user threshold) — @lead-product одна строка |
+
+**Не в v1:** daily cap / rate limit — только если спам на stress; env `MATCH_PUSH_MAX_PER_USER_DAY` опц.
+
+**Приёмка:** 2 paid-user с порогами 60 и 30 · лид km=45 → push только второму · km=70 → обоим · free — ни одному.
+
+---
+
+## § 3f-A4-MATCH-PUSH — уведомления @rawlead_bot (**O28** — superseded § **MATCH-PUSH-V2**)
+
+**Симптом:** бот **не шлёт** match-уведомления подписчикам. `/start` = welcome only, `users.tg_chat_id` **не пишется**, push-кода **нет**.
+
+**Канон:** `PRODUCT_VISION` · per `tg_chat_id` top-K · только `subscriptions.is_active`.
+
+| # | Задача |
+|---|--------|
+| p1 | `/start` (non-admin): upsert `users.tg_chat_id` по `from.id`; deep link `?start=login` → hint «войди в /cabinet/» |
+| p2 | Связка TG↔JWT: если `tg_user_id` уже в Neon после Login Widget — merge `tg_chat_id` на того же user |
+| p3 | **После L1** нового visible lead (Site): найти users с `tg_chat_id`, `is_active`, `keyword_match>0` по `user_tags` → sendMessage (top-K=3, dedupe по lead_id/day) |
+| p4 | Текст push: заголовок · match% · 1 строка summary · кнопка URL `/lenta/` или deep link |
+| p5 | Env `MATCH_PUSH=1` (default off в dev); rate limit; log `push:match:user=… lead=…` |
+| p6 | **Не** слать на free без Stars после O29; до Stars — owner beta + `MATCH_PUSH=1` для теста |
+
+**Приёмка:** ✅ Lead verify 2026-05-28 — код ok · **prod smoke** после деплoy + `MATCH_PUSH=1` + Neon `009`.
+
+---
+
+## § 3f-C-STARS — оплата (**O12 → P0, O29**)
+
+**Сейчас:** заглушка `stars_available: false`, кнопка disabled «скоро».
+
+**Поднять приоритет** — владелец: «прикрутить нормально» **до Design**.
+
+| # | Задача | Статус |
+|---|--------|--------|
+| s1 | Bot API: `sendInvoice` / Stars (XTR) · один тариф «ИИ-агент» 590–990 ₽ экв. | **✅** |
+| s2 | `pre_checkout_query` + `successful_payment` handler в bot poll | **✅** |
+| s3 | Neon: `subscriptions.plan`, `is_active`, `active_until` после оплаты | **✅** |
+| s4 | `GET /v1/me/subscription` → `stars_available: true` когда бот настроен | **✅** |
+| s5 | UI `/cabinet/` + `/pricing/`: живая кнопка «Оплатить Stars» → invoice / deep link | **✅** |
+| s6 | После оплаты: instant feed + «Написать отkлик» + MATCH_PUSH eligible | **✅** |
+
+**Не делать:** ЮKassa · несколько тарифов.
+
+**Ops владельца:** BotFather Stars для @rawlead_bot · webhook/poll на VPS.
+
+---
+
+# § LK-FEED-FILTERS — ✅ Lead verify 2026-05-28
+
+**Принято:** lk-1…lk-5 · `_passes_min_match` · theme **v1.7.14**.
+
+| # | Lead verify |
+|---|-------------|
+| lk-1 | sort match\|time + `sessionStorage` `rawlead_cabinet_sort` |
+| lk-2 | chips 30–100 + «Любая» (= overlap>0) |
+| lk-3 | API скрывает `keyword_match=0` |
+| lk-4 | карточка: `keyword_match` % |
+| lk-5 | `min_match` в `/v1/me/feed` + WP REST |
+
+**Деплoy:** theme v1.7.14 + API restart (sync `src/api_server.py`, `ai_analyze.py`).
+
+---
+
+
+**Не сейчас.** Copy/UI — Product § **TWO-SPEEDS-COPY**, Design § **TWO-SPEEDS-UI**.
+
+| # | Задача |
+|---|--------|
+| o11-1 | `GET /v1/feed` (anon): `created_at <= NOW() - interval '15 minutes'` или param `feed_tier=free` |
+| o11-2 | `GET /v1/me/feed` + paid JWT: **без** задержки |
+| o11-3 | Push TG (3f-A4): только paid / effective_access |
+| o11-4 | UI strip `.rl-feed-delay-notice` — после copy-волны PM |
+
+---
+
+
+Принято. Neon `007_subscriptions_status.sql` + theme **v1.7.13** + API restart.
+
+---
+
+# § LK-UX-POLISH — ✅ Lead verify 2026-05-28
+
+Принято. Деплой theme **v1.7.11** + API `photo_url` на VPS.
+
+**3f-A2 ✅:** L2 on-demand через `POST …/draft` (sfw-8) · v1.7.14.
+
+# § L3-DEPLOY-PROD — ✅ 2026-05-28
+
+
+**Код L3 ✅ Lead verify.** На VPS ещё **v1.7.8**, API без `mode=full`, в wp-config **нет** `RAWLEAD_TG_BOT_ID`.
+
+**@rawlead_bot id (владелец):** `8989158953`
+
+| # | Задача |
+|---|--------|
+| d1 | **Commit** uncommitted L3: theme v1.7.10, `api_server.py`, `purge_old_leads.py`, systemd timer, docs |
+| d2 | **VPS wp-config** `/var/www/rawlead.ru/wp-config.php`: `define('RAWLEAD_TG_BOT_ID', '8989158953');` (+ `RAWLEAD_TG_BOT_USERNAME`, `RAWLEAD_API_URL` если нет) |
+| d3 | **`.env.site` на VPS** (если пусто): `TELEGRAM_BOT_USER_ID=8989158953` — для radar/tg chain, не путать с `TELEGRAM_CHAT_ID` |
+| d4 | Деплой: `scripts/deploy-wp-theme-vps.py` · `systemctl restart rawlead-api` · опц. `rawlead-purge-leads.timer` |
+| d5 | **Проверка:** `GET http://127.0.0.1:8000/v1/skills/catalog?mode=full&limit=5` → skills > 0; `/cabinet/` → `rawleadCabinet.tgBotId` = 8989158953 в view-source/config |
+| d6 | BotFather `/setdomain` → `rawlead.ru` — напомнить владельцу если не сделано |
+
+**Не коммитить:** `.env`, credentials, `data/vps-staging/`.
+
+**Приёмка:** rawlead.ru/cabinet/ с VPN → fallback redirect открывается; «Добавить навык» → полный каталог.
 
 # § CABINET-PROD-LOGIN (L1) — вход на rawlead.ru (**P0, владелец 2026-05-28**)
 
@@ -42,6 +537,54 @@
 | l2-4 | Главная `/` — не пустая (hero + CTA лента + вход ЛК) |
 
 **Файлы:** `inc/marketing.php`, `template-parts/`, новые `page-*.php` или блоки Kadence.
+
+# § CABINET-SKILLS-PICKER (L3) — навыки в ЛК (**владелец 2026-05-28**)
+
+**Запрос:** «+ Добавить навык» → **modal с поиском**, не `window.prompt`. Список — **весь L1 canonical pool** (то же, откуда ИИ берёт `lead_tags`), а не только теги из уже попавших в Neon заказов. Окно открывается **сверху страницы** (не bottom sheet снизу).
+
+**Источник данных (канон):**
+
+| Слой | Файл |
+|------|------|
+| Product | [`SKILLS_TOOLS_CATALOG.md`](../product/SKILLS_TOOLS_CATALOG.md) |
+| L1 промпт | [`AI.md`](AI.md) — `lead_tags` только из canonical_tag пула |
+| Код | `src/skills_catalog.py` → `build_catalog_groups()` |
+
+**Copy (наружу, не «тег»):**
+
+| Было | Стало |
+|------|--------|
+| «+ Добавить тег» | **«+ Добавить навык»** |
+| prompt | modal + поиск |
+| «Удалить тег» | **«Убрать навык»** |
+
+| # | Задача |
+|---|--------|
+| l3-1 | **UI ЛК:** кнопка → modal; **anchor top** — панель под шапкой, `border-radius` снизу; **desktop + mobile** одинаково сверху (убрать mobile `bottom: 0` у `.rl-cabinet-skills-modal__panel`) |
+| l3-2 | **API `GET /v1/skills/catalog`:** для ЛK/выбора навыков — **статический полный каталог** `build_catalog_groups(ui_only=False)` — Tier A **+** Tier B, все 4 category (dev/design/marketing/text); опц. query `?mode=full` vs `?mode=popular` (лента — popular из lead_tags, ЛК — full) |
+| l3-3 | Не свободный текст — только выбор из каталога |
+| l3-4 | Сохранение — `PUT /v1/me/tags` (canonical_tag) |
+| l3-5 | Copy «тег» → «навык» на `/lenta/` если осталось |
+| l3-6 | Группы по category + title_ru; поиск по title + synonyms |
+| l3-7 | **Console:** `console.log("%c▲ RawLead Architecture by Rode51 ▲", "color:#00ff00;font-size:16px;font-weight:bold;");` в feed + cabinet |
+
+**Файлы:** `src/api_server.py`, `src/skills_catalog.py`, `assets/js/rawlead-cabinet.js`, `assets/css/rawlead.css`, `page-cabinet.php`.
+
+**Приёмка:** ЛК → «Добавить навык» → окно **сверху** → видны python/figma/seo и пр. **даже если таких заказов ещё не было в ленте** → выбрал → chip → match обновился.
+
+# § RETENTION-7D — очистка Neon (**O16, владелец 2026-05-28**)
+
+**Запрос:** не засорять БД — удалять данные **старше 7 дней**.
+
+| # | Задача |
+|---|--------|
+| r1 | **Scope:** `DELETE FROM leads WHERE created_at < now() - interval '7 days'` — user_tags/users/subscriptions **не трогать** |
+| r2 | Скрипт `scripts/purge_old_leads.py` — `--dry-run` / `--apply`; лог count |
+| r3 | Cron на VPS: daily (systemd timer или `@daily` rawlead user) **после** stress |
+| r4 | `/v1/feed` — если ещё нет фильтра: `created_at >= now() - 7 days` в query |
+| r5 | **Не удалять:** users, user_tags, subscriptions, settings |
+
+**⚠️ Product:** 7 дней = короткий архив; если нужна лента «30 дней» — владелец уточнит. Сейчас **7d по слову владельца**.
 
 # § 3f-C-STARS — оплата Telegram Stars (**O12, после 3f-A**)
 
@@ -115,9 +658,23 @@
 
 **Файлы (ориентир):** `src/telegram_control.py`, `src/bot_poll.py`, `scripts/tg_main.py`, `deploy/radar-ctl.sh` (новый), `docs/ops/DEPLOY_VPS.md`.
 
-**Не делать:** отдавать root shell в бот; admin-кнопки в WebApp ЛК.
+**Не делать:** отдавать root shell в bот; admin-кнопки в WebApp ЛК.
 
-# § LEGACY-SELF-STOP — ▶ гасится через ~15 с (**владелец 2026-05-28**)
+### b3-HOTFIX — ▶ после 🛑 не поднимает unit (**инцидент 2026-05-28**)
+
+**Симптом:** 🛑 → `rawlead-radar` = **failed/inactive**; ▶ пишет «Site активен», ℹ показывает «▶ Ingest: активен (systemd: не проверялся)», лента не обновляется.
+
+**Корень:** `systemctl is-active` на stopped/failed unit → **exit ≠ 0** → `_run_radar_ctl(status)` = `(False, …)` → ветка `start` **пропускается** → только `set_radar_paused(False)`.
+
+| # | Задача |
+|---|--------|
+| b3-h1 | `_run_radar_ctl status`: считать `inactive`/`failed`/`dead` валидным ответом (не ошибка sudo) |
+| b3-h2 | `_ACTION_RESUME`: если state ≠ `active` → **всегда** `start`, даже когда status-check «failed» |
+| b3-h3 | `_format_ingest_state_line`: при `unit_state is None` **не** писать «активен» — «⚠ systemd: не удалось проверить» |
+| b3-h4 | Приёмка: 🛑 → ▶ → `is-active` = active + `радар:старт` в логе |
+
+**Workaround ops:** `sudo /opt/rawlead/deploy/radar-ctl.sh start site` на VPS.
+ — ▶ гасится через ~15 с (**владелец 2026-05-28**)
 
 **Симптом:** Legacy ▶ → лампа «Neon» зелёная секунды → снова **■**; `radar_legacy.log` — пачка `neon:старт`, мало `neon:цикл`.
 
@@ -401,6 +958,8 @@
 **Не в этой задаче:** multi-user маркетинг, freemium 3q, несколько тарифов, оферта/ИП (владелец).
 
 **Проверка владельца (A):** Site ▶ + API ▶ → зайти на `/cabinet/` → выбрать навыки → увидеть match → «Написать отклик» → черновик ≠ пустой.
+
+**⚠️ OWNER-BETA-GRANT:** TG-login создаёт `plan=free`. Ops: Neon `UPDATE subscriptions SET plan='owner', is_active=TRUE` для uuid владельца. Coder: auto-grant если `tg_user_id == TELEGRAM_CHAT_ID`.
 
 **Сдача:** `STATUS.md` § 3f-OWNER-BETA · Product сверяет copy тарифа.
 
@@ -1594,11 +2153,42 @@ CSS: сетка 4 карточки desktop (2×2), mobile 1 col — соглас
 
 ---
 
-# § PRE-PROD-STRESS — стресс на хосте перед трафиком (**→ после § P5**, владелец 2026-05-27)
+# § PRE-PROD-UX-AUDIT — «ИИ-тестировщик», один прогон (**→ после O20 волна 4**, O21)
 
-**Канон ворот:** [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) § PRE-PROD-STRESS (S1–S5).
+**Решение владельца 2026-05-28:** перед трафиком — **один** автопроход по всему сайту: протыкать страницы, поймать баги и неудобства. **После** дизайнера + PM copy + финал Coder. **Не** параллельно SFW.
 
-**Когда:** деплой на VPS/хостинг **готов**, URL открывается, **рекламы ещё нет**.
+**Канон:** [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) § PRE-PROD · критерий **S2**.
+
+**База уже есть:** `scripts/preprod_playwright/smoke.py` (5 сценариев) — **расширить**, не дублировать.
+
+## Задачи
+
+| # | Готово когда |
+|---|----------------|
+| u1 | `scripts/preprod_playwright/ux_audit.py` — обход URL: `/`, `/lenta/`, `/cabinet/`, `/how/`, `/pricing/`, `/faq/`, `/contact/` |
+| u2 | На каждой: header/footer links 200; клик CTA (лента, ЛК, pricing→cabinet); mobile viewport 390×844 |
+| u3 | Сбор: console errors, failed network (4xx/5xx), скриншоты → `data/preprod_ux_audit/` |
+| u4 | JSON `data/preprod_ux_audit.json` — список findings (severity: critical/warn/info) |
+| u5 | Markdown `data/preprod_ux_audit.md` — human summary; опц. LLM pass (OpenRouter) по JSON+скринам: «удобство, мёртвые кнопки, регресс UX» |
+| u6 | `docs/ops/PREPROD_STRESS_RUN.md` § UX-audit — команда запуска, порог S2 |
+
+**Запуск (prod, один раз):**
+
+```powershell
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_audit.py --base-url https://rawlead.ru
+```
+
+**PASS S2:** 0 critical; все footer URL 200; отчёт приложен к STATUS § PRE-PROD.
+
+**Не в задаче:** бесконечный CI; повтор только после крупного деплоя или перед рекламой.
+
+---
+
+# § PRE-PROD-STRESS — нагрузка + smoke (**→ после § PRE-PROD-UX-AUDIT**, O21)
+
+**Канон ворот:** [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) § PRE-PROD-STRESS (S1, S3–S6).
+
+**Когда:** финальный деплой на prod готов, **дизайн+copy влиты**, рекламы ещё нет.
 
 ## Задачи
 

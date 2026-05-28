@@ -18,6 +18,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 from bot_poll import try_poll_commands  # noqa: E402
 from config import (  # noqa: E402
     apply_profile_argv,
+    bot_poll_external,
     load_config,
     load_radar_env,
     load_tg_monitor_config,
@@ -187,8 +188,10 @@ async def _loop() -> None:
     mark_tg_monitor_started(storage)
     reset_tg_session_stats(storage, telethon_monitor_accounts())
 
-    poll_task = asyncio.create_task(_bot_poll_loop(cfg, storage, log_path))
-    beat_task = asyncio.create_task(_heartbeat_loop(cfg, storage, log_path))
+    tasks: list[asyncio.Task] = []
+    if not bot_poll_external():
+        tasks.append(asyncio.create_task(_bot_poll_loop(cfg, storage, log_path)))
+    tasks.append(asyncio.create_task(_heartbeat_loop(cfg, storage, log_path)))
 
     await _ensure_proxies_live(log_path, tg_cfg)
 
@@ -207,8 +210,8 @@ async def _loop() -> None:
                 )
                 await _ensure_proxies_live(log_path, tg_cfg)
     finally:
-        poll_task.cancel()
-        beat_task.cancel()
+        for task in tasks:
+            task.cancel()
         _release_single_instance()
 
 

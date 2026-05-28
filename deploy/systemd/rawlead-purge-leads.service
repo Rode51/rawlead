@@ -1,0 +1,14 @@
+[Unit]
+Description=RawLead purge leads older than 7 days
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=rawlead
+WorkingDirectory=/opt/rawlead
+EnvironmentFile=/opt/rawlead/.env
+ExecStart=/opt/rawlead/.venv/bin/python scripts/purge_old_leads.py --apply
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

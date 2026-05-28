@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RawLead Landing
  * Description: Скелет страниц RawLead (Local): home, how, pricing, faq, contact + меню.
- * Version: 0.3.0
+ * Version: 0.3.1
  * Author: RawLead
  * Text Domain: rawlead-landing
  */

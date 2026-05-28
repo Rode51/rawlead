@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,7 +14,14 @@ import requests
 from budget import display_budget_text
 from config import DIRECT_REQUESTS_PROXIES, Config
 from rank import normalize_tags
-from skills_catalog import allowed_tags_prompt_block, partition_lead_tags
+from skills_catalog import (
+    CANONICAL_TAGS,
+    _L1_MAX_TAGS,
+    allowed_tags_prompt_block,
+    partition_lead_tags,
+)
+
+logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _PROFILE_PATH = _PROJECT_ROOT / "docs" / "ops" / "PROFILE.md"
@@ -118,7 +126,7 @@ time_for_client — срок заказчику с запасом
 money — «На бирже: … | Рынок: … | Старт отклика: …»
 reply_draft — «Брать»: стремись к 4–8 предл., «Здравствуйте. Готов реализовать…», цена «от …» · «Сомнительно»: стремись к 2–4 предл., «Сделаю…»/«Возьму…», без канцелярита · «МИМО»: "" · длина вне диапазона — всё равно заполни текст, не обнуляй
 risks — лимиты Cursor, расходники не оплатит заказчик, бан Telethon, scope creep
-lead_tags — массив 3–8 навыков lowercase без # (python, fastapi, wordpress, парсер, telegram bot, excel); при МИМО — []
+lead_tags — max 6 canonical_tag из SKILLS_TOOLS_CATALOG v0.3 (51 тег); при МИМО — []
 
 reply_draft ЗАПРЕЩЕНО: Cursor, ИИ, нейросеть, ChatGPT, Gemini, AI, агент, промпт.
 
@@ -170,6 +178,17 @@ class AiAnalysis:
 def load_profile_text(path: Path | None = None) -> str:
     p = path or _PROFILE_PATH
     return p.read_text(encoding="utf-8")
+
+
+def build_cabinet_profile_excerpt(user_tags: dict[str, float]) -> str:
+    """O23: навыки + ниша для on-demand L2 на /lenta/."""
+    tags = ", ".join(sorted(user_tags.keys())) if user_tags else "не указаны"
+    return (
+        f"Навыки пользователя: {tags}.\n"
+        "Подставь нишу (разработка / дизайн / маркетинг / тексты) по навыкам и заказу.\n"
+        "Пиши от первого лица. "
+        "Без упоминания ИИ, Cursor, ChatGPT, Gemini, нейросеть, агент, промпт."
+    )
 
 
 def build_profile_excerpt(path: Path | None = None) -> str:
@@ -428,8 +447,8 @@ def _parse_analysis(data: dict[str, Any], *, budget_text: str) -> AiAnalysis:
         lead_tags = tuple(normalize_tags([str(t) for t in raw_tags]))
     else:
         lead_tags = ()
-    if not skip_like and lead_tags and (len(lead_tags) < 3 or len(lead_tags) > 8):
-        lead_tags = lead_tags[:8]
+    if not skip_like and lead_tags and len(lead_tags) > _L1_MAX_TAGS:
+        lead_tags = lead_tags[:_L1_MAX_TAGS]
 
     raw_tools = data.get("tools_required", data.get("tools", []))
     tools = _normalize_tools_required(raw_tools)
@@ -503,28 +522,41 @@ def _log_ai_failure(
 
 
 # Канон: docs/team/architect/AI.md § L1/L2 «Тексты system»
-_LITE_SYSTEM = (
-    """Ты — фильтр фриланс-заказов для ленты RawLead (Digital: код, дизайн, маркетинг, тексты).
+_LITE_SYSTEM_HEAD = """Ты — фильтр фриланс-заказов для ленты RawLead (Digital: код, дизайн, маркетинг, тексты).
 
 Верни один JSON без markdown:
 verdict — «Брать» | «Сомнительно» | «МИМО»
 task_summary — 1–2 предложения: что нужно сделать простым языком (не копипаста описания)
-lead_tags — 3–5 canonical_tag из разрешённого списка (см. ниже); при МИМО — []
+lead_tags — max 6 canonical_tag из разрешённого списка v0.3 (51 тег); при МИМО — []
 ai_reasons — массив 2–3 коротких строк «почему такой verdict»
 
-МИМО: Figma/чистый фронт, 1С, mobile с нуля, накрутки, крипта, инфобиз, дипломы, нет бюджета.
+Правила категоризации (теги из одной ниши, кроме cross_niche):
+- Ниша обязательна: dev / design / marketing / text — при сомнении ближайшая, не пусто
+- Telegram-бот: разработка → telegram_bot_dev (dev); воронка/рассылка в TG → chatbot_marketing (marketing)
+- WordPress: тема/плагин/код → wordpress_dev (dev); «сайт на WP» без кода → web_design (design)
+- 3D: персонаж/explainer/лого 3D → threed_modeling (design); архвиз/интерьер/ландшафт → МИМО, не тегировать
+- ИИ: openai/gpt/claude/langchain/llm → только llm_integration (не api_integration одновременно); max 1 ИИ-тег
+- Парсинг: сайты/данные → web_scraping (dev); юзербот/парсер Telegram → telethon (dev)
+- Таргет vs SMM: «таргет/директ/ads» → target_ads или yandex_direct/google_ads; «вести соцсети» → smm
+- Копирайт vs SEO: без SEO → copywriting; явно SEO-текст → seo_copywriting
+- Инструменты (Figma, Photoshop, After Effects…) → НЕ в lead_tags (это L2 tools_required)
+
+Границы: text ≠ 3D/Blender/видеомонтаж (design); dev ≠ нейминг/описания товаров (text/marketing).
+Только canonical_tag из пула; синонимы → canonical; не из пула — не добавляй (не ai, не automation, не #ai).
+
+МИМО: Figma/чистый фронт, 1С, mobile с нуля, накрутки, крипта, инфобиз, дипломы, нет бюджета, архвиз 3D.
 Брать: парсеры, TG-боты, Python-автоматизация, правки бэкенда 1–2 файла.
 Сомнительно: между Брать и МИМО.
 
-Не выводи reply_draft, approach, money, risks."""
-    + allowed_tags_prompt_block()
-)
+Не выводи reply_draft, approach, money, risks, tools_required."""
+
+_LITE_SYSTEM = _LITE_SYSTEM_HEAD + allowed_tags_prompt_block()
 
 _PREMIUM_SPLIT_SYSTEM = """Ты — ИИ-архитектор фриланс-заказов (L2 premium) для Telegram-уведомления
 
 Заказ уже отфильтрован — verdict «Брать» (блок L1). Не меняй verdict, не переспрашивай и не копируй task_summary; в work_summary не дублируй L1 — только развёрнутый смысл для исполнителя.
 
-Дай: work_summary (2–4 предл.), tools_required (массив 2–5 инструментов lowercase, конкретно для этого заказа), difficulty, approach (ровно 2 предл.), time_for_client, money («На бирже: … | Рынок: … | Старт отклика: …»), risks, reply_draft, lead_tags (дополни теги из L1 до 3–8, не переписывай список с нуля).
+Дай: work_summary (2–4 предл.), tools_required (массив 2–5 инструментов lowercase, конкретно для этого заказа — не дублируй как lead_tags), difficulty, approach (ровно 2 предл.), time_for_client, money («На бирже: … | Рынок: … | Старт отклика: …»), risks, reply_draft, lead_tags (дополни теги из L1 до max 6 canonical v0.3, не переписывай список с нуля).
 
 Стек: Python (FastAPI, Telethon, aiogram 3), Neon, WordPress. Cursor Agent + Sandbox; сложные API — Gemini Deep Research → выжимка → @file в Cursor. Расходники платит заказчик.
 
@@ -532,6 +564,20 @@ JSON без markdown: work_summary, tools_required, difficulty, approach, time_f
 Не выводи verdict, task_summary, ai_reasons.
 
 reply_draft: 2–4 предложения, начало «Сделаю…» / «Возьму…»; разговорный, без воды, «как ты решишь». ЗАПРЕЩЕНО в reply_draft: Cursor, ИИ, нейросеть, ChatGPT, Gemini, AI, агент, промпт, «Здравствуйте. Готов реализовать»."""
+
+# O23 / L2-REPLY-SCENARIO — on-demand отклик на /lenta/ (канон Product)
+_CABINET_REPLY_SYSTEM = """Ты — опытный фрилансер. Твоя задача — написать сопроводительное письмо к заказу.
+
+ПРАВИЛА:
+1. Запрещены клише: «Уважаемый заказчик», «Готов взяться», «Качественно и в срок», «Имею большой опыт».
+2. Тон: уверенный, профессиональный, человечный, без лишней лести. Говори с заказчиком как коллега с коллегой.
+3. Структура: сразу к сути проблемы → короткое техническое решение → вопрос по делу в конце.
+4. Максимум 4–5 предложений. Никаких простыней.
+
+Контекст: ниша и навыки пользователя из profile_excerpt; текст заказа из task_summary.
+
+JSON без markdown: reply_draft.
+ЗАПРЕЩЕНО в reply_draft: Cursor, ИИ, нейросеть, ChatGPT, Gemini, AI, агент, промпт."""
 
 _PREMIUM_SPLIT_FIELDS = (
     "work_summary",
@@ -587,6 +633,11 @@ def _parse_lite_analysis(data: dict[str, Any]) -> AiLiteAnalysis:
         known, pending = partition_lead_tags([str(t) for t in raw_tags])
         lead_tags = known
         pending_tags = pending
+        if pending_tags:
+            logger.warning("L1 smoke: pending_tags=%s", list(pending_tags)[:6])
+        bad = [t for t in lead_tags if t not in CANONICAL_TAGS]
+        if bad:
+            logger.warning("L1 smoke: non-canonical lead_tags=%s", bad[:6])
     else:
         lead_tags = ()
         pending_tags = ()
@@ -847,6 +898,7 @@ def analyze_premium(
     url: str,
     lite: AiLiteAnalysis | None = None,
     profile_path: Path | None = None,
+    profile_excerpt: str | None = None,
     timeout_sec: float = _DEFAULT_TIMEOUT_SEC,
     errors: list[str] | None = None,
     log_prefix: str = "",
@@ -856,7 +908,7 @@ def analyze_premium(
         return None
 
     desc, truncated = _truncate_description(description)
-    excerpt = build_profile_excerpt(profile_path)
+    excerpt = profile_excerpt if profile_excerpt is not None else build_profile_excerpt(profile_path)
     budget_for_prompt = display_budget_text(
         budget_text,
         is_telegram="t.me" in (url or "").casefold(),
@@ -896,6 +948,76 @@ def analyze_premium(
             )
             note_ai_l2_call()
             return result
+        except (
+            AiAnalyzeError,
+            requests.RequestException,
+            json.JSONDecodeError,
+            ValueError,
+        ) as exc:
+            last_exc = exc
+            if attempt == 0:
+                continue
+
+    if last_exc is not None:
+        _log_ai_failure(errors, log_prefix, last_exc)
+    return None
+
+
+def _build_cabinet_reply_user(
+    *,
+    title: str,
+    budget_text: str,
+    lite: AiLiteAnalysis,
+) -> str:
+    return (
+        f"Заголовок: {title.strip()}\n"
+        f"Бюджет: {budget_text.strip()}\n\n"
+        f"Суть заказа (task_summary):\n{lite.task_summary.strip()}\n\n"
+        "Верни JSON: reply_draft — сопроводительное письмо от первого лица."
+    )
+
+
+def analyze_cabinet_reply_draft(
+    cfg: Config,
+    *,
+    title: str,
+    budget_text: str,
+    lite: AiLiteAnalysis,
+    profile_excerpt: str,
+    timeout_sec: float = _DEFAULT_TIMEOUT_SEC,
+    errors: list[str] | None = None,
+    log_prefix: str = "",
+) -> str | None:
+    """O23: L2-REPLY-SCENARIO — только reply_draft для inbox."""
+    if not cfg.ai_active or cfg.ai_provider != "openrouter":
+        return None
+    if not (lite.task_summary or "").strip():
+        return None
+
+    budget_for_prompt = display_budget_text(budget_text, is_telegram=False)
+    system = _CABINET_REPLY_SYSTEM + "\n\n" + profile_excerpt
+    user = _build_cabinet_reply_user(
+        title=title,
+        budget_text=budget_for_prompt,
+        lite=lite,
+    )
+    use_model = cfg.ai_model_premium.strip()
+
+    last_exc: BaseException | None = None
+    for attempt in range(2):
+        try:
+            raw = _openrouter_chat(
+                cfg,
+                model=use_model,
+                system=system,
+                user=user,
+                timeout_sec=timeout_sec,
+                json_mode=True,
+            )
+            data = _extract_json_object(raw)
+            draft = _validate_reply_draft_maybe(str(data.get("reply_draft", "")).strip())
+            note_ai_l2_call()
+            return draft
         except (
             AiAnalyzeError,
             requests.RequestException,

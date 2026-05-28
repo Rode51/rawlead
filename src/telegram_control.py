@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 
 import requests
 
-from config import Config, telegram_requests_proxies
+from config import Config, _PROJECT_ROOT, telegram_requests_proxies
 from radar_status import format_status_message
 from storage import ProjectStorage
+from match_push import upsert_subscriber_chat_id
+from stars_billing import (
+    answer_pre_checkout,
+    handle_successful_payment,
+    send_stars_invoice,
+    stars_available,
+)
 from tg_chain_log import log_relay_api_call
 from tg_relay_allowlist import (
     account_for_user_id,
@@ -22,14 +31,33 @@ _TELEGRAM_BOT_IN_PATH = re.compile(r"(/bot)[^/\s]+(/)")
 _PAUSE_CMDS = frozenset({"/pause", "/стоп"})
 _RESUME_CMDS = frozenset({"/resume", "/старт"})
 _STATUS_CMDS = frozenset({"/status"})
+_STOP_RADAR_CMDS = frozenset({"/stop-radar", "/stop_radar"})
+_START_CMD = "/start"
 
 BTN_PAUSE = "⏸ Пауза"
 BTN_RESUME = "▶ Старт"
+BTN_STOP = "🛑 Стоп"
 BTN_STATUS = "ℹ Статус"
 
 _ACTION_PAUSE = "pause"
 _ACTION_RESUME = "resume"
 _ACTION_STATUS = "status"
+_ACTION_STOP_HARD = "stop_hard"
+
+_WELCOME_SUBSCRIBER = (
+    "RawLead — лента заказов для фрилансеров.\n"
+    "Сайт: https://rawlead.ru/lenta/\n"
+    "Match-уведомления включены после /start."
+)
+_WELCOME_LOGIN = (
+    "RawLead — войдите в кабинет на сайте:\n"
+    "https://rawlead.ru/cabinet/"
+)
+_STARS_HINT = (
+    "Оплата подписки — Telegram Stars.\n"
+    "Нажмите /pay или кнопку «Оплатить Stars» в кабинете."
+)
+_NO_ACCESS = "Нет доступа."
 
 
 class TelegramControlError(RuntimeError):
@@ -40,15 +68,50 @@ def _mask_token(s: str) -> str:
     return _TELEGRAM_BOT_IN_PATH.sub(r"\1***MASKED***\2", s)
 
 
+def _admin_user_ids() -> frozenset[int]:
+    raw = os.environ.get("TELEGRAM_ADMIN_USER_IDS", "").strip()
+    if not raw:
+        return frozenset()
+    out: set[int] = set()
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.add(int(part))
+        except ValueError:
+            continue
+    return frozenset(out)
+
+
+def is_radar_admin(user_id: int | None, chat_id: int | None, cfg: Config) -> bool:
+    """Admin = TELEGRAM_CHAT_ID (+ опц. TELEGRAM_ADMIN_USER_IDS)."""
+    owner_chat = cfg.telegram_chat_id.strip()
+    if not owner_chat or chat_id is None:
+        return False
+    if str(chat_id).strip() != owner_chat:
+        return False
+    allowed_users = _admin_user_ids()
+    if not allowed_users:
+        return True
+    if user_id is None:
+        return False
+    return int(user_id) in allowed_users
+
+
 def _reply_keyboard_markup() -> str:
     markup = {
         "keyboard": [
             [{"text": BTN_PAUSE}, {"text": BTN_RESUME}],
-            [{"text": BTN_STATUS}],
+            [{"text": BTN_STOP}, {"text": BTN_STATUS}],
         ],
         "resize_keyboard": True,
     }
     return json.dumps(markup, ensure_ascii=False, separators=(",", ":"))
+
+
+def _remove_keyboard_markup() -> str:
+    return json.dumps({"remove_keyboard": True}, separators=(",", ":"))
 
 
 def _normalize_command(text: str) -> str:
@@ -70,10 +133,14 @@ def _resolve_action(text: str) -> str | None:
         return _ACTION_RESUME
     if cmd in _STATUS_CMDS:
         return _ACTION_STATUS
+    if cmd in _STOP_RADAR_CMDS:
+        return _ACTION_STOP_HARD
     if s == BTN_PAUSE:
         return _ACTION_PAUSE
     if s == BTN_RESUME:
         return _ACTION_RESUME
+    if s == BTN_STOP:
+        return _ACTION_STOP_HARD
     if s == BTN_STATUS:
         return _ACTION_STATUS
     return None
@@ -201,7 +268,7 @@ def _relay_allowlisted_message(
         return False
 
     text = message.get("text")
-    if isinstance(text, str) and text.strip() == "/start":
+    if isinstance(text, str) and text.strip().casefold().startswith(_START_CMD):
         return False
 
     acc = account_for_user_id(user_id) or ""
@@ -217,31 +284,25 @@ def _relay_allowlisted_message(
     return ok
 
 
-def _authorized_chat_id(message: dict, cfg: Config) -> bool:
-    chat = message.get("chat")
-    if not isinstance(chat, dict):
-        return False
-    chat_id = chat.get("id")
-    if chat_id is None:
-        return False
-    return str(chat_id).strip() == cfg.telegram_chat_id.strip()
-
-
-def _send_message(
+def _send_to_chat(
     cfg: Config,
+    chat_id: int | str,
     text: str,
     *,
-    with_keyboard: bool = True,
+    with_admin_keyboard: bool = False,
+    remove_keyboard: bool = False,
     timeout_sec: float = 20.0,
 ) -> None:
     proxies = telegram_requests_proxies(cfg)
     api_url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/sendMessage"
     data: dict[str, str | bool] = {
-        "chat_id": cfg.telegram_chat_id.strip(),
+        "chat_id": str(chat_id).strip(),
         "text": text,
     }
-    if with_keyboard:
+    if with_admin_keyboard:
         data["reply_markup"] = _reply_keyboard_markup()
+    elif remove_keyboard:
+        data["reply_markup"] = _remove_keyboard_markup()
     try:
         session = requests.Session()
         session.trust_env = False
@@ -280,19 +341,90 @@ def _send_message(
         raise TelegramControlError(f"sendMessage: {desc}")
 
 
+def _send_message(
+    cfg: Config,
+    text: str,
+    *,
+    with_keyboard: bool = True,
+    timeout_sec: float = 20.0,
+) -> None:
+    _send_to_chat(
+        cfg,
+        cfg.telegram_chat_id.strip(),
+        text,
+        with_admin_keyboard=with_keyboard,
+        timeout_sec=timeout_sec,
+    )
+
+
+def _radar_ctl_script() -> os.PathLike[str] | None:
+    script = _PROJECT_ROOT / "deploy" / "radar-ctl.sh"
+    return script if script.is_file() else None
+
+
+_UNIT_STATES_OK = frozenset(
+    {"active", "inactive", "failed", "dead", "activating", "deactivating"}
+)
+
+
+def _run_radar_ctl(cfg: Config, cmd: str) -> tuple[bool, str]:
+    script = _radar_ctl_script()
+    profile = cfg.radar_profile.strip().lower() or "site"
+    if script is None:
+        return False, "radar-ctl.sh не найден (ожидается VPS)."
+    try:
+        proc = subprocess.run(
+            ["sudo", str(script), cmd, profile],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, str(exc)[:160]
+    out = (proc.stdout or proc.stderr or "").strip()
+    state = out.lower()
+    if cmd == "status":
+        if state in _UNIT_STATES_OK:
+            return True, state
+        if state:
+            return True, state
+        detail = out or f"exit {proc.returncode}"
+        return False, detail[:200]
+    if proc.returncode != 0:
+        detail = out or f"exit {proc.returncode}"
+        return False, detail[:200]
+    return True, out or "ok"
+
+
+def _unit_label(cfg: Config) -> str:
+    return "Site" if cfg.radar_profile == "site" else "Dogfood"
+
+
 _ACTION_LOG_RU = {
     _ACTION_PAUSE: "пауза",
     _ACTION_RESUME: "старт",
     _ACTION_STATUS: "статус",
+    _ACTION_STOP_HARD: "стоп",
+}
+
+_ACK_RU = {
+    _ACTION_PAUSE: "✓ Принято: пауза",
+    _ACTION_RESUME: "✓ Принято: старт",
+    _ACTION_STATUS: "✓ Секунду…",
+    _ACTION_STOP_HARD: "✓ Принято: останавливаю радар…",
 }
 
 
 def send_control_panel(cfg: Config) -> None:
-    """Один раз при старте радара: «Поехали» + клавиатура управления."""
-    _send_message(
-        cfg,
-        "Поехали",
-    )
+    """Один раз при старте радара: «Поехали» + клавиатура управления (только владельцу)."""
+    _send_message(cfg, "Поехали")
+
+
+def _send_admin_ack(cfg: Config, action: str) -> None:
+    msg = _ACK_RU.get(action)
+    if msg:
+        _send_message(cfg, msg)
 
 
 def _handle_action(
@@ -301,6 +433,23 @@ def _handle_action(
     storage: ProjectStorage,
 ) -> None:
     interval = cfg.poll_interval_minutes
+    label = _unit_label(cfg)
+
+    if action == _ACTION_STOP_HARD:
+        ok, detail = _run_radar_ctl(cfg, "stop")
+        if ok:
+            storage.set_radar_paused(True)
+            try:
+                _send_message(
+                    cfg,
+                    f"{label}: процесс остановлен (systemd stop). {detail}",
+                )
+            except TelegramControlError:
+                pass
+        else:
+            _send_message(cfg, f"{label}: не удалось остановить процесс. {detail}")
+        return
+
     if action == _ACTION_PAUSE:
         if storage.is_radar_paused():
             _send_message(cfg, "Уже на паузе.")
@@ -314,11 +463,24 @@ def _handle_action(
         return
 
     if action == _ACTION_RESUME:
+        unit_ok, unit_state = _run_radar_ctl(cfg, "status")
+        us = unit_state.strip().lower() if unit_ok else ""
+        if us != "active":
+            started, start_detail = _run_radar_ctl(cfg, "start")
+            if started:
+                storage.set_radar_paused(False)
+                _send_message(
+                    cfg,
+                    f"{label}: процесс запущен (systemd start). {start_detail}",
+                )
+                return
+            _send_message(cfg, f"{label}: не удалось запустить процесс. {start_detail}")
+            return
+
         if not storage.is_radar_paused():
             _send_message(cfg, "Радар уже активен.")
         else:
             storage.set_radar_paused(False)
-            label = "Site" if cfg.radar_profile == "site" else "Dogfood"
             _send_message(
                 cfg,
                 f"{label} активен. Интервал опроса — {interval} мин.",
@@ -326,12 +488,127 @@ def _handle_action(
         return
 
     if action == _ACTION_STATUS:
-        _send_message(cfg, format_status_message(cfg, storage))
+        unit_ok, unit_state = _run_radar_ctl(cfg, "status")
+        us = unit_state.strip() if unit_ok else None
+        body = format_status_message(cfg, storage, unit_state=us)
+        if unit_ok and us:
+            body += f"\n\nsystemd rawlead-radar: {us}"
+        elif not unit_ok:
+            body += f"\n\nsystemd: не удалось проверить ({unit_state[:120]})"
+        _send_message(cfg, body)
+
+
+def _start_payload(text: str) -> str:
+    parts = (text or "").strip().split(maxsplit=1)
+    if len(parts) < 2:
+        return ""
+    return parts[1].strip().casefold()
+
+
+def _send_stars_invoice_reply(
+    cfg: Config,
+    chat_id: int,
+    user_id: int,
+    errors: list[str],
+) -> None:
+    ok, detail = send_stars_invoice(cfg, int(chat_id), tg_user_id=int(user_id))
+    if ok:
+        errors.append(f"stars:invoice tg={user_id}")
+        return
+    hint = detail or "Не удалось выставить счёт Stars."
+    if "STARS" in hint.upper() or "PAYMENT" in hint.upper():
+        hint += "\n\nBotFather → @rawlead_bot → Payments → включите Telegram Stars."
+    try:
+        _send_to_chat(cfg, chat_id, hint, remove_keyboard=True)
+    except TelegramControlError:
+        pass
+
+
+def _handle_subscriber_message(
+    message: dict,
+    cfg: Config,
+    text: str,
+    errors: list[str],
+    *,
+    is_admin: bool,
+) -> bool:
+    """/start · /pay · оплата — для всех (в т.ч. владелец TELEGRAM_CHAT_ID)."""
+    chat_id = _message_chat_id(message)
+    user_id = _message_from_user_id(message)
+    if chat_id is None or user_id is None:
+        return True
+
+    cmd = _normalize_command(text)
+    if cmd == _START_CMD:
+        upsert_subscriber_chat_id(
+            cfg.database_url,
+            tg_user_id=int(user_id),
+            tg_chat_id=int(chat_id),
+        )
+        payload = _start_payload(text)
+        try:
+            if payload == "login":
+                _send_to_chat(cfg, chat_id, _WELCOME_LOGIN, remove_keyboard=True)
+            elif payload in ("pay", "stars"):
+                _send_stars_invoice_reply(cfg, chat_id, int(user_id), errors)
+            else:
+                msg = _WELCOME_SUBSCRIBER
+                if stars_available(cfg):
+                    msg += "\n\n" + _STARS_HINT
+                _send_to_chat(cfg, chat_id, msg, remove_keyboard=True)
+        except TelegramControlError:
+            pass
+        return True
+
+    if cmd in ("/pay", "/stars"):
+        _send_stars_invoice_reply(cfg, chat_id, int(user_id), errors)
+        return True
+
+    payment = message.get("successful_payment")
+    if isinstance(payment, dict):
+        handle_successful_payment(
+            cfg,
+            tg_user_id=int(user_id),
+            tg_chat_id=int(chat_id),
+            payment=payment,
+            errors=errors,
+        )
+        try:
+            _send_to_chat(
+                cfg,
+                chat_id,
+                "✓ Оплата принята. Доступ к ленте и L2 активен.",
+                remove_keyboard=True,
+            )
+        except TelegramControlError:
+            pass
+        return True
+
+    if not is_admin and _resolve_action(text) is not None:
+        try:
+            _send_to_chat(cfg, chat_id, _NO_ACCESS, remove_keyboard=True)
+        except TelegramControlError:
+            pass
+        return True
+
+    return False
+
+
+def _handle_non_admin_message(
+    message: dict,
+    cfg: Config,
+    text: str,
+    errors: list[str],
+) -> bool:
+    """Legacy wrapper."""
+    return _handle_subscriber_message(
+        message, cfg, text, errors, is_admin=False
+    )
 
 
 def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
     """
-    Один короткий getUpdates; команды и кнопки из TELEGRAM_CHAT_ID.
+    Один короткий getUpdates; admin-команды только из TELEGRAM_CHAT_ID.
     Возвращает список коротких строк для лога (без токена).
     """
     errors: list[str] = []
@@ -346,7 +623,7 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
         session.trust_env = False
         resp = session.get(
             api_url,
-            params={"offset": offset, "timeout": 0, "allowed_updates": '["message"]'},
+            params={"offset": offset, "timeout": 0, "allowed_updates": '["message","pre_checkout_query"]'},
             timeout=25.0,
             proxies=proxies,
         )
@@ -395,6 +672,15 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
             continue
         update_id = upd.get("update_id")
 
+        pre_checkout = upd.get("pre_checkout_query")
+        if isinstance(pre_checkout, dict):
+            qid = pre_checkout.get("id")
+            if qid is not None:
+                answer_pre_checkout(cfg, str(qid), ok=stars_available(cfg))
+            if isinstance(update_id, int):
+                next_offset = max(next_offset, update_id + 1)
+            continue
+
         message = upd.get("message")
         if not isinstance(message, dict):
             continue
@@ -404,21 +690,51 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
             _relay_allowlisted_message(message, cfg, errors)
             continue
 
-        if not _authorized_chat_id(message, cfg):
-            continue
-
+        user_id = _message_from_user_id(message)
+        chat_id = _message_chat_id(message)
         text = message.get("text")
         if not isinstance(text, str):
+            text = ""
+
+        admin = is_radar_admin(user_id, chat_id, cfg)
+        if _handle_subscriber_message(message, cfg, text, errors, is_admin=admin):
+            if isinstance(update_id, int):
+                next_offset = max(next_offset, update_id + 1)
+            continue
+
+        if not admin:
             continue
 
         action = _resolve_action(text)
         if action is None:
+            try:
+                _send_message(
+                    cfg,
+                    "Не понял. Кнопки: ⏸ Пауза · ▶ Старт · 🛑 Стоп · ℹ Статус",
+                )
+            except TelegramControlError as exc:
+                errors.append(f"тг:бот:{_mask_token(str(exc))[:200]}")
+            if isinstance(update_id, int):
+                next_offset = max(next_offset, update_id + 1)
             continue
+
+        try:
+            _send_admin_ack(cfg, action)
+        except TelegramControlError as exc:
+            errors.append(f"тг:бот:ack:{_mask_token(str(exc))[:120]}")
+
+        # stop гасит systemd unit — offset нужно сохранить до systemctl stop.
+        if action == _ACTION_STOP_HARD and isinstance(update_id, int):
+            storage.set_tg_update_offset(update_id + 1, bot_token=bot_token)
 
         try:
             _handle_action(action, cfg, storage)
         except TelegramControlError as exc:
             errors.append(f"тг:бот:{_mask_token(str(exc))[:200]}")
+            try:
+                _send_message(cfg, f"Ошибка команды: {str(exc)[:160]}")
+            except TelegramControlError:
+                pass
         except Exception as exc:
             errors.append(f"тг:бот:{_mask_token(type(exc).__name__)}:{str(exc)[:120]}")
         else:

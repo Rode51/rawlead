@@ -10,12 +10,11 @@
 
 | # | Что | Кто | Статус |
 |---|-----|-----|--------|
-| **P5 E1** | WP + API на VPS | — | ✅ |
-| **P5 E2** | Site+Legacy радары на VPS; ПК не 24/7 | @coder | **→** |
-| **E-polish** | B1 навыки · A1 счётчик · C1 mobile | @coder + @designer | после E2 |
-| **3f** | ИИ-агент «Написать отклик» | @coder | после polish |
-| **PRE-PROD-STRESS** | S1–S6 | @coder → владелец | **после** polish + VPS (O1) |
-| **3h** | Биллинг 590–990 ₽ | @coder | после 1-го юзера |
+| **P5 E2** | Site+Legacy радары на VPS | — | ✅ |
+| **O23 + TAGS + FEED + O27–29** | inbox · tools · push · Stars · views | @coder | **✅** Lead verify |
+| **2 Деплoy + приёмка** | v1.7.22 · Neon `009` · SITE-ACCEPT-GATE | Lead + **владелец** | деплoy **✅** · gate **→** |
+| **Design / PM** | NEO + copy | Lead | **⏸** до gate |
+| **PRE-PROD** | UX-audit + stress S1–S6 | @coder → владелец | **после** Design+PM (O21) |
 
 **Не возвращаем:** Freelancehunt · contour owner/saas · stress до polish.
 
@@ -30,7 +29,7 @@
 | **E0–E5** PRE-LAUNCH-UX | ✅ | фильтры, каталог, REVOLUTION UI |
 | **3x** «Горячий» | ✅ | badge &lt; 5 мин |
 | **P5 E2** VPS радары | **→** | 24/7 без ПК |
-| **3f** ИИ-агент | → | черновик + цена + push |
+| **3f** ИИ-агент | **→** | draft + tools + push · Stars |
 | **3g–3h** Auth + биллинг | → | один тариф |
 | **3p–3q** Retention | потом | пауза · freemium |
 | **4–5** Аналитика · портфолио | потом | после метрик |

@@ -20,23 +20,23 @@
 ## Токены (RawLead пульт v2 — 2026-05-23)
 
 | Token | HEX | Использование |
-|-------|-----|---------------|
-| `color/bg/app` | `#0c0e13` | фон окна |
-| `color/bg/surface` | `#141820` | панель логов |
-| `color/bg/log` | `#090b10` | терминал |
-| `color/border` | `#2a3140` | границы |
-| `color/text/primary` | `#eceef4` | основной текст |
-| `color/text/muted` | `#8b93a7` | подсказки |
-| `color/text/log` | `#9bc18a` | mono лог |
-| `color/accent/primary` | `#5b8def` | play (idle) + glow |
-| `color/hero/running` | `#3dd68c` | stop (running) + glow |
-| `color/status/success` | `#3dd68c` | лампа **работает** |
-| `color/status/danger` | `#ef6b6b` | лампа **нет** |
-| `color/status/neutral` | `#5c6370` | idle |
-| `font/title` | Bahnschrift SemiBold | RAWLEAD |
-| `font/ui` | Segoe UI Variable Text | UI |
-| `font/signature` | Segoe Script | by Rode51 |
-| `hero/size` | 220px | круг play/stop |
+||-------|-----|---------------|
+|| `color/bg/app` | `#0c0e13` | фон окна |
+|| `color/bg/surface` | `#141820` | панель логов |
+|| `color/bg/log` | `#090b10` | терминал |
+|| `color/border` | `#2a3140` | границы |
+|| `color/text/primary` | `#eceef4` | основной текст |
+|| `color/text/muted` | `#8b93a7` | подсказки |
+|| `color/text/log` | `#9bc18a` | mono лог |
+|| `color/accent/primary` | `#5b8def` | play (idle) + glow |
+|| `color/hero/running` | `#3dd68c` | stop (running) + glow |
+|| `color/status/success` | `#3dd68c` | лампа **работает** |
+|| `color/status/danger` | `#ef6b6b` | лампа **нет** |
+|| `color/status/neutral` | `#5c6370` | idle |
+|| `font/title` | Bahnschrift SemiBold | RAWLEAD |
+|| `font/ui` | Segoe UI Variable Text | UI |
+|| `font/signature` | Segoe Script | by Rode51 |
+|| `hero/size` | 220px | круг play/stop |
 
 Полная спека: [`DESIGN_BRIEF.md`](DESIGN_BRIEF.md) (v2)
 
@@ -45,87 +45,91 @@
 ## Компоненты (каталог)
 
 | Компонент | Статусы | Проекты |
-|-----------|---------|---------|
-| Hero play/stop | idle (синий+glow), running (зелёный+glow), pressed | RawLead пульт v2 |
-| Status lamp | idle, ok, error | RawLead пульт |
-| Secondary button | default, hover | RawLead |
-| Log tabs | default, selected | RawLead |
+||-----------|---------|---------|
+|| Hero play/stop | idle (синий+glow), running (зелёный+glow), pressed | RawLead пульт v2 |
+|| Status lamp | idle, ok, error | RawLead пульт |
+|| Secondary button | default, hover | RawLead |
+|| Log tabs | default, selected | RawLead |
 
 ---
 
-## Токены (WordPress REVOLUTION — 2026-05-28)
+## Токены (WordPress NEO-BRUTALIST — 2026-05-28)
 
-Направление: **«Рабочий инструмент»** — тёплый, прямой, для фрилансера (не cold editorial B2B).  
-Референс: [`../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) v3 · Спека: [`../design/wp/feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) v2
+Направление: **«Neo-Brutalist Color Blocks»** — белая база, жирная типографика, плоские тени, цветные блоки-секции.
+Предыдущее (REVOLUTION тёплый Indigo) — **отменено**.
+Референс: [`../../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) v4 · Спека: [`../../design/wp/feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md)
 
 ### Цвет
 
 | Token | HEX | Использование |
 |-------|-----|---------------|
-| `color/bg/page` | `#FAFAF8` | тёплый белый — фон всех страниц |
-| `color/bg/section` | `#F3F3EF` | чередующие секции, sidebar-блоки |
-| `color/bg/inverse` | `#1A1A2E` | тёплый тёмный footer, hero-overlay |
-| `color/text/primary` | `#18181B` | заголовки |
-| `color/text/body` | `#3F3F46` | body, описания |
-| `color/text/muted` | `#71717A` | подписи, вторичный, placeholder |
-| `color/text/inverse` | `#FFFFFF` | текст на тёмном фоне |
-| `color/border` | `#E4E4E7` | тонкие разделители |
-| `color/cta/primary` | `#4F46E5` | Indigo — главный акцент |
-| `color/cta/primary-text` | `#FFFFFF` | текст на primary CTA |
-| `color/cta/primary-hover` | `#4338CA` | hover primary |
-| `color/cta/secondary-border` | `#4F46E5` | outline-кнопка |
-| `color/cta/secondary-text` | `#4F46E5` | текст outline-кнопки |
-| `color/match/bar` | `#4F46E5` | полоса совпадения % (один акцент) |
-| `color/source/fl` | `#00A65A` | FL.ru (бренд-зелёный) |
-| `color/source/kwork` | `#EA580C` | Kwork |
-| `color/source/tg` | `#0088CC` | Telegram (официальный) |
+| `color/bg/page` | `#FFFFFF` | чистый белый — база всех страниц |
+| `color/bg/section` | `#F5F5F0` | off-white — нейтральные чередующие секции |
+| `color/bg/hero` | `#FACC15` | **фирменный жёлтый** — hero, акцентные секции |
+| `color/bg/alt` | `#F3E8FF` | светло-фиолетовый — блок «Как работает» |
+| `color/bg/inverse` | `#0A0A0A` | чёрный footer |
+| `color/text/primary` | `#0A0A0A` | заголовки, основной текст |
+| `color/text/body` | `#1A1A1A` | body, описания |
+| `color/text/muted` | `#525252` | подписи, вторичный, placeholder |
+| `color/text/inverse` | `#FFFFFF` | текст на чёрном/тёмном фоне |
+| `color/text/on-hero` | `#0A0A0A` | текст на жёлтом фоне |
+| `color/border` | `#0A0A0A` | **основная рамка: чёрная 2px** |
+| `color/border/light` | `#D4D4D4` | вторичный разделитель |
+| `color/cta/primary` | `#0A0A0A` | кнопка default: чёрная |
+| `color/cta/primary-text` | `#FFFFFF` | текст на чёрной кнопке |
+| `color/cta/hover-bg` | `#FACC15` | кнопка hover: жёлтая |
+| `color/cta/hover-text` | `#0A0A0A` | текст на жёлтой кнопке |
+| `color/match/bar` | `#0A0A0A` | полоса совпадения % |
+| `color/source/fl` | `#00A65A` | FL.ru (без изменений) |
+| `color/source/kwork` | `#EA580C` | Kwork (без изменений) |
+| `color/source/tg` | `#0088CC` | Telegram (без изменений) |
 | `color/chip/take` | `#16A34A` | чип «Брать» |
 | `color/chip/maybe` | `#6B7280` | чип «Сомнительно» |
-| `color/chip/active` | `#4F46E5` | активный chip категории/навыка |
+| `color/chip/active` | `#0A0A0A` | активный chip: чёрная заливка |
 | `color/chip/active-text` | `#FFFFFF` | текст активного chip |
-| `color/chip/skill/active-bg` | `#EEF2FF` | активный skill chip (indigo-100) |
-| `color/chip/skill/active-text` | `#4F46E5` | текст активного skill chip |
+| `color/chip/skill/active-bg` | `#FACC15` | активный skill chip: жёлтый |
+| `color/chip/skill/active-text` | `#0A0A0A` | текст активного skill chip |
 
 ### Шрифты
 
 | Token | Значение | Применение |
 |-------|----------|------------|
-| `font/display` | **Manrope** 800 | H1, H2 — только Manrope (Unbounded удалён) |
+| `font/display` | **Manrope** 900 | H1 hero — максимальный вес |
+| `font/heading` | **Manrope** 800 | H2, H3 |
 | `font/body` | **Manrope** 400–600 | body, UI, подписи, кнопки |
-| `font/hero` | 52–64px / 800 / −0.02em | H1 «Лиды без шума» |
-| `font/h2` | 28–36px / 700 | заголовки секций |
-| `font/body-size` | 16–18px / 400 / 1.55 | абзацы |
-| `font/label` | 12–13px / 600 | чипы, badge, время, метки |
+| `font/hero` | `clamp(56px, 10vw, 96px)` / 900 / `−0.03em` | H1 «Лиды без шума» |
+| `font/h2` | `32–44px` / 800 | заголовки секций |
+| `font/body-size` | `16–18px` / 400 / 1.55 | абзацы |
+| `font/label` | `12–13px` / 700 | чипы, badge, метки |
 
 ### Форма и тень
 
 | Token | Значение | Применение |
 |-------|----------|------------|
-| `radius/card` | `20px` | карточки лидов — как мессенджер |
-| `radius/button` | `999px` | pill-кнопки |
-| `radius/chip` | `999px` | все chip-элементы |
-| `radius/section` | `16px` | блоки на лендинге |
-| `shadow/card` | `0 2px 12px rgba(0,0,0,0.07)` | дефолтная тень карточки |
-| `shadow/card-hover` | `0 8px 28px rgba(0,0,0,0.12)` | тень при hover |
+| `radius/card` | `4px` | карточки — почти квадрат |
+| `radius/button` | `0px` | кнопки — прямые углы |
+| `radius/chip` | `2px` | chips — минимальный скос |
+| `radius/section` | `0px` | секции без скруглений |
+| `shadow/card` | `4px 4px 0px #0A0A0A` | **плоская смещённая тень** (без blur) |
+| `shadow/card-hover` | `6px 6px 0px #0A0A0A` | hover: тень сильнее + сдвиг карточки |
 | `space/unit` | `8px` | baseline grid |
-| `space/section-y` | `88px` desktop / `56px` mobile | между секциями |
+| `space/section-y` | `80px` desktop / `48px` mobile | между секциями |
 | `container/max` | `900px` | лента (2 col); `1120px` лендинг |
 
 ### Анимации (motion tokens)
 
 | Token | Значение | Применение |
 |-------|----------|------------|
-| `motion/duration/appear` | `240ms` | fade+translate при скролле |
-| `motion/duration/expand` | `300ms` | раскрытие карточки лида |
-| `motion/duration/bar` | `600ms` | fill match-bar |
-| `motion/duration/cube` | `400ms` | сборка кубиков источников |
-| `motion/duration/press` | `80ms` | micro-press кнопок |
-| `motion/duration/hover` | `150ms` | hover карточки |
-| `motion/duration/sheet` | `300ms` | bottom sheet mobile |
+| `motion/duration/appear` | `200ms` | fade+translate при скролле |
+| `motion/duration/expand` | `280ms` | раскрытие карточки лида |
+| `motion/duration/bar` | `500ms` | fill match-bar |
+| `motion/duration/press` | `60ms` | micro-press кнопок |
+| `motion/duration/hover` | `120ms` | hover карточки |
+| `motion/duration/sheet` | `280ms` | bottom sheet mobile |
 | `motion/easing/default` | `ease-out` | всё движение |
 | `motion/stagger/card` | `40ms` | задержка между карточками |
 | `motion/scale/press` | `0.97` | scale при клике |
-| `motion/lift/hover` | `translateY(-2px)` | подъём карточки при hover |
+| `motion/lift/hover` | `translate(-2px, -2px)` | сдвиг карточки при hover (брутал-стиль) |
 
 Пульт (тёмный `#0c0e13`) и сайт — **разные поверхности**; не смешивать без запроса Lead.
 
@@ -138,5 +142,6 @@
 | 2026-05-20 | RawLead пульт v1 | Токены ops-dashboard, green/red lamps |
 | 2026-05-23 | RawLead пульт v2 | Буст-референс, play/stop, glow, логи вниз, палитра v2 |
 | 2026-05-23 | WordPress сайт v1 | Editorial light; REFERENCE + Unbounded/Manrope в child theme |
-| 2026-05-25 | WordPress сайт v2 | Исправлен цвет FL.ru, TG; motion-токены; /feed + /cabinet; шрифтовые токены |
-| 2026-05-28 | WordPress REVOLUTION | Смена направления: warm working tool; Indigo accent; только Manrope; shadow-cards; mobile-first |
+| 2026-05-25 | WordPress сайт v2 | Исправлен цвет FL.ru, TG; motion-токены; /feed + /cabinet |
+| 2026-05-28 | WordPress REVOLUTION | Тёплый Indigo; Manrope; shadow-cards; mobile-first — **отменено** |
+| 2026-05-28 | WordPress NEO-BRUTALIST | Белая база; жёлтый `#FACC15` hero; чёрные рамки; плоские тени; кнопка black→yellow |

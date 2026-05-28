@@ -260,17 +260,28 @@ Get-CimInstance Win32_Process | Where-Object {
 
 ---
 
-### После stress — ты как первый подписчик (#0)
+### SITE-ACCEPT-GATE — приёмка O23 (сейчас)
+
+**Free** — a3–a4, a7–a9 (delay, нет кнопки, inbox-ЛК, страницы). **Paid a5–a6** — beta в Neon, не Stars.
 
 | # | Действие |
 |---|----------|
-| 1 | `/start` в [@rawlead_bot](https://t.me/rawlead_bot) |
-| 2 | Открыть `/cabinet/` на prod → войти через TG |
-| 3 | Выбрать навыки → увидеть match → **«Написать отклик»** → черновик L2 |
-| 4 | Сказать Lead/Product если UX/тексты не ок → `@designer` |
-| 5 | Новые идеи → Lead в **OWNER_INTENT** |
+| 1 | Ctrl+F5 на `/cabinet/` — подтянуть подписку |
+| 2 | Блок «Подписка»: **beta** / «ИИ-агент (владелец)» |
+| 3 | `/lenta/` — кнопка «Написать отклик», без 15-мин gate |
+| 4 | Черновик → inbox → удалить |
 
-Код: [`team/architect/CODER_PROMPT.md`](team/architect/CODER_PROMPT.md) § **3f-OWNER-BETA**.
+Чеклист: `CODER_PROMPT.md` § **SITE-ACCEPT-GATE**.
+
+---
+
+### После stress — первый внешний платящий
+
+| # | Действие |
+|---|----------|
+| 1 | Stars → `is_active=true` (§ **3f-C-STARS**) |
+
+Код: § **3f-OWNER-BETA** · § **3f-C-STARS**.
 
 Деплой: [`ops/DEPLOY_VPS.md`](ops/DEPLOY_VPS.md) · лестница: [`team/common/TASKS.md`](team/common/TASKS.md).
 

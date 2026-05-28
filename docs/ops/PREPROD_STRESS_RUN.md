@@ -2,13 +2,38 @@
 
 **Ворота:** [`docs/team/architect/PRE_PROD_GATE.md`](../team/architect/PRE_PROD_GATE.md) § S1–S6.
 
-**Когда:** после § P5 (WP + API + Site-радар на VPS), **DNS резолвится**, рекламы ещё нет.
-
-**Не гонять:** 1000+ premium OpenRouter; нагрузка только на **чтение** ленты/API.
+**Когда:** после § P5 (WP + API + Site на VPS), **и после** Design + PM copy + Coder финал (O21). DNS готов, рекламы нет.
 
 ---
 
-## Переменные
+## Слой 0 — UX-audit «ИИ-тестировщик» (S2, O21)
+
+**Один прогон** перед stress — все страницы, клики, баги:
+
+```powershell
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_audit.py --base-url https://rawlead.ru
+```
+
+Отчёты: `data/preprod_ux_audit.json` · `data/preprod_ux_audit.md` · скрины `data/preprod_ux_audit/`
+
+| Что делает | Детали |
+|------------|--------|
+| Обход | `/`, `/lenta/`, `/cabinet/`, `/how/`, `/pricing/`, `/faq/`, `/contact/` |
+| Клики | header, footer, CTA, навыки «Применить», pricing→ЛК |
+| Ловит | 404/500, console errors, failed fetch, перекрытия на mobile 390px |
+| ИИ (опц.) | LLM summary по JSON — «неудобно / баг / мёртвая кнопка» |
+
+| PASS S2 | 0 critical findings; все footer URL 200 |
+
+Debug: `--headed` · опц. `--llm` для markdown-отчёта
+
+**Coder:** § PRE-PROD-UX-AUDIT в `CODER_PROMPT.md` (скрипт **→** после финала UI).
+
+---
+
+**Не гонять:** 1000+ premium OpenRouter. Нагрузка — **чтение** API/ленты.
+
+### Переменные
 
 | Переменная | Пример | Где |
 |------------|--------|-----|

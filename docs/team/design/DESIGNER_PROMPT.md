@@ -1,28 +1,8 @@
-# Designer — § SITE-POLISH (2026-05-28) **→ сейчас**
+# Designer — § NEO-BRUTALIST CSS (2026-05-28) **⏸ после SITE-ACCEPT-GATE**
 
-**Контекст:** [rawlead.ru](https://rawlead.ru) на VPS · stress отложен · владелец хочет **ЛК + регистрация + UX + тексты** до нагрузочных тестов.
-
-**→ Сейчас @designer:** макет/спека для Coder (CSS в `rawlead.css`, PHP только если Lead согласует отдельно).
-
-| # | Экран | Суть |
-|---|--------|------|
-| **sp1** | **`/cabinet/`** | Вход (TG Widget + fallback), блок навыков, match-лента, кнопка «Написать отклик», пустые состояния, mobile thumb-zone |
-| **sp2** | **Регистрация/вход** | Один путь: «Войти через Telegram» → кабинет; ошибки: бот не стартовал, домен не в BotFather |
-| **sp3** | **`/lenta/` на прод** | Filter-bar, skeleton, «Горячий», фильтр источника (после API `?source=`) |
-| **sp4** | **Лендинг** | Hero + live feed preview — тексты с Product c1–c4 |
-
-**Файлы:** обновить [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) § «Кабинет polish» · [`REFERENCE.md`](../../design/wp/REFERENCE.md) при расхождении с прод.
-
-**Сдача:** `DESIGNER_PROMPT` § SITE-POLISH ✅ · handoff `@coder` § SITE-POLISH p5.
-
----
-
-# Designer — § REVOLUTION CSS (E3, 2026-05-28)
-
-**Роль:** Designer (CSS-исполнитель)  
-**Токены:** [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) § WordPress REVOLUTION  
-**Спека страниц:** [`../../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) v3 · [`../../design/wp/feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) v2  
-**Каталог навыков:** [`../product/SKILLS_TOOLS_CATALOG.md`](../product/SKILLS_TOOLS_CATALOG.md)
+**Роль:** Designer (CSS-исполнитель)
+**Токены:** [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) § WordPress NEO-BRUTALIST
+**Спека страниц:** [`../../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) v4 · [`../../design/wp/feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md)
 
 **Файлы (можно трогать):**
 - `wordpress/rawlead-kadence-child/assets/css/rawlead.css` — **главный файл**
@@ -35,7 +15,7 @@
 
 ## Задача
 
-Пересобрать CSS сайта под **REVOLUTION**-направление.  
+Пересобрать CSS сайта под **NEO-BRUTALIST** направление.
 Всё в `rawlead.css`. PHP и JS не трогаешь — только CSS-классы по спеке.
 
 ---
@@ -44,31 +24,48 @@
 
 ```css
 :root {
-  /* REVOLUTION WP */
-  --rl-bg-page:        #FAFAF8;
-  --rl-bg-section:     #F3F3EF;
-  --rl-bg-inverse:     #1A1A2E;
-  --rl-text-primary:   #18181B;
-  --rl-text-body:      #3F3F46;
-  --rl-text-muted:     #71717A;
-  --rl-text-inverse:   #FFFFFF;
-  --rl-border:         #E4E4E7;
-  --rl-cta:            #4F46E5;
-  --rl-cta-hover:      #4338CA;
-  --rl-cta-text:       #FFFFFF;
-  --rl-match-fill:     #4F46E5;
-  --rl-source-fl:      #00A65A;
-  --rl-source-kwork:   #EA580C;
-  --rl-source-tg:      #0088CC;
-  --rl-shadow-card:    0 2px 12px rgba(0,0,0,0.07);
-  --rl-shadow-hover:   0 8px 28px rgba(0,0,0,0.12);
-  --rl-radius-card:    20px;
-  --rl-radius-btn:     999px;
-  --rl-radius-chip:    999px;
-  --rl-chip-active-bg: #4F46E5;
-  --rl-chip-skill-bg:  #EEF2FF;
-  --rl-chip-skill-txt: #4F46E5;
-  --font-main:         'Manrope', sans-serif;
+  /* NEO-BRUTALIST WP */
+  --rl-bg-page:          #FFFFFF;
+  --rl-bg-section:       #F5F5F0;
+  --rl-bg-hero:          #FACC15;
+  --rl-bg-alt:           #F3E8FF;
+  --rl-bg-inverse:       #0A0A0A;
+
+  --rl-text-primary:     #0A0A0A;
+  --rl-text-body:        #1A1A1A;
+  --rl-text-muted:       #525252;
+  --rl-text-inverse:     #FFFFFF;
+  --rl-text-on-hero:     #0A0A0A;
+
+  --rl-border:           #0A0A0A;
+  --rl-border-light:     #D4D4D4;
+  --rl-border-width:     2px;
+
+  --rl-cta:              #0A0A0A;
+  --rl-cta-text:         #FFFFFF;
+  --rl-cta-hover-bg:     #FACC15;
+  --rl-cta-hover-text:   #0A0A0A;
+
+  --rl-match-fill:       #0A0A0A;
+
+  --rl-source-fl:        #00A65A;
+  --rl-source-kwork:     #EA580C;
+  --rl-source-tg:        #0088CC;
+
+  --rl-shadow-card:      4px 4px 0px #0A0A0A;
+  --rl-shadow-hover:     6px 6px 0px #0A0A0A;
+  --rl-shadow-fab:       2px 2px 0px #0A0A0A;
+
+  --rl-radius-card:      4px;
+  --rl-radius-btn:       0px;
+  --rl-radius-chip:      2px;
+
+  --rl-chip-active-bg:   #0A0A0A;
+  --rl-chip-active-txt:  #FFFFFF;
+  --rl-chip-skill-bg:    #FACC15;
+  --rl-chip-skill-txt:   #0A0A0A;
+
+  --font-main:           'Manrope', sans-serif;
 }
 ```
 
@@ -79,40 +76,51 @@
 ### T1 — Глобальный фон и типографика
 
 - `body`: `background: var(--rl-bg-page); font-family: var(--font-main); color: var(--rl-text-primary)`
-- Убрать `font-family: 'Unbounded'` везде — заменить на Manrope 800 для display
-- H1/H2 всего сайта: Manrope 800, letter-spacing `-0.02em`
+- H1 hero: `font: 900 clamp(56px, 10vw, 96px)/1.05 var(--font-main); letter-spacing: -0.03em`
+- H2 секции: `font: 800 clamp(32px, 5vw, 44px)/1.1 var(--font-main); letter-spacing: -0.02em`
+- Body text: `font: 400 16px/1.55 var(--font-main); color: var(--rl-text-body)`
 - Секции с чередующимся фоном: `background: var(--rl-bg-section)`
+- Hero секция: `background: var(--rl-bg-hero)`
+- Alt секция (Как работает): `background: var(--rl-bg-alt)`
 - Footer: `background: var(--rl-bg-inverse); color: var(--rl-text-inverse)`
 
 ### T2 — Кнопки
 
 ```css
-/* primary */
+/* primary — чёрная, hover жёлтая */
 .rl-btn, .rl-btn--primary {
   background: var(--rl-cta);
   color: var(--rl-cta-text);
+  border: var(--rl-border-width) solid var(--rl-border);
   border-radius: var(--rl-radius-btn);
-  border: none;
-  padding: 12px 24px;
-  font: 600 15px/1 var(--font-main);
-  transition: background 150ms ease-out, transform 80ms ease-out;
+  padding: 14px 28px;
+  font: 700 15px/1 var(--font-main);
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out, transform 60ms ease-out;
 }
-.rl-btn:hover { background: var(--rl-cta-hover); }
+.rl-btn:hover, .rl-btn--primary:hover {
+  background: var(--rl-cta-hover-bg);
+  color: var(--rl-cta-hover-text);
+}
 .rl-btn:active { transform: scale(0.97); }
 
-/* secondary */
+/* secondary — белая, чёрная рамка */
 .rl-btn--secondary {
   background: transparent;
-  border: 1.5px solid var(--rl-cta);
-  color: var(--rl-cta);
+  border: var(--rl-border-width) solid var(--rl-border);
+  color: var(--rl-text-primary);
 }
-.rl-btn--secondary:hover { background: var(--rl-chip-skill-bg); }
+.rl-btn--secondary:hover { background: var(--rl-bg-section); }
 
-/* ghost */
+/* ghost — только текст */
 .rl-btn--ghost {
-  background: none; border: none;
-  color: var(--rl-cta);
+  background: none;
+  border: none;
+  color: var(--rl-text-primary);
   padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 ```
 
@@ -123,10 +131,9 @@
   position: sticky; top: 0; z-index: 100;
   height: 56px;
   background: var(--rl-bg-page);
-  border-bottom: 1px solid transparent;
-  transition: border-color 150ms;
+  border-bottom: var(--rl-border-width) solid var(--rl-border);
+  /* НЕ transparent — чёрная рамка всегда */
 }
-.rl-header--scrolled { border-bottom-color: var(--rl-border); }
 ```
 
 Mobile: height `52px`
@@ -136,14 +143,14 @@ Mobile: height `52px`
 ```css
 .rl-filter-bar {
   position: sticky;
-  top: 56px; /* высота header */
+  top: 56px;
   z-index: 90;
   background: var(--rl-bg-page);
-  border-bottom: 1px solid var(--rl-border);
+  border-bottom: var(--rl-border-width) solid var(--rl-border);
   height: 52px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 0 16px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
@@ -160,50 +167,49 @@ Mobile: height `52px`
   display: inline-flex; align-items: center; gap: 4px;
   padding: 6px 14px;
   border-radius: var(--rl-radius-chip);
-  background: var(--rl-bg-section);
-  border: 1px solid var(--rl-border);
-  color: var(--rl-text-body);
-  font: 600 13px/1 var(--font-main);
+  background: var(--rl-bg-page);
+  border: var(--rl-border-width) solid var(--rl-border);
+  color: var(--rl-text-primary);
+  font: 700 13px/1 var(--font-main);
   cursor: pointer; white-space: nowrap;
-  transition: background 150ms, color 150ms, border-color 150ms;
+  transition: background 120ms, color 120ms;
 }
 .rl-cat-chip.is-active {
   background: var(--rl-chip-active-bg);
-  color: #FFFFFF;
-  border-color: var(--rl-chip-active-bg);
+  color: var(--rl-chip-active-txt);
 }
 ```
 
 **Dropdown-кнопки [Навыки ▾] [Сортировка ▾]:**
 ```css
 .rl-filter-dropdown-btn {
-  margin-left: auto; /* прижать вправо */
+  margin-left: auto;
   flex-shrink: 0;
-  /* те же стили что у .rl-cat-chip */
   padding: 6px 12px;
+  /* те же стили что .rl-cat-chip */
 }
 .rl-filter-dropdown-btn.has-selection {
   background: var(--rl-chip-skill-bg);
-  border-color: var(--rl-cta);
-  color: var(--rl-cta);
+  color: var(--rl-chip-skill-txt);
+  border-color: var(--rl-border);
 }
 ```
 
-### T5 — Карточка лида (REVOLUTION)
+### T5 — Карточка лида (NEO-BRUTALIST)
 
 ```css
 .rl-lead-card {
   background: #FFFFFF;
+  border: var(--rl-border-width) solid var(--rl-border);
   border-radius: var(--rl-radius-card);
   box-shadow: var(--rl-shadow-card);
   padding: 20px 24px;
   cursor: pointer;
-  transition: box-shadow 150ms ease-out, transform 150ms ease-out;
-  /* убрать: border, border-color */
+  transition: box-shadow 120ms ease-out, transform 120ms ease-out;
 }
 .rl-lead-card:hover {
   box-shadow: var(--rl-shadow-hover);
-  transform: translateY(-2px);
+  transform: translate(-2px, -2px);
 }
 ```
 
@@ -212,15 +218,16 @@ Mobile: padding `16px 18px`
 **Match-bar:**
 ```css
 .rl-match__track {
-  height: 4px; border-radius: 2px;
-  background: var(--rl-border);
+  height: 4px;
+  border-radius: 0px;  /* без скругления — брутал */
+  background: var(--rl-border-light);
   overflow: hidden;
 }
 .rl-match__fill {
   height: 100%;
   background: var(--rl-match-fill);
   width: 0;
-  transition: width 600ms ease-out;
+  transition: width 500ms ease-out;
 }
 .is-visible .rl-match__fill { width: var(--match-value); }
 ```
@@ -231,15 +238,15 @@ Mobile: padding `16px 18px`
   display: inline-block;
   padding: 3px 10px;
   border-radius: var(--rl-radius-chip);
-  background: var(--rl-bg-section);
-  border: 1px solid var(--rl-border);
+  background: var(--rl-bg-page);
+  border: var(--rl-border-width) solid var(--rl-border-light);
   color: var(--rl-text-muted);
-  font: 600 11px/1.4 var(--font-main);
+  font: 700 11px/1.4 var(--font-main);
 }
 .rl-skill-chip.is-active {
   background: var(--rl-chip-skill-bg);
   color: var(--rl-chip-skill-txt);
-  border-color: #C7D2FE;
+  border-color: var(--rl-border);
 }
 ```
 
@@ -253,13 +260,12 @@ Mobile: padding `16px 18px`
   width: 420px;
   max-width: calc(100vw - 32px);
   background: #FFFFFF;
-  border: 1px solid var(--rl-border);
-  border-radius: 16px;
+  border: var(--rl-border-width) solid var(--rl-border);
+  border-radius: var(--rl-radius-card);
   box-shadow: var(--rl-shadow-hover);
   padding: 20px;
   z-index: 200;
 }
-/* Mobile — bottom sheet */
 @media (max-width: 767px) {
   .rl-skills-panel {
     position: fixed;
@@ -267,9 +273,10 @@ Mobile: padding `16px 18px`
     top: auto;
     width: 100%;
     max-width: 100%;
-    border-radius: 20px 20px 0 0;
+    border-radius: 4px 4px 0 0;
+    border-bottom: none;
     transform: translateY(100%);
-    transition: transform 300ms ease-out;
+    transition: transform 280ms ease-out;
     max-height: 80vh;
     overflow-y: auto;
   }
@@ -282,16 +289,16 @@ Mobile: padding `16px 18px`
 ```css
 .rl-my-skills {
   position: sticky;
-  top: 56px; /* под header */
+  top: 56px;
   z-index: 85;
   background: var(--rl-bg-page);
-  border-bottom: 1px solid var(--rl-border);
+  border-bottom: var(--rl-border-width) solid var(--rl-border);
   padding: 8px 16px;
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
   min-height: 48px;
 }
 .rl-my-skill-chip {
-  /* как rl-skill-chip.is-active, плюс × */
+  /* как rl-skill-chip.is-active — жёлтый + чёрная рамка */
   padding: 5px 10px 5px 12px;
   gap: 6px;
 }
@@ -304,7 +311,7 @@ Mobile: padding `16px 18px`
 .rl-feed-list {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  gap: 20px;
   max-width: 900px;
   margin: 0 auto;
   padding: 24px 16px;
@@ -324,15 +331,18 @@ Mobile: padding `16px 18px`
   width: 40px; height: 40px;
   border-radius: 50%;
   background: #FFFFFF;
-  border: 1px solid var(--rl-border);
-  box-shadow: var(--rl-shadow-card);
-  color: var(--rl-cta);
+  border: var(--rl-border-width) solid var(--rl-border);
+  box-shadow: var(--rl-shadow-fab);
+  color: var(--rl-text-primary);
   font: 700 16px/1 var(--font-main);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: box-shadow 150ms;
+  transition: box-shadow 120ms, transform 120ms;
 }
-.rl-bug-fab:hover { box-shadow: var(--rl-shadow-hover); }
+.rl-bug-fab:hover {
+  box-shadow: 3px 3px 0px #0A0A0A;
+  transform: translate(-1px, -1px);
+}
 @media (max-width: 767px) {
   .rl-bug-fab { bottom: 80px; right: 16px; }
 }
@@ -343,10 +353,12 @@ Mobile: padding `16px 18px`
 ```css
 @keyframes rl-pulse {
   0%, 100% { background-color: var(--rl-bg-section); }
-  50%       { background-color: var(--rl-border); }
+  50%       { background-color: var(--rl-border-light); }
 }
 .rl-skeleton-card {
+  border: var(--rl-border-width) solid var(--rl-border-light);
   border-radius: var(--rl-radius-card);
+  box-shadow: 4px 4px 0px var(--rl-border-light);
   height: 140px;
   animation: rl-pulse 1.4s ease-in-out infinite;
 }
@@ -354,41 +366,69 @@ Mobile: padding `16px 18px`
 
 ### T11 — Лендинг: Hero, Live Preview, Тарифы
 
-**Hero:**
+**Hero (жёлтый блок):**
 ```css
 .rl-hero {
   min-height: 100svh;
+  background: var(--rl-bg-hero);
   display: flex; flex-direction: column; justify-content: center;
   padding: 80px 16px 48px;
+  border-bottom: var(--rl-border-width) solid var(--rl-border);
 }
 .rl-hero__h1 {
-  font: 800 clamp(40px, 8vw, 64px)/1.1 var(--font-main);
-  letter-spacing: -0.02em;
-  color: var(--rl-text-primary);
+  font: 900 clamp(56px, 10vw, 96px)/1.05 var(--font-main);
+  letter-spacing: -0.03em;
+  color: var(--rl-text-on-hero);
   margin-bottom: 20px;
 }
 .rl-hero__sub {
-  font: 400 18px/1.55 var(--font-main);
-  color: var(--rl-text-body);
-  max-width: 520px;
-  margin-bottom: 32px;
+  font: 400 20px/1.55 var(--font-main);
+  color: var(--rl-text-on-hero);
+  opacity: 0.75;
+  max-width: 560px;
+  margin-bottom: 36px;
+}
+/* Кнопка в hero: чёрная → hover белая с рамкой */
+.rl-hero .rl-btn--primary:hover {
+  background: #FFFFFF;
+  color: #0A0A0A;
+  border-color: #0A0A0A;
 }
 ```
 
 **Live Preview:**
 ```css
 .rl-live-preview {
-  background: var(--rl-bg-section);
+  background: var(--rl-bg-page);
+  border-top: var(--rl-border-width) solid var(--rl-border);
+  border-bottom: var(--rl-border-width) solid var(--rl-border);
   padding: 48px 16px;
 }
-/* Карточки превью — те же .rl-lead-card, но non-interactive */
+.rl-live-preview__label {
+  font: 700 12px/1 var(--font-main);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rl-text-muted);
+  margin-bottom: 24px;
+}
 .rl-live-preview .rl-lead-card { pointer-events: none; }
+```
+
+**Как работает (фиолетовый блок):**
+```css
+.rl-how-section {
+  background: var(--rl-bg-alt);
+  border-top: var(--rl-border-width) solid var(--rl-border);
+  border-bottom: var(--rl-border-width) solid var(--rl-border);
+  padding: 80px 16px;
+}
 ```
 
 **Тариф-карточка:**
 ```css
 .rl-pricing-card {
   background: #FFFFFF;
+  border: var(--rl-border-width) solid var(--rl-border);
   border-radius: var(--rl-radius-card);
   box-shadow: var(--rl-shadow-card);
   padding: 32px;
@@ -397,16 +437,34 @@ Mobile: padding `16px 18px`
 }
 ```
 
+**Form inputs:**
+```css
+.rl-input, .rl-textarea {
+  width: 100%;
+  border: var(--rl-border-width) solid var(--rl-border);
+  border-radius: var(--rl-radius-btn);
+  padding: 12px 16px;
+  font: 400 16px/1 var(--font-main);
+  color: var(--rl-text-primary);
+  background: #FFFFFF;
+  transition: box-shadow 120ms;
+}
+.rl-input:focus, .rl-textarea:focus {
+  outline: none;
+  box-shadow: 2px 2px 0px #0A0A0A;
+}
+```
+
 ### T12 — Анимации (scroll-reveal)
 
 ```css
 .rl-reveal {
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(16px);
 }
 .rl-reveal.is-visible {
   opacity: 1; transform: none;
-  transition: opacity 240ms ease-out, transform 240ms ease-out;
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
 }
 .rl-reveal:nth-child(1) { transition-delay: 0ms; }
 .rl-reveal:nth-child(2) { transition-delay: 40ms; }
@@ -418,23 +476,28 @@ Mobile: padding `16px 18px`
 
 ## Что убрать из rawlead.css
 
-- Любые `font-family: 'Unbounded'` → Manrope 800
-- `background: #FFFFFF` на body → `#FAFAF8`
-- `background: #0A0A0A` на .rl-btn → `#4F46E5`
-- `.rl-lead-card { border: 1px solid #E8E8EC }` → убрать border, добавить shadow
-- `border-radius: 16px` на карточках → `20px`
-- `.rl-match__fill { background: #2563EB }` → `#4F46E5`
-- `.rl-filter-sidebar` (sidebar 280px) — убрать или скрыть (`display: none`); заменяет filter bar
-- Стиль манифест-полосы `#0A0A0A` → не нужна (секция убрана с лендинга)
-- `ghost-num` 120px серые цифры 01/02/03 — убрать
+- `border-radius: 20px` на карточках → `4px`
+- `border-radius: 999px` на кнопках и chips → `0px` / `2px`
+- `box-shadow: 0 2px 12px rgba(0,0,0,0.07)` → `4px 4px 0px #0A0A0A`
+- `background: #FAFAF8` на body → `#FFFFFF`
+- `background: #F3F3EF` на секциях → `#F5F5F0`
+- `background: #4F46E5` на кнопках → `#0A0A0A`
+- `background: #4338CA` hover кнопки → `#FACC15`
+- `background: #1A1A2E` footer → `#0A0A0A`
+- `background: #EEF2FF` skill chip active → `#FACC15`
+- `.rl-lead-card { border-color: ... }` — заменить на `border: 2px solid #0A0A0A`
+- `transform: translateY(-2px)` hover → `transform: translate(-2px, -2px)`
+- `transition: border-color 150ms` в header → убрать (рамка всегда)
+- Стиль манифест-полосы — секция убрана
+- `ghost-num` серые цифры 01/02/03 — убрать
 
 ---
 
 ## Сдача
 
-По завершении обнови `docs/team/common/STATUS.md` — строку E3 Designer.  
-Handoff → `@lead-architect` для `CODER_PROMPT § PRE-LAUNCH-UX`.
+По завершении обнови `docs/team/common/STATUS.md` — строку NEO-BRUTALIST Designer.
+Handoff → `@lead-architect` для `CODER_PROMPT § NEO-BRUTALIST`.
 
 ---
 
-_Lead Designer → @designer · REVOLUTION CSS · 2026-05-28_
+_Lead Designer → @designer · NEO-BRUTALIST CSS · 2026-05-28_

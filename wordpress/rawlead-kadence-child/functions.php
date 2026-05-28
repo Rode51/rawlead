@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.7.8');
+define('RAWLEAD_CHILD_VERSION', '1.7.23');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -133,11 +133,16 @@ add_action('wp_enqueue_scripts', static function (): void {
             true
         );
         wp_localize_script('rawlead-feed', 'rawleadFeed', [
-            'restFeed'   => esc_url_raw(rest_url('rawlead/v1/feed')),
-            'restTags'   => esc_url_raw(rest_url('rawlead/v1/me/tags')),
-            'restSkills' => esc_url_raw(rest_url('rawlead/v1/skills/catalog')),
-            'nonce'      => wp_create_nonce('wp_rest'),
-            'apiBase'    => rawlead_api_base_url(),
+            'restFeed'         => esc_url_raw(rest_url('rawlead/v1/feed')),
+            'restTags'         => esc_url_raw(rest_url('rawlead/v1/me/tags')),
+            'restSkills'       => esc_url_raw(rest_url('rawlead/v1/skills/catalog')),
+            'restDraft'        => esc_url_raw(rest_url('rawlead/v1/me/leads')),
+            'restSubscription' => esc_url_raw(rest_url('rawlead/v1/me/subscription')),
+            'pricingUrl'       => esc_url_raw(rawlead_page_url('pricing')),
+            'cabinetUrl'       => esc_url_raw(rawlead_page_url('cabinet')),
+            'botPayUrl'        => esc_url_raw('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay'),
+            'nonce'            => wp_create_nonce('wp_rest'),
+            'apiBase'          => rawlead_api_base_url(),
         ]);
     }
 
@@ -150,9 +155,15 @@ add_action('wp_enqueue_scripts', static function (): void {
             true
         );
         wp_localize_script('rawlead-cabinet', 'rawleadCabinet', [
-            'restFeed'             => esc_url_raw(rest_url('rawlead/v1/me/feed')),
+            'restReplies'          => esc_url_raw(rest_url('rawlead/v1/me/replies')),
             'restTags'             => esc_url_raw(rest_url('rawlead/v1/me/tags')),
+            'restSkills'           => esc_url_raw(rest_url('rawlead/v1/skills/catalog')),
             'restAuth'             => esc_url_raw(rest_url('rawlead/v1/auth/telegram')),
+            'restSubscription'          => esc_url_raw(rest_url('rawlead/v1/me/subscription')),
+            'restNotificationSettings'  => esc_url_raw(rest_url('rawlead/v1/me/notification-settings')),
+            'lentaUrl'                  => esc_url_raw(rawlead_page_url('lenta')),
+            'pricingUrl'           => esc_url_raw(rawlead_page_url('pricing')),
+            'botPayUrl'            => esc_url_raw('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay'),
             'tgBotUsername'        => rawlead_tg_login_bot_username(),
             'tgBotId'              => rawlead_tg_login_bot_id(),
             'tgLoginFallbackUrl'   => rawlead_tg_login_fallback_url(),

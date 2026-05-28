@@ -45,7 +45,7 @@ def main() -> int:
     print("version:", ver.strip())
     print("GUEST_SKILLS lines:", gs.strip())
     print("auth guard lines:", auth.strip())
-    ok = "1.7.7" in ver and int((gs.strip() or "0").split()[0]) >= 1
+    ok = "1.7.10" in ver and int((gs.strip() or "0").split()[0]) >= 1
     if ok:
         print("DEPLOY OK")
         return 0

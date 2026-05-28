@@ -9,11 +9,42 @@ from pathlib import Path
 if sys.platform == "win32":
     import msvcrt
 else:
+    import fcntl
+
     msvcrt = None  # type: ignore
 
 from config import Config, bot_poll_lock_path
 from storage import ProjectStorage
 from telegram_control import poll_commands
+
+
+def _try_acquire_poll_lock(fh) -> bool:
+    if sys.platform == "win32":
+        try:
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return False
+        return True
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    return True
+
+
+def _release_poll_lock(fh) -> None:
+    if sys.platform == "win32":
+        try:
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+        return
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+    except OSError:
+        pass
 
 
 def try_poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
@@ -30,18 +61,9 @@ def try_poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
         return poll_commands(cfg, storage)
 
     try:
-        if msvcrt is not None:
-            try:
-                fh.seek(0)
-                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
-            except OSError:
-                return []
+        if not _try_acquire_poll_lock(fh):
+            return []
         return poll_commands(cfg, storage)
     finally:
-        if msvcrt is not None:
-            try:
-                fh.seek(0)
-                msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
-            except OSError:
-                pass
+        _release_poll_lock(fh)
         fh.close()

@@ -4,6 +4,11 @@
 (function () {
   "use strict";
 
+  console.log(
+    "%c▲ RawLead Architecture by Rode51 ▲",
+    "color:#00ff00;font-size:16px;font-weight:bold;"
+  );
+
   var root = document.querySelector('[data-rl-app="feed"]');
   if (!root || !window.rawleadFeed) {
     return;
@@ -12,6 +17,41 @@
   var cfg = window.rawleadFeed;
   var TOKEN_KEY = "rawlead_access_token";
   var GUEST_SKILLS_KEY = "rawlead_lenta_skills";
+  var MAX_USER_TAGS = 6;
+  var TIER_A_BY_NICHE = {
+    dev: [
+      "python",
+      "javascript",
+      "php",
+      "wordpress_dev",
+      "telegram_bot_dev",
+      "api_integration",
+    ],
+    design: [
+      "figma",
+      "ui_ux",
+      "web_design",
+      "logo_design",
+      "brand_identity",
+      "banner_design",
+    ],
+    marketing: [
+      "smm",
+      "target_ads",
+      "yandex_direct",
+      "google_ads",
+      "seo",
+      "email_marketing",
+    ],
+    text: [
+      "copywriting",
+      "seo_copywriting",
+      "article_writing",
+      "translation",
+      "technical_writing",
+      "editing_proofreading",
+    ],
+  };
   var listEl = document.getElementById("rl-feed-list");
   var countEl = document.getElementById("rl-feed-count");
   var sentinelEl = document.getElementById("rl-feed-sentinel");
@@ -27,6 +67,7 @@
   var skillsApplyBtn = document.getElementById("rl-feed-skills-apply");
   var skillsClearBtn = document.getElementById("rl-feed-skills-clear");
   var skillsPanelEl = document.getElementById("rl-feed-skills-panel");
+  var skillsRareBtn = document.getElementById("rl-feed-skills-rare");
   var skillsTriggerEl = document.getElementById("rl-feed-skills-trigger-label");
   var sortTriggerEl = document.getElementById("rl-feed-sort-trigger");
   var sortBadgeEl = document.getElementById("rl-feed-sort-badge");
@@ -43,13 +84,18 @@
     appliedTags: [],
     catalog: [],
     catalogGroups: [],
+    showRareSkills: false,
+    tagsLimitFlash: false,
     tagsLoading: false,
     loading: false,
     done: false,
     totalShown: 0,
     expandedId: null,
     loadGeneration: 0,
+    itemsById: {},
   };
+
+  var subscriptionState = null;
 
   function apiUrl(params) {
     var q = new URLSearchParams(params);
@@ -75,6 +121,53 @@
       h.Authorization = "Bearer " + t;
     }
     return h;
+  }
+
+  function hasPaidAccess() {
+    return !!(subscriptionState && subscriptionState.effective_access);
+  }
+
+  function loadSubscription() {
+    if (!cfg.restSubscription || !getToken()) {
+      subscriptionState = null;
+      return Promise.resolve(null);
+    }
+    return fetch(cfg.restSubscription, {
+      credentials: "same-origin",
+      headers: authHeaders(),
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error("subscription " + res.status);
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        subscriptionState = data || null;
+        return data;
+      })
+      .catch(function () {
+        subscriptionState = null;
+        return null;
+      });
+  }
+
+  function draftUrl(leadId) {
+    var base = (cfg.restDraft || "").replace(/\/$/, "");
+    return base + "/" + leadId + "/draft";
+  }
+
+  function fetchDraft(leadId) {
+    return fetch(draftUrl(leadId), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: authHeaders(),
+    }).then(function (res) {
+      if (!res.ok) {
+        throw new Error("HTTP " + res.status);
+      }
+      return res.json();
+    });
   }
 
   function loadGuestTags() {
@@ -264,6 +357,36 @@
       html +=
         '<p class="rl-feed-card__text rl-feed-card__muted">Краткое описание появится после следующего цикла радара.</p>';
     }
+    var reply = (item.reply_draft || "").trim();
+    var tools = item.tools_required || [];
+    if (tools.length) {
+      html +=
+        '<div class="rl-feed-card__section">' +
+        '<h4 class="rl-feed-card__section-title">Инструменты</h4>' +
+        '<ul class="rl-feed-card__tools">' +
+        tools
+          .map(function (tool) {
+            return "<li>" + escapeHtml(tool) + "</li>";
+          })
+          .join("") +
+        "</ul></div>";
+    } else if (reply) {
+      html +=
+        '<div class="rl-feed-card__section">' +
+        '<h4 class="rl-feed-card__section-title">Инструменты</h4>' +
+        '<p class="rl-feed-card__text rl-feed-card__muted">Список инструментов появится после генерации отклика.</p>' +
+        "</div>";
+    }
+    if (reply) {
+      html +=
+        '<div class="rl-feed-card__section">' +
+        '<h4 class="rl-feed-card__section-title">Черновик отклика</h4>' +
+        '<p class="rl-feed-card__reply" data-reply-text>' +
+        escapeHtml(reply) +
+        "</p>" +
+        '<button type="button" class="rl-btn rl-btn--ghost rl-feed-card__copy" data-copy-reply>Скопировать черновик</button>' +
+        "</div>";
+    }
     if (item.url) {
       html +=
         '<a class="rl-btn rl-btn--ghost rl-feed-card__link" href="' +
@@ -273,8 +396,11 @@
     return html;
   }
 
-  function renderTagChips(leadTags) {
-    var tags = leadTags || [];
+  function renderTagChips(item) {
+    var tags =
+      (item && item.lead_tag_labels && item.lead_tag_labels.length
+        ? item.lead_tag_labels
+        : item && item.lead_tags) || [];
     var max = 4;
     var html = [];
     var i;
@@ -287,15 +413,53 @@
     return html.join("");
   }
 
+  function hasUserSkills() {
+    return state.appliedTags && state.appliedTags.length > 0;
+  }
+
+  function isPerfectMatch(item) {
+    var km = item.keyword_match != null ? item.keyword_match : 0;
+    return km >= 100 && hasUserSkills();
+  }
+
+  var VIEWS_EYE_SVG =
+    '<svg class="rl-feed-card__views-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z"/>' +
+    "</svg>";
+
+  function viewsHeadHtml(item) {
+    var v = item.display_views;
+    if (v == null || v <= 0) {
+      return "";
+    }
+    var n = escapeHtml(String(v));
+    return (
+      '<span class="rl-feed-card__views" aria-label="' +
+      n +
+      ' просмотров">' +
+      VIEWS_EYE_SVG +
+      '<span class="rl-feed-card__views-count">' +
+      n +
+      "</span></span>"
+    );
+  }
+
   function renderCard(item) {
     var src = sourceLabel(item.source);
+    var km = item.keyword_match != null ? item.keyword_match : 0;
     var rank = item.final_rank != null ? item.final_rank : 0;
+    var perfect = isPerfectMatch(item);
+    var barPct = km;
     var budget = item.budget_text || "—";
     var expanded = state.expandedId === item.id;
+    var matchBadge = perfect
+      ? '<span class="rl-feed-card__match-badge">Точное совпадение</span>'
+      : "";
 
     return (
       '<article class="rl-lead-card' +
       (expanded ? " is-expanded" : "") +
+      (perfect ? " rl-lead-card--perfect-match" : "") +
       '" data-id="' +
       item.id +
       '" tabindex="0" role="button">' +
@@ -308,9 +472,12 @@
       "</span>" +
       hotBadgeHtml(item) +
       "</div>" +
+      '<div class="rl-feed-card__head-meta">' +
+      viewsHeadHtml(item) +
       '<span class="rl-feed-card__time">' +
       formatTime(item.created_at) +
       "</span>" +
+      "</div>" +
       "</div>" +
       '<h3 class="rl-lead-card__title">' +
       '<span title="' +
@@ -325,20 +492,26 @@
       '<div class="rl-match">' +
       '<div class="rl-match__label">' +
       "<span>Совместимость " +
-      rank +
+      barPct +
       "%</span>" +
+      matchBadge +
       "</div>" +
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
-      rank +
+      barPct +
       '" aria-valuemin="0" aria-valuemax="100">' +
       '<span class="rl-match__fill" style="--match-value:' +
-      rank +
+      barPct +
       '%"></span>' +
       "</div>" +
       "</div>" +
       '<div class="rl-chips">' +
-      renderTagChips(item.lead_tags) +
+      renderTagChips(item) +
       "</div>" +
+      (hasPaidAccess() && km > 0
+        ? '<div class="rl-feed-card__cta">' +
+          '<button type="button" class="rl-btn rl-btn--primary rl-feed-card__reply-btn">Написать отклик</button>' +
+          "</div>"
+        : "") +
       '<div class="rl-feed-card__body">' +
       '<div class="rl-feed-card__body-inner">' +
       renderExpandedBody(item) +
@@ -380,10 +553,7 @@
       countEl.textContent = "";
       return;
     }
-    countEl.textContent =
-      state.appliedTags.length > 0
-        ? state.totalShown + " лидов · по совместимости"
-        : state.totalShown + " лидов за 7 дней";
+    countEl.textContent = state.totalShown + " лидов · по совместимости";
   }
 
   function categoryEmptyMessage() {
@@ -555,7 +725,15 @@
       if (!el) {
         return;
       }
+      if (state.tagsLimitFlash) {
+        el.hidden = false;
+        el.textContent = "Максимум " + MAX_USER_TAGS + " навыков";
+        return;
+      }
       el.hidden = !dirty;
+      if (!dirty && el.id === "rl-feed-skills-hint") {
+        el.textContent = "Выберите навыки и нажмите Применить";
+      }
     });
     applyBtns.forEach(function (btn) {
       if (!btn) {
@@ -565,11 +743,50 @@
     });
   }
 
+  function pickerRowVisible(row) {
+    if (!row || !row.tag) {
+      return false;
+    }
+    var tier = row.tier || "A";
+    var cats = state.draftCategories;
+    if (cats.length === 1) {
+      var niche = cats[0];
+      var tierA = TIER_A_BY_NICHE[niche] || [];
+      if (tierA.indexOf(row.tag) >= 0) {
+        return true;
+      }
+      return !!(state.showRareSkills && tier === "B" && row.category === niche);
+    }
+    if (cats.length > 1) {
+      if (row.category && cats.indexOf(row.category) < 0) {
+        return false;
+      }
+      return state.showRareSkills || tier === "A";
+    }
+    return true;
+  }
+
+  function updateRareSkillsUi() {
+    if (!skillsRareBtn) {
+      return;
+    }
+    var oneNiche = state.draftCategories.length === 1;
+    skillsRareBtn.hidden = !oneNiche;
+    skillsRareBtn.textContent = state.showRareSkills ? "Свернуть" : "Ещё навыки";
+    skillsRareBtn.setAttribute("aria-expanded", state.showRareSkills ? "true" : "false");
+  }
+
   function toggleDraftTag(tag) {
     if (!tag) {
       return;
     }
     var idx = state.draftTags.indexOf(tag);
+    if (idx < 0 && state.draftTags.length >= MAX_USER_TAGS) {
+      state.tagsLimitFlash = true;
+      updateSkillsDraftUi();
+      return;
+    }
+    state.tagsLimitFlash = false;
     state.draftTags =
       idx >= 0
         ? state.draftTags.filter(function (t) {
@@ -630,7 +847,7 @@
     if (groups) {
       container.innerHTML = groups
         .map(function (group) {
-          var skills = group.skills || [];
+          var skills = (group.skills || []).filter(pickerRowVisible);
           if (!skills.length) {
             return "";
           }
@@ -646,16 +863,17 @@
         })
         .join("");
     } else {
-      container.innerHTML =
-        '<div class="rl-feed-skills-group__chips">' +
-        state.catalog.map(skillChipHtml).join("") +
-        "</div>";
+      var flat = state.catalog.filter(pickerRowVisible);
+      container.innerHTML = flat.length
+        ? '<div class="rl-feed-skills-group__chips">' + flat.map(skillChipHtml).join("") + "</div>"
+        : '<p class="rl-feed-skills__empty">Нет навыков для выбранной ниши</p>';
     }
     bindSkillButtons(container);
   }
 
   function renderSkillsCatalog() {
     updateSkillsBadge();
+    updateRareSkillsUi();
     updateSkillsDraftUi();
     updateFilterBarUi();
     renderSkillsInto(skillsEl);
@@ -791,13 +1009,15 @@
       return Promise.resolve();
     }
     var url = cfg.restSkills;
-    if (state.draftCategories.length) {
-      var sep = url.indexOf("?") >= 0 ? "&" : "?";
+    var sep = url.indexOf("?") >= 0 ? "&" : "?";
+    if (state.draftCategories.length === 1) {
       url =
         url +
         sep +
-        "category=" +
-        encodeURIComponent(state.draftCategories.join(","));
+        "mode=full&limit=200&category=" +
+        encodeURIComponent(state.draftCategories[0]);
+    } else {
+      url = url + sep + "mode=popular&limit=80";
     }
     return fetch(url, { credentials: "same-origin" })
       .then(function (res) {
@@ -877,7 +1097,7 @@
     }
     var url = apiUrl(params);
 
-    fetch(url, { credentials: "same-origin" })
+    fetch(url, { credentials: "same-origin", headers: authHeaders() })
       .then(function (res) {
         if (!res.ok) {
           throw new Error("HTTP " + res.status);
@@ -917,6 +1137,9 @@
         } else {
           var frag = items.map(renderCard).join("");
           listEl.insertAdjacentHTML("beforeend", frag);
+          items.forEach(function (item) {
+            state.itemsById[item.id] = item;
+          });
           state.totalShown += items.length;
         }
         state.offset += data.count != null ? data.count : items.length;
@@ -957,6 +1180,16 @@
       });
   }
 
+  function updateCardDraft(card, item) {
+    var bodyInner = card.querySelector(".rl-feed-card__body-inner");
+    if (!bodyInner) {
+      return;
+    }
+    bodyInner.innerHTML = renderExpandedBody(item);
+    delete card.dataset.bound;
+    bindCards();
+  }
+
   function bindCards() {
     listEl.querySelectorAll(".rl-lead-card").forEach(function (card) {
       if (card.dataset.bound) {
@@ -964,7 +1197,11 @@
       }
       card.dataset.bound = "1";
       card.addEventListener("click", function (e) {
-        if (e.target.closest(".rl-feed-card__link")) {
+        if (
+          e.target.closest(
+            ".rl-feed-card__link, .rl-feed-card__reply-btn, .rl-feed-card__copy"
+          )
+        ) {
           return;
         }
         var id = parseInt(card.getAttribute("data-id"), 10);
@@ -985,6 +1222,69 @@
           card.click();
         }
       });
+      var replyBtn = card.querySelector(".rl-feed-card__reply-btn");
+      if (replyBtn) {
+        replyBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (!hasPaidAccess()) {
+            return;
+          }
+          var id = parseInt(card.getAttribute("data-id"), 10);
+          listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
+            c.classList.remove("is-expanded");
+          });
+          state.expandedId = id;
+          card.classList.add("is-expanded");
+          var replyEl = card.querySelector("[data-reply-text]");
+          if (replyEl && replyEl.textContent.trim()) {
+            replyEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            return;
+          }
+          var prevLabel = replyBtn.textContent;
+          replyBtn.disabled = true;
+          replyBtn.textContent = "Генерируем…";
+          fetchDraft(id)
+            .then(function (data) {
+              var base = state.itemsById[id] || { id: id };
+              var merged = Object.assign({}, base, {
+                reply_draft: data.reply_draft,
+                tools_required: data.tools_required || base.tools_required || [],
+              });
+              state.itemsById[id] = merged;
+              updateCardDraft(card, merged);
+            })
+            .catch(function (err) {
+              var msg =
+                err && err.message && err.message.indexOf("403") >= 0
+                  ? "Нет пересечения с вашими навыками"
+                  : "Не удалось сгенерировать черновик";
+              showError(msg);
+            })
+            .finally(function () {
+              replyBtn.disabled = false;
+              replyBtn.textContent = prevLabel;
+            });
+        });
+      }
+      var copyBtn = card.querySelector("[data-copy-reply]");
+      if (copyBtn) {
+        copyBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var replyEl = card.querySelector("[data-reply-text]");
+          var text = replyEl ? replyEl.textContent : "";
+          if (!text) {
+            return;
+          }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+              copyBtn.textContent = "Скопировано ✓";
+              setTimeout(function () {
+                copyBtn.textContent = "Скопировать черновик";
+              }, 2000);
+            });
+          }
+        });
+      }
     });
   }
 
@@ -1040,6 +1340,17 @@
     dd.open = false;
   });
 
+  document.addEventListener("mousedown", function (e) {
+    var sortDd = document.querySelector(".rl-filter-sort-dd");
+    if (!sortDd || !sortDd.open) {
+      return;
+    }
+    if (e.target.closest(".rl-filter-sort-dd")) {
+      return;
+    }
+    sortDd.open = false;
+  });
+
   bindWheelScroll(sidebarScroll || sidebar);
   bindSkillsPanels(sidebar || document);
 
@@ -1048,6 +1359,12 @@
   }
   if (skillsClearBtn) {
     skillsClearBtn.addEventListener("click", clearSkills);
+  }
+  if (skillsRareBtn) {
+    skillsRareBtn.addEventListener("click", function () {
+      state.showRareSkills = !state.showRareSkills;
+      renderSkillsCatalog();
+    });
   }
 
   function syncCategoryInputs(fromRoot, toRoot) {
@@ -1089,6 +1406,7 @@
         }
         state.draftCategories = readCategoriesFrom(root);
         state.appliedCategories = cloneCategories(state.draftCategories);
+        state.showRareSkills = false;
         pruneDraftTagsForCategories();
         renderSkillsCatalog();
         loadCatalog();
@@ -1230,7 +1548,9 @@
     io.observe(sentinelEl);
   }
 
-  Promise.all([loadTags(), loadCatalog()]).then(function () {
+  loadSubscription().then(function () {
+    return Promise.all([loadTags(), loadCatalog()]);
+  }).then(function () {
     state.draftCategories = readCategoriesFrom();
     state.appliedCategories = cloneCategories(state.draftCategories);
     renderSkillsCatalog();

@@ -46,20 +46,21 @@
 
 ---
 
-## PRE-PROD-STRESS — стресс и приёмка на хосте (владелец 2026-05-27)
+## PRE-PROD — UX-audit + stress (O21, 2026-05-28)
 
-**Когда:** сразу **после § P5** (WP + API + Site-радар на VPS/хостинге), **до** открытия трафика. На локалке — только слой **1** (промпты); слои **2–4** — только **боевой/staging URL**.
+**Когда:** **после** O20: SFW → Design → PM copy → Coder финал. **Не** между SFW и дизайнером.
 
-**Промпт Coder:** [`CODER_PROMPT.md`](CODER_PROMPT.md) § **PRE-PROD-STRESS**
+**Промпт:** [`CODER_PROMPT.md`](CODER_PROMPT.md) § **PRE-PROD-UX-AUDIT** · § **PRE-PROD-STRESS** · runbook [`ops/PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md)
 
-### Четыре слоя (порядок)
+### Слои (порядок)
 
-| Слой | Что проверяем | Авто | Кто |
-|------|----------------|------|-----|
-| **1. ИИ** | L1/L2 по **dev, design, marketing, text** — `task_summary`, инструменты, `reply_draft` без воды | скрипт матрицы → JSON | @coder · выборочно владелец |
-| **2. Сайт** | `/lenta/`, multi-category, навыки от category, % match, `/cabinet/`, TG Login | Playwright (5 сценариев) | @coder |
-| **3. API + WP** | `GET /v1/feed`, `/skills/catalog`, health; p95 latency | k6 или Locust (50–100 VU, **без** массового L1) | @coder |
-| **4. Радар + ИИ нагрузка** | 2–4 цикла Site на VPS: время цикла, `ИИ L1=` в логе, 429 OpenRouter, Neon | лог + замер | @coder · владелец смотрит бюджет |
+| Слой | Что | Скрипт |
+|------|-----|--------|
+| **1. ИИ** | L1/L2 матрица | `preprod_ai_matrix.py` |
+| **2. UX-audit** | Все страницы, один прогон «ИИ-тестировщик» | `preprod_playwright/ux_audit.py` |
+| **3. Smoke** | 5 сценариев | `preprod_playwright/smoke.py` |
+| **4. Нагрузка** | k6 на API | `preprod_k6_feed.js` |
+| **5. Радар** | 2–4 цикла Site | лог VPS |
 
 **Не гонять:** 1000+ вызовов premium на стресс — сжигает OpenRouter. Нагрузка на **чтение ленты**, не на полный парсинг+ИИ.
 
@@ -68,11 +69,11 @@
 | # | Критерий |
 |---|----------|
 | S1 | Матрица ИИ: по каждой из 4 category есть ≥3 примера в отчёте, без пустых `reply_draft` на «нормальном» лиде |
-| S2 | Playwright: лента + multi-category + «Применить» навыки — **pass** на prod URL |
-| S3 | k6: `GET /v1/feed?limit=20` — p95 &lt; **2 с** (или согласованный порог в STATUS), 0% 5xx за 5 мин |
-| S4 | Site ▶ на VPS: один цикл FL+Kwork завершился, `neon_insert` или replay в логе, нет лавины ошибок |
-| S5 | Владелец 15 мин: глазами 10 карточек на `/lenta/` — осмысленные, без вердикт-чипов (после PRE-LAUNCH A) |
-| S6 | `/cabinet/`: персонализация L2 подтверждена на тест-кейсе (смена `user_tags` меняет `reply_draft`; вход и me/* стабильны) |
+| S2 | UX-audit: 0 critical; отчёт `data/preprod_ux_audit.md` |
+| S3 | Smoke pass (`preprod_playwright/smoke.py`) |
+| S4 | k6: p95 &lt; 2 с, 0% 5xx за 5 мин |
+| S5 | Site ▶: цикл FL+Kwork без лавины ошибок |
+| S6 | Владелец 15 мин глазами + L2 в `/cabinet/` |
 
 **Красные флаги (стоп трафика):** 429/timeout OpenRouter на каждом лиде; API 5xx под 20 VU; CORS блокирует WP; лента пустая при живом радаре.
 
@@ -110,10 +111,10 @@
 ## Порядок Coder
 
 ```
-PRE-LAUNCH → P5-PREP → P5 (деплой на хост) → PRE-PROD-STRESS → «едем на прод» (трафик)
+SFW → Design → PM copy → Coder финал → PRE-PROD (UX-audit + stress S1–S6) → «едем на прод» (трафик)
 ```
 
-Промпт: [`CODER_PROMPT.md`](CODER_PROMPT.md) · Design: [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § D1
+Промпт: [`CODER_PROMPT.md`](CODER_PROMPT.md) § **PRE-PROD-UX-AUDIT** · § **PRE-PROD-STRESS**
 
 ---
 

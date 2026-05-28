@@ -11,7 +11,7 @@ $contact = rawlead_page_url('contact');
 
 $plan = [
     'name'     => __('ИИ-агент', 'rawlead-kadence-child'),
-    'price'    => __('от 300 ₽/мес', 'rawlead-kadence-child'),
+    'price'    => __('300 ⭐/мес (~400–720 ₽)', 'rawlead-kadence-child'),
     'subtitle' => __('Для любой ниши — дизайн, тексты, код, маркетинг. ИИ знает ваши теги.', 'rawlead-kadence-child'),
     'items'    => [
         __('Персональная лента по вашим навыкам', 'rawlead-kadence-child'),
@@ -20,8 +20,8 @@ $plan = [
         __('Рыночная цена заказа', 'rawlead-kadence-child'),
         __('Push в Telegram при новом матче', 'rawlead-kadence-child'),
     ],
-    'badge' => __('Скоро', 'rawlead-kadence-child'),
-    'cta'   => __('Узнать первым →', 'rawlead-kadence-child'),
+    'badge' => __('Beta', 'rawlead-kadence-child'),
+    'cta'   => __('Вход в кабинет →', 'rawlead-kadence-child'),
 ];
 ?>
 <section id="pricing-preview" class="rl-section rl-reveal" aria-labelledby="rl-pricing-title">
@@ -39,17 +39,17 @@ $plan = [
 					<?php endforeach; ?>
 				</ul>
 				<div class="rl-price-card__cta">
-					<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($contact); ?>">
+					<a class="rl-btn rl-btn--primary" href="<?php echo esc_url(rawlead_page_url('cabinet')); ?>">
 						<?php echo esc_html($plan['cta']); ?>
 					</a>
 				</div>
 			</article>
 		</div>
 		<p class="rl-pricing__note">
-			<em><?php esc_html_e('Оплата через Telegram Stars — скоро. Сейчас лента и кабинет бесплатно.', 'rawlead-kadence-child'); ?></em>
+			<em><?php esc_html_e('Оплата через Telegram Stars — @rawlead_bot /pay или кнопка в кабинете.', 'rawlead-kadence-child'); ?></em>
 		</p>
 		<p class="rl-pricing__link">
-			<a class="rl-link-arrow" href="<?php echo esc_url($contact); ?>"><?php esc_html_e('Узнать первым →', 'rawlead-kadence-child'); ?></a>
+			<a class="rl-link-arrow" href="<?php echo esc_url(rawlead_page_url('pricing')); ?>"><?php esc_html_e('Подробнее о тарифе →', 'rawlead-kadence-child'); ?></a>
 		</p>
 	</div>
 </section>

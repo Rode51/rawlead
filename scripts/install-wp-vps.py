@@ -11,6 +11,28 @@ _ROOT = Path(__file__).resolve().parents[1]
 _THEME = _ROOT / "wordpress" / "rawlead-kadence-child"
 
 
+def _tg_bot_id_from_env() -> str:
+    """Numeric @rawlead_bot id for wp-config RAWLEAD_TG_BOT_ID (OAuth fallback)."""
+    for env_name in (".env.site", ".env"):
+        path = _ROOT / env_name
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("TELEGRAM_BOT_USER_ID="):
+                val = line.split("=", 1)[1].strip().strip("'\"")
+                if val.isdigit():
+                    return val
+            if line.startswith("TELEGRAM_BOT_TOKEN="):
+                val = line.split("=", 1)[1].strip().strip("'\"")
+                prefix = val.split(":", 1)[0]
+                if prefix.isdigit():
+                    return prefix
+    return ""
+
+
 def main() -> int:
     subprocess.run(
         ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(_ROOT / "scripts" / "prep-vps-env.ps1")],
@@ -103,13 +125,19 @@ chown -R www-data:www-data /var/www/rawlead.ru
         "-o /usr/local/bin/wp && chmod +x /usr/local/bin/wp"
     )
 
+    tg_bot_id = _tg_bot_id_from_env()
+    tg_bot_id_line = ""
+    if tg_bot_id:
+        tg_bot_id_line = f"\\ndefine('RAWLEAD_TG_BOT_ID', '{tg_bot_id}');"
+
     wp_cfg = f"""
 cd /var/www/rawlead.ru
 if [ ! -f wp-config.php ]; then
   cp wp-config-sample.php wp-config.php
   wp config create --dbname=rawlead_wp --dbuser=rawlead --dbpass='{db_pass}' --dbhost=localhost --allow-root --skip-check
 fi
-grep -q RAWLEAD_API_URL wp-config.php || sed -i "/^\\/\\* That's all/i define('RAWLEAD_API_URL', 'http://127.0.0.1:8000');\\ndefine('RAWLEAD_TG_BOT_USERNAME', 'rawlead_bot');" wp-config.php
+grep -q RAWLEAD_API_URL wp-config.php || sed -i "/^\\/\\* That's all/i define('RAWLEAD_API_URL', 'http://127.0.0.1:8000');\\ndefine('RAWLEAD_TG_BOT_USERNAME', 'rawlead_bot');{tg_bot_id_line}" wp-config.php
+grep -q RAWLEAD_TG_BOT_ID wp-config.php || {{ [ -n "{tg_bot_id}" ] && sed -i "/^\\/\\* That's all/i define('RAWLEAD_TG_BOT_ID', '{tg_bot_id}');" wp-config.php || true; }}
 if ! wp core is-installed --allow-root 2>/dev/null; then
   wp core install --url='http://rawlead.ru' --title='RawLead' --admin_user='admin' --admin_password='{admin_pass}' --admin_email='admin@rawlead.ru' --skip-email --allow-root
 fi

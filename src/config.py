@@ -69,6 +69,10 @@ class Config:
     site_notify_owner: bool
     radar_conveyor: bool
     l1_batch_per_cycle: int
+    match_push_enabled: bool
+    stars_enabled: bool
+    stars_price_xtr: int
+    stars_subscription_days: int
 
     @property
     def ai_active(self) -> bool:
@@ -174,6 +178,12 @@ def bot_poll_lock_path(bot_token: str) -> Path:
     if not bot_id.isdigit():
         bot_id = "0"
     return _PROJECT_ROOT / "data" / f".bot_poll_{bot_id}.lock"
+
+
+def bot_poll_external() -> bool:
+    """VPS: polling в rawlead-bot-poll.service — main/tg_main не дублируют getUpdates."""
+    raw = os.environ.get("RAWLEAD_BOT_POLL_EXTERNAL", "").strip().casefold()
+    return raw in ("1", "true", "yes", "on")
 
 
 def _parse_ai_mode(raw: str | None, *, profile: str) -> str:
@@ -820,6 +830,25 @@ def load_config() -> Config:
         default=False,
     )
 
+    match_push_enabled = _parse_bool_flag(
+        os.environ.get("MATCH_PUSH"),
+        default=False,
+    )
+    stars_enabled = _parse_bool_flag(
+        os.environ.get("STARS_ENABLED"),
+        default=False,
+    )
+    stars_price_raw = os.environ.get("STARS_PRICE_XTR", "300").strip()
+    try:
+        stars_price_xtr = max(1, int(stars_price_raw))
+    except ValueError:
+        stars_price_xtr = 300
+    stars_days_raw = os.environ.get("STARS_SUBSCRIPTION_DAYS", "30").strip()
+    try:
+        stars_subscription_days = max(1, min(365, int(stars_days_raw)))
+    except ValueError:
+        stars_subscription_days = 30
+
     return Config(
         fl_projects_url=fl_url,
         kwork_projects_url=kwork_url,
@@ -847,4 +876,8 @@ def load_config() -> Config:
         site_notify_owner=site_notify_owner,
         radar_conveyor=radar_conveyor,
         l1_batch_per_cycle=l1_batch_per_cycle,
+        match_push_enabled=match_push_enabled,
+        stars_enabled=stars_enabled,
+        stars_price_xtr=stars_price_xtr,
+        stars_subscription_days=stars_subscription_days,
     )

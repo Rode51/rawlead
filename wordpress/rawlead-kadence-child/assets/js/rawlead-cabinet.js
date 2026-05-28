@@ -1,12 +1,17 @@
 /**
 
- * RawLead /cabinet — теги, персональная лента (final_rank), infinite scroll.
+ * RawLead /cabinet — навыки, персональная лента (final_rank), infinite scroll.
 
  */
 
 (function () {
 
   "use strict";
+
+  console.log(
+    "%c▲ RawLead Architecture by Rode51 ▲",
+    "color:#00ff00;font-size:16px;font-weight:bold;"
+  );
 
 
 
@@ -23,6 +28,44 @@
   var cfg = window.rawleadCabinet;
 
   var TOKEN_KEY = "rawlead_access_token";
+  var SORT_KEY = "rawlead_cabinet_sort";
+  var USER_META_KEY = "rawlead_user_meta";
+  var GUEST_SKILLS_KEYS = ["rawlead_lenta_skills", "rawlead_guest_skills"];
+  var MAX_USER_TAGS = 6;
+  var TIER_A_BY_NICHE = {
+    dev: [
+      "python",
+      "javascript",
+      "php",
+      "wordpress_dev",
+      "telegram_bot_dev",
+      "api_integration",
+    ],
+    design: [
+      "figma",
+      "ui_ux",
+      "web_design",
+      "logo_design",
+      "brand_identity",
+      "banner_design",
+    ],
+    marketing: [
+      "smm",
+      "target_ads",
+      "yandex_direct",
+      "google_ads",
+      "seo",
+      "email_marketing",
+    ],
+    text: [
+      "copywriting",
+      "seo_copywriting",
+      "article_writing",
+      "translation",
+      "technical_writing",
+      "editing_proofreading",
+    ],
+  };
 
   var loginEl = document.getElementById("rl-cabinet-login");
 
@@ -33,6 +76,9 @@
   var fallbackEl = document.getElementById("rl-cabinet-login-fallback");
   var fallbackLinkEl = document.getElementById("rl-cabinet-fallback-link");
   var widgetTimeoutMs = 3000;
+  var popupTimeoutMs = 8000;
+  var widgetLoadFailed = false;
+  var popupTimedOut = false;
   var hasWidgetAuthCompleted = false;
 
   function setLoginState(level, text) {
@@ -145,17 +191,46 @@
     completeTelegramAuth(payload);
   });
 
+  function redirectTgLoginFallback() {
+    if (!cfg.tgLoginFallbackUrl) {
+      setLoginState(
+        "error",
+        "Fallback URL не задан. Добавьте RAWLEAD_TG_BOT_ID в wp-config.php."
+      );
+      return;
+    }
+    setLoginState("info", "Переходим в Telegram для входа...");
+    window.location.href = cfg.tgLoginFallbackUrl;
+  }
+
   if (fallbackLinkEl) {
     fallbackLinkEl.addEventListener("click", function (e) {
       if (!cfg.tgBotId && !cfg.tgLoginFallbackUrl) {
         return;
       }
       e.preventDefault();
-      if (window.Telegram && window.Telegram.Login && cfg.tgBotId) {
+      if (widgetLoadFailed || popupTimedOut || !cfg.tgBotId) {
+        redirectTgLoginFallback();
+        return;
+      }
+      if (window.Telegram && window.Telegram.Login) {
         setLoginState("info", "Открываем Telegram Login popup...");
+        var popupDone = false;
+        var popupTimer = setTimeout(function () {
+          if (popupDone) {
+            return;
+          }
+          popupTimedOut = true;
+          setLoginState(
+            "warn",
+            "Не удалось открыть Telegram. Из РФ включите VPN или нажмите кнопку снова для redirect."
+          );
+        }, popupTimeoutMs);
         window.Telegram.Login.auth(
           { bot_id: Number(cfg.tgBotId), request_access: "write" },
           function (data) {
+            popupDone = true;
+            clearTimeout(popupTimer);
             if (!data) {
               setLoginState("error", "Telegram popup закрыт без авторизации.");
               return;
@@ -178,12 +253,7 @@
         );
         return;
       }
-      if (cfg.tgLoginFallbackUrl) {
-        setLoginState("info", "Переходим в Telegram fallback и ждём возврат в /cabinet/...");
-        window.location.href = cfg.tgLoginFallbackUrl;
-        return;
-      }
-      setLoginState("error", "Telegram popup API недоступен.");
+      redirectTgLoginFallback();
     });
   }
 
@@ -204,6 +274,614 @@
       localStorage.removeItem(TOKEN_KEY);
 
     }
+
+    try {
+      window.dispatchEvent(new Event("rawlead-auth-changed"));
+    } catch (e) {
+      /* IE11 */
+    }
+
+  }
+
+  function readUserMeta() {
+
+    try {
+
+      var raw = localStorage.getItem(USER_META_KEY);
+
+      if (!raw) {
+
+        return null;
+
+      }
+
+      return JSON.parse(raw);
+
+    } catch (e) {
+
+      return null;
+
+    }
+
+  }
+
+  function saveUserMeta(data) {
+
+    if (!data) {
+
+      return;
+
+    }
+
+    var username = (data.username || "").trim();
+
+    var firstName = (data.first_name || "").trim();
+
+    var photoUrl = (data.photo_url || "").trim();
+
+    var display = username ? "@" + username : firstName || "Telegram";
+
+    try {
+
+      localStorage.setItem(
+        USER_META_KEY,
+        JSON.stringify({
+          username: username,
+          first_name: firstName,
+          photo_url: photoUrl,
+          display: display,
+        })
+      );
+
+    } catch (e) {
+
+      /* private mode */
+
+    }
+
+    if (window.rawleadSyncHeader) {
+
+      window.rawleadSyncHeader();
+
+    }
+
+  }
+
+  function clearUserMeta() {
+
+    try {
+
+      localStorage.removeItem(USER_META_KEY);
+
+    } catch (e) {
+
+      /* private mode */
+
+    }
+
+    if (window.rawleadSyncHeader) {
+
+      window.rawleadSyncHeader();
+
+    }
+
+  }
+
+  function readGuestSkillTags() {
+
+    var tags = [];
+
+    var i;
+
+    var key;
+
+    var raw;
+
+    var parsed;
+
+    var j;
+
+    for (i = 0; i < GUEST_SKILLS_KEYS.length; i++) {
+
+      key = GUEST_SKILLS_KEYS[i];
+
+      try {
+
+        raw = localStorage.getItem(key);
+
+        if (!raw) {
+
+          continue;
+
+        }
+
+        parsed = JSON.parse(raw);
+
+        if (!Array.isArray(parsed)) {
+
+          continue;
+
+        }
+
+        for (j = 0; j < parsed.length; j++) {
+
+          if (typeof parsed[j] === "string" && parsed[j] && tags.indexOf(parsed[j]) < 0) {
+
+            tags.push(parsed[j]);
+
+          }
+
+        }
+
+      } catch (e) {
+
+        /* skip bad key */
+
+      }
+
+    }
+
+    return tags;
+
+  }
+
+  function clearGuestSkillKeys() {
+
+    var i;
+
+    for (i = 0; i < GUEST_SKILLS_KEYS.length; i++) {
+
+      try {
+
+        localStorage.removeItem(GUEST_SKILLS_KEYS[i]);
+
+      } catch (e) {
+
+        /* private mode */
+
+      }
+
+    }
+
+  }
+
+  function mergeGuestSkillsAfterAuth() {
+
+    var guest = readGuestSkillTags();
+
+    if (!guest.length) {
+
+      return Promise.resolve();
+
+    }
+
+    return fetch(cfg.restTags, { credentials: "same-origin", headers: authHeaders() })
+
+      .then(function (res) {
+
+        if (!res.ok) {
+
+          throw new Error("HTTP " + res.status);
+
+        }
+
+        return res.json();
+
+      })
+
+      .then(function (data) {
+
+        var server = data.tags || [];
+
+        var merged = server.slice();
+
+        var i;
+
+        for (i = 0; i < guest.length; i++) {
+
+          if (merged.indexOf(guest[i]) < 0) {
+
+            merged.push(guest[i]);
+
+          }
+
+        }
+
+        if (merged.length === server.length) {
+
+          clearGuestSkillKeys();
+
+          return merged;
+
+        }
+
+        return fetch(cfg.restTags, {
+
+          method: "PUT",
+
+          credentials: "same-origin",
+
+          headers: Object.assign(
+
+            { "Content-Type": "application/json" },
+
+            authHeaders()
+
+          ),
+
+          body: JSON.stringify({ tags: merged }),
+
+        }).then(function (res) {
+
+          if (!res.ok) {
+
+            throw new Error("HTTP " + res.status);
+
+          }
+
+          clearGuestSkillKeys();
+
+          return res.json().then(function (putData) {
+
+            return putData.tags || merged;
+
+          });
+
+        });
+
+      })
+
+      .catch(function () {
+
+        /* keep guest keys if merge failed */
+
+        return null;
+
+      });
+
+  }
+
+  var userBarEl = document.getElementById("rl-cabinet-user");
+  var userNameEl = document.getElementById("rl-cabinet-user-name");
+  var userAvatarEl = document.getElementById("rl-cabinet-user-avatar");
+  var logoutBtn = document.getElementById("rl-cabinet-logout");
+  var subEl = document.getElementById("rl-cabinet-sub");
+  var subBadgeEl = document.getElementById("rl-cabinet-sub-badge");
+  var subPlanEl = document.getElementById("rl-cabinet-sub-plan");
+  var subDetailEl = document.getElementById("rl-cabinet-sub-detail");
+  var subPayEl = document.getElementById("rl-cabinet-sub-pay");
+  var subPauseEl = document.getElementById("rl-cabinet-sub-pause");
+  var subResumeEl = document.getElementById("rl-cabinet-sub-resume");
+  var subNoteEl = document.getElementById("rl-cabinet-sub-note");
+  var subscriptionState = null;
+
+  var notifEl = document.getElementById("rl-cabinet-notif");
+  var notifThresholdEl = document.getElementById("rl-cabinet-notif-threshold");
+  var notifEnabledEl = document.getElementById("rl-cabinet-notif-enabled");
+  var notifStatusEl = document.getElementById("rl-cabinet-notif-status");
+
+  function renderUserBar() {
+
+    if (!userBarEl) {
+
+      return;
+
+    }
+
+    var meta = readUserMeta();
+
+    if (!meta) {
+
+      userBarEl.hidden = true;
+
+      return;
+
+    }
+
+    userBarEl.hidden = false;
+
+    if (userNameEl) {
+
+      userNameEl.textContent = meta.display || meta.username || "Telegram";
+
+    }
+
+    if (userAvatarEl) {
+
+      if (meta.photo_url) {
+
+        userAvatarEl.src = meta.photo_url;
+
+        userAvatarEl.hidden = false;
+
+      } else {
+
+        userAvatarEl.hidden = true;
+
+        userAvatarEl.removeAttribute("src");
+
+      }
+
+    }
+
+  }
+
+  function formatSubDate(iso) {
+    if (!iso) {
+      return "";
+    }
+    try {
+      return new Date(iso).toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    } catch (e) {
+      return iso;
+    }
+  }
+
+  function subscriptionStatusLabel(status) {
+    var map = {
+      beta: "Beta",
+      free: "Бесплатно",
+      active: "Активна",
+      paused: "Пауза",
+      expired: "Истекла",
+    };
+    return map[status] || status || "—";
+  }
+
+  function renderSubscription(data) {
+    if (!subEl) {
+      return;
+    }
+    subscriptionState = data || null;
+    if (!data) {
+      subEl.hidden = true;
+      return;
+    }
+    subEl.hidden = false;
+    var status = data.status || "free";
+    if (subBadgeEl) {
+      subBadgeEl.textContent = subscriptionStatusLabel(status);
+      subBadgeEl.className =
+        "rl-cabinet-sub__badge rl-cabinet-sub__badge--" + status;
+    }
+    if (subPlanEl) {
+      subPlanEl.textContent = data.plan_label || "ИИ-агент";
+    }
+    if (subDetailEl) {
+      var detail = "";
+      if (status === "paused" && data.paused_until) {
+        detail = "На паузе до " + formatSubDate(data.paused_until);
+      } else if (status === "active" && data.active_until) {
+        detail = "Активна до " + formatSubDate(data.active_until);
+      } else if (status === "beta") {
+        detail = "Полный доступ в режиме beta — оплата пока не требуется";
+      } else if (status === "free") {
+        detail = "Лента с задержкой 15 мин. Stars — мгновенный доступ и «Написать отклик» на ленте.";
+      } else if (status === "expired") {
+        detail = "Подписка истекла — продлите через Telegram Stars";
+      }
+      subDetailEl.textContent = detail;
+    }
+    if (subPayEl) {
+      if (data.stars_available) {
+        subPayEl.href = cfg.botPayUrl || "https://t.me/rawlead_bot?start=pay";
+        subPayEl.setAttribute("target", "_blank");
+        subPayEl.setAttribute("rel", "noopener");
+        subPayEl.removeAttribute("aria-disabled");
+        subPayEl.classList.remove("is-disabled");
+        subPayEl.textContent = "Оплатить Stars";
+      } else {
+        subPayEl.href = cfg.pricingUrl || subPayEl.getAttribute("href") || "#";
+        subPayEl.removeAttribute("target");
+        subPayEl.setAttribute("aria-disabled", "true");
+        subPayEl.classList.add("is-disabled");
+        subPayEl.textContent = "Оплатить Stars — скоро";
+      }
+    }
+    if (subPauseEl) {
+      subPauseEl.hidden = !data.can_pause;
+      subPauseEl.disabled = !data.can_pause;
+    }
+    if (subResumeEl) {
+      subResumeEl.hidden = status !== "paused";
+    }
+    if (subNoteEl) {
+      if (status === "active" || status === "paused") {
+        subNoteEl.textContent =
+          "Пауза без штрафов — доступ к платным функциям приостановится до даты возобновления.";
+      } else if (data.stars_available) {
+        subNoteEl.textContent =
+          "Оплата через Telegram Stars — мгновенная лента, «Написать отклик» и push match в боте.";
+      } else {
+        subNoteEl.textContent =
+          "Сейчас лента и кабинет бесплатны в режиме beta. Оплата через Telegram Stars подключится в следующем релизе.";
+      }
+    }
+  }
+
+  function loadSubscription() {
+    if (!cfg.restSubscription || !getToken()) {
+      renderSubscription(null);
+      return Promise.resolve(null);
+    }
+    return fetch(cfg.restSubscription, {
+      credentials: "same-origin",
+      headers: authHeaders(),
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error("subscription " + res.status);
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        renderSubscription(data);
+        return data;
+      })
+      .catch(function () {
+        renderSubscription(null);
+        return null;
+      });
+  }
+
+  function postSubscriptionPause(body) {
+    if (!cfg.restSubscription) {
+      return Promise.reject(new Error("no endpoint"));
+    }
+    return fetch(cfg.restSubscription, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+      body: JSON.stringify(body || {}),
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        if (!res.ok) {
+          throw new Error((data && data.message) || "pause failed");
+        }
+        renderSubscription(data);
+        return data;
+      });
+    });
+  }
+
+  function renderNotificationSettings(data) {
+    if (!notifEl) {
+      return;
+    }
+    if (!data) {
+      notifEl.hidden = true;
+      return;
+    }
+    notifEl.hidden = false;
+    if (notifThresholdEl) {
+      notifThresholdEl.value = String(data.push_min_match || 60);
+    }
+    if (notifEnabledEl) {
+      var enabled = data.push_enabled !== false;
+      notifEnabledEl.setAttribute("aria-checked", enabled ? "true" : "false");
+      notifEnabledEl.classList.toggle("is-on", enabled);
+    }
+  }
+
+  function loadNotificationSettings() {
+    if (!cfg.restNotificationSettings || !getToken()) {
+      renderNotificationSettings(null);
+      return Promise.resolve(null);
+    }
+    return fetch(cfg.restNotificationSettings, {
+      credentials: "same-origin",
+      headers: authHeaders(),
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error("notif-settings " + res.status);
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        renderNotificationSettings(data);
+        return data;
+      })
+      .catch(function () {
+        renderNotificationSettings(null);
+        return null;
+      });
+  }
+
+  function _notifSetStatus(msg, isErr) {
+    if (!notifStatusEl) {
+      return;
+    }
+    notifStatusEl.textContent = msg || "";
+    notifStatusEl.className = "rl-cabinet-notif__status" + (isErr ? " rl-cabinet-notif__status--err" : "");
+  }
+
+  function patchNotificationSettings(payload) {
+    if (!cfg.restNotificationSettings || !getToken()) {
+      return Promise.reject(new Error("no endpoint"));
+    }
+    return fetch(cfg.restNotificationSettings, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+      body: JSON.stringify(payload),
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        if (!res.ok) {
+          throw new Error((data && data.detail) || "patch failed");
+        }
+        renderNotificationSettings(data);
+        _notifSetStatus("Сохранено", false);
+        setTimeout(function () { _notifSetStatus(""); }, 2000);
+        return data;
+      });
+    }).catch(function (e) {
+      _notifSetStatus(e.message || "Ошибка сохранения", true);
+    });
+  }
+
+  if (notifThresholdEl) {
+    notifThresholdEl.addEventListener("change", function () {
+      var val = parseInt(notifThresholdEl.value, 10);
+      if (!isNaN(val)) {
+        patchNotificationSettings({ push_min_match: val });
+      }
+    });
+  }
+
+  if (notifEnabledEl) {
+    notifEnabledEl.addEventListener("click", function () {
+      var current = notifEnabledEl.getAttribute("aria-checked") === "true";
+      patchNotificationSettings({ push_enabled: !current });
+    });
+  }
+
+  if (subPauseEl) {
+    subPauseEl.addEventListener("click", function () {
+      subPauseEl.disabled = true;
+      postSubscriptionPause({ days: 14 })
+        .catch(function () {
+          if (subPauseEl) {
+            subPauseEl.disabled = false;
+          }
+        });
+    });
+  }
+
+  if (subResumeEl) {
+    subResumeEl.addEventListener("click", function () {
+      subResumeEl.disabled = true;
+      postSubscriptionPause({ resume: true })
+        .catch(function () {
+          if (subResumeEl) {
+            subResumeEl.disabled = false;
+          }
+        })
+        .finally(function () {
+          if (subResumeEl) {
+            subResumeEl.disabled = false;
+          }
+        });
+    });
+  }
+
+  function logout() {
+
+    setToken("");
+
+    clearUserMeta();
+
+    showLogin();
+
+  }
+
+  if (logoutBtn) {
+
+    logoutBtn.addEventListener("click", logout);
 
   }
 
@@ -268,6 +946,12 @@
       appEl.hidden = false;
 
     }
+
+    renderUserBar();
+
+    loadSubscription();
+
+    loadNotificationSettings();
 
   }
 
@@ -357,14 +1041,18 @@
 
       var hasWidget = box.querySelector("iframe, .telegram-login-button");
 
+      if (!hasWidget) {
+        widgetLoadFailed = true;
+      }
+
       if (!hasWidget && loginHintEl) {
 
         loginHintEl.hidden = false;
 
         loginHintEl.textContent =
 
-          "Виджет Telegram не загрузился. Обновите страницу (Ctrl+F5) и отключите блокировщик для telegram.org.";
-        showFallback(true, "Widget не загрузился. Используйте fallback-вход в новом окне.");
+          "Виджет Telegram не загрузился. Из РФ нужен VPN (Telegram заблокирован). Обновите страницу (Ctrl+F5) или используйте кнопку входа ниже.";
+        showFallback(true, "Widget не загрузился. Нажмите «Войти через Telegram» — откроется redirect.");
       } else {
         setLoginState("ok", "Widget загружен. Подтвердите вход в Telegram.");
         showFallback(true);
@@ -423,11 +1111,13 @@
         } catch (err) {
           throw new Error("token save failed");
         }
+        saveUserMeta(Object.assign({}, user, data));
         setLoginState("ok", "Вход выполнен. Загружаем кабинет...");
 
-        showApp();
-
-        bootCabinet();
+        return mergeGuestSkillsAfterAuth().then(function () {
+          showApp();
+          bootCabinet();
+        });
 
       })
 
@@ -471,17 +1161,41 @@
     };
   }
 
+  function parseTgAuthResultHash() {
+    var rawHash = (window.location.hash || "").replace(/^#/, "");
+    if (!rawHash || rawHash.indexOf("tgAuthResult=") !== 0) {
+      return null;
+    }
+    try {
+      var json = JSON.parse(decodeURIComponent(rawHash.slice("tgAuthResult=".length)));
+      if (json && json.user) {
+        return normalizeTelegramAuthPayload(
+          Object.assign({}, json.user, {
+            auth_date: json.auth_date,
+            hash: json.hash,
+          })
+        );
+      }
+    } catch (e) {
+      // fall through to query/hash parsers
+    }
+    return null;
+  }
+
   function consumeDeepLinkAuth() {
-    var queryPayload = parseAuthFromParams(new URLSearchParams(window.location.search || ""));
+    var payload = parseTgAuthResultHash();
+    if (!payload) {
+      payload = parseAuthFromParams(new URLSearchParams(window.location.search || ""));
+    }
     var hashPayload = null;
-    if (!queryPayload && window.location.hash) {
+    if (!payload && window.location.hash) {
       var rawHash = window.location.hash.replace(/^#/, "");
       if (rawHash.indexOf("?") >= 0) {
         rawHash = rawHash.split("?")[1];
       }
       hashPayload = parseAuthFromParams(new URLSearchParams(rawHash));
     }
-    var payload = queryPayload || hashPayload;
+    payload = payload || hashPayload;
     if (!payload || !payload.id || !payload.auth_date || !payload.hash) {
       return false;
     }
@@ -494,6 +1208,8 @@
   }
 
   var tagsEl = document.getElementById("rl-cabinet-tags");
+
+  var tagsClearBtn = document.getElementById("rl-cabinet-tags-clear");
 
   var tagsHint = document.getElementById("rl-cabinet-tags-hint");
 
@@ -515,17 +1231,42 @@
 
   var resetBtn = sidebar ? sidebar.querySelector(".rl-feed-reset") : null;
 
+  var skillsModalEl = document.getElementById("rl-cabinet-skills-modal");
+  var skillsOverlayEl = document.getElementById("rl-cabinet-skills-modal-overlay");
+  var skillsCatalogEl = document.getElementById("rl-cabinet-skills-catalog");
+  var skillsSearchEl = document.getElementById("rl-cabinet-skills-search");
+  var skillsApplyBtn = document.getElementById("rl-cabinet-skills-apply");
+  var skillsCancelBtn = document.getElementById("rl-cabinet-skills-cancel");
+  var skillsRareBtn = document.getElementById("rl-cabinet-skills-rare");
+  var skillsLimitEl = document.getElementById("rl-cabinet-skills-limit");
+
 
 
   var state = {
 
     tags: [],
 
+    catalog: [],
+
+    catalogGroups: [],
+
+    pickerDraft: [],
+
+    pickerQuery: "",
+
+    pickerNiche: null,
+
+    showRareSkills: false,
+
+    catalogLoading: false,
+
     offset: 0,
 
     limit: 20,
 
-    minScore: 0,
+    minMatch: 0,
+
+    sort: "match",
 
     source: "",
 
@@ -544,6 +1285,8 @@
     tagsLoading: false,
 
     loadGeneration: 0,
+
+    itemsById: {},
 
   };
 
@@ -783,11 +1526,15 @@
 
         '<h4 class="rl-feed-card__section-title">Черновик отклика</h4>' +
 
-        '<p class="rl-feed-card__reply">' +
+        '<p class="rl-feed-card__reply" data-reply-text>' +
 
         escapeHtml(reply) +
 
-        "</p></div>";
+        "</p>" +
+
+        '<button type="button" class="rl-btn rl-btn--ghost rl-feed-card__copy" data-copy-reply>Скопировать черновик</button>' +
+
+        "</div>";
 
     } else {
 
@@ -1005,7 +1752,7 @@
 
           escapeHtml(tag) +
 
-          '<button type="button" class="rl-cabinet-tag__remove" aria-label="Удалить тег">×</button></span>'
+          '<button type="button" class="rl-cabinet-tag__remove" aria-label="Убрать навык">×</button></span>'
 
         );
 
@@ -1015,7 +1762,7 @@
 
     html +=
 
-      '<button type="button" class="rl-cabinet-tag rl-cabinet-tag--add" id="rl-cabinet-tag-add">+ Добавить тег</button>';
+      '<button type="button" class="rl-cabinet-tag rl-cabinet-tag--add" id="rl-cabinet-tag-add">+ Добавить навык</button>';
 
     tagsEl.innerHTML = html;
 
@@ -1030,6 +1777,14 @@
     if (noTagsEl) {
 
       noTagsEl.hidden = state.tags.length > 0;
+
+    }
+
+    if (tagsClearBtn) {
+
+      tagsClearBtn.hidden = state.tags.length === 0;
+
+      tagsClearBtn.disabled = state.tagsLoading;
 
     }
 
@@ -1067,7 +1822,7 @@
 
     if (addBtn) {
 
-      addBtn.addEventListener("click", promptAddTag);
+      addBtn.addEventListener("click", openSkillsPicker);
 
     }
 
@@ -1075,17 +1830,245 @@
 
 
 
-  function promptAddTag() {
+  function skillChipHtml(row) {
 
-    var raw = window.prompt("Введите тег (например wordpress):");
+    var tag = row.tag || "";
 
-    if (!raw) {
+    var label = (row.title_ru || tag).trim() || tag;
+
+    var active = state.pickerDraft.indexOf(tag) >= 0;
+
+    var owned = state.tags.indexOf(tag) >= 0;
+
+    return (
+
+      '<button type="button" class="rl-feed-chip rl-feed-skill' +
+
+      (active ? " is-active" : "") +
+
+      (owned ? " is-disabled" : "") +
+
+      '" data-tag="' +
+
+      escapeHtml(tag) +
+
+      '"' +
+
+      (owned ? ' disabled aria-disabled="true"' : "") +
+
+      ">" +
+
+      escapeHtml(label) +
+
+      (row.count ? ' <span class="rl-feed-skill__count">' + row.count + "</span>" : "") +
+
+      "</button>"
+
+    );
+
+  }
+
+
+
+  function catalogCategoryForTag(tag) {
+
+    var i;
+
+    for (i = 0; i < state.catalog.length; i++) {
+
+      if (state.catalog[i].tag === tag) {
+
+        return state.catalog[i].category;
+
+      }
+
+    }
+
+    var g;
+
+    for (g = 0; g < state.catalogGroups.length; g++) {
+
+      var sk = state.catalogGroups[g].skills || [];
+
+      var j;
+
+      for (j = 0; j < sk.length; j++) {
+
+        if (sk[j].tag === tag) {
+
+          return state.catalogGroups[g].category;
+
+        }
+
+      }
+
+    }
+
+    return null;
+
+  }
+
+
+
+  function pickerRowVisible(row) {
+
+    if (!row || !row.tag) {
+
+      return false;
+
+    }
+
+    var tier = row.tier || "A";
+
+    var niche = state.pickerNiche;
+
+    if (niche) {
+
+      var tierA = TIER_A_BY_NICHE[niche] || [];
+
+      if (tierA.indexOf(row.tag) >= 0) {
+
+        return true;
+
+      }
+
+      return !!(state.showRareSkills && tier === "B" && row.category === niche);
+
+    }
+
+    return state.showRareSkills || tier === "A";
+
+  }
+
+
+
+  function updateRareSkillsUi() {
+
+    if (!skillsRareBtn) {
 
       return;
 
     }
 
-    var tag = raw.trim().toLowerCase().replace(/^#/, "");
+    skillsRareBtn.hidden = false;
+
+    skillsRareBtn.textContent = state.showRareSkills ? "Свернуть" : "Ещё навыки";
+
+    skillsRareBtn.setAttribute("aria-expanded", state.showRareSkills ? "true" : "false");
+
+  }
+
+
+
+  function renderPickerCatalog() {
+
+    if (!skillsCatalogEl) {
+
+      return;
+
+    }
+
+    updateRareSkillsUi();
+
+    var q = (state.pickerQuery || "").trim().toLowerCase();
+
+    var groups = state.catalogGroups.length ? state.catalogGroups : null;
+
+    if (!groups && !state.catalog.length) {
+
+      skillsCatalogEl.innerHTML =
+
+        '<p class="rl-feed-skills__empty">Пока нет навыков в ленте — дождитесь заказов из радара</p>';
+
+      return;
+
+    }
+
+    function rowMatches(row) {
+
+      if (!q) {
+
+        return true;
+
+      }
+
+      var tag = (row.tag || "").toLowerCase();
+
+      var label = (row.title_ru || row.tag || "").toLowerCase();
+
+      return tag.indexOf(q) >= 0 || label.indexOf(q) >= 0;
+
+    }
+
+    if (groups) {
+
+      skillsCatalogEl.innerHTML = groups
+
+        .map(function (group) {
+
+          var skills = (group.skills || []).filter(rowMatches).filter(pickerRowVisible);
+
+          if (!skills.length) {
+
+            return "";
+
+          }
+
+          return (
+
+            '<div class="rl-feed-skills-group">' +
+
+            '<p class="rl-feed-skills-group__title">' +
+
+            escapeHtml(group.title || group.category || "") +
+
+            "</p>" +
+
+            '<div class="rl-feed-skills-group__chips">' +
+
+            skills.map(skillChipHtml).join("") +
+
+            "</div></div>"
+
+          );
+
+        })
+
+        .join("");
+
+    } else {
+
+      var flat = state.catalog.filter(rowMatches).filter(pickerRowVisible);
+
+      skillsCatalogEl.innerHTML = flat.length
+
+        ? '<div class="rl-feed-skills-group__chips">' + flat.map(skillChipHtml).join("") + "</div>"
+
+        : '<p class="rl-feed-skills__empty">Ничего не найдено</p>';
+
+    }
+
+    skillsCatalogEl.querySelectorAll(".rl-feed-skill:not(.is-disabled)").forEach(function (btn) {
+
+      btn.addEventListener("click", function () {
+
+        togglePickerTag(btn.getAttribute("data-tag"));
+
+      });
+
+    });
+
+    if (skillsApplyBtn) {
+
+      skillsApplyBtn.disabled = state.pickerDraft.length === 0;
+
+    }
+
+  }
+
+
+
+  function togglePickerTag(tag) {
 
     if (!tag || state.tags.indexOf(tag) >= 0) {
 
@@ -1093,7 +2076,207 @@
 
     }
 
-    saveTags(state.tags.concat([tag]));
+    var idx = state.pickerDraft.indexOf(tag);
+
+    if (idx < 0 && state.tags.length + state.pickerDraft.length >= MAX_USER_TAGS) {
+
+      if (skillsLimitEl) {
+
+        skillsLimitEl.hidden = false;
+
+      }
+
+      return;
+
+    }
+
+    if (skillsLimitEl) {
+
+      skillsLimitEl.hidden = true;
+
+    }
+
+    state.pickerDraft =
+
+      idx >= 0
+
+        ? state.pickerDraft.filter(function (t) {
+
+            return t !== tag;
+
+          })
+
+        : state.pickerDraft.concat([tag]);
+
+    renderPickerCatalog();
+
+  }
+
+
+
+  function closeSkillsPicker() {
+
+    if (skillsModalEl) {
+
+      skillsModalEl.hidden = true;
+
+    }
+
+    state.pickerDraft = [];
+
+    state.pickerQuery = "";
+
+    state.showRareSkills = false;
+
+    if (skillsLimitEl) {
+
+      skillsLimitEl.hidden = true;
+
+    }
+
+    if (skillsSearchEl) {
+
+      skillsSearchEl.value = "";
+
+    }
+
+  }
+
+
+
+  function openSkillsPicker() {
+
+    if (!skillsModalEl) {
+
+      return;
+
+    }
+
+    state.pickerDraft = [];
+
+    state.pickerQuery = "";
+
+    state.showRareSkills = false;
+
+    state.pickerNiche = null;
+
+    if (skillsLimitEl) {
+
+      skillsLimitEl.hidden = true;
+
+    }
+
+    if (skillsSearchEl) {
+
+      skillsSearchEl.value = "";
+
+    }
+
+    skillsModalEl.hidden = false;
+
+    if (!state.catalog.length && !state.catalogGroups.length && !state.catalogLoading) {
+
+      loadCatalog().finally(renderPickerCatalog);
+
+      return;
+
+    }
+
+    renderPickerCatalog();
+
+  }
+
+
+
+  function applyPickerTags() {
+
+    if (!state.pickerDraft.length) {
+
+      return;
+
+    }
+
+    var merged = state.tags.slice();
+
+    state.pickerDraft.forEach(function (tag) {
+
+      if (merged.indexOf(tag) < 0 && merged.length < MAX_USER_TAGS) {
+
+        merged.push(tag);
+
+      }
+
+    });
+
+    closeSkillsPicker();
+
+    saveTags(merged);
+
+  }
+
+
+
+  function loadCatalog() {
+
+    if (!cfg.restSkills) {
+
+      return Promise.resolve();
+
+    }
+
+    state.catalogLoading = true;
+
+    var skillsUrl = cfg.restSkills + "?mode=full&limit=200";
+
+    if (state.pickerNiche) {
+
+      skillsUrl += "&category=" + encodeURIComponent(state.pickerNiche);
+
+    }
+
+    return fetch(skillsUrl, { credentials: "same-origin" })
+
+      .then(function (res) {
+
+        return res.ok ? res.json() : { skills: [] };
+
+      })
+
+      .then(function (data) {
+
+        state.catalogGroups = data.groups || [];
+
+        state.catalog = data.skills || [];
+
+      })
+
+      .catch(function () {
+
+        state.catalogGroups = [];
+
+        state.catalog = [];
+
+      })
+
+      .finally(function () {
+
+        state.catalogLoading = false;
+
+      });
+
+  }
+
+
+
+  function clearAllTags() {
+
+    if (state.tagsLoading || !state.tags.length) {
+
+      return;
+
+    }
+
+    saveTags([]);
 
   }
 
@@ -1149,6 +2332,12 @@
 
         state.tags = data.tags || tags;
 
+        if (!state.tags.length) {
+
+          clearGuestSkillKeys();
+
+        }
+
         renderTags();
 
         resetAndLoad();
@@ -1157,7 +2346,7 @@
 
       .catch(function () {
 
-        showError("Не удалось сохранить теги.");
+        showError("Не удалось сохранить навыки.");
 
       })
 
@@ -1205,9 +2394,15 @@
 
 
 
-  function renderTagChips(leadTags) {
+  function renderTagChips(item) {
 
-    var tags = leadTags || [];
+    var tags =
+
+      (item && item.lead_tag_labels && item.lead_tag_labels.length
+
+        ? item.lead_tag_labels
+
+        : item && item.lead_tags) || [];
 
     var max = 4;
 
@@ -1233,15 +2428,56 @@
 
 
 
+  function hasUserSkills() {
+    return state.tags && state.tags.length > 0;
+  }
+
+  function isPerfectMatch(item) {
+    var km = item.keyword_match != null ? item.keyword_match : 0;
+    return km >= 100 && hasUserSkills();
+  }
+
+  var VIEWS_EYE_SVG =
+    '<svg class="rl-feed-card__views-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z"/>' +
+    "</svg>";
+
+  function viewsHeadHtml(item) {
+    var v = item.display_views;
+    if (v == null || v <= 0) {
+      return "";
+    }
+    var n = escapeHtml(String(v));
+    return (
+      '<span class="rl-feed-card__views" aria-label="' +
+      n +
+      ' просмотров">' +
+      VIEWS_EYE_SVG +
+      '<span class="rl-feed-card__views-count">' +
+      n +
+      "</span></span>"
+    );
+  }
+
   function renderCard(item) {
 
     var src = sourceLabel(item.source);
 
-    var rank = item.final_rank != null ? item.final_rank : 0;
+    var km = item.keyword_match != null ? item.keyword_match : 0;
+
+    var rank = item.keyword_match != null ? item.keyword_match : 0;
+
+    var perfect = isPerfectMatch(item);
+
+    var barPct = perfect ? km : rank;
 
     var budget = item.budget_text || "—";
 
     var expanded = state.expandedId === item.id;
+
+    var matchBadge = perfect
+      ? '<span class="rl-feed-card__match-badge">Точное совпадение</span>'
+      : "";
 
 
 
@@ -1250,6 +2486,8 @@
       '<article class="rl-lead-card' +
 
       (expanded ? " is-expanded" : "") +
+
+      (perfect ? " rl-lead-card--perfect-match" : "") +
 
       '" data-id="' +
 
@@ -1275,11 +2513,17 @@
 
       "</div>" +
 
+      '<div class="rl-feed-card__head-meta">' +
+
+      viewsHeadHtml(item) +
+
       '<span class="rl-feed-card__time">' +
 
       formatTime(item.created_at) +
 
       "</span>" +
+
+      "</div>" +
 
       "</div>" +
 
@@ -1309,21 +2553,23 @@
 
       "<span>Совместимость " +
 
-      rank +
+      barPct +
 
       "%</span>" +
+
+      matchBadge +
 
       "</div>" +
 
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
 
-      rank +
+      barPct +
 
       '" aria-valuemin="0" aria-valuemax="100">' +
 
       '<span class="rl-match__fill" style="--match-value:' +
 
-      rank +
+      barPct +
 
       '%"></span>' +
 
@@ -1333,7 +2579,13 @@
 
       '<div class="rl-chips">' +
 
-      renderTagChips(item.lead_tags) +
+      renderTagChips(item) +
+
+      "</div>" +
+
+      '<div class="rl-feed-card__cta">' +
+
+      '<button type="button" class="rl-btn rl-btn--ghost rl-feed-card__delete-btn">Удалить из ЛК</button>' +
 
       "</div>" +
 
@@ -1399,7 +2651,7 @@
 
       state.totalShown > 0
 
-        ? state.totalShown + " заказов в ленте"
+        ? state.totalShown + " откликов"
 
         : "";
 
@@ -1445,17 +2697,27 @@
 
     var src = sidebar.querySelector('input[name="source"]:checked');
 
-    var score = sidebar.querySelector('input[name="min_score"]:checked');
+    var matchInp = sidebar.querySelector('input[name="min_match"]:checked');
+
+    var sortInp = sidebar.querySelector('input[name="sort"]:checked');
 
     state.source = src ? src.value : "";
 
     state.appliedCategories = readCategoriesFrom();
 
-    state.minScore = score ? parseInt(score.value, 10) || 0 : 0;
+    state.minMatch = matchInp ? parseInt(matchInp.value, 10) || 0 : 0;
+
+    state.sort = sortInp ? sortInp.value : "match";
 
     var dirty =
 
-      state.source !== "" || state.appliedCategories.length > 0 || state.minScore !== 0;
+      state.source !== "" ||
+
+      state.appliedCategories.length > 0 ||
+
+      state.minMatch !== 0 ||
+
+      state.sort !== "match";
 
     if (resetBtn) {
 
@@ -1489,26 +2751,6 @@
 
   function resetAndLoad() {
 
-    if (state.tags.length === 0) {
-
-      if (listEl) {
-
-        listEl.innerHTML = "";
-
-      }
-
-      if (noMatchEl) {
-
-        noMatchEl.hidden = true;
-
-      }
-
-      updateCount();
-
-      return;
-
-    }
-
     state.loadGeneration += 1;
 
     state.offset = 0;
@@ -1520,6 +2762,8 @@
     state.expandedId = null;
 
     state.loading = false;
+
+    state.itemsById = {};
 
     if (noMatchEl) {
 
@@ -1549,7 +2793,7 @@
 
   function loadMore(replace) {
 
-    if (state.done || state.tags.length === 0) {
+    if (state.done || !cfg.restReplies) {
 
       return;
 
@@ -1565,25 +2809,13 @@
 
     state.loading = true;
 
-    var params = {
+    var url = apiUrl(cfg.restReplies, {
 
       limit: state.limit,
 
       offset: state.offset,
 
-      min_score: state.minScore,
-
-    };
-
-    if (state.appliedCategories.length) {
-
-      params.category = state.appliedCategories.join(",");
-
-    }
-
-    var url = apiUrl(cfg.restFeed, params);
-
-
+    });
 
     fetch(url, { credentials: "same-origin", headers: authHeaders() })
 
@@ -1607,11 +2839,7 @@
 
         }
 
-        var items = (data.items || []).filter(function (item) {
-
-          return matchSource(item, state.source);
-
-        });
+        var items = data.items || [];
 
         if (listEl) {
 
@@ -1637,17 +2865,7 @@
 
           if (noMatchEl) {
 
-            noMatchEl.hidden = !(state.source === "" && state.minScore === 0);
-
-          }
-
-          if (!noMatchEl || noMatchEl.hidden) {
-
-            listEl.hidden = false;
-
-            listEl.innerHTML =
-
-              '<p class="rl-feed-empty">В этой нише пока нет заказов — попробуйте «Все»</p>';
+            noMatchEl.hidden = false;
 
           }
 
@@ -1664,6 +2882,12 @@
           var frag = items.map(renderCard).join("");
 
           listEl.insertAdjacentHTML("beforeend", frag);
+
+          items.forEach(function (item) {
+
+            state.itemsById[item.id] = item;
+
+          });
 
           state.totalShown += items.length;
 
@@ -1737,6 +2961,98 @@
 
 
 
+  function draftUrl(leadId) {
+
+    var base = (cfg.restDraft || "").replace(/\/$/, "");
+
+    return base + "/" + leadId + "/draft";
+
+  }
+
+
+
+  function fetchDraft(leadId) {
+
+    return fetch(draftUrl(leadId), {
+
+      method: "POST",
+
+      credentials: "same-origin",
+
+      headers: authHeaders(),
+
+    }).then(function (res) {
+
+      if (!res.ok) {
+
+        throw new Error("HTTP " + res.status);
+
+      }
+
+      return res.json();
+
+    });
+
+  }
+
+
+
+  function updateCardDraft(card, item) {
+
+    var bodyInner = card.querySelector(".rl-feed-card__body-inner");
+
+    if (!bodyInner) {
+
+      return;
+
+    }
+
+    bodyInner.innerHTML = renderExpandedBody(item);
+
+    delete card.dataset.bound;
+
+    bindCards();
+
+  }
+
+
+
+  function deleteReplyUrl(leadId) {
+
+    var base = (cfg.restReplies || "").replace(/\/$/, "");
+
+    return base + "/" + leadId;
+
+  }
+
+
+
+  function deleteReply(leadId) {
+
+    return fetch(deleteReplyUrl(leadId), {
+
+      method: "DELETE",
+
+      credentials: "same-origin",
+
+      headers: authHeaders(),
+
+    }).then(function (res) {
+
+      if (!res.ok) {
+
+        throw new Error("HTTP " + res.status);
+
+      }
+
+      return res.json();
+
+    });
+
+  }
+
+
+
   function bindCards() {
 
     if (!listEl) {
@@ -1757,7 +3073,7 @@
 
       card.addEventListener("click", function (e) {
 
-        if (e.target.closest(".rl-btn--soon, .rl-feed-card__link")) {
+        if (e.target.closest(".rl-btn--soon, .rl-feed-card__link, .rl-feed-card__delete-btn, .rl-feed-card__copy")) {
 
           return;
 
@@ -1798,6 +3114,114 @@
         }
 
       });
+
+      var deleteBtn = card.querySelector(".rl-feed-card__delete-btn");
+
+      if (deleteBtn) {
+
+        deleteBtn.addEventListener("click", function (e) {
+
+          e.stopPropagation();
+
+          var id = parseInt(card.getAttribute("data-id"), 10);
+
+          if (!id || !window.confirm("Удалить отклик из кабинета?")) {
+
+            return;
+
+          }
+
+          deleteBtn.disabled = true;
+
+          deleteReply(id)
+
+            .then(function () {
+
+              card.remove();
+
+              delete state.itemsById[id];
+
+              state.totalShown = Math.max(0, state.totalShown - 1);
+
+              updateCount();
+
+              if (state.totalShown === 0 && noMatchEl) {
+
+                noMatchEl.hidden = false;
+
+                if (listEl) {
+
+                  listEl.hidden = true;
+
+                }
+
+              }
+
+            })
+
+            .catch(function () {
+
+              deleteBtn.disabled = false;
+
+              showError("Не удалось удалить");
+
+            });
+
+        });
+
+      }
+
+      var copyBtn = card.querySelector("[data-copy-reply]");
+
+      if (copyBtn) {
+
+        copyBtn.addEventListener("click", function (e) {
+
+          e.stopPropagation();
+
+          var replyEl = card.querySelector("[data-reply-text]");
+
+          var text = replyEl ? replyEl.textContent : "";
+
+          if (!text) {
+
+            return;
+
+          }
+
+          function done(ok) {
+
+            copyBtn.textContent = ok ? "Скопировано ✓" : "Скопировать черновик";
+
+            setTimeout(function () {
+
+              copyBtn.textContent = "Скопировать черновик";
+
+            }, 2000);
+
+          }
+
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+
+            navigator.clipboard.writeText(text).then(function () {
+
+              done(true);
+
+            }).catch(function () {
+
+              done(false);
+
+            });
+
+            return;
+
+          }
+
+          done(false);
+
+        });
+
+      }
 
     });
 
@@ -1871,6 +3295,28 @@
 
       }
 
+      if (name === "sort") {
+
+        syncChips();
+
+        readFilters();
+
+        try {
+
+          sessionStorage.setItem(SORT_KEY, state.sort);
+
+        } catch (err) {
+
+          // ignore
+
+        }
+
+        resetAndLoad();
+
+        return;
+
+      }
+
       syncChips();
 
       readFilters();
@@ -1891,7 +3337,25 @@
 
         });
 
-        sidebar.querySelector('input[name="min_score"][value="0"]').checked = true;
+        sidebar.querySelector('input[name="min_match"][value="0"]').checked = true;
+
+        var sortMatch = sidebar.querySelector('input[name="sort"][value="match"]');
+
+        if (sortMatch) {
+
+          sortMatch.checked = true;
+
+        }
+
+        try {
+
+          sessionStorage.removeItem(SORT_KEY);
+
+        } catch (e) {
+
+          // ignore
+
+        }
 
         state.draftCategories = [];
 
@@ -1915,7 +3379,7 @@
 
   if (addFirst) {
 
-    addFirst.addEventListener("click", promptAddTag);
+    addFirst.addEventListener("click", openSkillsPicker);
 
   }
 
@@ -1923,9 +3387,67 @@
 
   if (changeSkills) {
 
-    changeSkills.addEventListener("click", promptAddTag);
+    changeSkills.addEventListener("click", openSkillsPicker);
 
   }
+
+  if (skillsOverlayEl) {
+
+    skillsOverlayEl.addEventListener("click", closeSkillsPicker);
+
+  }
+
+  if (skillsCancelBtn) {
+
+    skillsCancelBtn.addEventListener("click", closeSkillsPicker);
+
+  }
+
+  if (skillsApplyBtn) {
+
+    skillsApplyBtn.addEventListener("click", applyPickerTags);
+
+  }
+
+  if (skillsRareBtn) {
+
+    skillsRareBtn.addEventListener("click", function () {
+
+      state.showRareSkills = !state.showRareSkills;
+
+      renderPickerCatalog();
+
+    });
+
+  }
+
+  if (tagsClearBtn) {
+
+    tagsClearBtn.addEventListener("click", clearAllTags);
+
+  }
+
+  if (skillsSearchEl) {
+
+    skillsSearchEl.addEventListener("input", function () {
+
+      state.pickerQuery = skillsSearchEl.value || "";
+
+      renderPickerCatalog();
+
+    });
+
+  }
+
+  document.addEventListener("keydown", function (e) {
+
+    if (e.key === "Escape" && skillsModalEl && !skillsModalEl.hidden) {
+
+      closeSkillsPicker();
+
+    }
+
+  });
 
 
 
@@ -2033,15 +3555,15 @@
 
   function bootCabinet() {
 
-    syncChips();
+    loadSubscription();
 
-    state.draftCategories = readCategoriesFrom();
+    loadCatalog()
 
-    state.appliedCategories = state.draftCategories.slice();
+      .then(function () {
 
-    readFilters();
+        return loadTags();
 
-    loadTags()
+      })
 
       .then(function () {
 
@@ -2051,7 +3573,7 @@
 
       .catch(function () {
 
-        showError("Не удалось загрузить теги.");
+        showError("Не удалось загрузить навыки.");
 
       });
 
@@ -2073,6 +3595,8 @@
   }
 
   function startLoggedIn() {
+
+    renderUserBar();
 
     showApp();
 

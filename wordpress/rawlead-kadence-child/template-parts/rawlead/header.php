@@ -43,25 +43,70 @@ $nav = [
 			</ul>
 		</nav>
 		<div class="rl-header__cta">
-			<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($cabinet); ?>" id="rl-header-cta">
-				<?php esc_html_e('Вход в ЛК', 'rawlead-kadence-child'); ?>
+			<a class="rl-btn rl-btn--primary rl-header__cta-link" href="<?php echo esc_url($cabinet); ?>" id="rl-header-cta">
+				<img class="rl-header__avatar" id="rl-header-avatar" alt="" width="28" height="28" hidden>
+				<span id="rl-header-cta-text"><?php esc_html_e('Вход в ЛК', 'rawlead-kadence-child'); ?></span>
 			</a>
 		</div>
 	</div>
 </header>
 <script>
 (function () {
-	var key = "rawlead_access_token";
-	var el = document.getElementById("rl-header-cta");
-	if (!el) {
-		return;
-	}
-	try {
-		if (localStorage.getItem(key)) {
-			el.textContent = "Кабинет";
+	var TOKEN_KEY = "rawlead_access_token";
+	var META_KEY = "rawlead_user_meta";
+
+	function readMeta() {
+		try {
+			var raw = localStorage.getItem(META_KEY);
+			if (!raw) {
+				return null;
+			}
+			return JSON.parse(raw);
+		} catch (e) {
+			return null;
 		}
-	} catch (e) {
-		/* private mode */
 	}
+
+	window.rawleadSyncHeader = function () {
+		var el = document.getElementById("rl-header-cta");
+		var textEl = document.getElementById("rl-header-cta-text");
+		var avatarEl = document.getElementById("rl-header-avatar");
+		if (!el || !textEl) {
+			return;
+		}
+		var token = "";
+		try {
+			token = localStorage.getItem(TOKEN_KEY) || "";
+		} catch (e) {
+			token = "";
+		}
+		if (!token) {
+			textEl.textContent = "Вход в ЛК";
+			el.classList.remove("rl-header__cta-link--logged-in");
+			if (avatarEl) {
+				avatarEl.hidden = true;
+				avatarEl.removeAttribute("src");
+			}
+			return;
+		}
+		textEl.textContent = "Кабинет";
+		el.classList.add("rl-header__cta-link--logged-in");
+		var meta = readMeta();
+		if (avatarEl && meta && meta.photo_url) {
+			avatarEl.src = meta.photo_url;
+			avatarEl.hidden = false;
+		} else if (avatarEl) {
+			avatarEl.hidden = true;
+			avatarEl.removeAttribute("src");
+		}
+	};
+
+	window.rawleadSyncHeader();
+	window.addEventListener("rawlead-auth-changed", window.rawleadSyncHeader);
+	window.addEventListener("storage", function (e) {
+		if (e.key === TOKEN_KEY || e.key === META_KEY) {
+			window.rawleadSyncHeader();
+		}
+	});
 })();
 </script>

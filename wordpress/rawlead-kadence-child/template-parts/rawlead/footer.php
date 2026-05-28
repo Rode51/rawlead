@@ -13,6 +13,8 @@ $year = (int) gmdate('Y');
 	<div class="rl-container rl-footer__grid">
 		<a class="rl-footer__brand" href="<?php echo esc_url(home_url('/')); ?>">RawLead</a>
 		<ul class="rl-footer__links">
+			<li><a href="<?php echo esc_url(rawlead_page_url('lenta')); ?>"><?php esc_html_e('Лента', 'rawlead-kadence-child'); ?></a></li>
+			<li><a href="<?php echo esc_url(rawlead_page_url('cabinet')); ?>"><?php esc_html_e('Кабинет', 'rawlead-kadence-child'); ?></a></li>
 			<li><a href="<?php echo esc_url(rawlead_page_url('how')); ?>"><?php esc_html_e('Как работает', 'rawlead-kadence-child'); ?></a></li>
 			<li><a href="<?php echo esc_url(rawlead_page_url('pricing')); ?>"><?php esc_html_e('Тарифы', 'rawlead-kadence-child'); ?></a></li>
 			<li><a href="<?php echo esc_url(rawlead_page_url('faq')); ?>"><?php esc_html_e('Вопросы', 'rawlead-kadence-child'); ?></a></li>

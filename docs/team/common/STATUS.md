@@ -6,6 +6,85 @@
 
 ---
 
+## ✅ MATCH-PUSH-V2 O30 — backend (**Lead verify ✅ 2026-05-28**)
+
+| | |
+|--|--|
+| **sql/010** | `push_min_match` DEFAULT 60 · `push_enabled` DEFAULT TRUE — **Neon ✅** |
+| **match_push.py** | top-3 **убран** · всем paid при `km >= push_min_match` · `push_enabled` |
+| **API** | `GET/PATCH /v1/me/notification-settings` (30–100) |
+| **VPS** | API restart · `match_push.py` без TOP_K |
+| **⚠️ UI gap** | `rawlead-api.php` — **нет** REST proxy → `/cabinet/` блок «Уведомления» **404** |
+| **Fix** | § **MATCH-PUSH-V2-WP-PROXY** → @coder · theme bump **v1.7.24** |
+
+---
+
+## ✅ HOTFIX UX wave — v1.7.23 (**Lead verify ✅ 2026-05-28**)
+
+| | |
+|--|--|
+| **#20 DRAFT-403** | `barPct = keyword_match` · кнопка только `km > 0` · 403 → «Нет пересечения…» |
+| **#21 CABINET-SKILLS** | `pickerNiche = null` · full catalog · все 4 группы в модалке |
+| **#22 FEED-SORT-DD** | `mousedown` закрывает `.rl-filter-sort-dd` |
+| **Theme** | **v1.7.23** |
+| **Деплoy** | **✅ Lead ops** — prod rawlead.ru |
+
+---
+
+## ✅ TAGS-V0.3 + b3 + OWNER-BETA — (**Lead verify ✅ 2026-05-28**)
+
+| | |
+|--|--|
+| **TAGS t3-1…t3-7** | 51 canonical · PUT/GET max 6 · merge v0.2→v0.3 · picker **«Ещё навыки»** · чипы 4+«+N» · L1 smoke warn |
+| **t3-2b** | `openai`/`gpt` → `llm_integration` |
+| **OWNER-BETA-GRANT** | `_grant_owner_beta_if_match` при TG-login |
+| **b3-HOTFIX** | `status`: inactive/failed = ok · ▶ → `start` если ≠ active |
+| **Lead verify** | py_compile ok · 51 tags · 7-й tag → 6 · theme **v1.7.19** |
+| **Деплoy** | theme + API restart на VPS — **→ владелец/Lead ops** |
+
+**Открыто:** SITE-ACCEPT-GATE a2 + a5–a6 (TG-login владельца с VPN).
+
+---
+
+## ✅ PRE-DESIGN-BLOCKERS O27–O29 (**Lead verify ✅ 2026-05-28**)
+
+| | |
+|--|--|
+| **O27** | `POST …/draft` → `analyze_premium` · `tools_required` в Neon + ответ API · feed/cabinet «Инструменты» |
+| **O28** | `/start` → `upsert_subscriber_chat_id` · `push_match_for_lead` после L1 · dedupe `match_push_log` · env `MATCH_PUSH=1` |
+| **O29** | `sendInvoice` XTR · `pre_checkout_query` · `successful_payment` → `plan=agent` · `stars_available` в API · UI `/pay` + кабинет |
+| **Lead verify** | py_compile ok · draft 403 free / tools в `renderExpandedBody` · push top-K=3 paid/owner · Stars `activate_subscription` |
+| **Theme** | **v1.7.22** (O25b + blockers) |
+| **Деплoy** | **✅ Lead ops 2026-05-28** — Neon `009` · env `MATCH_PUSH=1` `STARS_ENABLED=1` · theme + API/bot/radar restart · smoke 5/5 |
+
+---
+
+## ✅ FEED-CARD-UX O25–O26 + O25b (**Lead verify ✅ 2026-05-28**)
+
+| | |
+|--|--|
+| **O25/O25b** | `feed_social.py`: fresh instant 1–3 · 15m/60m растут с age · delayed bonus · eye SVG + count (без «просмотров») |
+| **O26** | perfect-match badge + green bar |
+| **Smoke** | fresh 1 / delayed 2 · 15m 21/35 · 60m 29/41 (lead_id=42) |
+| **Theme** | **v1.7.22** |
+
+---
+
+## ✅ CABINET-INBOX-O23 — лента vs inbox (**Lead verify ✅ 2026-05-28**)
+
+| | |
+|--|--|
+| **Модель** | `/lenta/` — единственная lenta; anon + free TG → delay 15 мин, без «Написать отклик»; paid/beta → instant + кнопка |
+| **Inbox** | `user_lead_replies` · `GET/DELETE /v1/me/replies` · `/cabinet/` = профиль + inbox |
+| **L2** | `analyze_premium` on-demand через `POST …/draft` (O27) |
+| **Lead verify** | o23-1…7 · API `feed_delayed:true` · theme **v1.7.15** на prod |
+| **Деплoy VPS** | **✅ Lead** — `deploy-l3-vps.py` · Neon `008` · API restart |
+| **Владельцу** | § **SITE-ACCEPT-GATE** a1–a9 |
+
+**Открыто:** SITE-ACCEPT-GATE a1–a9.
+
+---
+
 ## ✅ L1 + L2 — вход ЛК prod + страницы сайта (**✅ Lead verify 2026-05-28**)
 
 | | |
@@ -37,19 +116,94 @@
 
 ---
 
+## ✅ L3 — навыки picker + retention 7d + L3-FIX (**Lead verify ✅ 2026-05-28**)
+
+| | |
+|--|--|
+| **L3-FIX** | API `?mode=full` → static L1 pool (Tier A+B); ЛК `?mode=full&limit=200`; modal **сверху**; theme **v1.7.10** |
+| **TG login RU** | widget fail → redirect; VPN hint; popup timeout 8s; `#tgAuthResult` hash; `RAWLEAD_TG_BOT_ID` в install + DEPLOY_VPS |
+| **Retention** | feed/me/feed 7d; `purge_old_leads.py` + systemd timer |
+| **Lead verify** | `api_server.py` L518–581, `rawlead-cabinet.js` L156–219/1423, `rawlead.css` L2425–2456 — ок |
+| **Деплoy VPS** | **✅ Coder 2026-05-28** — `deploy-l3-vps.py`: theme **v1.7.10**, API `mode=full`, `RAWLEAD_TG_BOT_ID=8989158953`, units **active** |
+| **Владельцу** | BotFather `/setdomain` → `rawlead.ru` · приёмка 🛑/▶ в @rawlead_bot |
+
+**⚠️ Вход TG из РФ:** без VPN redirect на `oauth.telegram.org` тоже не откроется — VPN обязателен.
+
+---
+
+## ✅ E-polish B3 — owner-only TG controls (**Coder 2026-05-28**)
+
+| | |
+|--|--|
+| **Сделано** | `is_radar_admin()`; admin-клавиатура ⏸/▶/🛑/ℹ только владельцу; подписчикам welcome + `remove_keyboard`; `/stop-radar` + 🛑 → `systemctl stop` через `deploy/radar-ctl.sh`; ▶ поднимает unit если inactive |
+| **Файлы** | `src/telegram_control.py`, `deploy/radar-ctl.sh`, `deploy/sudoers.d/rawlead-radar-ctl`, `docs/ops/DEPLOY_VPS.md` §9–10 |
+| **Как проверить** | § BOT-OWNER-CONTROLS приёмка 1–4; **на VPS** — 🛑 → `systemctl is-active rawlead-radar` = inactive; ▶ → active |
+| **Деплой VPS** | **✅** с L3 (`deploy-l3-vps.py`: `radar-ctl.sh`, sudoers, CRLF fix `deploy/*.sh`) |
+| **Hotfix 2026-05-28** | `bot_poll.py` fcntl; offset до 🛑; **`rawlead-bot-poll.service`**; ack «✓ Принято»; статус — явная строка ingest (🛑/⏸/▶) |
+| **b3-HOTFIX** | **✅ Coder** — см. блок **b3-HOTFIX** выше · Lead verify VPS pending |
+| **Радар VPS** | **✅ active** (Lead restart 2026-05-28) · TG acc1+acc3 **ready** · acc2 skip (нет chat_ids) · `bot_start` entity — некритично |
+
+---
+
+## ✅ LK-UX-POLISH + A1 + 3f-A (**Lead verify ✅ 2026-05-28**)
+
+| | |
+|--|--|
+| **LK-UX** | merge guest-навыков; avatar в шапке; user bar + «Выйти»; @rawlead_bot hint |
+| **A1** | «N лидов · по совместимости» |
+| **3f-A2** | expand + copy (**⚠️** L2 on-demand нет — только готовый `reply_draft` в Neon) |
+| **Lead verify** | `mergeGuestSkillsAfterAuth`, `header.php`, `page-cabinet.php`, v**1.7.11** |
+| **Деплой** | `deploy-wp-theme-vps.py` + restart API |
+
+---
+
+## ✅ 3f-B — тариф/статус подписки (**Lead verify ✅ 2026-05-28**)
+
+| | |
+|--|--|
+| **Сделано** | `GET /v1/me/subscription` из Neon; `POST …/pause` (days/resume); блок «Подписка» в ЛК; `/pricing/` 590 ₽ + Stars soon; `sql/007_subscriptions_status.sql` |
+| **Lead verify** | `api_server.py` L765–931 · `rawlead-api.php` REST proxy · `page-cabinet.php` + `rawlead-cabinet.js` subscription UI · `rawlead.css` · v**1.7.13** |
+| **Stars** | live при `STARS_ENABLED=1` — см. блок **O27–O29** |
+| **Beta owner** | `plan=owner` → status **beta**, `can_pause=false` ✅ |
+| **Деплoy** | Neon: `007_subscriptions_status.sql` · `deploy-wp-theme-vps.py` · `systemctl restart rawlead-api` |
+| **Не в 3f-B** | NEO-BRUTALIST CSS (MATCH_PUSH/Stars — **O27–O29 ✅**) |
+
+---
+
+## ✅ LK-FEED-FILTERS (O22) + SFW sfw-8 / sfw-3…7 (**Lead verify ✅ 2026-05-28**)
+
+| | |
+|--|--|
+| **O22** | sort match\|time + sessionStorage; min_match 30–100; `_passes_min_match`; карточка `keyword_match` % |
+| **sfw-8** | `POST /v1/me/leads/{id}/draft` + «Генерируем…» в ЛК |
+| **sfw-3…7** | how/faq/contact/pricing; footer; FAQ `<details>`; contact stub |
+| **Lead verify** | `api_server.py` · `page-cabinet.php` · `rawlead-cabinet.js` · v**1.7.14** |
+| **⚠️** | `reply_draft` в `leads` — один на лид (полный P4b per-user позже) |
+| **Деплoy** | theme + API на VPS · Lead ops |
+
+---
+
+## ⚠️ Pivot O23 (2026-05-28) — лента vs inbox
+
+**Решение владельца:** `/cabinet/` **не** дублирует ленту. Inbox откликов + профиль. «Написать отkлик» на **`/lenta/`** (paid). ТЗ: § **CABINET-INBOX-O23**.
+
+**Код v1.7.14** (match-лента в ЛК) — **legacy до O23**.
+
+---
+
 ## Сейчас (2026-05-28)
 
-**Следующий шаг:** деплой v1.7.7 на VPS (ты) → **@coder B3** → A1 → **3f**.
+**O30 ✅ + v1.7.24 prod.** Дальше: **SITE-ACCEPT-GATE** (ты) → Design/PM.
 
-| Открыто | Кто | Где |
-|---------|-----|-----|
-| **Деплой L1/L2/D1** | владелец | `deploy-wp-theme-vps.py` + `wp-vps-skeleton-pages.py` · BotFather domain |
-| **E-polish B3** | @coder | admin-only TG · § BOT-OWNER-CONTROLS |
-| **E-polish A1** | @coder | убрать «N лидов за 7 дней» |
+| Волна | Кто | Статус |
+|-------|-----|--------|
+| **Hotfix UX #20–22** | @coder | **✅** · **v1.7.23** prod |
+| **O30 MATCH-PUSH-V2** | @coder | **✅** Lead verify · **v1.7.24** prod |
+| **Приёмка** | **владелец** | § **SITE-ACCEPT-GATE** a2, a5–a6 |
 | **E-polish C1** — mobile UX | @lead-designer → @coder | `OWNER_INTENT` § C1 |
 | **P4b** — L2 `reply_draft` под профиль юзера | @coder + @lead-product | `TASKS.md` |
-| **PRE-PROD-STRESS** S1–S6 | @coder → владелец | `PRE_PROD_GATE.md` · после polish |
-| **3f** — ИИ «Написать отклик» + push | @coder | `CODER_PROMPT` § 3f-OWNER-BETA |
+| **PRE-PROD-STRESS** | S1–S6 | @coder → владелец | **после** Design + PM + Coder финал (O21) |
+| **O11 / 3r** две скорости ленты | @coder | **⏸** · copy/UI в Product+Design docs |
 
 **Владельцу:** Site/Legacy ■ на ПК — **не включать**; радар 24/7 только VPS systemd.
 
@@ -98,17 +252,17 @@
 
 ## ЛК и подписка (честный статус)
 
-**Лестница (канон O6):** polish (D1–A1) → **§ 3f фаза A** (ЛК + L2 без денег) → **фаза B** (экран тарифа) → **фаза C / касса** (590–990 ₽).
+**Лестница (канон O6):** polish (D1–A1) → **§ 3f фаза A** ✅ → **фаза B** ✅ → **фаза C / касса** (590–990 ₽).
 
 | Есть сейчас | Ещё нет (очередь) |
 |-------------|-------------------|
 | `/cabinet/`, вход TG + fallback | Gate «L2 только paid» |
-| JWT, навыки per user (B1 ✅) | Push match в TG подписчику (3f-A4) |
-| `/v1/me/feed`, match %, L2 в раскрытии | L2 персонально под профиль (P4b) |
-| Таблица `subscriptions` в Neon | Реальный `/v1/me/subscription` (не заглушка `free`) |
-| @rawlead_bot в коде | Оплата **Telegram Stars** (O12) — после L1 + 3f-A |
-| | Страница тарифа, статус, пауза подписки (3f-B) |
-| | Биллинг webhook → `is_active=true` |
+| JWT, навыки per user (B1 ✅) | L2 персонально под профиль (P4b full) |
+| `/v1/me/feed`, match %, sort, min_match, L2 on-demand | PRE-PROD stress S1–S6 |
+| `/v1/me/subscription` — реальные поля Neon | ЮKassa / несколько тарифов |
+| Push match TG (O28) · Stars оплата (O29) · `tools_required` (O27) | NEO-BRUTALIST CSS |
+| Таблица `subscriptions` + `is_active` / `paused_until` | |
+| Блок «Подписка» + `/pricing/` Stars live при `STARS_ENABLED=1` | |
 
 **ТЗ:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) § **3f-OWNER-BETA** (фазы A→B→C).
 

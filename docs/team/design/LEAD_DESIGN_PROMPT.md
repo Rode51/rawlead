@@ -1,17 +1,19 @@
 # Lead Designer — активный план
 
-**Дата:** 2026-05-25 · обновлено 2026-05-28 (революция дизайна)
-**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.10** (4 ниши, ставка B)
-**Статус:** ✅ **E3 REVOLUTION docs** — Lead verify 2026-05-28 · CSS → E5 @coder
+**Дата:** 2026-05-25 · обновлено 2026-05-28 (NEO-BRUTALIST — финальный выбор владельца)
+**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11** (4 ниши, ставка B)
+**Статус:** ✅ NEO-BRUTALIST docs · CSS **⏸** до § **SITE-ACCEPT-GATE** (O20) → @designer → @coder
 
 ---
 
-## § REVOLUTION — новый дизайн (2026-05-28) — **✅ docs сдано**
+## § NEO-BRUTALIST — финальный стиль (2026-05-28) — **✅ docs сдано**
 
-**Все предыдущие решения по стилю (REFERENCE v2, editorial, Unbounded) — отменены.**
-Предыдущий PRE-LAUNCH-UX v2 (ux1–ux6) — поглощён этим брифом.
+**Выбор владельца:** Style 13 из сессии перебора стилей (2026-05-28).
+**Все предыдущие решения по стилю (REFERENCE v2/v3, REVOLUTION, editorial, Unbounded, Indigo) — отменены.**
 
-### Что меняется
+> **Актуальный канон:** [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) § NEO-BRUTALIST · [`../../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) v4 · [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md) § NEO-BRUTALIST CSS
+
+### Что меняется (REVOLUTION → NEO-BRUTALIST)
 
 | Параметр | Было | Стало |
 |----------|------|-------|
@@ -76,6 +78,39 @@ Footer (тёмный `#1A1A2E`)
 ```
 
 **Убрать:** манифест-полоса (слишком театрально), кубики-анимация источников (время не окупается), блок «Для кого» 4 карточки (заменяет live feed).
+
+---
+
+## § CABINET-INBOX-UI — inbox вместо ленты (**O23**)
+
+**Канон:** Product §0j/0k · Coder § **CABINET-INBOX-O23**.
+
+| Поверхность | Было | Стало |
+|-------------|------|-------|
+| **`/lenta/`** | все видят одинаково | paid: кнопка «Написать отkлик»; anon strip про 15 мин |
+| **`/cabinet/`** | match-лента + фильтры | **«Мои отклики»** — компактный список; **удалить**; профиль/навыки/подписка сверху |
+| **Empty ЛК** | «нет match» | «Напишите отклик на ленте» |
+
+Фильтры sort/min_match (O22) — **на `/lenta/`**, не в sidebar ЛК.
+
+---
+
+## § TWO-SPEEDS-UI — две скорости (**O11+O23**)
+
+
+**Не в CSS-спринте NEO сейчас** — заложить в макет/REFERENCE; Coder подключит после фазы **3r**.
+
+| Поверхность | UI-элемент | Спека |
+|-------------|------------|--------|
+| **`/lenta/`** | Info-strip `.rl-feed-delay-notice` | Под `rl-feed-head__count`, muted 13–14px, ссылка на `/pricing/` |
+| **`/lenta/`** | (опц.) иконка часов на карточке | Только если O11 в коде и лид «задержанный» — не обязательно в MVP copy |
+| **`/pricing/`** | Таблица сравнения | 2 колонки: «Бесплатно» / «ИИ-агент» — строка **Скорость** |
+| **`/how/`**, **`/faq/`** | Текстовый блок / accordion | см. TWO-SPEEDS-COPY |
+| **`/cabinet/`** | В блоке подписки | Upsell: «Без задержки» рядом со Stars |
+
+**Mobile:** strip не sticky — одна строка + «Подробнее → pricing».
+
+---
 
 #### 2. Лента `/lenta/` — mobile-first
 

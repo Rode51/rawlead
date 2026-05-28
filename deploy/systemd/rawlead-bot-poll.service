@@ -1,0 +1,21 @@
+[Unit]
+Description=RawLead @rawlead_bot command poller (survives radar stop)
+After=network-online.target rawlead-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rawlead
+Group=rawlead
+WorkingDirectory=/opt/rawlead
+EnvironmentFile=/opt/rawlead/.env
+EnvironmentFile=-/opt/rawlead/.env.site
+Environment=RADAR_PROFILE=site
+Environment=RAWLEAD_BOT_POLL_EXTERNAL=1
+Environment=PYTHONPATH=/opt/rawlead/src
+ExecStart=/opt/rawlead/deploy/run-bot-poll.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

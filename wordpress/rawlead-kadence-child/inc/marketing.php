@@ -88,11 +88,11 @@ function rawlead_cabinet_login_url(): string {
 function rawlead_inner_page_lead(string $slug): string {
     return match ($slug) {
         'how'     => __('Пять шагов: от навыков до вашего отклика', 'rawlead-kadence-child'),
-        'pricing' => __('Тариф ИИ-агент — оплата Telegram Stars скоро', 'rawlead-kadence-child'),
+        'pricing' => __('Тариф ИИ-агент — 300 Telegram Stars/мес (~400–720 ₽)', 'rawlead-kadence-child'),
         'faq'     => __('Коротко о RawLead для любой ниши фриланса', 'rawlead-kadence-child'),
         'contact' => __('Свяжитесь с нами — Telegram или форма', 'rawlead-kadence-child'),
         'lenta'   => __('Открытый рынок заказов с бирж и Telegram', 'rawlead-kadence-child'),
-        'cabinet' => __('Персональная лента по вашим тегам — скоро', 'rawlead-kadence-child'),
+        'cabinet' => __('Персональная лента по вашим тегам и статус подписки', 'rawlead-kadence-child'),
         default   => '',
     };
 }
@@ -116,13 +116,7 @@ function rawlead_format_inner_content(string $content, string $slug): string {
     }
 
     if ($slug === 'faq') {
-        $formatted = preg_replace(
-            '/(<h2[^>]*>.*?<\/h2>)\s*(<p>.*?<\/p>)/is',
-            '<section class="rl-faq-card">$1$2</section>',
-            $content
-        );
-
-        return is_string($formatted) ? $formatted : $content;
+        return $content;
     }
 
     return $content;

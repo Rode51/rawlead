@@ -51,7 +51,9 @@ Ingest: `INSERT … ON CONFLICT (content_hash) DO NOTHING` — при дубле
 | `id` | UUID PK | seed `00000000-0000-0000-0000-000000000001` = владелец (#1) |
 | `wp_user_id` | BIGINT UNIQUE | связь с WP |
 | `email` | TEXT | |
-| `tg_chat_id` | BIGINT | для персональной рассылки бота |
+| `tg_chat_id` | BIGINT | для push в TG |
+| `push_min_match` | INT default 60 | порог % для MATCH_PUSH (O30) |
+| `push_enabled` | BOOL default TRUE | toggle push (O30) |
 | `created_at` | TIMESTAMPTZ | |
 
 ### `user_tags`

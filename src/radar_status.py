@@ -290,11 +290,42 @@ def build_status_detail(cfg: Config, storage: ProjectStorage) -> dict:
     return detail
 
 
-def _format_header_lines(cfg: Config, storage: ProjectStorage) -> list[str]:
-    profile = _profile_label(cfg.radar_profile)
+def _format_ingest_state_line(
+    storage: ProjectStorage,
+    unit_state: str | None,
+) -> str:
+    """Явное состояние ingest: работает / пауза / остановлен (systemd)."""
     paused = storage.is_radar_paused()
+    us = (unit_state or "").strip().lower()
+    if us == "active":
+        if paused:
+            return (
+                "⏸ Ingest: ПАУЗА — процесс жив, новые заказы не качаем"
+            )
+        return "▶ Ingest: РАБОТАЕТ — биржи и TG-монитор включены"
+    if us in ("inactive", "failed", "dead"):
+        note = " (флаг паузы в базе)" if paused else ""
+        return f"🛑 Ingest: ОСТАНОВЛЕН — unit rawlead-radar выключен{note}"
+    if us == "activating":
+        return "⏳ Ingest: запускается (systemd activating)…"
+    if us:
+        return f"⚠ Ingest: systemd={us}"
+    if paused:
+        return "⏸ Ingest: ПАУЗА — ⚠ systemd: не удалось проверить"
+    return "⚠ Ingest: systemd не удалось проверить (флаг паузы снят?)"
+
+
+def _format_header_lines(
+    cfg: Config,
+    storage: ProjectStorage,
+    *,
+    unit_state: str | None = None,
+) -> list[str]:
+    profile = _profile_label(cfg.radar_profile)
     lines = [
         "📊 Статус радара",
+        "",
+        _format_ingest_state_line(storage, unit_state),
         "",
         f"Профиль: {profile} · бот {_bot_label(cfg)}",
         f"TELEGRAM_CHAT_ID: {cfg.telegram_chat_id}",
@@ -303,14 +334,12 @@ def _format_header_lines(cfg: Config, storage: ProjectStorage) -> list[str]:
     if cfg.radar_profile == "site":
         conv = "вкл" if cfg.radar_conveyor else "выкл"
         lines.append(
-            f"Конвейер: {conv} · опрос {cfg.poll_interval_minutes} мин · "
-            f"{'⏸ пауза' if paused else '▶ активен'}"
+            f"Конвейер: {conv} · опрос {cfg.poll_interval_minutes} мин"
         )
     else:
         mode = "Neon consumer" if legacy_neon_consumer_enabled() else "биржи"
         lines.append(
-            f"Режим: {mode} · опрос {cfg.poll_interval_minutes} мин · "
-            f"{'⏸ пауза' if paused else '▶ активен'}"
+            f"Режим: {mode} · опрос {cfg.poll_interval_minutes} мин"
         )
     bot_ok = _bot_start_ok(cfg)
     if bot_ok is True:
@@ -516,19 +545,33 @@ def tg_pult_lamp_state(
     return "warn", "подключение…"
 
 
-def format_status_message(cfg: Config, storage: ProjectStorage) -> str:
-    lines = _format_header_lines(cfg, storage)
+def format_status_message(
+    cfg: Config,
+    storage: ProjectStorage,
+    *,
+    unit_state: str | None = None,
+) -> str:
+    lines = _format_header_lines(cfg, storage, unit_state=unit_state)
 
     if cfg.radar_profile == "site":
         lines.extend(_format_site_block(cfg, storage))
     else:
         lines.extend(_format_legacy_dogfood_block(storage))
 
+    ingest_down = bool(
+        unit_state and unit_state.strip().lower() not in ("active", "activating")
+    )
+
     if cfg.radar_profile == "site" or radar_tg_enabled():
         lines.append("")
-        tg_ok, tg_detail = _tg_monitor_state(storage)
-        icon = "🟢" if tg_ok else "🔴"
-        lines.append(f"Telegram-монитор: {icon} {tg_detail}")
+        if ingest_down:
+            lines.append(
+                "Telegram-монитор: 🔴 не работает (ingest остановлен; ниже — архив прошлой сессии)"
+            )
+        else:
+            tg_ok, tg_detail = _tg_monitor_state(storage)
+            icon = "🟢" if tg_ok else "🔴"
+            lines.append(f"Telegram-монитор: {icon} {tg_detail}")
 
         try:
             tg_cfg = load_tg_monitor_config()

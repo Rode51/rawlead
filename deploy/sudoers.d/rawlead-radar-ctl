@@ -1,0 +1,2 @@
+# /etc/sudoers.d/rawlead-radar-ctl — TG-бот (user rawlead) может гасить/поднимать radar units.
+rawlead ALL=(root) NOPASSWD: /opt/rawlead/deploy/radar-ctl.sh

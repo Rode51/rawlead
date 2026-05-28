@@ -20,6 +20,7 @@ _main_lock_fh = None
 from config import (
     Config,
     apply_profile_argv,
+    bot_poll_external,
     load_config,
     load_radar_env,
     radar_lock_path,
@@ -405,6 +406,8 @@ def run_cycle(
 
 
 def _poll_and_log_tg_commands(cfg: Config, storage: ProjectStorage) -> None:
+    if bot_poll_external():
+        return
     for line in try_poll_commands(cfg, storage):
         ts = radar_timestamp()
         full = f"{ts} {line}"

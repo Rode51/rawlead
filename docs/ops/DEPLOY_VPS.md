@@ -230,6 +230,7 @@ WP на **том же VPS** (nginx vhost `rawlead.ru` — настраивает
 ```php
 define('RAWLEAD_API_URL', 'http://127.0.0.1:8000');
 define('RAWLEAD_TG_BOT_USERNAME', 'rawlead_bot');
+define('RAWLEAD_TG_BOT_ID', '8989158953'); // @rawlead_bot — OAuth fallback / Login Widget
 ```
 
 WP на том же хосте — лучше `127.0.0.1:8000` (без лишнего TLS). Браузер ходит в WP REST same-origin; CORS нужен для `/docs` и отладки.
@@ -244,6 +245,28 @@ sudo -u www-data wp theme activate rawlead-kadence-child --path=/var/www/rawlead
 ```
 
 Страницы `/lenta/`, `/cabinet/` — по [`TZ_WP.md`](../team/architect/TZ_WP.md).
+
+### 5b. HTTPS — убрать «Не защищено» (**O18**)
+
+Сайт на **http://** — браузер показывает красное «Не защищено». Нужен **Let's Encrypt** (certbot) на nginx.
+
+**Условие:** DNS `rawlead.ru`, `www.rawlead.ru`, `api.rawlead.ru` → IP VPS (порт **443** открыт).
+
+На VPS (SSH root):
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d rawlead.ru -d www.rawlead.ru -d api.rawlead.ru --redirect
+sudo -u www-data wp option update siteurl 'https://rawlead.ru' --path=/var/www/rawlead.ru --allow-root
+sudo -u www-data wp option update home 'https://rawlead.ru' --path=/var/www/rawlead.ru --allow-root
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**Проверка:** `https://rawlead.ru/lenta/` — замок в адресной строке, без «Не защищено».
+
+**Авто с ПК:** `python scripts/install-wp-vps.py` — certbot в конце, если DNS уже на VPS.
+
+**После HTTPS:** BotFather `/setdomain` → `rawlead.ru` (Login Widget); в `.env.site` на VPS: `RADAR_CORS_ORIGINS=https://rawlead.ru`.
 
 ---
 
@@ -284,9 +307,49 @@ sudo rsync -a wordpress/rawlead-kadence-child/ /var/www/rawlead.ru/wp-content/th
 | Не запускать Site ▶ 24/7 | дубли ingest + TG |
 | **Не** ▶ Site / Legacy на ПК | только VPS systemd |
 | @FLPARSINGBOT | стоп/статус/карточки dogfood (E2b) |
+| @rawlead_bot poll | **только VPS** — иначе Bot API **409 Conflict** (два getUpdates на один токен) |
 | Пульт Tauri | не нужен 24/7; опц. SSH + `journalctl` |
 | `radarzakaz.local` | локальная вёрстка |
 
 ---
 
-_Coder § P5 · 2026-05-28 · без IP/секретов в git_
+## 9. TG admin: пауза vs стоп (§ B3)
+
+**@rawlead_bot** — кнопки ⏸/▶/🛑/ℹ **только** `TELEGRAM_CHAT_ID` (владелец). Подписчики: welcome без клавиатуры.
+
+| Действие | Что делает |
+|----------|------------|
+| **⏸ Пауза** / `/pause` | мягкий флаг SQLite (`radar_paused_*`); systemd **active**, процессы живут |
+| **▶ Старт** / `/старт` | снять паузу; если unit **inactive** — `systemctl start` через wrapper |
+| **🛑 Стоп** / `/stop-radar` | **hard stop:** `systemctl stop rawlead-radar` или `rawlead-radar-legacy` |
+| **ℹ Статус** | сводка + `systemctl is-active` |
+
+Wrapper (без произвольного shell):
+
+```bash
+sudo /opt/rawlead/deploy/radar-ctl.sh {stop|start|status} {site|legacy}
+```
+
+Sudoers (один раз на VPS):
+
+```bash
+sudo cp /opt/rawlead/deploy/sudoers.d/rawlead-radar-ctl /etc/sudoers.d/rawlead-radar-ctl
+sudo chmod 440 /etc/sudoers.d/rawlead-radar-ctl
+sudo visudo -c
+```
+
+**@FLPARSINGBOT** (legacy) — отдельный токен; `/pause` там **не** гасит Site ingest (разные `.env` / units).
+
+---
+
+## 10. Retention purge (7d)
+
+```bash
+sudo cp /opt/rawlead/deploy/systemd/rawlead-purge-leads.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now rawlead-purge-leads.timer
+```
+
+---
+
+_Coder § P5 · L3 · B3 · 2026-05-28 · без IP/секретов в git_
