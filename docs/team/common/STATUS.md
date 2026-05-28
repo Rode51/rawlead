@@ -10,7 +10,7 @@
 
 | | |
 |--|--|
-| **L1** | `canMountTelegramWidget()` + allowlist rawlead.ru; `rawlead_cabinet_login_url()`; fallback `return_to` prod; 127.0.0.1 только local |
+| **L1** | `canMountTelegramWidget()` + allowlist rawlead.ru; hotfix **v1.7.8** — рекурсия `tg_login_bot_id`↔`fallback_url` → 500 на `/cabinet/` |
 | **L2** | hero CTA лента+ЛК; pricing Stars; plugin `rawlead-landing` + `wp-vps-skeleton-pages.py` |
 | **Lead verify** | `marketing.php`, `functions.php` v1.7.7, `page-cabinet.php`, `rawlead-cabinet.js` — без hard-block prod |
 | **Деплой (владелец)** | `deploy-wp-theme-vps.py` + `wp-vps-skeleton-pages.py` · BotFather `/setdomain` → rawlead.ru |
@@ -140,3 +140,4 @@ _Lead Architect · ревизия docs 2026-05-28_
 3. **ЛК:** `/cabinet/` → TG-вход → навыки → `PUT …/me/tags` **200** + `Authorization: Bearer`.
 4. **Кросс-девайс:** тот же TG на телефоне и ПК → `/cabinet/` — **одинаковые** навыки после reload.
 5. **Лента залогинен:** после входа в ЛК открыть `/lenta/` — подтянулись навыки из Neon (тот же JWT).
+

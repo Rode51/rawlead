@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.7.7');
+define('RAWLEAD_CHILD_VERSION', '1.7.8');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -76,16 +76,6 @@ function rawlead_tg_login_fallback_normalize(string $url): string {
 function rawlead_tg_login_bot_id(): int {
     if (defined('RAWLEAD_TG_BOT_ID')) {
         return max(0, (int) RAWLEAD_TG_BOT_ID);
-    }
-    $fallback = rawlead_tg_login_fallback_url();
-    if ($fallback !== '') {
-        $parts = wp_parse_url($fallback);
-        if (is_array($parts) && !empty($parts['query'])) {
-            parse_str((string) $parts['query'], $query);
-            if (!empty($query['bot_id'])) {
-                return max(0, (int) $query['bot_id']);
-            }
-        }
     }
     return 0;
 }
