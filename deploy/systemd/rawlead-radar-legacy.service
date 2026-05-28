@@ -1,0 +1,20 @@
+[Unit]
+Description=RawLead Legacy dogfood (neon_legacy_consumer → @FLPARSINGBOT)
+After=network-online.target rawlead-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rawlead
+Group=rawlead
+WorkingDirectory=/opt/rawlead
+EnvironmentFile=/opt/rawlead/.env
+EnvironmentFile=-/opt/rawlead/.env.legacy
+Environment=RADAR_PROFILE=legacy
+Environment=PYTHONPATH=/opt/rawlead/src
+ExecStart=/opt/rawlead/deploy/run-radar-legacy.sh
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

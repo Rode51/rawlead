@@ -79,7 +79,7 @@ cd /opt/rawlead
 sudo -u rawlead python3 -m venv .venv
 sudo -u rawlead .venv/bin/pip install -r requirements.txt
 sudo -u rawlead .venv/bin/playwright install chromium
-chmod +x deploy/run-radar-site.sh
+chmod +x deploy/run-radar-site.sh deploy/run-radar-legacy.sh
 ```
 
 ---
@@ -92,6 +92,7 @@ chmod +x deploy/run-radar-site.sh
 |------|--------|
 | `.env` | общие ключи: `DATABASE_URL`, Telethon, FL/Kwork, прокси |
 | `.env.site` | `@rawlead_bot`, OpenRouter site, `RADAR_PROFILE=site` |
+| `.env.legacy` | `@FLPARSINGBOT`, OpenRouter legacy, `RADAR_PROFILE=legacy` (E2b) |
 
 **Прод `.env.site` (минимум):**
 
@@ -103,7 +104,7 @@ RADAR_EXCHANGES_ENABLED=1
 RADAR_TG_ENABLED=1
 ```
 
-Права: `chmod 600 .env .env.site`
+Права: `chmod 600 .env .env.site .env.legacy`
 
 ### Telethon-сессии (E2)
 
@@ -132,6 +133,7 @@ TELETHON_SESSION_ACC2=/opt/rawlead/data/sessions/+66967716330_telethon
 ```bash
 sudo cp /opt/rawlead/deploy/systemd/rawlead-api.service /etc/systemd/system/
 sudo cp /opt/rawlead/deploy/systemd/rawlead-radar.service /etc/systemd/system/
+sudo cp /opt/rawlead/deploy/systemd/rawlead-radar-legacy.service /etc/systemd/system/
 sudo systemctl daemon-reload
 ```
 
@@ -163,17 +165,44 @@ tail -f /opt/rawlead/data/radar_site.log
 **Уже в коде:** `neon_legacy_consumer.py` крутит `poll_commands` → `/status`, `/pause`, `/стоп`, кнопки панели; карточки из Neon → твой чат. **Не** парсит биржи (это Site `main`).
 
 1. На VPS: `.env.legacy` (бот FLPARSING, `FILTERS_LEGACY`, свой OpenRouter, `RADAR_LOG_PATH=data/radar_legacy.log`).
-2. `systemctl enable --now rawlead-radar-legacy` (unit — § Coder `deploy/systemd/rawlead-radar-legacy.service`).
-3. На ПК: **не** ▶ Legacy, **не** ▶ Site.
+2. `systemctl enable --now rawlead-radar-legacy` (unit: `deploy/systemd/rawlead-radar-legacy.service`, runner: `deploy/run-radar-legacy.sh`).
+3. На ПК: **не** ▶ Legacy, **не** ▶ Site — `scripts\stop-radar-desktop-full.vbs`.
+
+**Прод `.env.legacy` (минимум, без Telethon):**
+
+```env
+RADAR_PROFILE=legacy
+RADAR_EXCHANGES_ENABLED=0
+RADAR_TG_ENABLED=0
+RADAR_LOG_PATH=data/radar_legacy.log
+TELEGRAM_BOT_TOKEN=...FLPARSING...
+TELEGRAM_CHAT_ID=...
+TG_PROXY_URL=http://host:port:user:pass
+AI_API_KEY=...legacy_openrouter...
+FILTERS_MD_PATH=docs/ops/FILTERS_LEGACY.md
+AI_MODE=legacy
+POLL_INTERVAL_MINUTES=10
+# Опционально: отдельный SQLite (иначе пауза раздельная по ключам radar_paused_legacy / radar_paused_site)
+# SQLITE_PATH=data/projects_legacy.db
+```
+
+**Telethon на VPS — только для Site** (`rawlead-radar`). Legacy unit **не** нуждается в acc-сессиях, только Bot API.
 
 | Unit | Процессы | Бот управления |
 |------|----------|----------------|
 | `rawlead-radar` | `main.py` + `tg_main.py` | @rawlead_bot (опц.) |
 | `rawlead-radar-legacy` | `neon_legacy_consumer.py` | **@FLPARSINGBOT** — стоп/старт/статус |
 
-**Пауза:** сейчас флаг `radar_paused` в SQLite — если Site и Legacy **один** `SQLITE_PATH`, `/pause` в FLPARSING **может** остановить и Site. Coder § P5-E2: раздельный `SQLITE_PATH` для legacy **или** `radar_paused_legacy` / `radar_paused_site`.
+**Пауза раздельно (e4):** `/pause` в @FLPARSINGBOT пишет `radar_paused_legacy`; Site читает `radar_paused_site` — общий ingest **не** гасится. Старый ключ `radar_paused` сбрасывается при первом /pause|/старт после обновления.
 
-**Telethon:** только в unit Site (listen чатов). Legacy на VPS **без** acc-сессий, только Bot API.
+**E2 полный деплой (Site + Legacy на VPS):**
+
+```bash
+sudo systemctl enable --now rawlead-radar rawlead-radar-legacy
+sudo systemctl status rawlead-radar rawlead-radar-legacy
+tail -f /opt/rawlead/data/radar_site.log
+tail -f /opt/rawlead/data/radar_legacy.log
+```
 
 ---
 
@@ -228,6 +257,7 @@ sudo -u www-data wp theme activate rawlead-kadence-child --path=/var/www/rawlead
 | 4 | `systemctl status rawlead-api rawlead-radar` | active |
 | 5 | `radar_site.log` | циклы FL/Kwork, `site:сводка` |
 | 6 | E2b: `rawlead-radar-legacy` active | `radar_legacy.log` · `/status` в @FLPARSINGBOT отвечает |
+| 7 | E2b: `/pause` в @FLPARSINGBOT | Site ingest продолжается (`radar_site.log` без `neon:пауза`-тишины на биржах) |
 
 **Стоп-трафик:** пустая лента · API 5xx · CORS блок · два радара одновременно.
 
@@ -241,6 +271,7 @@ sudo -u rawlead git pull
 sudo -u rawlead .venv/bin/pip install -r requirements.txt
 sudo systemctl restart rawlead-api
 sudo systemctl restart rawlead-radar   # только если E2
+sudo systemctl restart rawlead-radar-legacy   # только если E2b
 sudo rsync -a wordpress/rawlead-kadence-child/ /var/www/rawlead.ru/wp-content/themes/rawlead-kadence-child/
 ```
 

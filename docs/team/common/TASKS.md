@@ -7,14 +7,16 @@ Vision: [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11**
 
 ## Сейчас
 
-**→ @coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) § **P5-E2-VPS**
+**→ @coder:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md) § **B1** (навыки на user_id)
+
+**VPS:** деплой E2 — **ты** (`DEPLOY_VPS.md` § E2/E2b).
 
 **Потом:** E-polish (B1 → A1 → C1) → § **3f-OWNER-BETA** → **PRE-PROD-STRESS** → трафик.
 
 | # | Задача | Кто | Статус |
 |---|--------|-----|--------|
-| 1 | **P5-E2-VPS** — радары Site+Legacy на сервер | @coder | **→** |
-| 2 | **B1** навыки не глобальные | @coder | E-polish |
+| 1 | **P5-E2-VPS** — радары Site+Legacy на сервер | @coder | **✅ код** · деплой — владелец |
+| 2 | **B1** навыки не глобальные | @coder | **→** |
 | 3 | **A1** убрать «N лидов за 7 дней» | @coder | E-polish |
 | 4 | **C1** mobile UX | @lead-designer → @coder | E-polish |
 | 5 | **P4b** L2 под профиль юзера | @coder + @lead-product | после E-polish |

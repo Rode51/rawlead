@@ -6,6 +6,7 @@ from __future__ import annotations
 
 
 
+import os
 import sqlite3
 
 from pathlib import Path
@@ -232,15 +233,33 @@ class ProjectStorage:
 
 
 
+    _PAUSE_KEY_LEGACY = "radar_paused_legacy"
+    _PAUSE_KEY_SITE = "radar_paused_site"
+    _PAUSE_KEY_SHARED = "radar_paused"
+
+    @classmethod
+    def _pause_setting_key(cls) -> str:
+        profile = os.environ.get("RADAR_PROFILE", "legacy").strip().casefold()
+        return cls._PAUSE_KEY_SITE if profile == "site" else cls._PAUSE_KEY_LEGACY
+
+    def _has_setting(self, key: str) -> bool:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM settings WHERE key = ? LIMIT 1",
+                (key,),
+            ).fetchone()
+            return row is not None
+
     def is_radar_paused(self) -> bool:
-
-        return self.get_setting("radar_paused", "0") == "1"
-
-
+        key = self._pause_setting_key()
+        if self._has_setting(key):
+            return self.get_setting(key, "0") == "1"
+        return self.get_setting(self._PAUSE_KEY_SHARED, "0") == "1"
 
     def set_radar_paused(self, paused: bool) -> None:
-
-        self.set_setting("radar_paused", "1" if paused else "0")
+        self.set_setting(self._pause_setting_key(), "1" if paused else "0")
+        if self._has_setting(self._PAUSE_KEY_SHARED):
+            self.set_setting(self._PAUSE_KEY_SHARED, "0")
 
 
 

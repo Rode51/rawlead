@@ -1,12 +1,12 @@
-# Coder — **→ § P5-E2-VPS**
+# Coder — **→ E-polish (B1)** · после § P5-E2-VPS ✅
 
 **Ворота прод:** [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) · бюджет: [`docs/ops/DEPLOY_BUDGET.md`](../../ops/DEPLOY_BUDGET.md).
 
 **Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11**.
 
-**Порядок (владелец 2026-05-28):** **P5-E2-VPS** → **E-polish** (B1/A1/C1) → **§ 3f-OWNER-BETA** → **§ PRE-PROD-STRESS**.
+**Порядок (владелец 2026-05-28):** **E-polish** (B1 → A1 → C1) → **§ 3f-OWNER-BETA** → **§ PRE-PROD-STRESS**.
 
-**→ Сейчас @coder:** **§ P5-E2-VPS** · затем E-polish по [`OWNER_INTENT.md`](OWNER_INTENT.md).
+**→ Сейчас @coder:** **E-polish B1** ([`OWNER_INTENT.md`](OWNER_INTENT.md)) · VPS E2 — **владелец** (`DEPLOY_VPS.md` § E2/E2b).
 
 **✅ Архив (не трогать без § в шапке):** SITE-POLISH, FEED-FRESHNESS, 3x-HOT-BADGE, BACKLOG-CLEAR, LEGACY-SELF-STOP, HOTFIX-POST-PULT и др. — см. [`STATUS.md`](../common/STATUS.md).
 
@@ -58,25 +58,9 @@
 3. `/lenta/` обновляется без ПК.
 4. @FLPARSINGBOT: `/status`, `/pause` → `/старт` — карточки dogfood; **Site** на паузе только если e4 сделан (иначе общая пауза — предупредить в статусе).
 
-| # | Задача |
-|---|--------|
-| e1 | `deploy/run-radar-site.sh` + `rawlead-radar.service` — уже есть; приёмка E2 |
-| e2 | **Новый** `deploy/run-radar-legacy.sh` + `deploy/systemd/rawlead-radar-legacy.service` → `neon_legacy_consumer.py --profile legacy` |
-| e3 | `DEPLOY_VPS.md` § E2b — `.env.legacy` на VPS, scp **не** нужны Telethon для legacy |
-| e4 | **Пауза раздельно:** `SQLITE_PATH` в `.env.legacy` ≠ site **или** `radar_paused_site` / `radar_paused_legacy` — чтобы /pause в FLPARSING **не** гасил Site ingest |
-| e5 | После деплоя: на ПК `stop-radar-desktop-full` — проверка **нет** дублей TG listen |
-| e6 | @rawlead_bot: hotfix `load_site_rollup_line` import — статус Site-бота |
+**✅ Coder 2026-05-28:** e2–e6 · Lead verify · деплoy на VPS — владелец.
 
-**Не делать:** второй VPS; Freelancehunt на VPS.
-
-**Приёмка владельца:**
-
-1. ПК: оба пульта **■**, скрипт stop full.
-2. VPS: `rawlead-radar` + `rawlead-radar-legacy` active.
-3. `/lenta/` обновляется без ПК.
-4. @FLPARSINGBOT: `/status`, `/pause` → `/старт` — карточки dogfood; **Site** на паузе только если e4 сделан (иначе общая пауза — предупредить в статусе).
-
-# § BACKLOG-CLEAR — сброс хвоста L1 без OpenRouter (**→ сейчас**, владелец)
+# § BACKLOG-CLEAR — сброс хвоста L1 без OpenRouter (**✅ 2026-05-28**)
 
 **Запрос:** очистить очередь ~1253 без L1; **новые** заказы в ленту; **не грузить** OpenRouter всем хвостом.
 

@@ -34,6 +34,7 @@
 | **O8** | Лента «40+ мин» — **баг/очередь**, не норма | FEED-FRESHNESS + Site ▶; верх FL/Kwork &lt; 15 мин в активные часы |
 | **O9** | Фильтры Site vs Legacy **разные файлы** | `FILTERS_SITE.md` / `FILTERS_LEGACY.md`; спорные МИМО по scope §0i — не автоправка без Product |
 | **O10** | **Legacy ■ на ПК — по желанию**; если ▶ — **не должен сам гаситься** | Баг § **LEGACY-SELF-STOP** в `CODER_PROMPT` · не путать с «держи выключенным» |
+| **O11** | **Две скорости:** открытая `/lenta/` — задержка ~15 мин (портфолио); **платники** — мгновенно в TG + ИИ-отклик | Не сейчас · после **3f** + **3h** · согласовать с Product (цена vision **590–990 ₽**, не 400–500) |
 
 ---
 
@@ -117,13 +118,14 @@
 |-----------|-----|--------|---------------------|
 | **P0** | **Legacy ▶ не гасится** | § LEGACY-SELF-STOP | **✅** import `lead_pipeline` |
 | **P0** | Пульт: скролл логов | § PULT-LOG-SCROLL-STICK | код ✅ · rebuild ⏳ |
-| **P0** | Site+TG + Legacy consumer **на VPS** | § **P5-E2-VPS**, `DEPLOY_VPS.md` E2/E2b | **Не в репо:** legacy unit/script |
-| **P0** | **Пауза раздельно** Site vs FLPARSING | P5-E2 **e4** | ⏳ открыто (общий `radar_paused` риск) |
+| **P0** | Site+TG + Legacy consumer **на VPS** | § **P5-E2-VPS** | **✅ код** · деплой — владелец |
+| **P0** | **Пауза раздельно** Site vs FLPARSING | P5-E2 **e4** | **✅** `radar_paused_site` / `radar_paused_legacy` |
 | **P1** | ИИ-агент «Написать отклик» + push | § **3f-OWNER-BETA** | после живой ленты на проде |
 | **P1** | Биллинг 590–990 ₽ | § **3h** | после 1-го внешнего юзера / сценария #0 |
 | **P1** | PRE-PROD-STRESS S1–S6 | `PRE_PROD_GATE.md` | **после** E-polish + VPS |
 | **P2** | TG в фильтре ленты (`source=tg`) | § TG-FEED-SOURCES | код ✅ |
 | **P2** | Freemium · пауза подписки | ROADMAP 3p, 3q | после 1-го платящего |
+| **P2** | **O11** задержка 15 мин на anon `/lenta/` vs instant TG paid | ROADMAP · Product | после 3f + биллинг |
 
 **Волна 2026-05-28 принята Lead** — детали: [`STATUS.md`](../common/STATUS.md) · [`archive/TASKS_HISTORY.md`](../archive/TASKS_HISTORY.md).
 
@@ -146,6 +148,7 @@
 | 2026-05-28 | Mobile UX пересобрать | **C1** · E-polish · Designer |
 | 2026-05-28 | Навыки общие на всех устройствах | **B1** · E-polish · баг данных |
 | 2026-05-28 | Ревизия docs — STATUS/TASKS без дублей | TASKS_HISTORY 2026-05-28 |
+| 2026-05-28 | Лента 15 мин free vs instant TG paid (O11) | E-later · Product |
 
 *Дописывай новые строки снизу; не удаляй старые без согласия владельца.*
 

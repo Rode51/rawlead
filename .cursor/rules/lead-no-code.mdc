@@ -25,7 +25,7 @@ alwaysApply: true
 
 1. Отказ одной фразой  
 2. Записать задачу в `docs/team/architect/CODER_PROMPT.md` + `docs/team/common/TASKS.md`  
-3. Владельцу: `@coder` + ссылка на промпт  
+3. Владельцу: **сводка простым языком** + копипаст `@coder` (см. `lead-architect.mdc` § Handoff)
 
 Даже если фича «маленькая» или «срочная» — только Coder/Mechanic.
 

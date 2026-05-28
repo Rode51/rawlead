@@ -306,7 +306,11 @@ def _handle_action(
             _send_message(cfg, "Уже на паузе.")
         else:
             storage.set_radar_paused(True)
-            _send_message(cfg, "Радар на паузе. FL/Kwork и ИИ отключены.")
+            if cfg.radar_profile == "site":
+                msg = "Site на паузе. FL/Kwork, TG и конвейер отключены."
+            else:
+                msg = "Dogfood на паузе. Карточки из Neon в @FLPARSINGBOT отключены."
+            _send_message(cfg, msg)
         return
 
     if action == _ACTION_RESUME:
@@ -314,9 +318,10 @@ def _handle_action(
             _send_message(cfg, "Радар уже активен.")
         else:
             storage.set_radar_paused(False)
+            label = "Site" if cfg.radar_profile == "site" else "Dogfood"
             _send_message(
                 cfg,
-                f"Радар активен. Интервал опроса — {interval} мин.",
+                f"{label} активен. Интервал опроса — {interval} мин.",
             )
         return
 

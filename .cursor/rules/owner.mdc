@@ -26,6 +26,10 @@ alwaysApply: false
 
 Не кодить. Фича → `@coder` + `CODER_PROMPT.md` · поломка → `@mechanic` + `docs/problems/`.
 
+## От Lead перед `@coder`
+
+Lead **сначала** пишет блок **«Что сделает Coder (коротко)»** — простым языком, без ТЗ. **Потом** даёт копипаст для нового чата. Так ты понимаешь, чего ждать, до запуска Coder.
+
 ## Разрешено владельцу
 
 - `.env`, `docs/ops/FILTERS.md`, `docs/ops/PROFILE.md`

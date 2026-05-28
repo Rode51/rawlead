@@ -40,6 +40,6 @@ alwaysApply: true
 - **Git commit / push** — **только Lead Architect**; Coder/Mechanic/Designer не коммитят; push — по просьбе владельца
 - **Сообщения коммита Lead** — **только по-русски** (что сделали / приняли), см. `lead-architect.mdc` § Git
 - **Перед работой** — [`docs/README.md`](docs/README.md) → [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) → файл роли; не «тыкаться» по всему repo
-- **После `CODER_PROMPT.md`** — в чат владельцу: блок **копипаст** для `@coder` (см. `lead-architect.mdc`)
+- **После handoff на @coder** — в чат владельцу: **сначала** сводка «что сделает Coder» простым языком, **потом** копипаст (см. `lead-architect.mdc` § Handoff)
 - **Код:** без простыней; карта — `docs/team/architect/CODE_STRUCTURE.md`; перенос папок — отдельное TZ + правка путей
 - **MCP (внешние tools):** канон [`docs/team/common/MCP_POOL.md`](docs/team/common/MCP_POOL.md) — Perplexity, Playwright, Firecrawl, Glif, Chrome (+ Neon = БД). Если tools MCP **нет** в сессии — не выдумывать веб/скрейп; сказать владельцу включить сервер из пула (настройка позже — ок)
