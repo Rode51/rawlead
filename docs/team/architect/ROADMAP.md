@@ -6,17 +6,18 @@
 
 ---
 
-## Сейчас (2026-05-28)
+## Сейчас (2026-05-29)
 
 | # | Что | Кто | Статус |
 |---|-----|-----|--------|
-| **P5 E2** | Site+Legacy радары на VPS | — | ✅ |
-| **O23 + TAGS + FEED + O27–29** | inbox · tools · push · Stars · views | @coder | **✅** Lead verify |
-| **2 Деплoy + приёмка** | v1.7.22 · Neon `009` · SITE-ACCEPT-GATE | Lead + **владелец** | деплoy **✅** · gate **→** |
-| **Design / PM** | NEO + copy | Lead | **⏸** до gate |
-| **PRE-PROD** | UX-audit + stress S1–S6 | @coder → владелец | **после** Design+PM (O21) |
+| **Accept** | Wave-2 O52–O58 | владелец | **✅** |
+| **O38** | Gemini + AI audit | @mechanic | **→ сейчас** |
+| **O37** | PRE-PROD stress | @coder | **⏸ после O38** |
+| **O41** | WAVE-3 hero + demo | — | **✅ v1.10.7+** |
+| **O56+O57** | shared draft + async | — | **✅ v1.10.8** |
+| **O58** | draft GET poll | — | **✅ v1.10.9** |
 
-**Не возвращаем:** Freelancehunt · contour owner/saas · stress до polish.
+**Порядок:** приёмка UI ✅ → **O38** → **O37**.
 
 ---
 

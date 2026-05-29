@@ -1,6 +1,6 @@
 # RawLead — WordPress сайт · дизайн-референс
 
-**Статус:** v4 · NEO-BRUTALIST · 2026-05-28
+**Статус:** v5 · NEO-BRUTALIST · 2026-05-29 (nav W16 · announcement bar W15 · pricing 300⭐ W14 · /how W18 · /contact W19)
 **Направление:** «Neo-Brutalist Color Blocks» — белая база, жёлтый hero, чёрные рамки, плоские тени
 **Поверхности:** лендинг `/` · `/lenta/` (лента) · `/cabinet/` (кабинет) · `/how` · `/faq` · `/contact`
 **Отменено (v3 REVOLUTION):** тёплый Indigo `#4F46E5`, shadow-cards, pill-кнопки, `#FAFAF8` фон
@@ -51,52 +51,89 @@
 
 ### 3.1 Header (sticky, все страницы)
 
-**Все страницы:**
+**Announcement bar (только лендинг `/`, над шапкой):**
 ```
-[RawLead]   Лента · Тарифы · Контакты   [Войти в кабинет]
+Радар онлайн · 800+ лидов в неделю   [Смотреть ленту →]
 ```
-- Фон `#FFFFFF`, `border-bottom: 2px solid #0A0A0A` (всегда, не только при скролле)
-- Логотип «RawLead» — Manrope 900, `#0A0A0A`, → `/`
-- CTA «Войти в кабинет» — чёрная прямоугольная кнопка, `0px` radius
-- Мобайл: гамбургер справа; меню — drawer слева
+- `background: #0A0A0A`, `color: #FFFFFF`, height `38px`, Manrope 600 13px
+- CTA: `color: #FACC15`, без underline, → `/lenta/`
+- Mobile: текст короче «800+ лидов · [Смотреть →]»
 
-**Продуктовые `/lenta/`, `/cabinet/`:**
+**Все страницы (кроме `/lenta/`, `/cabinet/`):**
 ```
-[RawLead]                                [Войти в кабинет]
+[◎ RawLead  by Rode51]   Лента · Тарифы · Как устроено   [Войти →]
 ```
-- Минимальный, не отвлекает от контента
+- Фон `#FFFFFF`, `border-bottom: 2px solid #0A0A0A` (всегда)
+- Логотип: марка ◎ 20px + «RawLead» Manrope 900 + «by Rode51» 11px 0.4 opacity
+- Nav items: Manrope 700, 13px, uppercase, letter-spacing 0.08em; active: `border-bottom: 2px solid #0A0A0A`
+- «Контакты» убрана из primary nav — только в footer
+- CTA «Войти →» — чёрная прямоугольная кнопка `0px` radius (не «Войти в кабинет»)
+- Мобайл: гамбургер справа; drawer меню
+
+**Продуктовые `/lenta/`, `/cabinet/` (минимальный):**
+```
+[◎ RawLead]                              [Войти →]
+```
+- Минимальный, не отвлекает от контента продукта
 
 ### 3.2 Лендинг `/`
+
+> **O41 (2026-05-29):** hero = только текст + CTA (жёлтый экран). Live Preview Feed = отдельная белая секция НИЖЕ с `border-top: 4px solid #0A0A0A`. Это разделение — ключевое отличие от Wave 2 «косметики».
 
 ```
 Header (sticky, 2px black border-bottom)
 
 Hero (min-height: 100svh, background: #FACC15)
-  H1: «Лиды без шума»
+  ─── ТОЛЬКО ТЕКСТ + CTA — никаких карточек внутри жёлтого блока ───
+
+  H1: «Лиды без шума»                              ← CANONICAL, не менять
       Manrope 900, clamp(56px, 10vw, 96px), #0A0A0A, letter-spacing -0.03em
+      max-width: 720px; margin-bottom: 24px
+
   Подзаголовок:
       «Биржи и Telegram — в одной ленте. ИИ убирает мусор до тебя.»
-      Manrope 400, 20px, #0A0A0A, opacity 0.75
-  CTA: [Смотреть ленту →]
-      background #0A0A0A, color #FFFFFF, radius 0px, padding 16px 32px
-      hover: background #FFFFFF, color #0A0A0A, border 2px solid #0A0A0A
-  Нижний декор: толстая чёрная линия 4px как подчёркивание секции
+      Manrope 400, clamp(18px, 2.5vw, 22px), #0A0A0A, opacity 0.75
+      max-width: 560px; margin-bottom: 40px
 
-Live Preview Feed (background: #FFFFFF, border-top/bottom 2px solid #0A0A0A)
-  Подпись: «Последние заказы из ленты» — Manrope 700 uppercase 12px letter-spacing 0.1em
-  3–4 карточки в новом стиле (bordered + flat shadow)
-  [Открыть все →] — ghost link, черный, → /lenta/
+  CTA-группа (flex-row gap 16px, mobile: flex-column):
+    PRIMARY:   [Смотреть ленту →]
+                 bg #0A0A0A, color #FFFFFF, radius 0px, padding 16px 32px
+                 hover: bg #FACC15, color #0A0A0A, border 2px solid #0A0A0A
+    SECONDARY: [Тарифы ↓]
+                 bg transparent, border 2px solid #0A0A0A, color #0A0A0A, padding 14px 28px, radius 0px
+                 hover: bg #0A0A0A, color #FACC15
+                 → якорь #pricing-preview на этой же странице
 
-Блок «Как это работает» (background: #F3E8FF)
+  Hero geo-декор (W11): SVG-угловые элементы, opacity 0.12, не перекрывают текст
+  Нижний отбивщик: border-bottom 4px solid #0A0A0A
+
+Live Preview Feed (background: #FFFFFF, border-top: 4px solid #0A0A0A, border-bottom: 2px solid #0A0A0A)
+  ─── ОТДЕЛЬНАЯ БЕЛАЯ СЕКЦИЯ, полностью изолирована от жёлтого ───
+
+  Метка секции: «Последние заказы из ленты»
+    Manrope 700, 11px, uppercase, letter-spacing 0.1em, color #0A0A0A
+    padding-top: 32px; margin-bottom: 20px
+
+  3 карточки (.rl-lead-card) в полном neo-brutalist стиле:
+    border: 2px solid #0A0A0A
+    box-shadow: 4px 4px 0 #0A0A0A
+    radius: 4px
+    hover: box-shadow 6px 6px 0 #0A0A0A + translate(-2px,-2px)
+    — НЕ интерактивные (без кнопки «Написать»), только preview
+
+  [Открыть все →] — ghost link, Manrope 700 14px, черный, → /lenta/
+    padding: 20px 0 32px; выровнен по левому краю карточек
+
+Блок «Как это работает» (background: #F3E8FF, border-top: 2px solid #0A0A0A)
   3 пункта, layout 3 col desktop / 1 col mobile
   Каждый: иконка 32px + Manrope 700 18px + 2 строки text
   Без нумерации 01-02-03
 
-Тарифы (якорь id="pricing-preview", background: #F5F5F0)
+Тарифы (якорь id="pricing-preview", background: #F5F5F0, border-top: 2px solid #0A0A0A)
   Одна карточка «ИИ-агент»
   border: 2px solid #0A0A0A, shadow: 4px 4px 0 #0A0A0A, radius: 4px
-  Цена: «от 300 ₽/мес» · Badge «Скоро» (чёрный outline)
-  CTA: [Узнать первым →] — чёрная кнопка
+  Цена: «300 ⭐ / мес» (Telegram Stars) · без Badge «Скоро»
+  CTA: [Подключить — 300 ⭐ →] — чёрная кнопка → /pricing/
 
 Footer (background: #0A0A0A, color: #FFFFFF)
   RawLead | Лента · Тарифы · Контакты | Telegram
@@ -104,6 +141,12 @@ Footer (background: #0A0A0A, color: #FFFFFF)
 ```
 
 **Убрать:** pill-кнопки, shadow soft-cards (заменяет flat shadow), манифест-полоса, sidebar фильтры, кубики-анимация.
+
+**O41 checkpoints (для @coder):**
+- Hero = NO cards inside yellow zone (только H1 + sub + CTA-группа)
+- Live Preview = белая секция, первый элемент после hero-border
+- Secondary CTA на жёлтом: `border: 2px solid #0A0A0A` — не ghost-link
+- H1 на prod = «Лиды без шума» (если иное — баг, исправить)
 
 ### 3.3 Лента `/lenta/`
 
@@ -117,14 +160,21 @@ Footer (background: #0A0A0A, color: #FFFFFF)
 - Mobile: 1 col; Desktop: 2 col max-width 900px
 - **O11 (copy-волна):** info-strip `.rl-feed-delay-notice` под счётчиком — «~15 мин на бесплатной ленте · подписка мгновенно» (см. Product § TWO-SPEEDS-COPY)
 
-### 3.3a `/pricing/` — строка «Скорость»
+### 3.3a \/pricing/\ — полная страница
 
-В таблице «Бесплатно vs ИИ-агент»:
+H1 «Тарифы» на жёлтом (\#FACC15\) фоне — отдельная страница, не только якорь.
+
+Таблица сравнения 2 колонки (NEO: \order: 2px solid #0A0A0A\, без зебры):
 
 | | Бесплатно | ИИ-агент |
 |--|-----------|----------|
 | Скорость | ~15 мин задержка | **Мгновенно** + push TG |
+| Отклики | — | Черновик ИИ |
+| Push в Telegram | — | ✓ |
+| Цена | 0 | **300 ⭐ / мес** |
 
+CTA под таблицей: \[Подключить — 300 ⭐ в Telegram →]\  
+Оплата: Telegram Stars (не ЮKassa). Кнопка → Stars-оплата через @rawlead_bot.
 ### 3.4 Кабинет `/cabinet/`
 
 Детальная спека: [`feed-cabinet-mvp.md`](feed-cabinet-mvp.md)
@@ -133,25 +183,46 @@ Footer (background: #0A0A0A, color: #FFFFFF)
 - Навыки пользователя: bordered chips, active = yellow fill + black text
 - Match-bar: `background: #0A0A0A`
 
+**Inbox-карточка = карточка ленты + черновик + удалить:**
+
+```
+[Source●] [Бюджет]  [ИДЕАЛЬНО ✦]                [✕ Удалить]
+Заголовок заказа
+████████░░  73%   👁 234
+[Брать]  [Сомнительно]
+─────────────────────────────────
+Черновик ИИ ▾   (desktop: раскрыт / mobile: collapsed)
+«Здравствуйте, готов взяться...»
+[Скопировать]
+```
+
+- Нет черновика: «Черновик не сгенерирован · [Написать на ленте →]» (muted)
+- `[✕ Удалить]` — top-right; удаляет из ЛК, не отзыв с платформы
+- Empty paid: «Напишите первый отклик на ленте →»
+- Empty free: «Доступно с подпиской · 300 ⭐»
+
 ### 3.5 `/how` — Как работает
 
 ```
 Header
 
-H1: «Как работает RawLead»
-    Manrope 800, 44px, на фоне #F3E8FF (полная ширина секция)
+H1: «Как работает»
+    Manrope 900, clamp(40px, 8vw, 64px), на фоне #FACC15 (полная ширина секция)
 
-4 шага (карточки 2×2 desktop / 1 col mobile):
-  border: 2px solid #0A0A0A, shadow: 4px 4px 0 #0A0A0A, radius: 4px
-  Каждая: иконка + Manrope 700 18px + 2 строки
+3 горизонтальных шага (desktop: 1 строка 3 col · mobile: 1 col):
+  Без карточек — просто номер + текст + подпись
+  Разделитель: вертикальная линия 2px solid #0A0A0A между шагами (desktop)
 
-Шаги:
-  1. «Подключаешь биржи»
-  2. «Радар парсит»
-  3. «ИИ фильтрует»
-  4. «Ты видишь в ленте» (+ подпись O11: бесплатно с задержкой ~15 мин, подписка — сразу)
+  ① Биржи в одном потоке
+    FL · Kwork · Telegram — без ручного мониторинга
 
-CTA: [Смотреть ленту →] — чёрная кнопка
+  ② ИИ убирает мусор
+    ~87% нерелевантного срезается до тебя
+
+  ③ Ты видишь первым
+    Платники — мгновенно. Бесплатно — ~15 мин
+
+CTA: [Смотреть ленту →] — чёрная кнопка, full-width mobile
 Footer
 ```
 
@@ -178,13 +249,14 @@ Header
 
 H1: «Связаться» (background: #FACC15 секция)
 
-Форма (CF7):
-  inputs: border: 2px solid #0A0A0A, radius: 0px, focus: shadow 2px 2px 0 #0A0A0A
-  [Отправить] — чёрная прямоугольная кнопка
+Основное:
+  [Написать в Telegram →] — чёрная кнопка, padding 16px 32px
+  ведёт на t.me/rawlead (или @rawlead_bot)
 
-«Или напишите напрямую →» [Telegram] (ghost link)
+Дополнительно (muted, 14px):
+  «Или напишите на email: hello@rawlead.ru»
 
-Убрать: «заявка на ранний доступ», «закрытое тестирование»
+Убрать: форму CF7, «заявка», «ранний доступ», «закрытое тестирование»
 Footer
 ```
 
@@ -292,9 +364,9 @@ Footer
 | Кто | Что |
 |-----|-----|
 | **Lead Designer** | ✅ NEO-BRUTALIST: токены, страницы, компоненты — этот файл |
-| **Designer** | → `DESIGNER_PROMPT.md` § NEO-BRUTALIST CSS |
-| **Coder** | → `CODER_PROMPT.md` § NEO-BRUTALIST после Designer |
+| **Designer** | ✅ Wave 2 → [`wave-2-css-brief.md`](wave-2-css-brief.md) |
+| **Coder** | → `CODER_PROMPT.md` § WAVE-2-CSS после Lead |
 
 ---
 
-_Lead Designer · NEO-BRUTALIST · 2026-05-28_
+_Lead Designer · NEO-BRUTALIST · 2026-05-29 · O41 hero/card split_

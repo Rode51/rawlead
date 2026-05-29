@@ -22,7 +22,7 @@ from uuid import UUID, uuid4
 import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict
 from src.config import load_config, load_radar_env
 
@@ -44,6 +44,7 @@ from src.skills_catalog import (
 )
 from src.public_feed import is_public_feed_source, public_feed_source_sql
 from src.jwt_auth import decode_access_token, issue_access_token
+from src.telegram_login import login_bot_token, verify_telegram_login
 from src.feed_social import display_views
 from src.rank import (
     final_rank,
@@ -53,12 +54,21 @@ from src.rank import (
     parse_lead_tags,
     tags_as_weights,
 )
-from src.ai_analyze import (
-    AiLiteAnalysis,
-    analyze_premium,
-    build_cabinet_profile_excerpt,
-)
+from src.ai_analyze import draft_stats_24h
 from src.stars_billing import stars_available
+from src.draft_async import draft_response_body, poll_draft, submit_draft
+from src.match_push import (
+    DraftError,
+    draft_rate_limit_retry_after,
+    merge_chat_id_on_login,
+)
+from src.reply_draft_strip import strip_reply_draft_price_deadline
+from src.owner_admin import (
+    fetch_dashboard,
+    is_owner_db_user,
+    ops_html,
+    record_pageview,
+)
 
 # /cabinet/ login and /v1/me/* are site-product endpoints.
 # Force site profile to avoid accidental legacy token verification
@@ -77,6 +87,8 @@ _FEED_RETENTION_DAYS = 7
 _FEED_DELAY_MINUTES = 15
 _BOT_FEED_WHERE = "is_visible = TRUE"
 _HOT_MAX_AGE_SEC = 300
+_DRAFT_HOURLY_LIMIT = 10
+_DRAFT_RETRY_AFTER_SEC = 5
 
 
 def _lead_is_hot(created_at: Any) -> bool:
@@ -177,7 +189,7 @@ def _row_to_item(
         "created_at": created_at.isoformat() if created_at else None,
         "is_hot": _lead_is_hot(created_at),
         "tools_required": tools,
-        "reply_draft": (reply_draft or "").strip(),
+        "reply_draft": strip_reply_draft_price_deadline((reply_draft or "").strip()),
         "display_views": display_views(lead_id, created_at, feed_delayed=feed_delayed),
     }
 
@@ -628,6 +640,7 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
                     photo_url=photo_url,
                 )
                 _grant_owner_beta_if_match(cur, user_id, int(payload.id))
+                merge_chat_id_on_login(cur, tg_user_id=int(payload.id))
             conn.commit()
     except Exception as exc:
         logger.error("auth_telegram: %s", exc)
@@ -649,8 +662,9 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "version": _VERSION}
+def health() -> dict[str, Any]:
+    stats = draft_stats_24h()
+    return {"status": "ok", "version": _VERSION, **stats}
 
 
 # 3c2 ─────────────────────────────────────────────────────────────────────────
@@ -921,87 +935,118 @@ def _parse_ai_reasons(raw: Any) -> list[str]:
     return []
 
 
+def _draft_http_error(exc: DraftError, *, lead_id: int) -> HTTPException:
+    if exc.code == "ai_unavailable":
+        return HTTPException(status_code=503, detail="ai unavailable")
+    if exc.code == "forbidden":
+        return HTTPException(status_code=403, detail=exc.detail)
+    if exc.code == "not_found":
+        return HTTPException(status_code=404, detail="not found")
+    if exc.code == "rate_limit":
+        return HTTPException(status_code=429, detail=exc.detail)
+    if exc.code == "ai_fail":
+        stats = draft_stats_24h()
+        logger.warning("lenta:draft:%d:fail %s", lead_id, exc.detail)
+        logger.info(
+            "lenta:draft:stats draft_ok=%d draft_fail=%d",
+            stats["draft_ok"],
+            stats["draft_fail"],
+        )
+        from src.draft_async import _DRAFT_USER_FAIL
+
+        return HTTPException(
+            status_code=503,
+            detail={
+                "detail": _DRAFT_USER_FAIL,
+                "retry_after_sec": _DRAFT_RETRY_AFTER_SEC,
+            },
+        )
+    return HTTPException(status_code=500, detail="db error")
+
+
+def _me_lead_draft_response(
+    resp: Any,
+    *,
+    lead_id: int,
+) -> Any:
+    from fastapi.responses import JSONResponse
+
+    body = draft_response_body(resp)
+    if resp.status == "ready":
+        reply = strip_reply_draft_price_deadline(body.get("reply_draft") or "")
+        body["reply_draft"] = reply
+        stats = draft_stats_24h()
+        logger.info(
+            "lenta:draft:%d:ok draft_ok=%d draft_fail=%d",
+            lead_id,
+            stats["draft_ok"],
+            stats["draft_fail"],
+        )
+        return body
+    if resp.status == "failed":
+        stats = draft_stats_24h()
+        logger.warning("lenta:draft:%d:fail %s", lead_id, body.get("error", ""))
+        logger.info(
+            "lenta:draft:stats draft_ok=%d draft_fail=%d",
+            stats["draft_ok"],
+            stats["draft_fail"],
+        )
+        return body
+    return JSONResponse(status_code=202, content=body)
+
+
+@app.get("/v1/me/leads/{lead_id}/draft")
+def me_lead_draft_get(
+    lead_id: int,
+    user_id: str = Depends(_resolve_user_id),
+) -> Any:
+    """O56: poll async draft status."""
+    cfg = load_config()
+    if not cfg.ai_active:
+        raise HTTPException(status_code=503, detail="ai unavailable")
+    resp = poll_draft(
+        cfg,
+        user_id=user_id,
+        lead_id=lead_id,
+        log_prefix=f"lenta:draft:{lead_id}:",
+    )
+    return _me_lead_draft_response(resp, lead_id=lead_id)
+
+
 @app.post("/v1/me/leads/{lead_id}/draft")
 def me_lead_draft(
     lead_id: int,
     user_id: str = Depends(_resolve_user_id),
-) -> dict[str, Any]:
-    """O23: on-demand L2 на /lenta/ → INSERT inbox (paid only)."""
+) -> Any:
+    """O56: on-demand L2 async — 202 pending или 200 ready."""
     cfg = load_config()
     if not cfg.ai_active:
         raise HTTPException(status_code=503, detail="ai unavailable")
 
+    retry_after = draft_rate_limit_retry_after(user_id)
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "detail": f"draft rate limit: max {_DRAFT_HOURLY_LIMIT}/hour",
+                "retry_after_sec": retry_after,
+            },
+        )
+
     try:
-        with psycopg.connect(_db_url()) as conn:
-            with conn.cursor() as cur:
-                if not _user_effective_access(cur, user_id):
-                    raise HTTPException(status_code=403, detail="paid subscription required")
-
-                row = _fetch_visible_lead(cur, lead_id)
-                if row is None:
-                    raise HTTPException(status_code=404, detail="not found")
-                user_tags = _load_user_tags(cur, user_id)
-                tags = _canonical_lead_tags(row[8])
-                km = keyword_match(tags, user_tags)
-                if km <= 0:
-                    raise HTTPException(status_code=403, detail="no skill overlap")
-
-                lite = AiLiteAnalysis(
-                    verdict=(row[7] or "Сомнительно").strip(),
-                    task_summary=(row[12] or "").strip() or (row[3] or "")[:400],
-                    lead_tags=tuple(tags),
-                    ai_reasons=tuple(_parse_ai_reasons(row[9])),
-                )
-                profile = build_cabinet_profile_excerpt(user_tags)
-                premium = analyze_premium(
-                    cfg,
-                    title=row[2] or "",
-                    budget_text=row[5] or "",
-                    description=row[3] or "",
-                    url=row[4] or "",
-                    lite=lite,
-                    profile_excerpt=profile,
-                    log_prefix=f"lenta:draft:{lead_id}:",
-                )
-                if premium is None or not (premium.reply_draft or "").strip():
-                    raise HTTPException(status_code=503, detail="draft generation failed")
-
-                reply = premium.reply_draft.strip()
-                tools = [str(t).strip() for t in premium.tools_required if str(t).strip()]
-                tools_json = json.dumps(tools, ensure_ascii=False)
-                cur.execute(
-                    """
-                    UPDATE leads
-                    SET tools_required = %s::jsonb,
-                        reply_draft = COALESCE(NULLIF(%s, ''), reply_draft)
-                    WHERE id = %s
-                    """,
-                    (tools_json, reply, lead_id),
-                )
-                cur.execute(
-                    """
-                    INSERT INTO user_lead_replies (user_id, lead_id, reply_draft, deleted_at)
-                    VALUES (%s::uuid, %s, %s, NULL)
-                    ON CONFLICT (user_id, lead_id) DO UPDATE
-                    SET reply_draft = EXCLUDED.reply_draft,
-                        created_at = NOW(),
-                        deleted_at = NULL
-                    """,
-                    (user_id, lead_id, reply),
-                )
-                conn.commit()
-    except HTTPException:
-        raise
+        resp = submit_draft(
+            cfg,
+            user_id=user_id,
+            lead_id=lead_id,
+            log_prefix=f"lenta:draft:{lead_id}:",
+        )
+    except DraftError as exc:
+        raise _draft_http_error(exc, lead_id=lead_id) from exc
     except Exception as exc:
         logger.error("me_lead_draft %d: %s", lead_id, exc)
         raise HTTPException(status_code=500, detail="db error") from exc
 
-    return {
-        "id": lead_id,
-        "reply_draft": reply,
-        "tools_required": tools,
-        "keyword_match": km,
-    }
+    return _me_lead_draft_response(resp, lead_id=lead_id)
 
 
 @app.get("/v1/me/replies")
@@ -1349,6 +1394,50 @@ def me_notification_settings_patch(
     except Exception as exc:
         logger.error("me_notification_settings_patch: %s", exc)
         raise HTTPException(status_code=500, detail="db error") from exc
+
+
+def _require_owner_user(
+    user_id: str = Depends(_resolve_user_id),
+) -> str:
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                if not is_owner_db_user(cur, user_id):
+                    raise HTTPException(status_code=403, detail="owner only")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("_require_owner_user: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+    return user_id
+
+
+@app.get("/ops/", response_class=HTMLResponse)
+def ops_dashboard_page() -> HTMLResponse:
+    """O45: owner admin UI (JWT из /cabinet/ localStorage)."""
+    api_base = os.getenv("RAWLEAD_PUBLIC_API_URL", "").strip()
+    return HTMLResponse(ops_html(api_base=api_base))
+
+
+@app.get("/v1/admin/dashboard")
+def admin_dashboard(_owner: str = Depends(_require_owner_user)) -> dict[str, Any]:
+    del _owner
+    return fetch_dashboard(_db_url())
+
+
+class PageviewPayload(BaseModel):
+    path: str = "/"
+
+
+@app.post("/v1/admin/pageview", status_code=204)
+def admin_pageview_beacon(payload: PageviewPayload) -> Response:
+    """O45: публичный beacon — только path, агрегат по дням."""
+    allowed_prefixes = ("/", "/lenta", "/cabinet", "/pricing", "/how", "/contact")
+    path = (payload.path or "/").strip()[:200] or "/"
+    if not any(path == p or path.startswith(p + "/") for p in allowed_prefixes):
+        raise HTTPException(status_code=400, detail="path not allowed")
+    record_pageview(_db_url(), path=path)
+    return Response(status_code=204)
 
 
 # 3c4 ─────────────────────────────────────────────────────────────────────────

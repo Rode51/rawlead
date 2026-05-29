@@ -24,6 +24,8 @@ from public_feed import is_public_feed_source
 from storage import ProjectStorage
 from radar_cycle_log import (
     SourceCycleStats,
+    log_pipeline_line,
+    note_dup_fast_skip,
     note_neon_dup_skip,
     note_neon_insert,
     note_neon_replay,
@@ -36,9 +38,11 @@ _TELEGRAM_BOT_IN_PATH = re.compile(r"(/bot)[^/\s]+(/)")
 
 __all__ = [
     "short_err",
+    "ingest_with_l1",
     "process_new_listing",
     "process_new_listing_from_tg",
     "ListingNotifyPlan",
+    "drain_l1_backlog",
 ]
 
 
@@ -176,6 +180,156 @@ def _neon_dup_skip_return(
     return inserted, None
 
 
+def _neon_dup_fast_skip_return(
+    project: ListingProject,
+    *,
+    inserted: bool,
+    errors: list[str],
+    stats: SourceCycleStats | None,
+) -> tuple[bool, None]:
+    errors.append(f"{project.source}:id={project.project_id} skip:dup_fast_skip")
+    note_dup_fast_skip()
+    if stats is not None:
+        stats.note_skip("skip:dup_fast_skip")
+    return inserted, None
+
+
+def _insert_neon_after_gates(
+    project: ListingProject,
+    pg: NeonLeadStorage,
+    *,
+    fingerprint: str,
+    ingest_body: str,
+    inserted: bool,
+    exchange_neon: bool,
+    errors: list[str],
+    stats: SourceCycleStats | None,
+) -> tuple[bool, bool, bool, bool]:
+    """INSERT Neon после filter/budget. Четвёртый флаг — dup_abort (вернуть dup skip)."""
+    neon_replay = False
+    neon_sqlite_resync = False
+    ext_id = str(project.project_id)
+
+    def _mark_sqlite_resync() -> None:
+        nonlocal neon_sqlite_resync
+        note_neon_sqlite_resync()
+        neon_sqlite_resync = True
+        errors.append(_neon_resync_tag(project, "neon_resync_insert"))
+
+    in_neon = pg.lead_exists(project.source, ext_id, errors)
+    if in_neon:
+        if _neon_needs_l1_replay(
+            pg, content_hash=fingerprint, project=project, errors=errors
+        ):
+            neon_replay = True
+            note_neon_replay()
+        return True, neon_replay, neon_sqlite_resync, False
+
+    neon_inserted = pg.record_new_lead(
+        project,
+        errors,
+        content_hash=fingerprint,
+        body=ingest_body,
+    )
+    if neon_inserted:
+        note_neon_insert()
+        if not inserted:
+            _mark_sqlite_resync()
+        return True, neon_replay, neon_sqlite_resync, False
+
+    if not pg.lead_exists(project.source, ext_id, errors):
+        if exchange_neon:
+            neon_inserted = pg.record_new_lead(
+                project,
+                errors,
+                content_hash="",
+                body=ingest_body,
+            )
+            if neon_inserted:
+                note_neon_insert()
+                if not inserted:
+                    _mark_sqlite_resync()
+                return True, neon_replay, neon_sqlite_resync, False
+            if _neon_needs_l1_replay(
+                pg,
+                content_hash=fingerprint,
+                project=project,
+                errors=errors,
+            ):
+                neon_replay = True
+                note_neon_replay()
+                errors.append(
+                    _neon_resync_tag(project, "neon_resync_skip:hash_dup_needs_l1")
+                )
+                return False, neon_replay, neon_sqlite_resync, False
+            errors.append(
+                _neon_resync_tag(project, "neon_resync_skip:insert_failed")
+            )
+        elif _neon_needs_l1_replay(
+            pg, content_hash=fingerprint, project=project, errors=errors
+        ):
+            neon_replay = True
+            note_neon_replay()
+        else:
+            return False, False, False, True
+    elif _neon_needs_l1_replay(
+        pg, content_hash=fingerprint, project=project, errors=errors
+    ):
+        neon_replay = True
+        note_neon_replay()
+    elif exchange_neon:
+        errors.append(_neon_resync_tag(project, "neon_resync_skip:hash_race"))
+    else:
+        return False, False, False, True
+
+    return (
+        pg.lead_exists(project.source, ext_id, errors),
+        neon_replay,
+        neon_sqlite_resync,
+        False,
+    )
+
+
+def _run_l1_inline_site(
+    project: ListingProject,
+    cfg: Config,
+    pg: NeonLeadStorage,
+    *,
+    ingest_snippet: str,
+    errors: list[str],
+    stats: SourceCycleStats | None,
+) -> None:
+    """Fallback L1 без pool (тесты / одиночный вызов)."""
+    from l1_pool import L1Pool
+
+    with L1Pool(cfg, pg, errors=errors, stats=stats) as pool:
+        pool.submit(project, ingest_snippet=ingest_snippet)
+
+
+def ingest_with_l1(
+    project: ListingProject,
+    storage: ProjectStorage,
+    word_filter: ListingWordFilter,
+    cfg: Config,
+    *,
+    errors: list[str],
+    pg: NeonLeadStorage | None = None,
+    stats: SourceCycleStats | None = None,
+    l1_pool=None,
+) -> tuple[bool, ListingNotifyPlan | None]:
+    """Hot path O34: dedup → filter → budget → Neon → L1 (pool)."""
+    return plan_new_listing(
+        project,
+        storage,
+        word_filter,
+        cfg,
+        errors=errors,
+        pg=pg,
+        stats=stats,
+        l1_pool=l1_pool,
+    )
+
+
 def plan_new_listing(
     project: ListingProject,
     storage: ProjectStorage,
@@ -185,7 +339,7 @@ def plan_new_listing(
     errors: list[str],
     pg: NeonLeadStorage | None = None,
     stats: SourceCycleStats | None = None,
-    defer_l1: bool = False,
+    l1_pool=None,
 ) -> tuple[bool, ListingNotifyPlan | None]:
     """Возвращает (was_new, plan). plan — только если нужно слать уведомление."""
     try:
@@ -206,107 +360,58 @@ def plan_new_listing(
     neon_sqlite_resync = False
     ext_id = str(project.project_id)
 
-    def _mark_sqlite_resync() -> None:
-        nonlocal neon_sqlite_resync
-        note_neon_sqlite_resync()
-        neon_sqlite_resync = True
-        errors.append(_neon_resync_tag(project, "neon_resync_insert"))
-
+    in_neon = False
     if neon_wide and pg is not None:
-        if exchange_neon and not inserted:
-            errors.append(_neon_resync_tag(project, "neon_resync_check"))
+        if (
+            not inserted
+            and exchange_neon
+            and storage.is_neon_dup_fast_path(
+                project.source, project.project_id, fingerprint
+            )
+        ):
+            return _neon_dup_fast_skip_return(
+                project, inserted=inserted, errors=errors, stats=stats
+            )
 
         in_neon = pg.lead_exists(project.source, ext_id, errors)
-
-        if not in_neon:
-            neon_inserted = pg.record_new_lead(
-                project,
-                errors,
-                content_hash=fingerprint,
-                body=ingest_body,
-            )
-            if neon_inserted:
-                note_neon_insert()
-                if not inserted:
-                    _mark_sqlite_resync()
-            elif not pg.lead_exists(project.source, ext_id, errors):
-                if exchange_neon:
-                    neon_inserted = pg.record_new_lead(
-                        project,
-                        errors,
-                        content_hash="",
-                        body=ingest_body,
-                    )
-                    if neon_inserted:
-                        note_neon_insert()
-                        if not inserted:
-                            _mark_sqlite_resync()
-                    elif _neon_needs_l1_replay(
-                        pg,
-                        content_hash=fingerprint,
-                        project=project,
-                        errors=errors,
-                    ):
-                        neon_replay = True
-                        note_neon_replay()
-                        errors.append(
-                            _neon_resync_tag(
-                                project, "neon_resync_skip:hash_dup_needs_l1"
-                            )
-                        )
-                    else:
-                        errors.append(
-                            _neon_resync_tag(
-                                project, "neon_resync_skip:insert_failed"
-                            )
-                        )
-                elif _neon_needs_l1_replay(
-                    pg, content_hash=fingerprint, project=project, errors=errors
-                ):
+        if in_neon and _neon_needs_l1_replay(
+            pg, content_hash=fingerprint, project=project, errors=errors
+        ):
+            storage.clear_neon_dup_synced(project.source, project.project_id)
+            neon_replay = True
+        elif in_neon and not inserted:
+            if exchange_neon:
+                prev_hash = storage.get_neon_synced_hash(
+                    project.source, project.project_id
+                )
+                if prev_hash and prev_hash != fingerprint:
+                    storage.clear_neon_dup_synced(project.source, project.project_id)
                     neon_replay = True
-                    note_neon_replay()
                 else:
+                    storage.mark_neon_dup_synced(
+                        project.source, project.project_id, fingerprint
+                    )
+                    errors.append(
+                        _neon_resync_tag(project, "neon_resync_skip:sqlite_dup_neon_ok")
+                    )
                     return _neon_dup_skip_return(
                         project, inserted=inserted, errors=errors, stats=stats
                     )
-            elif _neon_needs_l1_replay(
-                pg, content_hash=fingerprint, project=project, errors=errors
-            ):
-                neon_replay = True
-                note_neon_replay()
-            elif exchange_neon:
-                errors.append(
-                    _neon_resync_tag(project, "neon_resync_skip:hash_race")
-                )
             else:
                 return _neon_dup_skip_return(
                     project, inserted=inserted, errors=errors, stats=stats
                 )
-        elif _neon_needs_l1_replay(
-            pg, content_hash=fingerprint, project=project, errors=errors
-        ):
-            neon_replay = True
-            note_neon_replay()
-        elif not inserted:
-            if exchange_neon:
-                errors.append(
-                    _neon_resync_tag(project, "neon_resync_skip:sqlite_dup_neon_ok")
-                )
-            return _neon_dup_skip_return(
-                project, inserted=inserted, errors=errors, stats=stats
-            )
-
-    if not inserted and not neon_replay and not neon_sqlite_resync:
-        if neon_wide and pg is not None and _neon_needs_l1_replay(
-            pg, content_hash=fingerprint, project=project, errors=errors
-        ):
-            neon_replay = True
-            note_neon_replay()
-        else:
+        elif not in_neon and not inserted and not exchange_neon:
             return False, None
+        elif not in_neon and not inserted and exchange_neon:
+            errors.append(_neon_resync_tag(project, "neon_resync_check"))
+    elif not inserted:
+        return False, None
 
     if not word_filter.accepts_listing(project, wide=cfg.filter_wide):
-        errors.append(f"{project.source}:id={project.project_id} skip:filter")
+        line = f"pipeline:skip filter {project.source}:id={ext_id}"
+        errors.append(line)
+        log_pipeline_line(cfg.radar_log_path, line)
         if stats is not None:
             stats.note_skip("skip:filter")
         return inserted or neon_replay or neon_sqlite_resync, None
@@ -330,7 +435,28 @@ def plan_new_listing(
             stats.note_skip("skip:dup_content")
         return inserted or neon_replay or neon_sqlite_resync, None
 
-    if pg is not None and not neon_wide:
+    if cfg.ai_active and not meets_min_budget(project.budget_text, cfg.min_budget_rub):
+        errors.append(f"{project.source}:id={project.project_id} skip:budget")
+        if stats is not None:
+            stats.note_skip("skip:budget")
+        return inserted or neon_replay or neon_sqlite_resync, None
+
+    if neon_wide and pg is not None and not in_neon:
+        in_neon, neon_replay, neon_sqlite_resync, dup_abort = _insert_neon_after_gates(
+            project,
+            pg,
+            fingerprint=fingerprint,
+            ingest_body=ingest_body,
+            inserted=inserted,
+            exchange_neon=exchange_neon,
+            errors=errors,
+            stats=stats,
+        )
+        if dup_abort:
+            return _neon_dup_skip_return(
+                project, inserted=inserted, errors=errors, stats=stats
+            )
+    elif pg is not None and not neon_wide:
         if not pg.record_new_lead(
             project,
             errors,
@@ -348,23 +474,38 @@ def plan_new_listing(
                 )
         else:
             note_neon_insert()
+            in_neon = True
 
-    if defer_l1:
-        return inserted or neon_replay or neon_sqlite_resync, None
+    was_new = inserted or neon_replay or neon_sqlite_resync
+    ingest_snippet = ingest_body
+
+    if (
+        cfg.radar_profile == "site"
+        and is_public_feed_source(project.source)
+        and cfg.ai_active
+        and cfg.ai_uses_l1_l2
+        and pg is not None
+        and (in_neon or neon_replay)
+    ):
+        if l1_pool is not None:
+            l1_pool.submit(project, ingest_snippet=ingest_snippet)
+        else:
+            _run_l1_inline_site(
+                project,
+                cfg,
+                pg,
+                ingest_snippet=ingest_snippet,
+                errors=errors,
+                stats=stats,
+            )
+        return was_new, None
 
     lite_analysis: AiLiteAnalysis | None = None
     full_analysis: AiAnalysis | None = None
     ai_unavailable = False
-    ingest_snippet = (project.listing_snippet or project.title).strip()
     task_fallback_text = ingest_snippet
 
     if cfg.ai_active:
-        if not meets_min_budget(project.budget_text, cfg.min_budget_rub):
-            errors.append(f"{project.source}:id={project.project_id} skip:budget")
-            if stats is not None:
-                stats.note_skip("skip:budget")
-            return inserted or neon_replay or neon_sqlite_resync, None
-
         log_prefix = f"{project.source}:id={project.project_id} "
 
         if cfg.ai_uses_l1_l2:
@@ -378,8 +519,15 @@ def plan_new_listing(
                 log_prefix=log_prefix,
             )
             if lite_analysis is None:
+                if pg is not None:
+                    pg.mark_l1_failed(project, errors, body_snippet=ingest_snippet)
                 ai_unavailable = True
-            elif lite_analysis.is_skip_verdict():
+                reason = "skip:ai_unavailable"
+                errors.append(f"{project.source}:id={project.project_id} {reason}")
+                if stats is not None:
+                    stats.note_skip(reason)
+                return was_new, None
+            if lite_analysis.is_skip_verdict():
                 reason = f"skip:ai:{lite_analysis.verdict}"
                 errors.append(f"{project.source}:id={project.project_id} {reason}")
                 if stats is not None:
@@ -394,7 +542,7 @@ def plan_new_listing(
                     _rollup_after_lite(
                         cfg, project, lite_analysis, ingest_snippet=ingest_snippet
                     )
-                return inserted or neon_replay or neon_sqlite_resync, None
+                return was_new, None
 
             if pg is not None:
                 pg.update_after_lite(
@@ -410,19 +558,11 @@ def plan_new_listing(
             if not _should_notify_bot_lite(
                 cfg, lite_analysis, ai_unavailable=ai_unavailable
             ):
-                if ai_unavailable:
-                    reason = "skip:ai_unavailable"
-                    errors.append(f"{project.source}:id={project.project_id} {reason}")
-                    if stats is not None:
-                        stats.note_skip(reason)
-                elif lite_analysis is not None:
-                    reason = f"skip:ai:{lite_analysis.verdict}"
-                    errors.append(
-                        f"{project.source}:id={project.project_id} {reason}"
-                    )
-                    if stats is not None:
-                        stats.note_skip(reason)
-                return inserted or neon_replay or neon_sqlite_resync, None
+                reason = f"skip:ai:{lite_analysis.verdict}"
+                errors.append(f"{project.source}:id={project.project_id} {reason}")
+                if stats is not None:
+                    stats.note_skip(reason)
+                return was_new, None
         else:
             description = _resolve_description(project, cfg, errors)
             task_fallback_text = description or task_fallback_text
@@ -443,7 +583,7 @@ def plan_new_listing(
                 errors.append(f"{project.source}:id={project.project_id} {reason}")
                 if stats is not None:
                     stats.note_skip(reason)
-                return inserted or neon_replay or neon_sqlite_resync, None
+                return was_new, None
 
             if not _should_notify_bot_legacy(
                 cfg, full_analysis, ai_unavailable=ai_unavailable
@@ -457,12 +597,12 @@ def plan_new_listing(
                 errors.append(f"{project.source}:id={project.project_id} {reason}")
                 if stats is not None:
                     stats.note_skip(reason)
-                return inserted or neon_replay or neon_sqlite_resync, None
+                return was_new, None
 
     if cfg.radar_profile == "site" and is_public_feed_source(project.source):
-        return inserted or neon_replay or neon_sqlite_resync, None
+        return was_new, None
 
-    return inserted or neon_replay or neon_sqlite_resync, ListingNotifyPlan(
+    return was_new, ListingNotifyPlan(
         project=project,
         lite_analysis=lite_analysis,
         analysis=full_analysis,
@@ -570,10 +710,10 @@ def process_new_listing(
     errors: list[str],
     pg: NeonLeadStorage | None = None,
     stats: SourceCycleStats | None = None,
-    defer_l1: bool = False,
+    l1_pool=None,
 ) -> tuple[bool, bool]:
     """Возвращает (was_new, notified). Дубликат в SQLite → (False, False)."""
-    was_new, plan = plan_new_listing(
+    was_new, plan = ingest_with_l1(
         project,
         storage,
         word_filter,
@@ -581,7 +721,7 @@ def process_new_listing(
         errors=errors,
         pg=pg,
         stats=stats,
-        defer_l1=defer_l1,
+        l1_pool=l1_pool,
     )
     if plan is None:
         return was_new, False
@@ -639,6 +779,10 @@ def drain_l1_backlog(
             errors=errors,
             log_prefix=log_prefix,
         )
+        if lite is None:
+            pg.mark_l1_failed(project, errors, body_snippet=snippet)
+            errors.append(f"{row.source}:id={row.external_id} skip:l1_failed:backlog")
+            continue
         pg.update_after_lite(
             project,
             lite=lite,
@@ -786,9 +930,30 @@ async def process_new_listing_from_tg(
     """TG: acc→бот (Telethon), карточка ИИ; relay владельцу — sync или poll."""
     from tg_forward import format_tg_acc_label, forward_listing_to_owner
 
-    was_new, plan = plan_new_listing(
-        project, storage, word_filter, cfg, errors=errors, pg=pg, stats=stats
-    )
+    from l1_pool import L1Pool
+
+    if pg is not None:
+        with L1Pool(cfg, pg, errors=errors, stats=stats) as pool:
+            was_new, plan = ingest_with_l1(
+                project,
+                storage,
+                word_filter,
+                cfg,
+                errors=errors,
+                pg=pg,
+                stats=stats,
+                l1_pool=pool,
+            )
+    else:
+        was_new, plan = ingest_with_l1(
+            project,
+            storage,
+            word_filter,
+            cfg,
+            errors=errors,
+            pg=pg,
+            stats=stats,
+        )
     if plan is None:
         return was_new, False
 

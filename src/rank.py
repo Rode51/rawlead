@@ -22,15 +22,13 @@ def normalize_tags(tags: list[str]) -> list[str]:
 
 
 def keyword_match(lead_tags: list[str], user_tags: dict[str, float]) -> int:
-    """Weighted overlap → 0..100."""
-    if not user_tags:
-        return 0
+    """F2: matched lead tags / len(lead_tags) → 0..100 (extra user tags do not penalize)."""
     lead_set = {str(t).strip().lower() for t in lead_tags if t}
-    matched = sum(w for tag, w in user_tags.items() if tag in lead_set)
-    total = sum(user_tags.values())
-    if total <= 0:
+    if not lead_set or not user_tags:
         return 0
-    return min(100, round(matched / total * 100))
+    user_keys = {str(k).strip().lower() for k in user_tags if k}
+    matched = sum(1 for tag in lead_set if tag in user_keys)
+    return min(100, round(100 * matched / len(lead_set)))
 
 
 def final_rank(ai_score: int | None, keyword_match_val: int) -> int:

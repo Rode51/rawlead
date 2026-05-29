@@ -18,12 +18,14 @@ flowchart LR
 
   O <-->|план, taste| LD
   LD --> DESIGNER_PROMPT
-  LD --> DESIGN_SYSTEM
-  D --> DESIGN_BRIEF
+  LD --> docs_design_wp["docs/design/wp/*-brief"]
+  D --> docs_design_wp
   LD -.->|handoff| LA
   LA --> CODER_PROMPT
   C --> код
 ```
+
+~~`DESIGN_BRIEF` для WP~~ — **не используется**; WP-спека только в `docs/design/wp/`.
 
 | Роль | Уровень | Делает |
 |------|---------|--------|
@@ -34,16 +36,35 @@ flowchart LR
 
 ---
 
-## Один активный план
+## Один активный план — **не путать файлы**
 
-| Файл | Назначение |
-|------|------------|
-| **`LEAD_DESIGN_PROMPT.md`** | Текущая инициатива с владельцем (цель, scope, критерии приёмки) |
-| **`DESIGNER_PROMPT.md`** | Задача для **@designer** (пишет Lead Designer после согласования плана) |
-| **`DESIGN_BRIEF.md`** / `docs/design/<проект>/` | Артефакт сдачи Designer |
-| **`DESIGN_SYSTEM.md`** | Канон токенов и правил на все проекты |
+| Файл | Кто пишет | Кто читает | Содержание |
+|------|-----------|------------|------------|
+| **`LEAD_DESIGN_PROMPT.md`** | Lead Designer | Lead Designer, Lead Architect (шапка) | **Решения владельца** · одна активная § в шапке · архив § ниже |
+| **`DESIGNER_PROMPT.md`** | Lead Designer | **@designer** · Lead Architect (handoff) | **Одна активная §** в шапке · детальная спека для Coder · **архив § — не читать** |
+| **`docs/design/wp/REFERENCE.md`** | Lead Designer | все design + Coder (ссылка) | Визуальный канон: цвета, типографика, компоненты |
+| **`docs/design/wp/feed-cabinet-mvp.md`** | Lead Designer | design + Coder | Flows `/lenta/` · `/cabinet/` |
+| **`docs/design/wp/wave-*-brief.md`** | Designer → Lead ревью | Coder (через CODER_PROMPT) | **Техспека волны** — единственный канон CSS/JS для Coder |
+| **`DESIGN_SYSTEM.md`** | Lead Designer | Designer | Токены, принципы (все проекты) |
+| **`DESIGN_BRIEF.md`** | Designer | — | **Только пульт/desktop** — **не** WP-лендинг |
 
-Новая инициатива → обновить `LEAD_DESIGN_PROMPT.md` → выписать `DESIGNER_PROMPT.md` → Designer сдаёт brief.
+**Запрещено дублировать:** полную CSS-спеку и в `DESIGNER_PROMPT`, и в `wave-*-brief` — канон спеки = **`docs/design/wp/`**. В промптах — только ссылка + § «→ Сейчас».
+
+### Конвейер (строго)
+
+```text
+Владелец ↔ Lead Designer → LEAD_DESIGN_PROMPT (решения)
+         → DESIGNER_PROMPT § активная ИЛИ docs/design/wp/wave-N-brief.md
+         → Lead Architect → CODER_PROMPT § (ссылки, не копипаст ТЗ)
+         → @coder → wordpress/ (не design docs)
+```
+
+| Роль | Читает | Не читает |
+|------|--------|-----------|
+| **Lead Designer** | STATUS · LEAD_DESIGN_PROMPT · REFERENCE v5 · feed-cabinet-mvp | CODER_PROMPT целиком · архив § без нужды |
+| **Designer** | **DESIGNER_PROMPT § шапка + активная §** · REFERENCE · brief волны | LEAD_DESIGN_PROMPT · PRODUCT_VISION · архив § |
+| **Lead Architect** | DESIGNER_PROMPT § активная · STATUS · TASKS | правка design без Lead Designer |
+| **Coder** | **CODER_PROMPT §** · файлы из § «Файлы» | DESIGNER_PROMPT · LEAD_DESIGN_PROMPT · wave-brief (если не в CODER) |
 
 ---
 
@@ -53,7 +74,7 @@ flowchart LR
 2. Lead Designer фиксирует план в `LEAD_DESIGN_PROMPT.md`.
 3. При необходимости — `DESIGNER_PROMPT.md` для исполнителя.
 4. Владелец открывает чат `@designer` с ссылкой на промпт.
-5. После сдачи brief — Lead Designer ревью; инженерию передаёт Lead Architect (секция «Handoff → Coder» в brief).
+5. После сдачи спеки — Lead Designer ревью → **Lead Architect** переносит в `CODER_PROMPT.md` (ссылки, не дубль ТЗ) → `@coder`.
 
 ---
 

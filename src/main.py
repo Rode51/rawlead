@@ -36,6 +36,7 @@ from kwork_parser import KworkListingError, fetch_listing_projects as fetch_kwor
 from public_feed import public_feed_sources
 from vc_ru_parser import VcRuListingError, fetch_listing_projects as fetch_vc_ru_listing
 
+from l1_pool import L1Pool
 from lead_pipeline import drain_l1_backlog, process_new_listing, short_err
 from listing import ListingProject
 from pg_storage import NeonLeadStorage, pg_storage_from_config
@@ -166,6 +167,7 @@ def _process_listings(
     pg: NeonLeadStorage | None = None,
     tg_poll_state: dict[str, float] | None = None,
     stats: SourceCycleStats | None = None,
+    l1_pool: L1Pool | None = None,
 ) -> tuple[int, int]:
     """Обработка карточек одного источника; возвращает (new_ids, notifications)."""
     new_ids = 0
@@ -182,8 +184,7 @@ def _process_listings(
             errors=errors,
             pg=pg,
             stats=stats,
-            defer_l1=cfg.radar_conveyor
-            and project.source not in ("fl", "kwork"),
+            l1_pool=l1_pool,
         )
         if was_new:
             new_ids += 1
@@ -281,6 +282,16 @@ def run_cycle(
     tg_poll_state: dict[str, float] = {"last": 0.0}
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
+    l1_pool: L1Pool | None = None
+    if (
+        cfg.radar_profile == "site"
+        and pg is not None
+        and pg.enabled
+        and cfg.ai_active
+        and cfg.ai_uses_l1_l2
+    ):
+        l1_pool = L1Pool(cfg, pg, errors=errors)
+
     prefetched = _fetch_listings_parallel(cfg, enabled_sources, errors)
 
     if "fl" in enabled_sources:
@@ -300,6 +311,7 @@ def run_cycle(
                 pg=pg,
                 tg_poll_state=tg_poll_state,
                 stats=stats_fl,
+                l1_pool=l1_pool,
             )
             stats_fl.new_ids = n
             stats_fl.to_bot = notify
@@ -329,6 +341,7 @@ def run_cycle(
                     pg=pg,
                     tg_poll_state=tg_poll_state,
                     stats=stats_kwork,
+                    l1_pool=l1_pool,
                 )
                 stats_kwork.new_ids = n
                 stats_kwork.to_bot = notify
@@ -354,6 +367,7 @@ def run_cycle(
                 pg=pg,
                 tg_poll_state=tg_poll_state,
                 stats=stats_web,
+                l1_pool=l1_pool,
             )
             stats_web.new_ids = n
             stats_web.to_bot = notify
@@ -362,14 +376,16 @@ def run_cycle(
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
-    if cfg.radar_conveyor and pg is not None and cfg.ai_active:
-        backlog = pg.count_leads_missing_l1(errors=errors)
-        if backlog > 100:
+    if l1_pool is not None:
+        l1_done = l1_pool.drain()
+        if l1_done > 0:
             _append_log_line(
                 cfg.radar_log_path,
-                f"конвейер:backlog={backlog}",
+                f"pipeline:L1 pool done={l1_done} workers={cfg.l1_max_workers}",
                 echo=True,
             )
+
+    if cfg.l1_backlog_drain and pg is not None and cfg.ai_active:
         l1_n = drain_l1_backlog(
             cfg,
             pg,
@@ -386,6 +402,7 @@ def run_cycle(
 
     _collect_misc_errors(errors, summary)
     summary.sync_neon_from_globals()
+    summary.cycle_sec = max(0.0, time.monotonic() - cycle_t0)
     if cfg.radar_profile == "site":
         commit_site_rollup_cycle(summary)
     record_cycle_summary(storage, summary)
@@ -506,6 +523,8 @@ def main() -> None:
     _echo(
         f"Интервал: {cfg.poll_interval_minutes} мин | "
         f"Конвейер: {'вкл' if cfg.radar_conveyor else 'выкл'} | "
+        f"L1 pool: {cfg.l1_max_workers} | "
+        f"Backlog drain: {'вкл' if cfg.l1_backlog_drain else 'выкл'} | "
         f"ИИ: {'вкл' if cfg.ai_active else 'выкл'} | "
         f"Фильтр: {'широкий' if cfg.filter_wide else 'узкий'} | "
         f"Пауза: {'да' if storage.is_radar_paused() else 'нет'} | "

@@ -1,23 +1,1120 @@
-# Coder — **→ MATCH-PUSH-V2-WP-PROXY (O30b)**
+# Coder — **→ Следующее:** приёмка O58 · потом **O38** audit
 
-**O30 backend ✅ Lead verify 2026-05-28** · Neon `010` · VPS API без top-3.
+**O58 ✅** deploy **v1.10.9** · poll GET работает.
 
-**→ Сейчас:** § **MATCH-PUSH-V2-WP-PROXY** — REST proxy в `rawlead-api.php` + theme **v1.7.24**.
+---
 
-# § MATCH-PUSH-V2-WP-PROXY — REST proxy (**O30b, P0**)
+# § O58 — (**✅ deploy 2026-05-29 v1.10.9**)
 
-**Симптом:** `/cabinet/` блок «Уведомления» не грузится — `GET /wp-json/rawlead/v1/me/notification-settings` → **404**.
+**Симптом:** после O56 POST отклика — banner **«No route was found matching the URL and request method.»**
 
-**Корень:** `functions.php` шлёт `restNotificationSettings`, но **`rawlead-api.php` не регистрирует route** (есть только `/me/subscription`).
+**Корень:** `rawlead-feed.js` poll → **GET** `/wp-json/rawlead/v1/me/leads/{id}/draft` · в `rawlead-api.php` зарегистрирован только **POST** → WordPress 404.
 
-**Fix:**
+| # | Fix |
+|---|-----|
+| h1 | `register_rest_route` draft: **`GET`** + **`POST`** (или второй route тот же path) |
+| h2 | GET callback → `wp_remote_get($url, …)` · те же auth headers что POST |
+| h3 | Проброс status **202** pending / **200** ready без потери body |
+| h4 | Smoke: POST draft → pending → GET poll → ready · `/lenta/` |
+
+**Файлы:** `inc/rawlead-api.php` · bump theme **v1.10.9** · deploy theme
+
+---
+
+# § O56+O57 — (**✅ deploy 2026-05-29 v1.10.8**)
+
+**Решение владельца (2026-05-29):** если на lead уже есть черновик — **всем** отдавать его · не генерировать заново на каждого · сильно меньше токенов при «все нажали на новый заказ».
+
+## Сейчас (Lead verify)
+
+| | |
+|--|--|
+| `leads.reply_draft` | **есть** · при on-demand пишется `COALESCE` — **первый** текст остаёт |
+| Проблема | `generate_and_store_lead_draft` смотрит только **`user_lead_replies`** per user → **100 юзеров = 100 L2** |
+| Промпт | L2 с **`profile_excerpt`** пользователя — каждый вызов персональный и дорогой |
+
+## Целевая модель
+
+```
+Новый lead в ленте
+  → (опц.) фон: 1× L2 generic → leads.reply_draft
+  → User₁ жмёт «Отклик» → если reply_draft есть → копия в user_lead_replies → 0 AI
+  → User₂…₁₀₀ → тот же cache hit
+  → Если пусто → ONE job (lock lead_id) → остальные poll pending → тот же текст всем
+```
+
+| # | Fix |
+|---|-----|
+| s1 | **Fast path:** `leads.reply_draft` не пуст → strip → `INSERT user_lead_replies` для user → **return без L2** · log `draft:cache_hit lead=` |
+| s2 | **Thundering herd:** `draft_status` pending на lead (или row lock) · 2–100-й запрос → **202 pending** · poll до ready · **один** worker |
+| s3 | **Промпт shared:** on-demand L2 **без** `profile_excerpt` — универсальный отклик по **task_summary + tools** заказа (приветствие + 2–3 шага) · km% остаётся персональным |
+| s4 | **Не перезаписывать** канон: `UPDATE leads SET reply_draft=… WHERE reply_draft IS NULL OR reply_draft=''` |
+| s5 | Feed/TG/inbox: показывать shared draft если user ещё не «сохранил» в inbox — badge «Отклик ✓» после copy |
+| s6 | **Опц. v2 backlog:** кнопка «Персонализировать» = отдельный L2 с profile (rate limit) — **не в O57** |
+| s7 | Tests: 2 user same lead → 1 analyze_premium call · 2nd instant cache |
+| s8 | **Модель умнее (владелец 2026-05-29):** env `OPENROUTER_MODEL_SHARED_DRAFT` (или поднять `OPENROUTER_MODEL_PREMIUM` только для shared path) · **L1 остаётся flash-lite** · shared L2 = **1×/lead** → можно **pro/sonnet** · radar ingest L2 **не** трогать без отдельного решения |
+
+**Экономика:** 100 users × 1 lead = **1 L2** вместо 100 (~99% tokens on-demand) → **1 дорогой вызов** вместо 100 дешёвых/flaky.
+
+**Пример env (Lead, не коммитить ключи):**
+```env
+AI_MODEL=google/gemini-2.5-flash-lite          # L1 ingest
+OPENROUTER_MODEL_SHARED_DRAFT=google/gemini-2.5-pro  # O57 один отклик/lead
+```
+
+---
+
+# § WAVE-2-ACCEPT-FIX O56 — draft · размер · expand (**→ Coder · один чат**)
+
+**Контекст:** владелец после O55 · скрин «draft generation failed» · карточка не разворачивается после отклика.
+
+## Корень (Lead verify)
+
+| # | Симптом | Почему |
+|---|---------|--------|
+| 1 | Отклик **иногда OK, иногда fail** | L2 on-demand **sync** в HTTP · OpenRouter flaky · `analyze_premium` → None → `DraftError("ai_fail", "draft generation failed")` · конкуренция с radar L2 |
+| 2 | Свернутые карточки **разной высоты** | `height: auto` · разное число чипов/строк title |
+| 3 | После отклика **не разворачивается** | `updateCardDraft` → `delete dataset.bound` + `bindCards()` **вешает 2-й click listener** · 1-й expand + 2-й collapse в одном клике |
+
+---
+
+## O56a — Draft **async** + надёжнее (не блокировать HTTP)
+
+**Цель:** генерация не падает от нагрузки/таймаута · UI не висит 30s.
+
+| # | Fix |
+|---|-----|
+| a1 | `POST /v1/me/leads/{id}/draft` → если L2 не готов за **3s** (или сразу): **202** `{status:"pending", lead_id}` · фон: thread/`asyncio.create_task` / простая очередь in-process |
+| a2 | `GET /v1/me/leads/{id}/draft` (или тот же POST idempotent) → `{status: pending\|ready\|failed, reply_draft?, error?}` |
+| a3 | Таблица/колонка `draft_jobs` или reuse `user_lead_replies` + status · TTL pending 10 min |
+| a4 | L2 worker: `max_retries=5` · backoff 1s/2s/4s · timeout 90s · **отдельный** semaphore (max 2 concurrent on-demand L2, radar не душит) |
+| a5 | UI feed + TG callback: poll каждые 2s до ready/failed (max 90s) · spinner «Генерируем…» |
+| a6 | Ошибка пользователю **по-русски**: «ИИ временно недоступен — повторите» · **не** raw `draft generation failed` |
+| a7 | Лог: `lenta:draft:{id}:fail {exc}` с `_log_ai_failure` detail |
+
+**Файлы:** `api_server.py` · `match_push.py` · `ai_analyze.py` · `rawlead-feed.js` · `match_push.py` TG path · tests · опц. migration
+
+**Не over-engineer:** Redis/Celery не нужен · in-process queue достаточно для MVP.
+
+---
+
+## O56b — Свернутые карточки **одинаковой высоты**
+
+| # | Fix |
+|---|-----|
+| b1 | `.rl-feed-list .rl-lead-card:not(.is-expanded)` + `#rl-cabinet-list` — **`min-height`** (подобрать ~220–260px desktop) |
+| b2 | Title collapsed: **1 строка** ellipsis (уже) · budget всегда 1 строка |
+| b3 | `.rl-chips` — **`min-height`** под 1–2 ряда · max 3 чипа + `+N` в collapsed (опц.) |
+| b4 | Expanded — `min-height: auto` · без ломания O54 grid |
+
+**Файлы:** `rawlead.css` · опц. `renderTagChips` limit collapsed
+
+---
+
+## O56c — После отклика: **collapse OK, expand снова работает**
+
+| # | Fix |
+|---|-----|
+| c1 | **Убрать** per-card re-bind pattern · **event delegation** на `#rl-feed-list` / `#rl-cabinet-list` (один listener) **или** `card.replaceWith(card.cloneNode(true))` перед bind |
+| c2 | `updateCardDraft`: collapse после success · **клик** → toggle expand с черновиком (как ЛК) |
+| c3 | Regression: generate → collapsed + badge · click → body + copy · click → collapse |
+| c4 | То же **`rawlead-cabinet.js`** если `updateCardDraft` там |
+
+**Файлы:** `rawlead-feed.js` · `rawlead-cabinet.js`
+
+---
+
+# § WAVE-2-ACCEPT-FIX O55 — (**✅ deploy 2026-05-29 v1.10.7**)
+
+**Контекст:** владелец 2026-05-29 · три бага/фичи.
+
+## Корень (Lead verify)
+
+| # | Симптом | Почему |
+|---|---------|--------|
+| 1 | Главная — **фикс. %** + **идеальная** карточка по центру | `rawlead-scroll.js` тянет **3 реальных** лида из API |
+| 2 | Лента: после отклика **не сворачивается** | `updateCardDraft()` **принудительно** expand · в ЛК toggle |
+| 3 | TG «Сгенерировать отклик» — **тишина** | Код есть · prod **0** `tg:draft:` в логе · callback/send молча падает |
+
+---
+
+## O55a — Главная live preview = **рекламный demo**
+
+| # | Fix |
+|---|-----|
+| a1 | Убрать API fetch в `initLivePreview()` — **3 статические** карточки |
+| a2 | Фикс. %: левая **42%** · центр **100%** + `ИДЕАЛЬНО ✦` · правая **67%** |
+| a3 | Центр — визуальный акцент (col 2 · scale/shadow) |
+| a4 | CTA → `/lenta/` · PHP в `live-preview.php` предпочтительно |
+| a5 | Mobile: ideal card первая |
+
+**Файлы:** `live-preview.php` · `rawlead-scroll.js` · `rawlead.css`
+
+---
+
+## O55b — Лента: после отклика → **свернуть** (как ЛК)
+
+| # | Fix |
+|---|-----|
+| b1 | `updateCardDraft()`: `state.expandedId = null` · remove `is-expanded` |
+| b2 | Badge «Отклик ✓» на collapsed · expand по клику |
+| b3 | Toggle = логика `rawlead-cabinet.js` |
+
+**Файлы:** `rawlead-feed.js`
+
+---
+
+## O55c — TG «Сгенерировать отклик» → сообщение + ЛК
+
+| # | Fix |
+|---|-----|
+| c1 | `getWebhookInfo` → `deleteWebhook` если set · restart `rawlead-bot-poll` |
+| c2 | Лог каждого `draft:` callback |
+| c3 | Не глотать ошибки sendMessage / answerCallbackQuery |
+| c4 | Retry getUpdates при ConnectionResetError |
+| c5 | Deploy src + **restart rawlead-bot-poll** |
+| c6 | Smoke: push → callback → `tg:draft:ok` + inbox row |
+
+**Файлы:** `match_push.py` · `telegram_control.py` · `bot_poll_main.py`
+
+---
+
+# § WAVE-2-ACCEPT-FIX O54 — (**✅ deploy 2026-05-29 v1.10.6 + API**)
+
+**Контекст:** владелец после O53 · скрин: сосед «раскрывается» · в черновике «срок … стоимость …».
+
+## Корень (Lead verify)
+
+| Баг | Почему |
+|-----|--------|
+| **Сосед растягивается** | Grid `align-items: stretch` + `.rl-lead-card { height: 100% }` — при expand одной карточки **строка** растёт, сосед **тянется** на всю высоту (`margin-top: auto` на chips → пустота как «раскрытие») |
+| **Срок/цена в черновике** | O52a сделали **только TG** (`strip_tg_draft_price_deadline` в `match_push.py`). **Сайт** — промпты L2 **явно требуют** срок+цену в `reply_draft`: `_PREMIUM_SPLIT_SYSTEM` стр.605 · `_CABINET_REPLY_SYSTEM` стр.614 · API отдаёт draft **без strip** |
+
+---
+
+## O54a — Соседняя карточка **не меняет высоту**
+
+| # | Fix |
+|---|-----|
+| a1 | `.rl-feed-list`, `#rl-cabinet-list` → **`align-items: start`** (не stretch) |
+| a2 | `.rl-lead-card` → **`height: auto`** · убрать `height: 100%` на feed + cabinet |
+| a3 | Expanded: `align-self: start` — оставить · body растёт **только** у `.is-expanded` |
+| a4 | Smoke: 2 col · expand A · **B остаётся компактной** (chips у верха, без пустого хвоста) · collapse A · B не дёргается |
+
+**Файлы:** `rawlead.css` (~1958–2031)
+
+---
+
+## O54b — Черновик **без срока и цены** (сайт + TG + новые генерации)
+
+| # | Fix |
+|---|-----|
+| b1 | **Промпты** `ai_analyze.py`: `_PREMIUM_SPLIT_SYSTEM`, `_CABINET_REPLY_SYSTEM`, legacy `_SYSTEM` (стр.159) — `reply_draft` **без** срока/цены/«от X ₽»/«N недель» · только приветствие + интерес + 2–3 шага · `time_for_client` и `money` — **отдельные поля JSON**, не в текст отклика |
+| b2 | Вынести `strip_reply_draft_price_deadline()` (из `strip_tg_draft_*`) в общий модуль · расширить regex под **inline** хвост: «Ориентировочный срок …», «стоимость — от …», «, срок …, цена …» в **одном абзаце** |
+| b3 | Применить strip: `api_server.py` `_row_to_feed_item` · `POST /v1/me/leads/{id}/draft` response · inbox select · TG callback (alias) |
+| b4 | Опц. post-strip после L2 validate в `lead_pipeline` / `analyze_cabinet_reply_draft` перед save в БД |
+| b5 | Tests: inline «…Python и Neon. Ориентировочный срок — 2 недели, стоимость — от 45 000 руб.» → хвост обрезан |
+
+**Файлы:** `ai_analyze.py` · `match_push.py` · `api_server.py` · `tests/test_match_push_o50.py` (rename/extend)
+
+**Не трогать:** F2 match · O53 card layout (кроме a1–a2)
+
+---
+
+# § WAVE-2-ACCEPT-FIX O53 — (**✅ deploy 2026-05-29 v1.10.5**)
+
+**Контекст:** владелец после O52 · скрин 2026-05-29.
+
+## O53a — Expand **внутри ячейки**, не на всю сетку
+
+**Симптом:** раскрытая карточка **на всю ширину** (2 col) — «вообще не то», должна остаться **как была** (420px в своей колонке).
+
+| # | Fix |
+|---|-----|
+| a1 | **Убрать** `.is-expanded { grid-column: 1 / -1; max-width: 100% }` — feed + cabinet |
+| a2 | Раскрытие = **только** body внутри карточки · `max-width: 420px` · `justify-self: center` **без изменений** |
+| a3 | Сосед **не дёргается** (без `:has` на list) — align-items stretch на grid |
+| a4 | Expanded: title multiline · body visible · **та же рамка/тень** что collapsed |
+
+**Файлы:** `rawlead.css` (~1968–1976, 2318, 3530, 4065)
+
+---
+
+## O53b — Убрать «Р» и «N» в текстах карточки
+
+**Симптом:** бюджет «до 500 **Р**» · в заголовках/тексте артефакты (**`\r\n`**, `&mdash;`).
+
+| # | Fix |
+|---|-----|
+| b1 | JS `formatBudgetDisplay(s)` — `500 Р` / `500р` / `500 руб` → **`500 ₽`** · единый символ |
+| b2 | `decodeHtmlEntities` в title/body/draft перед `escapeHtml` (`&mdash;` → —, `&amp;` …) |
+| b3 | Strip `\r`, лишние `\n` в однострочных полях (title, budget line) |
+| b4 | Опц. API `display_budget_text` / normalize при ingest — если дубли |
+
+**Файлы:** `rawlead-feed.js` · `rawlead-cabinet.js` · опц. `budget.py`
+
+---
+
+## O53c — ЛК inbox = те же карточки что лента (**без глаза**)
+
+**Симптом:** `/cabinet/` карточки **другая вёрстка** (`rl-inbox-card`, draft всегда виден, другой head).
+
+| # | Fix |
+|---|-----|
+| c1 | **Один** шаблон карточки с лентой: `renderLeadCard(item, { showViews: false, showDelete: true, mode: 'inbox' })` — вынести общее из `rawlead-feed.js` или дублировать markup **1:1** |
+| c2 | **Без** `viewsHeadHtml` в ЛК · **с** time в head-meta как лента |
+| c3 | Expand/collapse + body (суть · инструменты · черновик) — **как лента**, не отдельный `.rl-inbox-card__draft` block |
+| c4 | Кнопка **✕ удалить** — в head-meta (как сейчас), не ломая layout ленты |
+| c5 | CSS: убрать/deprecated `.rl-inbox-card` overrides, если карточка = `.rl-lead-card` |
+
+**Файлы:** `rawlead-cabinet.js` · `rawlead.css` · `page-cabinet.php` если нужно
+
+---
+
+# § WAVE-2-ACCEPT-FIX — O52 (**✅ deploy 2026-05-29**)
+
+**Контекст:** владелец 2026-05-29 после Wave-2 deploy.
+
+## O52a — TG L2: без срока/цены · с приветствием
 
 | # | Задача |
 |---|--------|
-| w1 | `register_rest_route` `GET` + `PATCH` `/me/notification-settings` → proxy на `/v1/me/notification-settings` (Bearer) |
-| w2 | Theme **v1.7.24** · deploy |
+| t1 | **TG callback** (`match_push.py` `handle_tg_draft_callback`): в сообщение бота **не** включать строки с ценой/сроком из draft — post-process strip (regex «от … ₽», «N дней», «срок») **или** отдельный prompt `analyze_tg_reply_draft` |
+| t2 | **Приветствие разрешить** для TG (и опц. сайт): «Здравствуйте» / «Добрый день» — **1 короткая фраза** в начале · site L2 может оставить шаги + «от …» |
+| t3 | O49 validate: `_REPLY_DRAFT_BAD_START_RE` — **не** блокировать «Здравствуйте» если дальше не канцелярит |
 
-**Приёмка:** залогинен `/cabinet/` → блок «Уведомления» · смена 60→30 → «Сохранено» · Neon `users.push_min_match` обновился.
+**Файлы:** `match_push.py` · `ai_analyze.py` · tests
+
+---
+
+## O52b — Карточка после отклика: expand + badge
+
+**Симптом:** после генерации отклика карточка **не раскрывается** по клику; кнопка «Написать отклик» остаётся.
+
+| # | Задача |
+|---|--------|
+| c1 | Если `reply_draft` не пустой → **убрать** CTA «Написать отkлик» |
+| c2 | Вместо CTA — badge **`Отклик ✓`** (`.rl-badge--replied`) в head, NEO жёлтый/чёрный как `--perfect` |
+| c3 | **Клик по карточке** всегда toggle `is-expanded` · показывать секцию «Черновик отклика» |
+| c4 | Кнопка «Написать отклик» до генерации: по клику expand + generate (как сейчас) |
+| c5 | После generate: **не** ломать `dataset.bound` / re-bind · `updateCardDraft` перерисовать head+cta |
+| c6 | То же **`rawlead-cabinet.js`** inbox |
+
+**Файлы:** `rawlead-feed.js` · `rawlead-cabinet.js` · `rawlead.css`
+
+---
+
+## O52c — ~~ИДЕАЛЬНО ✦ при 100%~~ **❌ отменено владельцем**
+
+**Остаётся F2 (O46):** «ИДЕАЛЬНО ✦» только при **≥2** тегах лида и `km=100`. Один тег → 100% **без** ✦ — **ожидаемо**.
+
+---
+
+## O52e — Grid: соседняя карточка дёргается при collapse (**P1**)
+
+**Симптом:** сворачиваешь раскрытую карточку → **соседняя** резко expand/collapse.
+
+**Корень (Lead):** CSS `.rl-feed-list:has(.rl-lead-card.is-expanded)` меняет `align-items` / `height` **на всех** карточках в grid ([`rawlead.css`](../../wordpress/rawlead-kadence-child/assets/css/rawlead.css) ~1969–2017). То же `#rl-cabinet-list:has(...)`.
+
+| # | Fix |
+|---|-----|
+| e1 | **Убрать** parent `:has(.is-expanded)` rules, влияющие на **соседей** |
+| e2 | Expand/collapse — **только** `.rl-lead-card.is-expanded` (body, title clip) · соседи **height: 100%** / stretch **без изменений** |
+| e3 | Опц.: expanded card `grid-column: 1 / -1` на desktop — если нужно место для body, **не** через `:has` на list |
+| e4 | Smoke: 2 col · expand A · collapse A · **B не двигается** · `/lenta/` + `/cabinet/` |
+
+**Файлы:** `rawlead.css` · опц. `rawlead-feed.js` / `rawlead-cabinet.js`
+
+---
+
+## O52d — Блок «Уведомления» под NEO UI
+
+**Симптом:** `.rl-cabinet-notif` — дефолтный select/toggle, не как лента/фильтры.
+
+| # | Задача |
+|---|--------|
+| n1 | Карточка как `.rl-cabinet-panel` / filter bar: **2px border**, `--rl-shadow-card`, radius card |
+| n2 | Порог % — **slider** или chip-row 30/40/50/60/70/80/90/100 (как min_match на ленте) · не native `<select>` |
+| n3 | Toggle — стиль `.rl-toggle` как в design system · label + hint `/start` в `@rawlead_bot` |
+| n4 | Mobile 390px |
+
+**Ref:** `docs/design/wp/wave-2-css-brief.md` · `REFERENCE.md` · `page-cabinet.php`
+
+---
+
+# § PRE-STRESS-WAVE-2 — (**✅ deploy 2026-05-29**)
+
+**Контекст:** владелец 2026-05-29 · premium продукт · **до stress** · тикеты: [`2026-05-29-lenta-draft-503-flaky.md`](../../problems/2026-05-29-lenta-draft-503-flaky.md)
+
+## O47 — L1-TAGS-STRICT: CMS и lead_tags (**P0**)
+
+**Проблема:** Joomla + BaForms → L1 ставит `wordpress_dev` → ложный 100% / ИДЕАЛЬНО ✦. **«Так оставлять нельзя».**
+
+| # | Задача |
+|---|--------|
+| t1 | L1 prompt [`ai_analyze.py`](../../src/ai_analyze.py) `_LITE_SYSTEM_HEAD`: **жёсткие правила CMS** — Joomla/Bitrix/OpenCart **≠** `wordpress_dev`; WP только если явно WordPress/WooCommerce/theme/plugin |
+| t2 | Post-validate L1: если body/title содержит `joomla|bitrix|opencart|baforms` (casefold) → **strip** `wordpress_dev` из lead_tags · опц. добавить `php` если dev-ниша |
+| t3 | Golden tests: 5 кейсов (Joomla captcha, WP plugin, чистый API, TG bot, 1C) — expected tags |
+| t4 | Backfill **не** обязателен v1; новые L1 после деплоя |
+
+**Файлы:** `ai_analyze.py` · `skills_catalog.py` · `tests/test_l1_tags_cms.py`
+
+---
+
+## O48 — DRAFT-RELIABILITY: on-demand L2 под нагрузку (**P0**)
+
+**Проблема:** `POST /v1/me/leads/{id}/draft` → **503** flaky (lead 7019 ×3). «Много пользователей» — чинить **сейчас**.
+
+| # | Задача |
+|---|--------|
+| r1 | `me_lead_draft`: `errors=[]` → **logger.warning** с `lenta:draft:{id}:ai:…` |
+| r2 | **3 retry** analyze_premium только для on-demand (не pipeline) |
+| r3 | Ответ 503: JSON `detail` + `retry_after_sec` · UI: «Повторить» + не generic toast |
+| r4 | Rate limit per user: max **10 draft/h** (429) — защита OpenRouter |
+| r5 | Метрика в `/status` или log: `draft_ok` / `draft_fail` за 24h |
+
+**Файлы:** `api_server.py` · `ai_analyze.py` · `rawlead-feed.js` · `rawlead-cabinet.js` · `rawlead-api.php`
+
+---
+
+## O49 — L2-PREMIUM-V2: качество отклика (**P1 · premium**)
+
+**Проблема:** черновик ~7/10 · «Готов заменить…» · слабый блок «как сделаю».
+
+| # | Задача |
+|---|--------|
+| q1 | L2 prompt: **запрет** начала с «Готов…» / «Готов заменить» · старт: «Заинтересовал…» / «Беру задачу…» / «Сделаю…» |
+| q2 | Обязательно **2–3 конкретных шага** (не абстракции) · срок + «от X ₽» из money |
+| q3 | `_validate_reply_draft_take`: reject «^готов\s» (regex) — **retry** LLM |
+| q4 | Smoke matrix 10 лидов — Lead/владелец sample |
+
+**Файлы:** `ai_analyze.py` · `docs/team/architect/AI.md` § L2
+
+---
+
+## O50 — TG-PUSH-FULL-CARD: карточка + генерация в боте (**P1**)
+
+**Запрос владельца:** push = **вся инфа с карточки** + кнопка **«Сгенерировать отклик»** → черновик **в TG** · та же карточка → **ЛК** на сайте.
+
+**Сейчас:** push = title + summary + ссылка на ленту ([`match_push.py`](../../src/match_push.py) `_format_push_text`).
+
+| # | MVP |
+|---|-----|
+| b1 | Push text: source · budget · match% · task_summary · lead_tag labels · tools (если есть) |
+| b2 | Inline **`callback_data`**: `draft:{lead_id}` — **не** только URL |
+| b3 | Handler @rawlead_bot: callback → тот же `me_lead_draft` / shared fn → **sendMessage** с reply_draft |
+| b4 | **INSERT** `user_lead_replies` — карточка в `/cabinet/` inbox без повторного клика на сайте |
+| b5 | Dedupe: повтор callback → отдать сохранённый draft |
+| b6 | Free user: push **без** кнопки generate (только «Открыть») · paid/beta — полный flow |
+
+**Файлы:** `match_push.py` · `bot_poll.py` / `scripts/bot_poll_main.py` · `api_server.py` (shared draft fn)
+
+---
+
+## O51 — LK-GRID-2COL: inbox как лента (**P1 · UI**)
+
+**Запрос:** `/cabinet/` карточки **2 колонки** как `.rl-feed-list` на `/lenta/`.
+
+| # | Задача |
+|---|--------|
+| g1 | `#rl-cabinet-list`: `display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))` · max-width как feed |
+| g2 | Mobile `<768px`: 1 col · expanded card full width |
+| g3 | Smoke 390px + desktop |
+
+**Файлы:** `rawlead.css` · опц. `page-cabinet.php`
+
+---
+
+# § PRE-STRESS-PACK — (**✅ deploy 2026-05-29**)
+
+**Контекст:** владелец 2026-05-29 · канон match: [`NEON_SCHEMA.md`](NEON_SCHEMA.md) §3 · push: **O30** · навыки: **O24** (конфликт → **O42**)
+
+## O42 — MATCH-SYSTEM: совместимость и лимит навыков
+
+**Решение владельца 2026-05-29:** **F2** — % = пересечение / теги лида · «ИДЕАЛЬНО ✦» только если у лида **≥2** тега и все совпали · cap **12**.
+
+**Запрос:** снять давление «не набрать 50%» · больше карточек с осмысленным %.
+
+**Старая формула (убрать):** `matched / sum(user_tags) * 100` — чем больше навыков в ЛК, тем **ниже** %.
+
+**Новая база (все F1–F4):**
+
+```
+km = round(100 * matched_lead_tags / max(len(lead_tags), 1))
+```
+
+`matched` = сколько тегов **лида** есть в профиле пользователя · `0%` если пересечения нет.
+
+**Пример:** лид `[wordpress, php, woocommerce]` · у тебя `[wordpress, php, js]` → **67%** (2/3), не 2/6=33%.
+
+### Как добиться 100% — подварианты (владелец выбирает **один**)
+
+| ID | Формула % | Когда **100%** на карточке | «ИДЕАЛЬНО ✦» (O26) | Lead |
+|----|-----------|---------------------------|---------------------|------|
+| **F1** | пересечение / **теги лида** | все теги лида есть у тебя | = km === 100 | Просто, понятно |
+| **F2** ✅ | пересечение / **теги лида** | все теги лида есть у тебя | **только** если у лида **≥2** тега и все совпали | **Принято владельцем 2026-05-29** |
+| **F3** | **Jaccard:** пересечение / **объединение** | только если наборы тегов **идентичны** | = km === 100 | Жёстко · 100% почти никогда · не для MVP |
+| **F4** | как F1, но % = `min(100, round(100 * matched / min(len(lead_tags), 4)))` | все теги лида (до 4 в знаменателе) | km === 100 и ≥2 тега у лида | Искусственно завышает % на «толстых» лидах |
+
+**Смысл 100% при F1/F2:** «заказ полностью закрыт твоими навыками» — у лида 3 тега, у тебя в профиле **все три** (можно иметь и 10 лишних — **не штрафуют**).
+
+**Лимит навыков:** с формулой от лида cap **6** больше не нужен для % → поднять до **12** (O24 смягчить) · UI picker без «макс 6».
+
+**Код (после выбора F1–F4):**
+
+| # | Файлы |
+|---|--------|
+| m1 | `rank.py` `keyword_match()` · unit-тесты (таблица кейсов F*) |
+| m2 | `skills_catalog.py` `_USER_MAX_TAGS=12` · `api_server.py` · WP hint |
+| m3 | `rawlead-feed.js` / cabinet: perfect-match = правило F* · smoke |
+| m4 | `NEON_SCHEMA.md` §3 одна строка · опц. `PRODUCT_VISION` |
+
+**→ @lead-product:** O24 «≤6» → «≤12» + формула от лида.
+
+---
+
+## O43 — MATCH-PUSH: не шлёт + настройка порога
+
+**Симптом владельца:** push **не приходит**; настройки порога **не видит / не работает**.
+
+**Уже есть (STATUS O30):** API `notification-settings` · UI `#rl-cabinet-notif` (**hidden** до paid) · `match_push.py`.
+
+| # | Задача | Готово когда |
+|---|--------|--------------|
+| p1 | **Диагностика prod:** `.env.site` `MATCH_PUSH=1` · `@rawlead_bot` poll · `users.tg_chat_id` после `/start` · `push_enabled` · лог `push:match:` в radar | checklist в STATUS |
+| p2 | UI: блок «Уведомления» **виден** paid-user · hint free: «Подключи Stars + /start в боте» · порог 30–100 сохраняется | `/cabinet/` |
+| p3 | Smoke: 2 тест-user порог 30/60 · лид km=45 → push только 30 · `/status` или log | Lead verify |
+
+**Файлы:** `match_push.py` · `rawlead-cabinet.js` · `page-cabinet.php` · `rawlead-api.php` · ops `.env.site`
+
+---
+
+## O44 — L2 черновик: подход + без воды
+
+**Запрос владельца:** в `reply_draft` — **как выполнишь** (ключевые шаги), уникально, компетентно, **без простыней** (ориентир FL: «Укажите, как именно…»).
+
+| # | Задача |
+|---|--------|
+| d1 | L2 prompt [`ai_analyze.py`](../../src/ai_analyze.py): `reply_draft` = 3–5 предл. · **1-е** — суть/интерес · **2-е** — **как сделаешь** (из `approach`, без дубля полей в UI) · **3-е** — срок/цена «от …» |
+| d2 | Запрет: шаблон «Здравствуйте. Готов…» · вода · >6 предл. → warn не fail |
+| d3 | Inbox/cabinet: показывать черновик как сейчас · smoke 3 лида |
+
+**Не делать:** отдельное поле `approach` в UI (склеить в draft).
+
+---
+
+## O45 — OWNER-ADMIN-MVP (**✅ scope · → Coder после O44**)
+
+**Решение владельца:** **A** — `/ops/` на VPS, доступ **только owner TG** (`TELEGRAM_CHAT_ID`).
+
+| # | MVP |
+|---|-----|
+| a1 | **`/ops/`** на rawlead.ru (nginx → static или FastAPI template) · gate: owner JWT / TG id · **403** для остальных |
+| a2 | **Пользователи:** таблица из Neon — tg @, `created_at`, plan, `tags` count |
+| a3 | **Визиты v1:** beacon `POST /v1/admin/pageview` (path, day) **или** parse nginx access · счётчик по дням |
+| a4 | Не WP-admin · не публичный URL в sitemap |
+
+**Файлы:** `api_server.py` · `pg_storage.py` · nginx snippet · опц. `wordpress/` не трогать
+
+---
+
+# § WAVE-4-MICRO — микроправки UI (**✅ Coder · Lead verify + deploy 2026-05-29**)
+
+## micro-6…7 — (**✅ v1.10.3**)
+
+micro-6 modal ЛК + micro-7 TG badge — **✅** Lead verify + deploy prod 2026-05-29.
+
+## micro-6…7 — (архив спека)
+
+**Симптом (владелец):** кнопка «Добавить навык» / «+» — modal **не виден** или не открывается.
+
+**Корень (Lead):** panel в `#rl-cabinet-skills-modal` имеет класс **`rl-skills-panel`** (dropdown ленты). В CSS `.rl-skills-panel { position: absolute; top: calc(100% + 8px) }` идёт **после** `.rl-cabinet-skills-modal__panel` и **перебивает** center-layout → panel уезжает за viewport.
+
+| # | Задача | Файлы |
+|---|--------|-------|
+| m6-1 | Изолировать modal от dropdown: **не** наследовать dropdown-позиционирование · вариант A: убрать `rl-skills-panel` с cabinet panel · вариант B: `.rl-cabinet-skills-modal .rl-cabinet-skills-modal__panel` — `position: relative; top/left/right/bottom: auto !important` **после** блока `.rl-skills-panel` | `rawlead.css` · `page-cabinet.php` |
+| m6-2 | Layout: overlay `position:absolute; inset:0` · panel flex-center · **desktop + mobile 390px** · z-index panel > overlay | `rawlead.css` |
+| m6-3 | JS: `openSkillsPicker()` → `skillsModalEl.hidden = false` · overlay/ESC/«Отмена» закрывают · catalog рендерится | `rawlead-cabinet.js` |
+
+**Готово когда:** `/cabinet/` → «+ навык» / «Добавить первый» → **видимое** окно **по центру** · можно выбрать chip и «Добавить».
+
+---
+
+## micro-7 — Badge источника Telegram = **«TG»** (не chat id)
+
+**Симптом:** live preview / карточки — `TG:-1001090393372` вместо **TG**.
+
+**Корень:** `rawlead-scroll.js` `sourceLabel()` — только exact `tg`/`telegram`; source с API = `tg:-100…` → fallback на raw string.
+
+| # | Задача | Файлы |
+|---|--------|-------|
+| m7-1 | `sourceLabel`: `s.indexOf("tg") === 0` → `{ label: "TG", cls: "tg" }` (как в `rawlead-feed.js`, но label **«TG»** не «Telegram») | `rawlead-scroll.js` · `rawlead-feed.js` · `rawlead-cabinet.js` — **одинаково** |
+| m7-2 | Опц.: strip `**` из title в preview (`renderPreviewCard`) если в строке markdown-bold | `rawlead-scroll.js` |
+
+**Готово когда:** главная live preview + `/lenta/` + `/cabinet/` — TG-заказ badge = **TG** · без chat id в UI.
+
+---
+
+## micro-1…5 — (**✅ v1.10.2**)
+
+micro-1…5 + DEPLOY-CRLF — **✅** Lead verify 2026-05-29. Детали ниже (архив).
+
+---
+
+## micro-1 — Убрать hero live-счётчик
+
+**Решение владельца:** удалить UI, API не трогать.
+
+| Файл | Действие |
+|------|----------|
+| `template-parts/rawlead/hero.php` | убрать `.rl-hero__stat` |
+| `assets/js/rawlead-scroll.js` | убрать `initHeroCounter()` |
+| `assets/css/rawlead.css` | убрать `.rl-hero__stat*` |
+
+**Готово когда:** grep `hero-counter|rl-hero__stat|initHeroCounter` = 0.
+
+---
+
+## micro-2 — FAB «Поддержка» → открывает окно чата
+
+**Симптом:** кнопка не открывает модалку (или не на всех страницах).  
+**Корень (Lead):** `assets/js/rawlead-support.js` **не enqueued** в `functions.php`.
+
+| # | Задача | Файлы |
+|---|--------|-------|
+| m2-1 | Enqueue `rawlead-support.js` на всех shell-страницах (как footer FAB) + `wp_localize_script` `rawleadSupport.restSupport` | `functions.php` |
+| m2-2 | Клик FAB → модалка `#rl-support-modal` visible · overlay/ESC/✕ закрывают | `rawlead-support.js` · `footer.php` |
+| m2-3 | UI = **окно чата** (textarea + «Отправить →») — backend stub `/support` ok · **реальный чат позже** | без API |
+
+**Готово когда:** Ctrl+F5 `/` `/lenta/` `/cabinet/` — FAB → модалка · отправка → success · mobile 390px.
+
+---
+
+## micro-3 — Навыки ленты ≠ навыки ЛК (развязать)
+
+**Проблема владельца:** «Сбросить» на **/lenta/** не должен сбрасывать навыки **профиля** в **/cabinet/**.
+
+**Корень (Lead):** `rawlead-feed.js` при login делает `PUT /me/tags` — тот же endpoint, что профиль ЛК.
+
+**Правило (канон `feed-cabinet-mvp.md`):**
+
+| Контекст | Хранение | Назначение |
+|----------|----------|------------|
+| **/lenta/** | `localStorage` `rawlead_lenta_skills` (guest **и** logged-in) | только **сортировка** ленты |
+| **/cabinet/** | `GET/PUT /me/tags` | **профиль** для match / push |
+
+| # | Задача | Файлы |
+|---|--------|-------|
+| m3-1 | `rawlead-feed.js`: `loadTags` / `persistTags` / `clearSkills` — **не** PUT/GET `/me/tags` для sort-skills | `rawlead-feed.js` |
+| m3-2 | `rawlead-cabinet.js`: не чистить профиль при операциях ленты; `clearGuestSkillKeys` — только merge-after-auth, не при «Сбросить» ленты | `rawlead-cabinet.js` |
+| m3-3 | Regression: выбрал навыки в ЛК → на ленте «Сбросить» → в ЛК навыки **на месте** | manual |
+
+---
+
+## micro-4 — Лента: кнопка «Мои навыки»
+
+В panel/sheet навыков **/lenta/** — кнопка **«Мои навыки»**:
+
+- `GET /me/tags` (только если logged-in; иначе hint «Войди в кабинет»)
+- подставляет теги в **draft** sort-skills (не сохраняет в профиль автоматически — user жмёт «Применить»)
+
+| Файл | Действие |
+|------|----------|
+| `page-lenta.php` | кнопка в `.rl-skills-panel__footer` рядом с «Применить» / «Сбросить» |
+| `rawlead-feed.js` | handler `loadMyProfileSkills()` |
+| `rawlead.css` | ghost btn, mobile sheet |
+
+---
+
+## micro-5 — ЛК: модалка «Добавить навык» по центру экранa
+
+**Симптом:** `#rl-cabinet-skills-modal` прилипает к верху (`top: header`), «болтается внизу».
+
+| # | Задача |
+|---|--------|
+| m5-1 | `.rl-cabinet-skills-modal` — flex center overlay · panel `max-width ~480px` · `max-height 85vh` · **center** desktop + mobile |
+| m5-2 | Убрать `top: var(--rl-header-h)` full-width sheet-стиль для modal |
+
+**Файлы:** `rawlead.css` · при необходимости обёртка в `page-cabinet.php`.
+
+---
+
+## Deploy + сдача (micro-6…7)
+
+| # | Готово когда |
+|---|--------------|
+| d1 | `RAWLEAD_CHILD_VERSION` → **1.10.3** |
+| d2 | `/cabinet/` modal center + open · `/` TG badge |
+| d3 | **→ Lead ops:** `deploy-wp-theme-vps.py` + `fix-vps-radar-crlf.py` |
+
+**Сдача:** `STATUS.md` § WAVE-4-MICRO micro-6…7 · **не** менял `src/`.
+
+---
+
+# § DEPLOY-CRLF — radar не должен падать после deploy (**✅ Coder · deploy-wp-theme v1.10.2**)
+
+**Приоритет:** P0 · повторяющийся инцидент (CRLF → exit 127)  
+**Канон:** `deploy-l3-vps.py` уже делает `sed` на `deploy/*.sh`
+
+| # | Файл | Готово когда |
+|---|------|--------------|
+| dc1 | `scripts/deploy-wp-theme-vps.py` | sed `deploy/*.sh` после theme rsync **✅** |
+| dc2 | Lead ops | `fix-vps-radar-crlf.py` restart после deploy (пока не auto-restart в theme deploy) |
+
+---
+
+# § WAVE-2-CSS — Neo-Brutalist Wave 2 (**✅ Coder · Lead verify 2026-05-29**)
+
+| Документ | Содержание |
+|----------|------------|
+| [`docs/design/wp/wave-2-css-brief.md`](../../design/wp/wave-2-css-brief.md) | **CSS/JS/анимации** w2-1…w2-8 · delta audit · приёмка Designer |
+| [`docs/design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) **v5** | Страницы · nav W16 · announcement W15 · `/pricing` W17 · `/how` W18 · `/contact` W19 |
+| [`docs/team/design/LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § **DESIGN-WAVE-2** | Решения **W1–W19** |
+| [`docs/design/wp/feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) | `/lenta/` · `/cabinet/` flows |
+| [`docs/team/design/DESIGN_SYSTEM.md`](../design/DESIGN_SYSTEM.md) § NEO-BRUTALIST | Токены |
+| [`docs/design/assets/`](../../design/assets/) | Концепты PNG (mark, hero geo, category icons) |
+
+**Scope:** `wordpress/rawlead-kadence-child/**` (+ при необходимости `wordpress/rawlead-landing/content/` для W17–W19 copy/HTML).
+
+**Запрещено:** `src/`, `scripts/`, `desktop/`, API-контракты.
+
+---
+
+## A — Motion + лента/кабинет (brief w2-1…w2-4)
+
+| # | Задача | Файлы | Готово когда |
+|---|--------|-------|--------------|
+| a1 | Scroll reveal `.rl-lead-card` + IO | `rawlead-feed.js`, `rawlead-cabinet.js`, `rawlead.css` | stagger при viewport; `prefers-reduced-motion` → сразу visible |
+| a2 | Match-bar 0→N% **только** при `.is-visible` | CSS + JS | удалить `.rl-match-ready` + rAF; **без `!important`** в финале (см. brief § Lead review) |
+| a3 | 100% match NEO | JS `renderCard` + CSS | `.rl-lead-card--perfect-match` · бейдж `ИДЕАЛЬНО ✦` · жёлтый pulse · **без indigo REVOLUTION** |
+| a4 | Пагинация «Загрузить ещё» | feed + cabinet JS/PHP | убрать sentinel IO; кнопка + `Показано X из Y`; `.is-loading` |
+
+Детали и сниппеты — **только** в [`wave-2-css-brief.md`](../../design/wp/wave-2-css-brief.md).
+
+---
+
+## B — Brand + UI polish (w2-5…w2-8)
+
+| # | Задача | Готово когда |
+|---|--------|--------------|
+| b1 | Мегафон SVG в категориях | `page-lenta.php` — brief w2-5 |
+| b2 | **by Rode51** | `header.php` + `footer.php` — brief w2-6 |
+| b3 | Марка ◎ (опц. v1) | SVG в `assets/images/` или PNG-concept; header — brief w2-7 |
+| b4 | Hero geo-декор | `::before/::after` на `.rl-hero` — brief w2-8; без SVG — закомментировать bg, hero не ломать |
+| b5 | Hover/press | карточка 120ms shadow+translate; btn active 0.96/60ms — brief w2-3b |
+
+---
+
+## C — Страницы (REFERENCE v5 · W14–W19)
+
+| # | Страница | W# | Готово когда |
+|---|----------|-----|--------------|
+| c1 | **Announcement bar** (только `/`) | W15 | чёрная полоска 38px · «800+ лидов» · CTA `/lenta/` |
+| c2 | **Header nav** | W16 | `Лента · Тарифы · Как устроено` · `Войти →` · `by Rode51` · без «Контакты» в primary |
+| c3 | **`/pricing/`** | W17 | H1 на жёлтом · таблица Free vs ИИ-агент · **300 ⭐** · CTA Stars |
+| c4 | **`/how/`** | W18 | 3 шага горизонтально (не 4 карточки 2×2) |
+| c5 | **`/contact/`** | W19 | **без CF7** · только TG + email muted |
+| c6 | **Ценник везде** | W14 | grep `590` / beta-waitlist → 0 · **300 ⭐** на landing + pricing-preview |
+
+Продуктовые `/lenta/`, `/cabinet/` — **минимальный header** (REFERENCE §3.1).
+
+---
+
+## D — Удалить (W13 · Lead финал)
+
+| # | Готово когда |
+|---|--------------|
+| d1 | **`flow.php`:** секция `.rl-flow__sources` **удалена полностью** (не заменять chips) |
+| d2 | CSS/JS: все `.rl-flow__sources`, cube-анимации, REVOLUTION perfect-match (indigo/green) |
+| d3 | `rawlead-scroll.js`: убрать `.rl-flow__sources` из observer |
+
+---
+
+## E — Theme bump + deploy
+
+| # | Готово когда |
+|---|--------------|
+| e1 | `RAWLEAD_CHILD_VERSION` → **1.9.0** (или **1.9.1** при hotfix) · `style.css` Version |
+| e2 | Ctrl+F5 prod: `/` `/lenta/` `/cabinet/` `/pricing/` `/how/` `/contact/` · desktop + **390px** |
+| e3 | **→ Lead ops / owner:** `scripts/deploy-wp-theme-vps.py` на VPS после сдачи |
+
+---
+
+## F — Приёмка (Lead verify)
+
+Список Designer — [`wave-2-css-brief.md`](../../design/wp/wave-2-css-brief.md) § «Приёмка» +:
+
+| # | Проверка |
+|---|----------|
+| f1 | Лента: stagger · match-bar on visible · perfect yellow · «Загрузить ещё» |
+| f2 | Нет auto infinite scroll (sentinel) |
+| f3 | Нет кубиков flow · нет indigo perfect-match |
+| f4 | Nav + announcement + 300 ⭐ + `/how` 3 шага + contact без формы |
+| f5 | `prefers-reduced-motion`: анимации off |
+| f6 | **Не** менял `src/` |
+
+**Сдача Coder:** кратко в `STATUS.md` § WAVE-2-CSS + theme version · скрин не обязателен.
+
+**После prod:** stress O37 (владелец — после theme deploy).
+
+---
+
+# § BACKLOG-TAIL-CLEAR-O40 — хвост без L1 старше N дней (**✅ код** · ops по запросу)
+
+**Контекст (владелец 2026-05-29):** `/status` «Очередь без L1: **153**» пугает зря. После **O34** новые идут через L1 pool — хвост **не блокирует** ленту.  
+**Факт deploy:** `clear_l1_backlog --apply` → `to_clear=0` — все 153 под **top 100 id DESC** + 48h, хотя большинство **старое**.
+
+**Цель:** пометить старьё **без OpenRouter** (`ai_verdict='Пропущено'`, `is_visible=false`) · в `/status` — **не** пугать, если «живой» хвост = 0.
+
+## A — Скрипт (расширить `clear_l1_backlog.py` + `pg_storage.py`)
+
+| # | Готово когда |
+|---|--------------|
+| a1 | Флаг **`--days-old N`** (default **7**) — чистить только `created_at < NOW() - N days` |
+| a2 | **`--hours-protect`** (default 48) — **никогда** не трогать строки моложе (даже если days-old большой) |
+| a3 | Режим **`--by-age`**: при `--days-old` **не** применять `top_ids_protect` (иначе 153 не очищается) · legacy режим без `--by-age` — как сейчас |
+| a4 | dry-run печатает: `missing_before`, `older_than_Nd`, `protected_48h`, `to_clear`, `missing_after` |
+| a5 | apply: `ai_verdict='Пропущено'`, `ai_score=0`, `is_visible=false`, `ai_reasons=["backlog_cleared_age"]` |
+| a6 | **Не** вызывать `analyze_lite` / replay с L1 на cleared rows |
+
+**Пример VPS:**
+
+```powershell
+.venv\Scripts\python.exe scripts\clear_l1_backlog.py --profile site --by-age --days-old 7 --dry-run
+.venv\Scripts\python.exe scripts\clear_l1_backlog.py --profile site --by-age --days-old 7 --apply
+```
+
+## B — `/status` v2 (не пугать зря)
+
+| # | Готово когда |
+|---|--------------|
+| b1 | `count_leads_missing_l1_recent(hours=48)` — «без L1 за 48 ч» |
+| b2 | В блоке «Лента»: **«Без L1 (48 ч): N»** · если N=0 и backlog drain **выкл** — OK, без ⚠ |
+| b3 | **«Хвост исторический: M»** — всего без L1 минус recent (или `created_at` старше 48h) · **без** текста «свежие ждут ИИ», если `L1_BACKLOG_DRAIN=0` |
+| b4 | ⚠ «Проблемы» только если **`missing_recent > 0`** при drain off **или** drain on и total > 100 |
+
+**Файлы:** `scripts/clear_l1_backlog.py`, `src/pg_storage.py`, `src/radar_status.py`, `docs/ops/RADAR_LOG.md`, `docs/FOR_YOU.md` (1 блок ops)
+
+## C — Приёмка
+
+| # | Проверка |
+|---|----------|
+| c1 | dry-run на prod DB (или fixture): `older_than_7d > 0`, `to_clear > 0` при текущих 153 |
+| c2 | apply → `/status`: «Без L1 (48 ч)» ≤ few · «Хвост исторический» ↓ · нет ложного ⚠ |
+| c3 | Новые заказы после apply — L1 pool как раньше (regression `test_l1_pipeline`) |
+| c4 | Unit: `--by-age` не трогает строку `created_at` = now-1d без L1 |
+
+**→ Lead ops после Coder:** VPS `--apply` · владелец — `/status` в TG.
+
+---
+
+# § PIPELINE-FAST-STABLE-O39 — быстрее биржи + не ломать ленту (**после O32**)
+
+**Решение владельца (2026-05-29):** ускорять, но **стабильность важнее сырой скорости**. Не повторять сценарий «код локально ✅, VPS старый → лента мертва».
+
+**Корень медленности (факт VPS):** не `POLL_INTERVAL` и не L1 на новых — **~4 мин уходит на resync ~102 dupes/цикл**: для каждого SQLite-dup вызывается `pg.lead_exists()` + лог `neon_resync_skip:sqlite_dup_neon_ok` (`lead_pipeline.py` ~348–362).
+
+**Цели (измеримые):**
+
+| Метрика | Сейчас | Цель O39 |
+|---------|--------|----------|
+| Цикл при **0 новых** (idle) | ~234 с | **≤ 90 с** |
+| Новый подходящий FL/Kwork → `is_visible` | ~4–5 мин worst | **≤ 2 мин** worst (TG не трогать) |
+| Deploy → prod parity | ручной, ломался CRLF | smoke **авто** |
+
+**Принцип:** ускорять **холодный путь dupes**, не резать L1/filter и не «fetch каждые 10 сек» без лимитов.
+
+## A — Стабильность (сначала)
+
+| # | Готово когда |
+|---|--------------|
+| a1 | § **BOT-STATUS-V2** в TG: блок **«Цикл»** — `cycle_sec`, `neon_dup_skip`, `is_visible` за 10 мин, **нет** `конвейер:backlog` при O34 |
+| a2 | `scripts/deploy-o34-vps.py` (или `check-vps-e2.py`): post-deploy smoke — `rawlead-radar` active · `l1_pool.py` exists · **нет** `конвейер:backlog=` в последних 3 циклах · feed API 200 |
+| a3 | `.gitattributes`: `*.sh text eol=lf` — CRLF не ломает systemd |
+| a4 | Тест `tests/test_l1_pipeline.py` + новый `tests/test_dup_fast_path.py` — **зелёные** до merge |
+
+## B — Fast path dupes (главное ускорение)
+
+| # | Готово когда |
+|---|--------------|
+| b1 | **SQLite-dup + exchange_neon:** если `not inserted` и локально известно «уже в Neon + L1 ok» — **не** звать `pg.lead_exists()` каждый цикл. Вариант: колонка/флаг `neon_synced_at` или кеш in-cycle; replay-path (`_neon_needs_l1_replay`) — **всегда** сохранить |
+| b2 | Счётчик в footer цикла: `dup_fast_skip=N` (сколько пропущено без Neon RTT) · `neon_dup_skip` остаётся для audit |
+| b3 | **Не** менять порядок O34: filter → budget → Neon insert → L1 pool на **новых** |
+| b4 | Лимит FL fetch без флага не урезать; опц. env `FL_FETCH_LIMIT` / `KWORK_FETCH_LIMIT` — только документ в `.env.example`, default = как сейчас |
+
+## C — Приёмка
+
+| # | Проверка |
+|---|----------|
+| c1 | Локально: симуляция 90 dupes — цикл **< 90 с** (mock Neon или integration с счётчиком вызовов `lead_exists`) |
+| c2 | VPS после deploy: 3 цикла подряд `cycle_sec ≤ 120` при `новых 0` |
+| c3 | Сценарий **1 новый** заказ (fixture/mock): filter pass → L1 → `is_visible=1` **в том же цикле**, без backlog |
+| c4 | Replay: смена `content_hash` у dup → L1 replay **срабатывает** (не регресс NEON-DEDUP-REPLAY) |
+| c5 | § **PRE-PROD-STRESS** — прогон **после** O39, не до |
+
+**Файлы:** `src/lead_pipeline.py`, `src/storage.py` (или sqlite schema), `src/radar_cycle_log.py`, `src/radar_status.py`, `scripts/deploy-o34-vps.py`, `.gitattributes`, `tests/`
+
+**Не делать в O39:** убирать L1 · `POLL_INTERVAL=0` · параллельные записи SQLite без lock-review · «instant» за счёт `is_visible` без L1.
+
+---
+
+# § BOT-STATUS-V2 (O32) — `/status` v2 (**→ сейчас**)
+
+**Симптом:** владелец не видит разницу «парсер жив» vs «лента свежая» · старый формат `/status`.
+
+| # | Готово когда |
+|---|--------------|
+| s1 | Первая строка **`@rawlead_bot`** (не FLPARSINGBOT) |
+| s2 | Блоки: FL · Kwork · TG · лента (last visible human ago) · L1 backlog · acc one-liner |
+| s3 | «Проблемы» — **только** при реальных сбоях (fetch error, radar down, backlog при O34 off) |
+| s4 | `< 3500` символов · `tests/test_radar_status_v2.py` зелёный |
+
+**Файлы:** `src/radar_status.py`, `src/radar_cycle_log.py`, `src/telegram_control.py`, `docs/ops/RADAR_LOG.md`
+
+**→ Lead ops:** deploy `src/` + restart radar после сдачи.
+
+---
+
+# § E5b-COPY-GAP — PM copy доработка (**после O33/O32**)
+
+**Канон:** [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § PRE-LAUNCH-UX c1–c4 · § TWO-SPEEDS · голос **«ты»** (2026-05-29)
+
+**Что уже ✅ в E5:** `/lenta/` c1 (filter, empty, strip) · c3 bug modal · `pricing-preview.php` · часть `page-cabinet.php` inbox empty · `functions.php` CTA
+
+**Что ❌ пропущено:**
+
+| # | Задача | Файлы |
+|---|--------|-------|
+| **b1** | **«ты»-форма** — заменить вы/ваш/вам → ты/твой/тебе (PM канон) | `page-cabinet.php`, `hero.php`, `audience.php`, `pricing-preview.php`, `marketing.php`, `rawlead-feed.js` (403 msg), `rawlead-landing/content/*.html` |
+| **b2** | **Лендинг c4** — home/how/pricing/faq/contact: без «ранний доступ» **и** «ты» | `wordpress/rawlead-landing/content/` — **в E5 не трогали** |
+| **b3** | **marketing.php** — cabinet meta: не «лента по тегам», а inbox/отклики (O23) | `inc/marketing.php` |
+| **b4** | **faq** — строка «Сервис платный?» = PM: Stars **300 ⭐** / подписка (согласовать с pricing-preview) | `rawlead-landing/content/faq.html` |
+| **b5** | Theme **v1.8.1** · deploy |
+
+**Не в волне:** hero «Лиды без шума» (Design § landing) — отдельно после copy gap.
+
+**Приёмка:** grep `ранний|Ранний|7 дней|Мои заказы` → 0 · на `/` `/faq/` `/cabinet/` везде «ты» · faq/contact/pricing без beta-waitlist.
+
+---
+
+# § FL-VISIBILITY-CHECK — «в ленте только Kwork» (**O31, диагностика**)
+
+**Симптом владельца:** на `/lenta/` кажется, что заказы только с Kwork; FL «мёртв»?
+
+**Как устроено (не гадать):**
+
+```
+Site radar main.py → FL + Kwork параллельно → Neon (insert)
+→ L1 (ИИ) → is_visible=true → только тогда /v1/feed
+```
+
+**FL может быть жив**, но **не виден** если: (1) `fl:fetch:` ошибка/proxy; (2) L1 backlog — свежие FL ждут очереди; (3) L1 → МИМО/filter → `is_visible=false`.
+
+| # | Диагностика | Где смотреть |
+|---|-------------|--------------|
+| d1 | Парсер FL **качает**? | VPS `radar_site.log` — строки `FL.ru │ скачано N · новых M` |
+| d2 | Ошибка fetch? | `fl:fetch:` / `HTTP 403` / `нет карточек` в том же логе |
+| d3 | FL в Neon, но не в ленте? | `/status` @rawlead_bot → «Очередь без L1» · «Последний visible» |
+| d4 | Mix источников в API | `GET /v1/feed?limit=50` — поле `source`: `fl` / `kwork` / `tg` |
+
+**Корень (известный, Lead 2026-05-28):** L1 backlog **ASC по id** — свежие FL/Kwork ждут, Kwork может чаще проходить L1 первым по объёму/вердикту.
+
+**Fix:** § **FEED-FRESHNESS** f1–f3 (приоритет свежих DESC · L1 на ingest для fl/kwork).
+
+**Владельцу сейчас:** `/status` в [@rawlead_bot](https://t.me/rawlead_bot) → блок «Лента / Neon» · или VPS `tail -50 /opt/rawlead/data/radar_site.log | grep -E 'FL\\.ru|Kwork|site:сводка|fl:fetch'`
+
+---
+
+# § PIPELINE-INSTANT-O34 — канон без очереди (**P0**)
+
+**Запрос владельца 2026-05-29:** реализовать цепочку:
+
+```
+fetch → dedup → filter → Neon → L1 (parallel) → visible → feed (±15m) → match → L2 по клику
+```
+
+**Без** отложенной очереди на **новых** заказах. L2 / match / delay **не трогать** — уже так.
+
+---
+
+## Диагноз (код, не гадать)
+
+| Сейчас | Проблема |
+|--------|----------|
+| `record_new_lead` **до** `word_filter` | Отсеянные заказы **висят** в Neon без L1 → backlog |
+| `drain_l1_backlog` 40/цикл | Отдельная «очередь» — **не нужна** для hot path |
+| L1 **последовательно** в цикле | 3 новых × ~15 с = **45 с** блокируют fetch |
+| AI fail → `return` без UPDATE | Строка **вечно** `ai_verdict IS NULL` |
+| FL/Kwork | `defer_l1=False` уже ✅ — O33 i1 **не актуален** |
+
+---
+
+## Архитектура (канон Lead)
+
+### Hot path — только **новые** прошедшие filter
+
+```mermaid
+flowchart LR
+  F[fetch] --> D[dedup SQLite]
+  D --> W{filter}
+  W -->|нет| X[skip — Neon НЕ трогаем]
+  W -->|да| N[INSERT Neon]
+  N --> P[L1 pool N workers]
+  P --> V[UPDATE visible + push]
+```
+
+| # | Задача | Детали | Файлы |
+|---|--------|--------|-------|
+| **p1** | **Порядок p1:** dedup → **filter → budget** → Neon → L1 | Вынести filter **до** `record_new_lead` в `plan_new_listing` | `lead_pipeline.py` |
+| **p2** | **Убрать очередь** на Site | `drain_l1_backlog` **не вызывать** при `RADAR_PROFILE=site` (или `L1_BACKLOG_DRAIN=0` default site) | `main.py`, `config.py` |
+| **p3** | **defer_l1=0** везде Site | Удалить ветку `if defer_l1: return` для site + public feed | `lead_pipeline.py`, `main.py` |
+| **p4** | **Parallel L1** | `ThreadPoolExecutor(max_workers=L1_MAX_WORKERS)` default **3** — только **новые** после filter; worker: neon insert (если ещё нет) → `analyze_lite` → `update_after_lite` → `push_match` | `lead_pipeline.py`, новый `l1_pool.py` или функция |
+| **p5** | **AI fail — терминал** | После 2 retry: `UPDATE ai_verdict='l1_failed'`, `is_visible=false` — **не** в backlog count | `pg_storage.py`, `lead_pipeline.py` |
+| **p6** | **Лог** | `pipeline:L1 fl:id=123 visible=1 worker=2/3` · `pipeline:skip filter` · **без** `конвейер:backlog` на site | `radar_cycle_log.py` |
+| **p7** | Env | `L1_MAX_WORKERS=3` · `L1_BACKLOG_DRAIN=0` (site) · `.env.example` | `config.py` |
+| **p8** | TG | `process_new_listing_from_tg` — **тот же** `ingest_with_l1()` (filter→neon→pool), не дублировать | `lead_pipeline.py`, `tg_main` callers |
+| **p9** | Тесты | unit: filter-before-neon · mock L1 pool 2 workers · fail→l1_failed | `tests/` |
+
+### Второй ИИ — **не отдельный процесс**, а pool
+
+| Вопрос владельца | Решение |
+|------------------|---------|
+| Зачем очередь? | **Не нужна** на новых — убираем drain на site |
+| Async? | **Да** — thread pool в том же `main`/`tg_main` (не новый systemd-сервис в O34) |
+| Второй ИИ? | **Фаза O34:** 3 **параллельных** вызова `OPENROUTER_MODEL_SUMMARY` (уже L1-модель). **Опционально p10:** `OPENROUTER_API_KEY_L1_2` — round-robin если 429 rate limit |
+
+**Не в O34:** отдельный daemon `l1_worker.py`, Celery, Redis queue — только если pool не хватит (отложить).
+
+### One-shot ops (Lead/владелец после деплоя)
+
+```powershell
+.venv\Scripts\python.exe scripts\clear_l1_backlog.py --profile site --dry-run
+.venv\Scripts\python.exe scripts\clear_l1_backlog.py --profile site --apply
+# VPS: restart rawlead-radar
+```
+
+---
+
+## Не ломать
+
+- Legacy `neon_legacy_consumer` — без изменений ingest
+- `/v1/feed` delay 15m anon — без изменений
+- L2 по клику — без изменений
+- `OPENROUTER_MODEL_PREMIUM` — только L2
+
+---
+
+## Приёмка
+
+1. Новый kwork/fl (1 шт.) → `is_visible=true` **&lt; 60 с** после insert (paid JWT в `/v1/feed`).
+2. Filter-skip → **0** новых строк Neon (grep log `pipeline:skip filter`).
+3. `count_leads_missing_l1` **не растёт** на новых циклах.
+4. 3 новых в одном цикле → L1 wall time **&lt; 2×** одиночного (pool работает).
+5. AI down → `l1_failed`, не ∞ backlog.
+
+**STATUS.md:** Сделано / Файлы / Как проверить.
+
+**Связано (архив):** § **FEED-FRESHNESS** · § **INSTANT-FEED-L1/O33** — заменено O34.
+
+---
+
+---
+
+# § TG-AUTH-500-HOTFIX — вход TG 500 (**P0, блокер**)
+
+**Тикет:** [`docs/problems/2026-05-29-cabinet-tg-auth-500.md`](../../problems/2026-05-29-cabinet-tg-auth-500.md)
+
+**Симптом:** widget OK → после auth **500 Internal Server Error** (не 401 hash).
+
+**Корень:** `api_server.py` ~612 — `verify_telegram_login`, `login_bot_token` **не импортированы**.
+
+| # | Задача |
+|---|--------|
+| h1 | `from src.telegram_login import login_bot_token, verify_telegram_login` |
+| h2 | Smoke: `POST /v1/auth/telegram` с fake hash → **401** `invalid telegram hash`, не 500 |
+| h3 | VPS: `systemctl restart rawlead-api` · повтор входа владельца |
+
+**Приёмка:** rawlead.ru/cabinet/ → вход TG → JWT → кабинет без 500.
+
+**После:** § **BOT-STATUS-V2** (O32).
+
+---
+
+# § BOT-STATUS-V2 — читаемый `/status` (**O32, после hotfix**)
+
+**Запрос владельца 2026-05-29:** пересобрать статус — **понятно**, не стена текста. **Да, меняем.**
+
+**Баг сейчас:** SITE профиль показывает **`@FLPARSINGBOT`** — должно **`@rawlead_bot`**.
+
+**Файлы:** `radar_status.py` · `telegram_control.py` · `radar_cycle_log.py` · `docs/ops/RADAR_LOG.md`
+
+**Правила UX:**
+
+- Блоки с **заголовком** + пустая строка между блоками
+- **🟢/🟡/🔴** только для health (не на каждой строке)
+- Цифры **в одну строку** «FL: 90 скачано · 0 новых · OK»
+- **Проблемы** — отдельный блок внизу (или «Всё ок»)
+- **&lt; 3500** символов (лимит TG)
+
+**Макет Site `/status` (канон для Coder):**
+
+```
+📡 RawLead SITE · @rawlead_bot
+▶ Работает · poll 1 мин · Neon OK
+
+── Биржи (последний цикл) ──
+FL.ru   🟢 90 скачано · 0 новых · fetch OK
+Kwork   🟢 12 скачано · 1 новый · 1 в Neon
+TG      🟢 пульс 30с назад
+
+── Лента ──
+Последний заказ на сайте: 12 мин назад (kwork)
+Очередь L1: 42 (норма)          ← после O33
+За 10 мин: L1=8 · visible=3
+
+── Telegram acc ──
+acc1 🟢 ready · 10 чатов · +12 msg
+acc2 🟡 нет chat_ids (только join)
+acc3 🟢 ready · 11 чатов
+
+── Если проблемы ──
+(пусто — блок не показывать)
+```
+
+**Legacy** — отдельный шаблон (Dogfood, без бирж).
+
+| # | Задача |
+|---|--------|
+| s1 | `_bot_label(cfg)` — site=@rawlead_bot, legacy=@FLPARSINGBOT |
+| s2 | `_format_site_block` + per-source FL/Kwork из last cycle summary |
+| s3 | Human timestamps («12 мин назад», не UTC простыня) |
+| s4 | Блок «Проблемы» только если есть |
+| s5 | Кнопка «Статус» = тот же текст |
+
+**Приёмка:** владелец за 10 с понимает: парсеры · лента · acc · что чинить.
+
+---
+
+# § DESIGN-WAVE-1-E5 — NEO CSS + copy + mobile (**✅ partial 2026-05-29**)
+
+**Канон Design:** [`DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) · [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § DESIGN-WAVE-1 · [`REFERENCE.md`](../../design/wp/REFERENCE.md) v4 · [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) v3
+
+**Канон Copy:** [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § PRE-LAUNCH-UX c1–c4 · § TWO-SPEEDS-COPY
+
+| # | Задача | Файлы |
+|---|--------|-------|
+| **e5-1** | **NEO-BRUTALIST** — пересобрать `:root` + компоненты по `DESIGNER_PROMPT` (жёлтый hero, чёрные рамки, flat shadow) | `rawlead.css` |
+| **e5-2** | **Copy c1–c4** — filter bar, empty states, report bug, убрать «ранний доступ» | `rawlead-feed.js`, `rawlead-cabinet.js`, `faq.html`, `contact.html`, `pricing-preview.php`, `marketing.php`, `functions.php`, `page-*.php` |
+| **e5-3** | **TWO-SPEEDS strip** — `.rl-feed-delay-notice` под filter bar (anon/free): copy из TWO-SPEEDS | `page-lenta.php`, `rawlead-feed.js`, `rawlead.css` |
+| **e5-4** | **Inbox UI** — compact list; дата = **`replied_at`** (не `created_at` лида); подпись «Черновик · {date}»; аккордеон черновик + [Скопировать] [Удалить] | `rawlead-cabinet.js`, `rawlead.css` |
+| **e5-5** | **C1 mobile** — skills/sort **bottom sheets** 95vh/40vh; sticky «Применить» 52px; filter bar sticky 48px | `rawlead.css`, `rawlead-feed.js`, `page-lenta.php` |
+| **e5-6** | **Счётчик ленты A1** — убрать «N лидов за 7 дней» → «N заказов» / «N заказов · по совместимости» | `rawlead-feed.js` |
+| **e5-7** | **Cabinet H1** — «Мои отклики»; empty inbox по c2 (paid/free) | `page-cabinet.php`, `rawlead-cabinet.js` |
+| **e5-8** | Theme **v1.8.0** · `deploy-wp-theme-vps.py` |
+
+**Не в волне:** live preview feed на `/` (отдельно) · TG Login deep link без iframe (e5-9 backlog) · O11 delay в API · P4b per-user draft · stress PRE-PROD.
+
+**Приёмка Lead:** Ctrl+F5 `/`, `/lenta/`, `/cabinet/` desktop + 390px · brutalist tokens · strip 15 мин · inbox date = replied_at · нет «ранний доступ».
 
 ---
 
@@ -162,9 +1259,11 @@
 
 ---
 
-# § SITE-ACCEPT-GATE — полная приёмка функций сайта (**O20, владелец**)
+# § SITE-ACCEPT-GATE — полная приёмка функций сайта (**O20**)
 
-**Когда:** после деплоя **O23** (и опц. sfw-10). **До этого** — @lead-designer и @lead-product **не стартуют**.
+**✅ Закрыт владельцем 2026-05-28.** Design + PM **разблокированы**.
+
+**Когда было:** после деплоя O23…O30. **До этого** — @lead-designer и @lead-product не стартовали.
 
 **Где проверять:** [rawlead.ru](https://rawlead.ru) prod · VPN для TG-login из РФ.
 

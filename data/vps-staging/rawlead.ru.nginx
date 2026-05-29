@@ -1,0 +1,26 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name rawlead.ru www.rawlead.ru;
+    root /var/www/rawlead.ru;
+    index index.php index.html;
+    client_max_body_size 32M;
+    location /ops/ {
+        proxy_pass http://127.0.0.1:8000/ops/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+    location /v1/admin/ {
+        proxy_pass http://127.0.0.1:8000/v1/admin/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+    }
+    location ~ /\.ht { deny all; }
+}

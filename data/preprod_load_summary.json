@@ -1,0 +1,21 @@
+{
+  "generated_at": "2026-05-28T06:50:33.706507+00:00",
+  "api_url": "http://127.0.0.1:8000",
+  "workers": 2,
+  "duration_sec": 3,
+  "requests_total": 4,
+  "feed_requests": 2,
+  "errors_count": 4,
+  "error_rate": 1.0,
+  "p50_feed_ms": 2046.9,
+  "p95_feed_ms": 2047.5,
+  "p50_all_ms": 2047.5,
+  "p95_all_ms": 2049.9,
+  "s3_pass": false,
+  "sample_errors": [
+    "/health status=None err=[WinError 10061] Подключение не установлено, т.к. конечный компьютер отверг запрос на подключение",
+    "/health status=None err=[WinError 10061] Подключение не установлено, т.к. конечный компьютер отверг запрос на подключение",
+    "/v1/feed?limit=20 status=None err=[WinError 10061] Подключение не установлено, т.к. конечный компьютер отверг запрос на подключение",
+    "/v1/feed?limit=20 status=None err=[WinError 10061] Подключение не установлено, т.к. конечный компьютер отверг запрос на подключение"
+  ]
+}

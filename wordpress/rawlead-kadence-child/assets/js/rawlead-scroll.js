@@ -32,8 +32,8 @@
     progress.style.width = (max > 0 ? (y / max) * 100 : 0) + "%";
   }
 
-  /* Reveal on scroll + flow source cubes */
-  var motionTargets = main.querySelectorAll(".rl-reveal, .rl-flow__sources");
+  /* Reveal on scroll */
+  var motionTargets = main.querySelectorAll(".rl-reveal");
   if (!prefersReduced && "IntersectionObserver" in window) {
     var revealIo = new IntersectionObserver(
       function (entries) {
@@ -46,23 +46,8 @@
       },
       { root: null, rootMargin: "0px 0px -10% 0px", threshold: 0.1 }
     );
-    var sourcesIo = new IntersectionObserver(
-      function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            sourcesIo.unobserve(entry.target);
-          }
-        });
-      },
-      { root: null, rootMargin: "0px 0px -8% 0px", threshold: 0.15 }
-    );
     motionTargets.forEach(function (el) {
-      if (el.classList.contains("rl-flow__sources")) {
-        sourcesIo.observe(el);
-      } else {
-        revealIo.observe(el);
-      }
+      revealIo.observe(el);
     });
   } else {
     motionTargets.forEach(function (el) {
@@ -107,4 +92,32 @@
   }
 
   updateProgress();
+
+  /* WAVE-4-ADDON — parallax hero geo */
+  function initHeroParallax() {
+    var geoEl = document.querySelector(".rl-hero__geo");
+    if (!geoEl || prefersReduced) {
+      return;
+    }
+    window.addEventListener(
+      "scroll",
+      function () {
+        geoEl.style.transform = "translateY(" + window.scrollY * 0.15 + "px)";
+      },
+      { passive: true }
+    );
+  }
+
+  function initLivePreview() {
+    var box = document.getElementById("rl-live-preview-cards");
+    if (!box) {
+      return;
+    }
+    box.querySelectorAll(".rl-lead-card").forEach(function (card) {
+      card.classList.add("is-visible");
+    });
+  }
+
+  initHeroParallax();
+  initLivePreview();
 })();

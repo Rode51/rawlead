@@ -221,17 +221,42 @@ Get-CimInstance Win32_Process | Where-Object {
 
 ---
 
-## Твои шаги (2026-05-28)
+## Твои шаги (2026-05-29)
 
-**Сайт:** [rawlead.ru/lenta](https://rawlead.ru). Волна Coder **принята** — [`STATUS.md`](team/common/STATUS.md). **Stress — после** VPS + polish (O1).
+**План:** O35+O41 prod ✅ → **ты проверяешь UI** → stress → Mechanic audit.
 
-| Сейчас | Действие |
-|--------|----------|
-| 1 | **Site ▶** на ПК — пока нет P5-E2 на VPS |
-| 2 | **@coder** § **P5-E2-VPS** — радары на сервер |
-| 3 | Polish **B1** → **A1** → **C1** — [`OWNER_INTENT`](team/architect/OWNER_INTENT.md) |
-| 4 | **3f** → stress → трафик |
-| 5 | Новые идеи → Lead в **OWNER_INTENT** |
+| # | Сейчас | Действие |
+|---|--------|----------|
+| **1** | **Ты** | Ctrl+F5 https://rawlead.ru/ — hero «Лиды без шума» · белый live preview · «Тарифы ↓» · 390px |
+| **2** | **@coder** | § PRE-PROD-STRESS — **после** твоего OK |
+| **3** | **@mechanic** | O38 audit — после stress |
+
+Theme **v1.9.0** · O41 deploy Lead **2026-05-29** · радар **active**.
+
+~~stress до Wave 2~~ — отменено владельцем 2026-05-29.
+
+**Не трогать:** Site/Legacy ■ на ПК — радар 24/7 только VPS systemd.
+
+### Recraft MCP (Design Wave 2)
+
+| Шаг | Действие |
+|-----|----------|
+| 1 | **Cursor → Reload Window** (или перезапуск) — в MCP должен быть `recraft` |
+| 2 | Новый чат `@designer` → при первой генерации — **OAuth Recraft** в браузере |
+| 3 | Ассеты → `docs/design/assets/` · канон: [`design/assets/README.md`](design/assets/README.md) |
+
+Если credits на **API balance**, а не Studio — см. local setup в [`MCP_POOL.md`](team/common/MCP_POOL.md) § Recraft local.
+
+### Хвост L1 в Neon (153 без ИИ)
+
+**Не паника:** после O34 это **не блокирует** ленту. `/status` пока пугает зря — **O40** починит.
+
+| Шаг | Когда | Действие |
+|-----|-------|----------|
+| 1 | **✅ O40 на VPS** | `/status` — «Без L1 (48 ч)» + «Хвост исторический» (без ложного «конвейер») |
+| 2 | **apply** | Сейчас **`to_clear=0`** — все 153 **моложе 7 дней** в Neon. Повтор `--by-age --days-old 1` когда часть старше 48 ч |
+
+Текущий `--apply` без `--by-age` **не чистит** 153 — все под защитой top-100 id.
 
 ### Пульт Site: «POLL_INTERVAL минимум 10, получено 1»
 
@@ -260,18 +285,33 @@ Get-CimInstance Win32_Process | Where-Object {
 
 ---
 
-### SITE-ACCEPT-GATE — приёмка O23 (сейчас)
+### SITE-ACCEPT-GATE — **✅ закрыт 2026-05-28**
 
-**Free** — a3–a4, a7–a9 (delay, нет кнопки, inbox-ЛК, страницы). **Paid a5–a6** — beta в Neon, не Stars.
+Gate принят. Чеклист: `CODER_PROMPT.md` § **SITE-ACCEPT-GATE** (архив).
 
-| # | Действие |
-|---|----------|
-| 1 | Ctrl+F5 на `/cabinet/` — подтянуть подписку |
-| 2 | Блок «Подписка»: **beta** / «ИИ-агент (владелец)» |
-| 3 | `/lenta/` — кнопка «Написать отклик», без 15-мин gate |
-| 4 | Черновик → inbox → удалить |
+### Coder — **сейчас P0 (TG 500)**
 
-Чеклист: `CODER_PROMPT.md` § **SITE-ACCEPT-GATE**.
+```
+@coder
+Правила: .cursor/rules/coder.mdc
+Задача: docs/team/architect/CODER_PROMPT.md — § TG-AUTH-500-HOTFIX
+Тикет: docs/problems/2026-05-29-cabinet-tg-auth-500.md
+После fix — restart rawlead-api на VPS.
+```
+
+### Lead ops (перед Coder O32)
+
+1. Deploy site radar (O34) на VPS + restart `rawlead-radar`
+2. `clear_l1_backlog.py --profile site --apply`
+3. Theme v1.8.2 уже на prod — **ты:** реальный вход TG на `/cabinet/`
+
+### Mechanic — **аудит O38**
+
+```
+@mechanic
+Тикет: docs/problems/2026-05-29-gemini-full-audit.md (создаст Lead)
+Цель: слабые места код+docs+ops; не дублировать PRE-PROD stress
+```
 
 ---
 

@@ -39,7 +39,14 @@ $lead = rawlead_inner_page_lead($slug);
 			</header>
 			<div class="rl-container rl-inner-body">
 				<div class="entry-content rl-prose">
-					<?php the_content(); ?>
+					<?php
+					$inner_html = rawlead_inner_page_html($slug);
+					if ($inner_html !== null) {
+						echo wp_kses_post($inner_html);
+					} else {
+						the_content();
+					}
+					?>
 				</div>
 			</div>
 		</article>

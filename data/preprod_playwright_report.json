@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-05-28T15:14:03.603080+00:00",
+  "base_url": "https://rawlead.ru",
+  "scenarios_total": 5,
+  "scenarios_pass": 5,
+  "s2_pass": true,
+  "results": [
+    {
+      "name": "lenta_loads",
+      "pass": true,
+      "ms": 6536,
+      "error": null
+    },
+    {
+      "name": "multi_category",
+      "pass": true,
+      "ms": 3390,
+      "error": null
+    },
+    {
+      "name": "skills_apply",
+      "pass": true,
+      "ms": 2703,
+      "error": null
+    },
+    {
+      "name": "cabinet_login_stub",
+      "pass": true,
+      "ms": 271,
+      "error": null
+    },
+    {
+      "name": "no_verdict_chips",
+      "pass": true,
+      "ms": 1661,
+      "error": null
+    }
+  ]
+}

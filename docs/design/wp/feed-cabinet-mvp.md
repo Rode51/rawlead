@@ -1,10 +1,10 @@
-# WP /lenta/ и /cabinet/ — дизайн-спека v2
+# WP /lenta/ и /cabinet/ — дизайн-спека v4
 
-**Статус:** REVOLUTION · 2026-05-28  
-**Токены:** [`../../team/design/DESIGN_SYSTEM.md`](../../team/design/DESIGN_SYSTEM.md) § WP REVOLUTION  
-**Анимации:** [`REFERENCE.md`](REFERENCE.md) § 6  
-**Каталог навыков:** [`../../team/product/SKILLS_TOOLS_CATALOG.md`](../../team/product/SKILLS_TOOLS_CATALOG.md) v0.2  
-**Coder:** промпт от Lead Architect после принятия дизайна
+**Статус:** NEO-BRUTALIST · обновлено 2026-05-29 (WAVE-4-UX-FIX — карточки ЛК, nav, FAB, копирайт)
+**Токены:** [`../../team/design/DESIGNER_PROMPT.md`](../../team/design/DESIGNER_PROMPT.md) § CSS-переменные
+**Анимации:** [`REFERENCE.md`](REFERENCE.md) § 6
+**Каталог навыков:** [`../../team/product/SKILLS_TOOLS_CATALOG.md`](../../team/product/SKILLS_TOOLS_CATALOG.md) v0.2
+**Coder-спека:** [`../../team/design/DESIGNER_PROMPT.md`](../../team/design/DESIGNER_PROMPT.md) § WAVE-4-UX-FIX
 
 ---
 
@@ -12,26 +12,30 @@
 
 | | `/lenta/` | `/cabinet/` |
 |--|-----------|------------|
-| **Доступ** | анон, без входа | только авторизованный |
-| **Лента** | все `is_visible=true` лиды | match по `user_tags`, sort by `final_rank` |
-| **Навыки** | выбор → **сортировка** (лента не пустеет) | редактируемые теги → **фильтр + сортировка** |
-| **Карточка** | закрытая → раскрытие с L1-саммари | то же + match-bar + черновик отклика |
-| **Ощущение** | «открытый рынок» | «мой персональный поток» |
-| **Первый принцип** | **Mobile-first** — thumb-zone, зоны касания ≥ 44px | то же |
+| **Доступ** | анон, без входа | TG Login; anon → редирект |
+| **Лента** | все `is_visible=true` лиды | **inbox откликов** (O23) — не match-лента |
+| **Навыки** | выбор → **сортировка** (лента не пустеет) | collapsed strip → sheet; редактируемые |
+| **Карточка** | закрытая → раскрытие с L1-саммари | заголовок → аккордеон (черновик + [Скопировать] [Удалить]) |
+| **Ощущение** | «открытый рынок» | «мои отклики» — личный inbox |
+| **Первый принцип** | **Mobile-first** — thumb-zone ≥ 44px, viewport 390px | то же |
 
-Обе страницы продуктовые. Фон `#FAFAF8`, без маркетингового шума.
+Обе страницы продуктовые. Стиль: NEO-BRUTALIST (токены из `DESIGNER_PROMPT.md`).
 
 ---
 
 ## 1. Header (тонкий, sticky)
 
 ```
-[RawLead]                                [Войти в кабинет]
+[RawLead]    Лента · Тарифы · Как устроено    [Войти →]
 ```
 
-- Фон `#FAFAF8`, `border-bottom: 1px solid #E4E4E7` при `scrollY > 0`
+- Фон `#FAFAF8`, `border-bottom: 2px solid #0A0A0A` при `scrollY > 0` (NEO)
 - Высота: 56px desktop / 52px mobile
-- На `/cabinet/`: «Войти в кабинет» → имя пользователя + «Выйти»
+- Nav-пункты: **Лента · Тарифы · Как устроено** — на **всех страницах** включая `/lenta/`
+- На `/cabinet/`: «Войти →» → «@username · Выйти»
+- Active nav-item: `text-decoration: underline 2px solid #0A0A0A`
+
+> **WAVE-4 fix:** на `/lenta/` навигация полная (Тарифы + Как устроено) — не только лого+кнопка.
 
 ---
 
@@ -57,7 +61,7 @@
 │  ┌─ Card ─────────┐  ┌─ Card ─────────┐                 │
 │  │  (expanded)    │  │                │                 │
 │  └────────────────┘  └────────────────┘                 │
-│  ...infinite scroll...                                   │
+│  [Загрузить ещё →]  Показано N из M  (Wave 2, не infinite scroll) │
 └──────────────────────────────────────────────────────────┘
 
 [?]  ← Report bug FAB, fixed bottom-right
@@ -253,52 +257,142 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 
 ---
 
-## 4. Страница `/cabinet/`
+## 4. Страница `/cabinet/` (O23 — inbox откликов)
 
-### 4.1 Layout
+**Канон:** Product §0j/0k · LEAD_DESIGN_PROMPT § CABINET-INBOX-UI · § C1-MOBILE-UX  
+**ЛК ≠ вторая лента match** — карточки match из O22/LK-FEED сняты.
+
+### 4.1 Три состояния
+
+#### STATE 1 — Anon (не авторизован)
 
 ```
-┌─ Header (sticky, 56px) ──────────────────────────────┐
-│ RawLead                          Иван И. · [Выйти]   │
+┌─ Header (sticky, 48px mobile / 56px desktop) ────────┐
+│ RawLead                                   [Войти]     │
 └──────────────────────────────────────────────────────┘
-┌─ My Skills (sticky, min-height 48px) ───────────────┐
-│ [python ×] [figma ×] [seo ×]  [+ Добавить навык]    │
+┌─ Page content, max-width 560px, центр ──────────────┐
+│                                                      │
+│  Войдите через Telegram                              │
+│  чтобы сохранять отклики                             │
+│                                                      │
+│  [Войти через Telegram →]   ← full-width pill 52px   │
+│                                                      │
+│  или [Смотреть ленту →]                              │
 └──────────────────────────────────────────────────────┘
-┌─ Filter Bar (sticky, 52px) — та же что на /lenta/ ─┐
-│ [Все] [Разработка] ...  [Навыки ▾] [Сортировка ▾]   │
+```
+
+**TG Login кнопка:** `.rl-tg-login-btn` — кастомная, full-width, deep link в TG. **Без** iframe Telegram-Widget.
+
+#### STATE 2 — Free (TG login, подписка не активна)
+
+```
+┌─ Header (sticky) ────────────────────────────────────┐
+│ RawLead                         Иван И. · [Выйти]    │
 └──────────────────────────────────────────────────────┘
-┌─ Page content, max-width 900px ─────────────────────┐
-│  H1 «Мои заказы»                                     │
-│  ┌─ Card + match-bar ──┐  ┌─ Card + match-bar ──┐   │
-│  │ match: 92%          │  │ match: 78%           │   │
-│  └─────────────────────┘  └─────────────────────┘   │
+┌─ Page content, max-width 640px ─────────────────────┐
+│                                                      │
+│ [python ×] [figma ×]  [+ Добавить] ← collapsed row  │
+│                                                      │
+│ ┌─ Подписка ────────────────────────────────────┐   │
+│ │ ИИ-агент  590–990 ₽/мес                        │   │
+│ │ Мгновенная лента · Отклики · Push в TG          │   │
+│ │ [Попробовать →]                                 │   │
+│ └─────────────────────────────────────────────────┘  │
+│                                                      │
+│ ┌─ Мои отклики ─────────────────────────────────┐   │
+│ │ 🔒 Доступно с подпиской                        │   │
+│ │ Получите мгновенную ленту и кнопку «Написать   │   │
+│ │ отклик» на каждом заказе                       │   │
+│ └─────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────┘
+```
+
+#### STATE 3 — Paid (is_active = true)
+
+```
+┌─ Header (sticky) ────────────────────────────────────┐
+│ RawLead                         Иван И. · [Выйти]    │
+└──────────────────────────────────────────────────────┘
+┌─ Page content, max-width 640px ─────────────────────┐
+│                                                      │
+│ [python ×] [figma ×]  [+ Добавить] ← collapsed row  │
+│                                                      │
+│ ┌─ Подписка ──────────────────────────────────── ┐  │
+│ │ ✅ ИИ-агент активна  · [Пауза] [Управление]    │  │
+│ └────────────────────────────────────────────────┘  │
+│                                                      │
+│ Мои отклики (3)                                      │
+│                                                      │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Верстка лендинга · FL.ru · 27 мая               │ │
+│ │ [▼ Показать черновик]                           │ │
+│ └─────────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Бот для мониторинга чатов · Kwork · 26 мая      │ │
+│ │ [▼ Показать черновик]                           │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                      │
 └──────────────────────────────────────────────────────┘
 [?] FAB
 ```
 
-### 4.2 «Мои навыки» — sticky strip
+### 4.2 Навыки-строка (collapsed)
 
 ```
-Мои навыки:  [python ×]  [figma ×]  [seo ×]  [+ Добавить навык]
+[python ×]  [figma ×]  [seo ×]  [+ Добавить]
 ```
 
 | Элемент | Стиль |
 |---------|-------|
-| Strip фон | `#FAFAF8`, border-bottom `1px solid #E4E4E7` |
-| Chip активный | bg `#EEF2FF`, text `#4F46E5`, border `#C7D2FE`, `×` справа |
-| Hover на чипе | `×` ярче opacity 1.0; bg `#E0E7FF` |
-| `[+ Добавить навык]` | outline pill `#4F46E5`; клик → inline input с autocomplete из каталога |
-| Без навыков | «Добавьте навыки, чтобы видеть персональную ленту» + CTA |
-| После изменения | лента перезагружается (spinner 300ms) |
+| Контейнер | 1 строка, overflow hidden; `min-height: 44px` |
+| Chip активный | NEO: bg `var(--rl-chip-skill-bg)`, border `var(--rl-border)`, text `var(--rl-chip-skill-txt)` |
+| `[+ Добавить]` | ghost btn + border; клик → sheet с autocomplete из каталога |
+| Mobile | tap на любой части строки → full-sheet навыков |
 
-**Добавление навыка:** input с autocomplete из `SKILLS_TOOLS_CATALOG` (title_ru + canonical_tag). Hint: «Начни вводить: python, figma, seo…»
+**Добавление навыка:** sheet с autocomplete из `SKILLS_TOOLS_CATALOG`. Hint: «Начни вводить: python, figma, seo…»
 
-### 4.3 Пустые состояния
+### 4.3 Inbox карточка отклика
 
-| Ситуация | UI |
-|----------|----|
-| Нет навыков | Иконка `☁` + «Добавьте навыки профиля» + [Добавить] |
-| Навыки есть, нет матчей | Иконка `🔍` + «Пока нет заказов по вашим навыкам — попробуйте расширить» + [Изменить навыки] |
+**Закрытое состояние:**
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Верстка лендинга на WordPress   · FL.ru · 27 мая   │
+│  [▼ Показать черновик]                              │
+└─────────────────────────────────────────────────────┘
+```
+
+**Раскрытое (аккордеон):**
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Верстка лендинга на WordPress   · FL.ru · 27 мая   │
+│  [▲ Скрыть]                                         │
+│  ─────────────────────────────────────────────────  │
+│  «Здравствуйте. Готов реализовать задачу по          │
+│  вёрстке лендинга по макету Figma...»               │
+│                                                      │
+│  [Скопировать текст]        [Удалить из ЛК]          │
+└─────────────────────────────────────────────────────┘
+```
+
+| Элемент | Стиль |
+|---------|-------|
+| Карточка | NEO: border `var(--rl-border-width) solid var(--rl-border)`, shadow `var(--rl-shadow-card)`, radius `var(--rl-radius-card)` |
+| Заголовок | Manrope 15px/600, `var(--rl-text-primary)` |
+| Мета | источник badge + дата Manrope 12px, `var(--rl-text-muted)` |
+| Черновик | Manrope 13px/400, `var(--rl-text-body)`; placeholder «Черновик появится после анализа» |
+| [Скопировать] | `.rl-btn--secondary`, min-height 44px |
+| [Удалить из ЛК] | `.rl-btn--ghost`, red text `#DC2626`; confirm inline «Удалить?» |
+| Анимация | `grid-template-rows: 0fr → 1fr`, opacity 0→1, 280ms ease-out |
+| Mobile padding | `16px 18px` |
+
+### 4.4 Пустые состояния
+
+| Состояние | UI |
+|-----------|----|
+| Paid, inbox пуст | «Пока нет откликов — напиши первый на ленте →» + ghost link `/lenta/` |
+| Free, inbox locked | «Доступно с подпиской [590 ₽/мес]» + CTA |
 | Загрузка | 2 skeleton-карточки |
 
 ---
@@ -351,15 +445,90 @@ Mobile: bottom: 80px (над thumb-zone), right: 16px
 
 ---
 
-## 7. Handoff
+## 7. Mobile C1 — acceptance layer (390×844)
 
-| Кому | Что |
-|------|-----|
-| **Designer** | CSS REVOLUTION: новые токены (фон, тени, Indigo), filter bar, skill chips, card v2 — `DESIGNER_PROMPT.md` |
-| **Coder (через Lead Architect)** | PHP-шаблоны, JS filter bar, skills dropdown, API `/v1/feedback`, bottom sheet, match-bar animate |
+**Scope:** WP-сайт на телефоне. Канон: LEAD_DESIGN_PROMPT § C1-MOBILE-UX.
 
-Coder: `CODER_PROMPT.md` § PRE-LAUNCH-UX — после приёмки Designer CSS.
+### 7.1 Touch targets
+
+- Все интерактивные элементы: `min-height: 44px`, `min-width: 44px`
+- Кнопки в карточке: min-height `44px`
+- Chip навыка: min-height `36px` (допустимо в плотной группе)
+
+### 7.2 Bottom sheets — спека
+
+| Sheet | Тригер | Размер | Содержимое |
+|-------|--------|--------|------------|
+| **Навыки** | `[Навыки▾]` в filter bar | Full-sheet `95vh` | Табы категорий → чипы по нише → sticky [Применить →] 52px |
+| **Сортировка** | `[Сорт▾]` в filter bar | Half-sheet `40vh` | 2 radio варианта: «Новые» / «По совместимости» |
+| **Навыки кабинета** | tap на collapsed skills row | Full-sheet `95vh` | autocomplete input + текущие чипы + [Сохранить] |
+
+**CSS (все sheets):**
+- `position: fixed; bottom: 0; left: 0; right: 0`
+- `border-radius: 4px 4px 0 0` (NEO: без скругления на bottom)
+- Handle: `width 40px; height 4px; bg var(--rl-border-light)` — по центру сверху
+- Overlay: `rgba(0,0,0,0.5)` → tap закрывает
+- Transform: `translateY(100%)` → `translateY(0)`, 280ms ease-out
+- `overscroll-behavior: contain`
+
+### 7.3 TWO-SPEEDS strip (mobile)
+
+```
+┌─────────────────────────────────────────────────────┐
+│ ⏱ Обновляется раз в 15 мин · Подробнее →            │
+└─────────────────────────────────────────────────────┘
+```
+
+- Позиция: под `.rl-filter-bar`, **не sticky**
+- Стиль: Manrope 13px, `var(--rl-text-muted)`, padding `8px 16px`
+- «Подробнее →» → ghost link `/pricing/`
+- Desktop: та же строка (не sticky на обоих)
+
+### 7.4 Hero mobile (лендинг)
+
+```
+┌─────────────────────────────────────────────────────┐
+│                                                      │
+│  Лиды без шума                  ← H1 32px/800        │
+│                                                      │
+│  Биржи и Telegram —             ← 16px/400           │
+│  в одной ленте. ИИ убирает      ← 2 строки          │
+│  мусор до тебя.                                      │
+│                                 ← gap 32px           │
+│  [Смотреть ленту →]             ← full-width 52px    │
+│                                 ← gap 12px           │
+│  [Смотреть тарифы ↓]            ← full-width 48px    │
+│                                                      │
+└─────────────────────────────────────────────────────┘
+```
+
+- `padding-top: 24px` (не 80px как desktop)
+- CTA stack: `display: flex; flex-direction: column; gap: 12px`
+- Live preview: **2 карточки** под hero, не pointer-events
+
+### 7.5 TG Login кнопка (все состояния)
+
+```html
+<a href="tg://resolve?domain=rawlead_bot" class="rl-tg-login-btn">
+  Войти через Telegram →
+</a>
+```
+
+- Class: `.rl-tg-login-btn` — full-width, `min-height: 52px`, NEO primary style
+- **Без** `<script async src="https://telegram.org/js/telegram-widget.js">` — не используем
+- Fallback для desktop: та же кнопка, `max-width: 400px`
 
 ---
 
-_Lead Designer · REVOLUTION · 2026-05-28_
+## 8. Handoff
+
+| Кому | Что |
+|------|-----|
+| **Designer** | CSS NEO-BRUTALIST + Mobile C1: DESIGNER_PROMPT.md T1–T16 |
+| **Coder (через Lead Architect)** | PHP-шаблоны (3 состояния cabinet), JS filter bar + sheets, inbox accordion, TG deep link, TWO-SPEEDS strip, API `/v1/feedback` |
+
+Coder: `CODER_PROMPT.md` § PRE-LAUNCH-UX + § CABINET-INBOX-O23 — после приёмки Designer CSS.
+
+---
+
+_Lead Designer · NEO-BRUTALIST + O23 + C1 · 2026-05-29_

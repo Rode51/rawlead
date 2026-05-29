@@ -120,16 +120,20 @@
 
 | Token | Значение | Применение |
 |-------|----------|------------|
-| `motion/duration/appear` | `200ms` | fade+translate при скролле |
+| `motion/duration/appear` | `320ms` | карточка ленты: fade+translateY(24px) |
+| `motion/duration/section` | `400ms` | секция лендинга `.rl-reveal` |
 | `motion/duration/expand` | `280ms` | раскрытие карточки лида |
-| `motion/duration/bar` | `500ms` | fill match-bar |
+| `motion/duration/bar` | `600ms` | fill match-bar (viewport trigger) |
+| `motion/duration/perfect` | `700ms` | pulse ring 100% match |
 | `motion/duration/press` | `60ms` | micro-press кнопок |
 | `motion/duration/hover` | `120ms` | hover карточки |
 | `motion/duration/sheet` | `280ms` | bottom sheet mobile |
 | `motion/easing/default` | `ease-out` | всё движение |
-| `motion/stagger/card` | `40ms` | задержка между карточками |
-| `motion/scale/press` | `0.97` | scale при клике |
+| `motion/stagger/card` | `60ms` × n (max 4 шагов) | карточки 2–5 в ряду |
+| `motion/scale/press` | `0.96` | scale при клике `.rl-btn` |
 | `motion/lift/hover` | `translate(-2px, -2px)` | сдвиг карточки при hover (брутал-стиль) |
+
+Спека Wave 2: [`../../design/wp/wave-2-css-brief.md`](../../design/wp/wave-2-css-brief.md)
 
 Пульт (тёмный `#0c0e13`) и сайт — **разные поверхности**; не смешивать без запроса Lead.
 
@@ -145,3 +149,4 @@
 | 2026-05-25 | WordPress сайт v2 | Исправлен цвет FL.ru, TG; motion-токены; /feed + /cabinet |
 | 2026-05-28 | WordPress REVOLUTION | Тёплый Indigo; Manrope; shadow-cards; mobile-first — **отменено** |
 | 2026-05-28 | WordPress NEO-BRUTALIST | Белая база; жёлтый `#FACC15` hero; чёрные рамки; плоские тени; кнопка black→yellow |
+| 2026-05-29 | WordPress Wave 2 motion | IO stagger, match-bar 600ms, perfect pulse, load-more; brief `wave-2-css-brief.md` |

@@ -675,63 +675,151 @@ add_action('rest_api_init', static function (): void {
 
 
 
-    register_rest_route('rawlead/v1', '/me/leads/(?P<lead_id>\d+)/draft', [
+    $draft_route_args = [
 
-        'methods'             => 'POST',
+        'lead_id' => ['type' => 'integer', 'required' => true, 'minimum' => 1],
 
-        'permission_callback' => '__return_true',
+    ];
 
-        'args'                => [
+    $draft_proxy = static function (WP_REST_Request $request, string $method): WP_REST_Response|WP_Error {
 
-            'lead_id' => ['type' => 'integer', 'required' => true, 'minimum' => 1],
+        if (rawlead_api_bearer_from_request($request) === '') {
 
-        ],
+            return new WP_Error('rawlead_auth', 'Login required', ['status' => 401]);
 
-        'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+        }
 
-            if (rawlead_api_bearer_from_request($request) === '') {
+        $lead_id = (int) $request->get_param('lead_id');
 
-                return new WP_Error('rawlead_auth', 'Login required', ['status' => 401]);
+        $url = rawlead_api_base_url() . '/v1/me/leads/' . $lead_id . '/draft';
 
-            }
+        $headers = rawlead_api_user_headers($request, false);
 
-            $lead_id = (int) $request->get_param('lead_id');
+        $timeout = $method === 'POST' ? 90 : 20;
 
-            $url = rawlead_api_base_url() . '/v1/me/leads/' . $lead_id . '/draft';
+        if ($method === 'POST') {
 
             $response = wp_remote_post($url, [
 
-                'timeout' => 90,
+                'timeout' => $timeout,
 
-                'headers' => rawlead_api_user_headers($request, false),
+                'headers' => $headers,
 
             ]);
 
-            if (is_wp_error($response)) {
+        } else {
 
-                return $response;
+            $response = wp_remote_get($url, [
+
+                'timeout' => $timeout,
+
+                'headers' => $headers,
+
+            ]);
+
+        }
+
+        if (is_wp_error($response)) {
+
+            return $response;
+
+        }
+
+        $code = (int) wp_remote_retrieve_response_code($response);
+
+        $raw = wp_remote_retrieve_body($response);
+
+        $data = json_decode($raw, true);
+
+        if ($code < 200 || $code >= 300) {
+
+            $detail = '';
+
+            $retry_after = null;
+
+            if (is_array($data)) {
+
+                if (isset($data['detail'])) {
+
+                    if (is_string($data['detail'])) {
+
+                        $detail = $data['detail'];
+
+                    } elseif (is_array($data['detail'])) {
+
+                        $detail = (string) ($data['detail']['detail'] ?? 'API error');
+
+                        $retry_after = $data['detail']['retry_after_sec'] ?? null;
+
+                    }
+
+                }
+
+                if ($retry_after === null && isset($data['retry_after_sec'])) {
+
+                    $retry_after = $data['retry_after_sec'];
+
+                }
 
             }
 
-            $code = (int) wp_remote_retrieve_response_code($response);
+            if ($detail === '' && is_string($raw) && $raw !== '') {
 
-            $raw = wp_remote_retrieve_body($response);
-
-            $data = json_decode($raw, true);
-
-            if ($code < 200 || $code >= 300) {
-
-                $detail = is_array($data) && isset($data['detail']) ? (string) $data['detail'] : $raw;
-
-                return new WP_Error('rawlead_api_http', $detail ?: 'API error', ['status' => $code]);
+                $detail = $raw;
 
             }
 
-            $data = is_array($data) ? $data : [];
+            $err_data = ['status' => $code];
 
-            return new WP_REST_Response($data, 200);
+            if ($retry_after !== null) {
 
-        },
+                $err_data['retry_after_sec'] = (int) $retry_after;
+
+            }
+
+            return new WP_Error('rawlead_api_http', $detail ?: 'API error', $err_data);
+
+        }
+
+        $data = is_array($data) ? $data : [];
+
+        return new WP_REST_Response($data, $code);
+
+    };
+
+    register_rest_route('rawlead/v1', '/me/leads/(?P<lead_id>\d+)/draft', [
+
+        [
+
+            'methods'             => 'GET',
+
+            'permission_callback' => '__return_true',
+
+            'args'                => $draft_route_args,
+
+            'callback'            => static function (WP_REST_Request $request) use ($draft_proxy): WP_REST_Response|WP_Error {
+
+                return $draft_proxy($request, 'GET');
+
+            },
+
+        ],
+
+        [
+
+            'methods'             => 'POST',
+
+            'permission_callback' => '__return_true',
+
+            'args'                => $draft_route_args,
+
+            'callback'            => static function (WP_REST_Request $request) use ($draft_proxy): WP_REST_Response|WP_Error {
+
+                return $draft_proxy($request, 'POST');
+
+            },
+
+        ],
 
     ]);
 
@@ -1109,6 +1197,76 @@ add_action('rest_api_init', static function (): void {
 
         ],
 
+    ]);
+
+    register_rest_route('rawlead/v1', '/me/notification-settings', [
+        [
+            'methods'             => 'GET',
+            'permission_callback' => '__return_true',
+            'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+                if (rawlead_api_bearer_from_request($request) === '') {
+                    return new WP_Error('rawlead_auth', 'Login required', ['status' => 401]);
+                }
+                $url = rawlead_api_base_url() . '/v1/me/notification-settings';
+                $response = wp_remote_get($url, [
+                    'timeout' => 20,
+                    'headers' => rawlead_api_user_headers($request, false),
+                ]);
+                if (is_wp_error($response)) {
+                    return $response;
+                }
+                $code = (int) wp_remote_retrieve_response_code($response);
+                $raw = wp_remote_retrieve_body($response);
+                $data = json_decode($raw, true);
+                if ($code < 200 || $code >= 300) {
+                    $detail = is_array($data) && isset($data['detail']) ? (string) $data['detail'] : $raw;
+                    return new WP_Error('rawlead_api_http', $detail ?: 'API error', ['status' => $code]);
+                }
+                return new WP_REST_Response(is_array($data) ? $data : [], 200);
+            },
+        ],
+        [
+            'methods'             => 'PATCH',
+            'permission_callback' => '__return_true',
+            'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+                if (rawlead_api_bearer_from_request($request) === '') {
+                    return new WP_Error('rawlead_auth', 'Login required', ['status' => 401]);
+                }
+                $body = $request->get_json_params();
+                if (!is_array($body)) {
+                    $body = [];
+                }
+                $url = rawlead_api_base_url() . '/v1/me/notification-settings';
+                $response = wp_remote_request($url, [
+                    'method'  => 'PATCH',
+                    'timeout' => 20,
+                    'headers' => array_merge(
+                        rawlead_api_user_headers($request, false),
+                        ['Content-Type' => 'application/json']
+                    ),
+                    'body'    => wp_json_encode($body),
+                ]);
+                if (is_wp_error($response)) {
+                    return $response;
+                }
+                $code = (int) wp_remote_retrieve_response_code($response);
+                $raw = wp_remote_retrieve_body($response);
+                $data = json_decode($raw, true);
+                if ($code < 200 || $code >= 300) {
+                    $detail = is_array($data) && isset($data['detail']) ? (string) $data['detail'] : $raw;
+                    return new WP_Error('rawlead_api_http', $detail ?: 'API error', ['status' => $code]);
+                }
+                return new WP_REST_Response(is_array($data) ? $data : [], 200);
+            },
+        ],
+    ]);
+
+    register_rest_route('rawlead/v1', '/support', [
+        'methods'             => 'POST',
+        'permission_callback' => '__return_true',
+        'callback'            => static function (): WP_REST_Response {
+            return new WP_REST_Response(['ok' => true], 200);
+        },
     ]);
 
 });

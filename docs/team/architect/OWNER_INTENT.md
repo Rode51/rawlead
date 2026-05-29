@@ -47,13 +47,20 @@
 | **O21** | **Перед трафиком — один прогон «ИИ-тестировщика»** + нагрузочный stress | § **PRE-PROD-UX-AUDIT** + § **PRE-PROD-STRESS** · **после** финала Coder (O20 волна 4) |
 | **O22** | **ЛК:** sort + min_match 30–100% | § **LK-FEED-FILTERS** · **⚠️ cabinet-feed отменён → O23** |
 | **O23** | **Лента = feed; ЛК = inbox откликов** | § **CABINET-INBOX-O23** · **Free TG без Stars = anon** (15 мин, без кнопки) **✅ владелец** |
-| **O24** | **Каталог навыков v0.3:** 4 ниши, 2 уровня, ≤6 тегов, один `llm_integration`, без абстракций в UI | § **TAGS-V0.3** · **✅ Lead verify 2026-05-28** |
+| **O24** | **Каталог навыков v0.3:** 4 ниши, 2 уровня, ≤6 тегов → **O46 cap 12**, один `llm_integration`, без абстракций в UI | § **TAGS-V0.3** · **✅ Lead verify 2026-05-28** |
 | **O25** | **Синтетические просмотры** на карточке: ~30 «онлайн», выше на delay-ленте, без палева | § **FEED-CARD-UX** f1–f2 |
 | **O26** | **100% match** — особое выделение карточки (`keyword_match === 100`) | § **FEED-CARD-UX** · **✅ Lead verify** |
 | **O27** | **L2 инструменты** на карточке — не только черновик | § **L2-TOOLS-FIX** · **→ Coder до Design** |
 | **O28** | **Push match** в @rawlead_bot подписчикам | § **3f-A4-MATCH-PUSH** · **→ Coder до Design** |
 | **O29** | **Stars** — живая оплата (не заглушка) | § **3f-C-STARS** P0 · **→ Coder до Design** |
 | **O30** | **Push match:** не top-3 глобально — **каждому paid** при `keyword_match ≥ порог`; порог **настраивает пользователь** (default **60%**, диапазон 30–100) | § **MATCH-PUSH-V2** · отменяет top-K=3 (O28 MVP) |
+| **O46** | **Match F2:** `km = matched/lead_tags×100` · «ИДЕАЛЬНО ✦» только при ≥2 тегах лида и полном покрытии · cap навыков **12** | § **PRE-STRESS-PACK O42** · 2026-05-29 |
+| **O47** | **L1 tags strict:** Joomla/Bitrix ≠ wordpress_dev · post-validate · golden tests | § **PRE-STRESS-WAVE-2** · **P0 до stress** |
+| **O48** | **Draft reliability:** log 503 · retry · rate limit · UI «Повторить» · scale | § **PRE-STRESS-WAVE-2** · **P0** |
+| **O49** | **L2 premium v2:** без «Готов…» · шаги · 9/10 quality | § **PRE-STRESS-WAVE-2** |
+| **O50** | **TG push:** полная карточка + callback «Сгенерировать» → draft в TG + ЛК | § **PRE-STRESS-WAVE-2** |
+| **O51** | **ЛК grid 2 col** как лента | § **PRE-STRESS-WAVE-2** |
+| **O38** | **Gemini audit + вся AI-логика** перед stress · strong agent | `problems/2026-05-29-gemini-full-audit.md` |
 
 ---
 
@@ -134,6 +141,29 @@
 |----|--------|------|-----|
 | **C1** | Mobile UX пересбор | E-polish | @lead-designer → @coder |
 
+### § C1 — Mobile UX сайта (NEO + E-polish)
+
+**Не путать:** это **не** «Контур 1» (Legacy-радар / @FLPARSINGBOT) и **не** отдельный «Conversion 1».  
+**C1** = **Wave C, пункт 1** в E-polish — **mobile-first пересбор WP-сайта** rawlead.ru.
+
+**Область:** `/lenta/`, `/cabinet/`, лендинг `/`, `/how/`, `/pricing/`, `/faq/` — viewport **390×844** (iPhone-class).
+
+**Не в scope C1:** desktop-пульт Tauri (`desktop/`), Legacy/Site радары, TG-бот UI.
+
+| Поверхность | Что проверить / пересобрать |
+|-------------|----------------------------|
+| **`/lenta/`** | sticky header + filter bar; горизонтальный скролл категорий; sheet «Навыки» / «Сортировка»; карточки 1 col; thumb-zone кнопок; FAB «Сообщить об ошибке» не перекрывает контент |
+| **`/cabinet/`** | skills modal **сверху** (не bottom sheet); inbox компактный список; блоки подписка/уведомления stack на узком экране |
+| **Лендинг** | hero readable; CTA «Смотреть ленту» / «Войти в кабинет»; без горизонтального скролла страницы |
+| **TG-login** | виджет не обрезан; после login — redirect в `/cabinet/` без поломки layout |
+| **Touch** | min tap target ~44px; dropdown/sheet закрывается tap outside (см. D1) |
+
+**Канон mobile:** [`LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) § структура `/lenta/` · [`REFERENCE.md`](../../design/wp/REFERENCE.md) v4 · NEO-BRUTALIST tokens.
+
+**Handoff Coder:** после CSS-спеки в `DESIGNER_PROMPT.md` → § **PRE-LAUNCH-UX** (mobile чек-лист u2).
+
+**Решение владельца (журнал 2026-05-28):** «Mobile UX пересобрать» — в рамках NEO, не отдельный продуктовый pivot.
+
 ---
 
 ## Очередь инженерии (roadmap, не чат)
@@ -187,9 +217,47 @@
 | 2026-05-28 | Просмотры: eye icon, рост по age, не 36 на «только что» | **O25b** · § FEED-CARD-UX |
 | 2026-05-28 | Карточка: 100% match — особое выделение | **O26** · § FEED-CARD-UX · ✅ Lead verify |
 | 2026-05-28 | **До Design:** L2 tools на карточке, push бота, Stars — не заглушка | **O27–O29** · § PRE-DESIGN-BLOCKERS |
-| 2026-05-28 | Push: **не top-3** — всем paid при match ≥ порога; порог user (default 60%) | **O30** · § MATCH-PUSH-V2 |
+| 2026-05-28 | **Push:** не top-3 — всем paid при match ≥ порога; порог user (default 60%) | **O30** · § MATCH-PUSH-V2 |
+| 2026-05-28 | **Gate ✅** — функции сайта приняты на prod; старт Design + PM | **O20** · § SITE-ACCEPT-GATE |
+| 2026-05-29 | В ленте «только Kwork» — проверить FL fetch + L1→visible; не путать с «парсер мёртв» | **O31** · § FEED-FRESHNESS · § FL-VISIBILITY-CHECK |
+| 2026-05-29 | **Pipeline:** dedup→filter→Neon→L1 parallel, **без очереди** на новых; drain off site | **O34** · § PIPELINE-INSTANT-O34 |
+| 2026-05-29 | ~~Instant feed O33~~ | заменено **O34** |
+| 2026-05-29 | **`/status` пересобрать** — читаемый, блоками, правильный бот | **O32** · § BOT-STATUS-V2 |
+| 2026-05-29 | **План дня:** UI/UX волна 2 · TG-регистрация · stress · аудит Gemini 2M | **O35–O38** · см. § «План дня» ниже |
+| 2026-05-29 | **Ускорить ленту, но стабильно** | **O39** ✅ deploy · цикл **~71 с** |
+| 2026-05-29 | **Stress не сейчас** — сначала Wave 2 UI/UX | **O35** · O37 ⏸ |
+| 2026-05-29 | **Хвост 153 без L1** — clear по возрасту, не токенами ИИ | **O40** · § BACKLOG-TAIL-CLEAR · параллельно Design |
+| 2026-05-29 | **Wave 2 prod ✅** — сначала добить вопросы с Designer, потом дальше (stress/Coder) | **O35f** · O37 ⏸ до UI OK |
+| 2026-05-29 | **Wave 2 недостаточно** — белая карточка на жёлтом «ущербно»; хочет Gumroad-level; hero + card preview пересобрать | **O41** · → @lead-designer Wave 3 brief |
+| 2026-05-29 | **Радар молчал ~42 мин** — CRLF deploy/*.sh exit 127 | **✅ fix Lead ops** · STATUS INCIDENT |
+
+### План дня владельца (2026-05-29)
+
+| # | Намерение | Lead-решение | Кто | Когда |
+|---|-----------|--------------|-----|-------|
+| **O35** | Wave 2 UI/UX theme | Coder v1.9.0 + deploy VPS | **✅ prod** |
+| **O35f** | Вопросы по UI с Designer | @lead-designer / @designer | **→ сейчас** |
+| **O37** | Stress test | § PRE-PROD-STRESS | **⏸ после O38** |
+| **O38** | Полный аудит Gemini ~2M | [`problems/2026-05-29-gemini-full-audit.md`](../../problems/2026-05-29-gemini-full-audit.md) | **⏸ после приёмки O42–O45** |
+
+**Порядок (обновлено 2026-05-29):** **O42–O45** Coder → **приёмка владельца** → **O38 audit** → **O37 stress**.
+
+**Не параллелить в Coder:** один чат = одна задача (`SCALE.md`).
 
 *Дописывай новые строки снизу; не удаляй старые без согласия владельца.*
+
+| 2026-05-29 | **PRE-STRESS-PACK** | Match F1–F4 · Push · L2 · `/ops/` admin | **O42–O45** → приёмка → **O38** → O37 |
+| 2026-05-29 | **O52c отменено** | ИДЕАЛЬНО ✦ только ≥2 тега (F2) — 100% с 1 тегом без ✦ OK |
+| 2026-05-29 | **Wave-2 accept** | O52–O58 · theme v1.10.9 | **✅ закрыта** |
+| 2026-05-29 | **O38 scope+** | Mechanic: код + ИИ + **docs drift** + **product drift** (`PRODUCT_VISION` §0d vs prod) | **→ Mechanic** |
+| 2026-05-29 | **O56+O57 deploy** | async · shared draft · v1.10.8 · pro model VPS | **✅** |
+| 2026-05-29 | **O57 SHARED DRAFT** | Один L2 на lead · всем один черновик · cache `leads.reply_draft` | **→ O56+O57** |
+| 2026-05-29 | **O56 accept v5** | Async draft · uniform collapsed · expand after reply | **O56** |
+| 2026-05-29 | **O54 accept v3** | Сосед не растягивается · черновик без срока/цены | **✅ v1.10.6** |
+| 2026-05-29 | **O53 accept v2** | Карточка in-cell · ₽ not Р · decode HTML · ЛК = лента без глаза | **✅ v1.10.5** |
+| 2026-05-29 | **Match формула A** | % от тегов **лида** · cap 6→**12** | **O42** ✅ F2 |
+| 2026-05-29 | **Admin /ops/** | VPS · только owner TG | **O45** ✅ scope |
+| 2026-05-29 | **WAVE-4-MICRO** | FAB → окно чата (stub ok) · навыки ленты ≠ ЛК · «Мои навыки» на ленте · modal ЛК по центру · убрать hero-счётчик | → `CODER_PROMPT` § WAVE-4-MICRO |
 
 ---
 

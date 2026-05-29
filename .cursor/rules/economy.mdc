@@ -9,7 +9,9 @@ alwaysApply: true
 
 ## Обязательное чтение
 
-**Lead Product / Lead Designer / Lead Architect** — Read по таблице § «Включение» в своём `.mdc` (vision, ниша). Первый ответ: `Прочитал: …` → дело.
+**Lead Product / Lead Designer / Lead Architect** — Read **блоки A+B+C** из § «Онбординг» в своём `.mdc`. Первый ответ: `Прочитал: …` + **`Сейчас на prod: …`** → дело.
+
+**Design — не путать файлы:** [`docs/team/design/LEAD_DESIGN.md`](docs/team/design/LEAD_DESIGN.md) § «Один активный план» · WP = `docs/design/wp/` · `DESIGN_BRIEF.md` = **только пульт**.
 
 **Coder / Mechanic / Designer-исполнитель** — **только** промпт задачи + `STATUS` (и тикет для Mechanic). Vision и `KAK_ETO` **не читать**, если не указано в промпте.
 

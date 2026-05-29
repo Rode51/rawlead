@@ -202,7 +202,7 @@ _V02_MERGE_ALIASES: dict[str, str] = {
     "resume_cv_writing": "technical_writing",
 }
 
-_USER_MAX_TAGS = 6
+_USER_MAX_TAGS = 12
 
 # Tier A default per niche (picker)
 TIER_A_BY_NICHE: dict[str, tuple[str, ...]] = {
@@ -281,7 +281,7 @@ def category_for_canonical_tag(canonical: str) -> str | None:
 
 
 def user_tags_input_count(raw_tags: list[str]) -> int:
-    """Число уникальных canonical после merge (до обрезки max 6)."""
+    """Число уникальных canonical после merge (до обрезки max 12)."""
     seen: set[str] = set()
     for raw in normalize_tags(raw_tags):
         canonical = resolve_canonical_tag(raw)
@@ -291,7 +291,7 @@ def user_tags_input_count(raw_tags: list[str]) -> int:
 
 
 def normalize_user_tags(raw_tags: list[str]) -> list[str]:
-    """user_tags: v0.2→v0.3 merge, canonical only, max 6."""
+    """user_tags: v0.2→v0.3 merge, canonical only, max 12."""
     out: list[str] = []
     seen: set[str] = set()
     for raw in normalize_tags(raw_tags):
@@ -353,6 +353,32 @@ def partition_lead_tags(raw_tags: list[str]) -> tuple[tuple[str, ...], tuple[str
     if "llm_integration" in known and "api_integration" in known:
         known = [t for t in known if t != "api_integration"]
     return tuple(known[:_L1_MAX_TAGS]), tuple(pending)
+
+
+_CMS_NON_WP_MARKERS = ("joomla", "bitrix", "opencart", "baforms")
+
+
+def _text_has_non_wp_cms(title: str, snippet: str) -> bool:
+    hay = f"{title or ''}\n{snippet or ''}".casefold()
+    return any(m in hay for m in _CMS_NON_WP_MARKERS)
+
+
+def sanitize_l1_cms_tags(
+    lead_tags: tuple[str, ...],
+    *,
+    title: str = "",
+    snippet: str = "",
+) -> tuple[str, ...]:
+    """Post-validate L1: Joomla/Bitrix/OpenCart/BaForms ≠ wordpress_dev (O47)."""
+    if not lead_tags or "wordpress_dev" not in lead_tags:
+        return lead_tags
+    if not _text_has_non_wp_cms(title, snippet):
+        return lead_tags
+    tags = [t for t in lead_tags if t != "wordpress_dev"]
+    has_dev = any(category_for_canonical_tag(t) == "dev" for t in tags)
+    if (has_dev or not tags) and "php" not in tags and len(tags) < _L1_MAX_TAGS:
+        tags.append("php")
+    return tuple(tags[:_L1_MAX_TAGS])
 
 
 def allowed_tags_prompt_block() -> str:

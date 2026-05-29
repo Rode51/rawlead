@@ -109,7 +109,13 @@ class ProjectStorage:
 
         conn.commit()
 
-
+    def _migrate_neon_synced_columns(self, conn: sqlite3.Connection) -> None:
+        cols = self._table_columns(conn)
+        if "neon_synced_at" not in cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN neon_synced_at TEXT")
+        if "neon_synced_hash" not in cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN neon_synced_hash TEXT")
+        conn.commit()
 
     def _ensure_schema(self) -> None:
 
@@ -172,6 +178,7 @@ class ProjectStorage:
             conn.commit()
 
             self._migrate_legacy_project_id_only(conn)
+            self._migrate_neon_synced_columns(conn)
 
 
 
@@ -366,7 +373,69 @@ class ProjectStorage:
 
             return cur.rowcount == 1
 
+    def get_neon_synced_hash(self, source: str, project_id: int) -> str:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT neon_synced_hash FROM projects
+                WHERE source = ? AND project_id = ?
+                LIMIT 1
+                """,
+                (source, project_id),
+            ).fetchone()
+        if row is None or row["neon_synced_hash"] is None:
+            return ""
+        return str(row["neon_synced_hash"]).strip()
 
+    def is_neon_dup_fast_path(
+        self, source: str, project_id: int, content_hash: str
+    ) -> bool:
+        """Локально известно: dup в SQLite, тот же текст, Neon+L1 уже синхронизированы."""
+        h = (content_hash or "").strip()
+        if not h:
+            return False
+        synced_hash = self.get_neon_synced_hash(source, project_id)
+        if not synced_hash or synced_hash != h:
+            return False
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT neon_synced_at FROM projects
+                WHERE source = ? AND project_id = ?
+                LIMIT 1
+                """,
+                (source, project_id),
+            ).fetchone()
+        return row is not None and bool(row["neon_synced_at"])
+
+    def mark_neon_dup_synced(
+        self, source: str, project_id: int, content_hash: str
+    ) -> None:
+        h = (content_hash or "").strip()
+        if not h:
+            return
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE projects
+                SET neon_synced_at = datetime('now'), neon_synced_hash = ?
+                WHERE source = ? AND project_id = ?
+                """,
+                (h, source, project_id),
+            )
+            conn.commit()
+
+    def clear_neon_dup_synced(self, source: str, project_id: int) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE projects
+                SET neon_synced_at = NULL, neon_synced_hash = NULL
+                WHERE source = ? AND project_id = ?
+                """,
+                (source, project_id),
+            )
+            conn.commit()
 
     def try_record_content_fingerprint(self, content_hash: str, *, source: str = "") -> bool:
 

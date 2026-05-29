@@ -16,6 +16,7 @@ from config import Config
 from lead_category import category_for_listing
 from listing import ListingProject
 from public_feed import is_public_feed_source, public_feed_sources
+from reply_draft_strip import strip_reply_draft_price_deadline
 
 if TYPE_CHECKING:
     from ai_analyze import AiAnalysis
@@ -406,6 +407,84 @@ class NeonLeadStorage:
             logger.warning("%s", msg)
             errors.append(msg)
 
+    def fetch_lead_id(
+        self,
+        source: str,
+        external_id: str,
+        errors: list[str] | None = None,
+    ) -> int | None:
+        """id строки leads по (source, external_id) — для match push после L1."""
+        if not self.enabled:
+            return None
+        src = (source or "").strip()
+        eid = (external_id or "").strip()
+        if not src or not eid:
+            return None
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id FROM leads
+                        WHERE source = %s AND external_id = %s
+                        LIMIT 1
+                        """,
+                        (src, eid),
+                    )
+                    row = cur.fetchone()
+            return int(row[0]) if row else None
+        except Exception as exc:
+            msg = f"pg:lead_id:{src}:{eid}:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return None
+
+    def mark_l1_failed(
+        self,
+        project: ListingProject,
+        errors: list[str],
+        *,
+        body_snippet: str = "",
+    ) -> None:
+        """Терминал после retry L1: не попадает в count_leads_missing_l1."""
+        if not self.enabled:
+            return
+        snippet = (body_snippet or project.listing_snippet or project.title or "").strip()
+        category = category_for_listing(
+            project.source,
+            listing_category=project.listing_category,
+            title=project.title,
+            snippet=snippet,
+        )
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE leads
+                        SET body = %s,
+                            ai_verdict = 'l1_failed',
+                            ai_score = 0,
+                            is_visible = FALSE,
+                            category = COALESCE(NULLIF(category, ''), %s)
+                        WHERE source = %s AND external_id = %s
+                        """,
+                        (
+                            snippet,
+                            category,
+                            project.source,
+                            str(project.project_id),
+                        ),
+                    )
+        except Exception as exc:
+            msg = (
+                f"pg:l1_failed:{project.source}:id={project.project_id}:"
+                f"{_short_pg_err(exc)}"
+            )
+            logger.warning("%s", msg)
+            errors.append(msg)
+
     def record_pending_tags(
         self,
         tags: list[str],
@@ -447,7 +526,7 @@ class NeonLeadStorage:
         if not self.enabled:
             return
         tools_json = json.dumps(list(premium.tools_required), ensure_ascii=False)
-        reply = (premium.reply_draft or "").strip()
+        reply = strip_reply_draft_price_deadline((premium.reply_draft or "").strip())
         try:
             with self.connection() as conn:
                 with conn.cursor() as cur:
@@ -602,6 +681,38 @@ class NeonLeadStorage:
             err.append(msg)
             return 0
 
+    def count_leads_missing_l1_recent(
+        self, hours: int = 48, errors: list[str] | None = None
+    ) -> int:
+        """Без L1 за последние N часов (свежий хвост для /status)."""
+        if not self.enabled:
+            return 0
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return 0
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM leads
+                        WHERE ai_verdict IS NULL
+                          AND ai_score IS NULL
+                          AND source = ANY(%s)
+                          AND created_at >= NOW() - make_interval(hours => %s)
+                        """,
+                        (sources, int(hours)),
+                    )
+                    row = cur.fetchone()
+                    return int(row[0]) if row else 0
+        except Exception as exc:
+            msg = f"pg:count_missing_l1_recent:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return 0
+
     def clear_l1_backlog_tail(
         self,
         *,
@@ -609,11 +720,19 @@ class NeonLeadStorage:
         top_ids_protect: int = 100,
         dry_run: bool = True,
         errors: list[str] | None = None,
+        days_old: int | None = None,
+        by_age: bool = False,
     ) -> dict[str, int]:
-        """§ BACKLOG-CLEAR: пометить старый хвост без L1 без вызова ИИ."""
+        """§ BACKLOG-CLEAR / BACKLOG-TAIL-CLEAR-O40: пометить старый хвост без L1.
+
+        by_age=True + days_old=N: чистить только created_at < NOW()-N дней;
+          защита — только hours_protect (top_ids_protect игнорируется).
+        Legacy (by_age=False): как раньше — top_ids_protect + hours_protect.
+        """
         if not self.enabled:
             return {
                 "missing_before": 0,
+                "older_than_Nd": 0,
                 "protected": 0,
                 "to_clear": 0,
                 "cleared": 0,
@@ -623,15 +742,20 @@ class NeonLeadStorage:
         if not sources:
             return {
                 "missing_before": 0,
+                "older_than_Nd": 0,
                 "protected": 0,
                 "to_clear": 0,
                 "cleared": 0,
                 "missing_after": 0,
             }
         err = errors if errors is not None else []
-        reasons_json = json.dumps(["backlog_cleared"], ensure_ascii=False)
+        if by_age:
+            reasons_json = json.dumps(["backlog_cleared_age"], ensure_ascii=False)
+        else:
+            reasons_json = json.dumps(["backlog_cleared"], ensure_ascii=False)
         stats = {
             "missing_before": 0,
+            "older_than_Nd": 0,
             "protected": 0,
             "to_clear": 0,
             "cleared": 0,
@@ -653,40 +777,85 @@ class NeonLeadStorage:
                     row = cur.fetchone()
                     stats["missing_before"] = int(row[0]) if row else 0
 
-                    cur.execute(
-                        """
-                        WITH missing AS (
-                            SELECT id, created_at
+                    if by_age and days_old is not None:
+                        # Режим --by-age: кандидаты — только строки старше days_old дней
+                        cur.execute(
+                            """
+                            SELECT COUNT(*)
                             FROM leads
                             WHERE ai_verdict IS NULL
                               AND ai_score IS NULL
                               AND source = ANY(%s)
-                        ),
-                        protected AS (
-                            SELECT id FROM missing
-                            WHERE created_at >= NOW() - make_interval(hours => %s)
-                            UNION
-                            SELECT id FROM (
-                                SELECT id FROM missing
-                                ORDER BY id DESC
-                                LIMIT %s
-                            ) recent_top
-                        ),
-                        to_clear AS (
-                            SELECT id FROM missing
-                            WHERE id NOT IN (SELECT id FROM protected)
+                              AND created_at < NOW() - make_interval(days => %s)
+                            """,
+                            (sources, int(days_old)),
                         )
-                        SELECT
-                            (SELECT COUNT(*) FROM protected),
-                            (SELECT COUNT(*) FROM to_clear)
-                        """,
-                        (sources, int(hours_protect), int(top_ids_protect)),
-                    )
-                    prow = cur.fetchone()
-                    stats["protected"] = int(prow[0]) if prow else 0
-                    stats["to_clear"] = int(prow[1]) if prow else 0
+                        row = cur.fetchone()
+                        stats["older_than_Nd"] = int(row[0]) if row else 0
 
-                    if not dry_run and stats["to_clear"] > 0:
+                        cur.execute(
+                            """
+                            WITH missing AS (
+                                SELECT id, created_at
+                                FROM leads
+                                WHERE ai_verdict IS NULL
+                                  AND ai_score IS NULL
+                                  AND source = ANY(%s)
+                                  AND created_at < NOW() - make_interval(days => %s)
+                            ),
+                            protected AS (
+                                SELECT id FROM missing
+                                WHERE created_at >= NOW() - make_interval(hours => %s)
+                            ),
+                            to_clear AS (
+                                SELECT id FROM missing
+                                WHERE id NOT IN (SELECT id FROM protected)
+                            )
+                            SELECT
+                                (SELECT COUNT(*) FROM protected),
+                                (SELECT COUNT(*) FROM to_clear)
+                            """,
+                            (sources, int(days_old), int(hours_protect)),
+                        )
+                        prow = cur.fetchone()
+                        stats["protected"] = int(prow[0]) if prow else 0
+                        stats["to_clear"] = int(prow[1]) if prow else 0
+
+                        if not dry_run and stats["to_clear"] > 0:
+                            cur.execute(
+                                """
+                                WITH missing AS (
+                                    SELECT id, created_at
+                                    FROM leads
+                                    WHERE ai_verdict IS NULL
+                                      AND ai_score IS NULL
+                                      AND source = ANY(%s)
+                                      AND created_at < NOW() - make_interval(days => %s)
+                                ),
+                                protected AS (
+                                    SELECT id FROM missing
+                                    WHERE created_at >= NOW() - make_interval(hours => %s)
+                                )
+                                UPDATE leads
+                                SET ai_verdict = 'Пропущено',
+                                    ai_score = 0,
+                                    is_visible = FALSE,
+                                    ai_reasons = %s::jsonb
+                                WHERE id IN (
+                                    SELECT id FROM missing
+                                    WHERE id NOT IN (SELECT id FROM protected)
+                                )
+                                """,
+                                (
+                                    sources,
+                                    int(days_old),
+                                    int(hours_protect),
+                                    reasons_json,
+                                ),
+                            )
+                            stats["cleared"] = cur.rowcount
+                    else:
+                        # Legacy режим: top_ids_protect + hours_protect
                         cur.execute(
                             """
                             WITH missing AS (
@@ -705,25 +874,59 @@ class NeonLeadStorage:
                                     ORDER BY id DESC
                                     LIMIT %s
                                 ) recent_top
-                            )
-                            UPDATE leads
-                            SET ai_verdict = 'Пропущено',
-                                ai_score = 0,
-                                is_visible = FALSE,
-                                ai_reasons = %s::jsonb
-                            WHERE id IN (
+                            ),
+                            to_clear AS (
                                 SELECT id FROM missing
                                 WHERE id NOT IN (SELECT id FROM protected)
                             )
+                            SELECT
+                                (SELECT COUNT(*) FROM protected),
+                                (SELECT COUNT(*) FROM to_clear)
                             """,
-                            (
-                                sources,
-                                int(hours_protect),
-                                int(top_ids_protect),
-                                reasons_json,
-                            ),
+                            (sources, int(hours_protect), int(top_ids_protect)),
                         )
-                        stats["cleared"] = cur.rowcount
+                        prow = cur.fetchone()
+                        stats["protected"] = int(prow[0]) if prow else 0
+                        stats["to_clear"] = int(prow[1]) if prow else 0
+
+                        if not dry_run and stats["to_clear"] > 0:
+                            cur.execute(
+                                """
+                                WITH missing AS (
+                                    SELECT id, created_at
+                                    FROM leads
+                                    WHERE ai_verdict IS NULL
+                                      AND ai_score IS NULL
+                                      AND source = ANY(%s)
+                                ),
+                                protected AS (
+                                    SELECT id FROM missing
+                                    WHERE created_at >= NOW() - make_interval(hours => %s)
+                                    UNION
+                                    SELECT id FROM (
+                                        SELECT id FROM missing
+                                        ORDER BY id DESC
+                                        LIMIT %s
+                                    ) recent_top
+                                )
+                                UPDATE leads
+                                SET ai_verdict = 'Пропущено',
+                                    ai_score = 0,
+                                    is_visible = FALSE,
+                                    ai_reasons = %s::jsonb
+                                WHERE id IN (
+                                    SELECT id FROM missing
+                                    WHERE id NOT IN (SELECT id FROM protected)
+                                )
+                                """,
+                                (
+                                    sources,
+                                    int(hours_protect),
+                                    int(top_ids_protect),
+                                    reasons_json,
+                                ),
+                            )
+                            stats["cleared"] = cur.rowcount
 
                     cur.execute(
                         """

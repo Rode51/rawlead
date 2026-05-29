@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.7.23');
+define('RAWLEAD_CHILD_VERSION', '1.10.9');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -85,6 +85,29 @@ add_action('after_setup_theme', static function (): void {
     add_theme_support('responsive-embeds');
 });
 
+/**
+ * Brand favicon (RL mark) — overrides WP default site icon in browser tab.
+ */
+function rawlead_favicon_url(): string {
+    return RAWLEAD_CHILD_URI . '/assets/images/rawlead-favicon-v1.png';
+}
+
+add_action('init', static function (): void {
+    remove_action('wp_head', 'wp_site_icon', 99);
+});
+
+add_action('wp_head', static function (): void {
+    $icon = rawlead_favicon_url();
+    printf(
+        '<link rel="icon" type="image/png" href="%s" sizes="32x32">' . "\n",
+        esc_url($icon)
+    );
+    printf(
+        '<link rel="apple-touch-icon" href="%s">' . "\n",
+        esc_url($icon)
+    );
+}, 99);
+
 add_action('wp_enqueue_scripts', static function (): void {
     wp_enqueue_style(
         'rawlead-fonts',
@@ -122,6 +145,10 @@ add_action('wp_enqueue_scripts', static function (): void {
             RAWLEAD_CHILD_VERSION,
             true
         );
+        wp_localize_script('rawlead-scroll', 'rawleadHome', [
+            'restFeed' => esc_url_raw(rest_url('rawlead/v1/feed')),
+            'lentaUrl' => esc_url_raw(rawlead_page_url('lenta')),
+        ]);
     }
 
     if (is_page('lenta')) {
@@ -173,6 +200,19 @@ add_action('wp_enqueue_scripts', static function (): void {
             'loginUrl'             => rawlead_cabinet_login_url(),
             'nonce'                => wp_create_nonce('wp_rest'),
             'apiBase'              => rawlead_api_base_url(),
+        ]);
+    }
+
+    if (rawlead_is_shell_page()) {
+        wp_enqueue_script(
+            'rawlead-support',
+            RAWLEAD_CHILD_URI . '/assets/js/rawlead-support.js',
+            [],
+            RAWLEAD_CHILD_VERSION,
+            true
+        );
+        wp_localize_script('rawlead-support', 'rawleadSupport', [
+            'restSupport' => esc_url_raw(rest_url('rawlead/v1/support')),
         ]);
     }
 }, 20);
@@ -256,8 +296,9 @@ add_filter('the_content', static function (string $content): string {
 
     $cta = match ($slug) {
         'how' => sprintf(
-            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">Смотреть тарифы</a></p>',
-            esc_url($pricing)
+            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">%s</a></p>',
+            esc_url(rawlead_page_url('lenta')),
+            esc_html__('Смотреть ленту →', 'rawlead-kadence-child')
         ),
         'pricing' => sprintf(
             '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">%s</a> '

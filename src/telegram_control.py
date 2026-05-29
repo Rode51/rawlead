@@ -6,13 +6,14 @@ import json
 import os
 import re
 import subprocess
+import time
 
 import requests
 
 from config import Config, _PROJECT_ROOT, telegram_requests_proxies
 from radar_status import format_status_message
 from storage import ProjectStorage
-from match_push import upsert_subscriber_chat_id
+from match_push import handle_tg_draft_callback, upsert_subscriber_chat_id
 from stars_billing import (
     answer_pre_checkout,
     handle_successful_payment,
@@ -491,10 +492,6 @@ def _handle_action(
         unit_ok, unit_state = _run_radar_ctl(cfg, "status")
         us = unit_state.strip() if unit_ok else None
         body = format_status_message(cfg, storage, unit_state=us)
-        if unit_ok and us:
-            body += f"\n\nsystemd rawlead-radar: {us}"
-        elif not unit_ok:
-            body += f"\n\nsystemd: не удалось проверить ({unit_state[:120]})"
         _send_message(cfg, body)
 
 
@@ -606,6 +603,50 @@ def _handle_non_admin_message(
     )
 
 
+def ensure_bot_polling_mode(cfg: Config) -> list[str]:
+    """O55c: webhook блокирует getUpdates — сброс при старте bot-poll."""
+    lines: list[str] = []
+    token = cfg.telegram_bot_token.strip()
+    if not token:
+        lines.append("тг:webhook:skip no_token")
+        return lines
+
+    proxies = telegram_requests_proxies(cfg)
+    base = f"https://api.telegram.org/bot{token}/"
+    try:
+        session = requests.Session()
+        session.trust_env = False
+        info_resp = session.get(
+            base + "getWebhookInfo",
+            timeout=15.0,
+            proxies=proxies,
+        )
+        if info_resp.status_code != 200:
+            lines.append(f"тг:webhook:info HTTP {info_resp.status_code}")
+            return lines
+        info = info_resp.json()
+        if not info.get("ok"):
+            lines.append("тг:webhook:info not ok")
+            return lines
+        url = str((info.get("result") or {}).get("url") or "").strip()
+        if not url:
+            lines.append("тг:webhook:none")
+            return lines
+        del_resp = session.post(
+            base + "deleteWebhook",
+            data={"drop_pending_updates": "false"},
+            timeout=15.0,
+            proxies=proxies,
+        )
+        if del_resp.status_code == 200 and del_resp.json().get("ok"):
+            lines.append("тг:webhook:deleted")
+        else:
+            lines.append(f"тг:webhook:delete HTTP {del_resp.status_code}")
+    except requests.RequestException as exc:
+        lines.append(f"тг:webhook:err {type(exc).__name__}")
+    return lines
+
+
 def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
     """
     Один короткий getUpdates; admin-команды только из TELEGRAM_CHAT_ID.
@@ -621,12 +662,24 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
     try:
         session = requests.Session()
         session.trust_env = False
-        resp = session.get(
-            api_url,
-            params={"offset": offset, "timeout": 0, "allowed_updates": '["message","pre_checkout_query"]'},
-            timeout=25.0,
-            proxies=proxies,
-        )
+        resp = None
+        for attempt in range(3):
+            try:
+                resp = session.get(
+                    api_url,
+                    params={
+                        "offset": offset,
+                        "timeout": 0,
+                        "allowed_updates": '["message","callback_query","pre_checkout_query"]',
+                    },
+                    timeout=25.0,
+                    proxies=proxies,
+                )
+                break
+            except (requests.ConnectionError, ConnectionResetError) as exc:
+                if attempt >= 2:
+                    raise exc
+                time.sleep(0.5 * (attempt + 1))
     except requests.RequestException as exc:
         errors.append(f"тг:бот:{_mask_token(type(exc).__name__ + ': ' + str(exc))[:200]}")
         return errors
@@ -671,6 +724,13 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
         if not isinstance(upd, dict):
             continue
         update_id = upd.get("update_id")
+
+        callback_query = upd.get("callback_query")
+        if isinstance(callback_query, dict):
+            if handle_tg_draft_callback(cfg, callback_query, errors):
+                if isinstance(update_id, int):
+                    next_offset = max(next_offset, update_id + 1)
+                continue
 
         pre_checkout = upd.get("pre_checkout_query")
         if isinstance(pre_checkout, dict):

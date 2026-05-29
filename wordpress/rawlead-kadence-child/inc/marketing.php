@@ -87,12 +87,12 @@ function rawlead_cabinet_login_url(): string {
 
 function rawlead_inner_page_lead(string $slug): string {
     return match ($slug) {
-        'how'     => __('Пять шагов: от навыков до вашего отклика', 'rawlead-kadence-child'),
+        'how'     => __('Три шага: от радара до твоего отклика', 'rawlead-kadence-child'),
         'pricing' => __('Тариф ИИ-агент — 300 Telegram Stars/мес (~400–720 ₽)', 'rawlead-kadence-child'),
         'faq'     => __('Коротко о RawLead для любой ниши фриланса', 'rawlead-kadence-child'),
-        'contact' => __('Свяжитесь с нами — Telegram или форма', 'rawlead-kadence-child'),
+        'contact' => __('Telegram или email — без формы', 'rawlead-kadence-child'),
         'lenta'   => __('Открытый рынок заказов с бирж и Telegram', 'rawlead-kadence-child'),
-        'cabinet' => __('Персональная лента по вашим тегам и статус подписки', 'rawlead-kadence-child'),
+        'cabinet' => __('Inbox откликов, навыки и статус подписки', 'rawlead-kadence-child'),
         default   => '',
     };
 }
@@ -106,13 +106,7 @@ function rawlead_format_inner_content(string $content, string $slug): string {
     }
 
     if ($slug === 'how' || $slug === 'pricing') {
-        $formatted = preg_replace(
-            '/(<h2[^>]*>.*?<\/h2>)(.*?)(?=<h2|$)/is',
-            '<section class="rl-block-card">$1<div class="rl-block-card__body">$2</div></section>',
-            $content
-        );
-
-        return is_string($formatted) ? $formatted : $content;
+        return $content;
     }
 
     if ($slug === 'faq') {
@@ -120,4 +114,41 @@ function rawlead_format_inner_content(string $content, string $slug): string {
     }
 
     return $content;
+}
+
+/**
+ * Canonical HTML for inner shell pages (overrides WP editor copy on deploy).
+ */
+function rawlead_inner_page_html(string $slug): ?string {
+    $lenta = esc_url(rawlead_page_url('lenta'));
+    $cabinet = esc_url(rawlead_page_url('cabinet'));
+    $bot_pay = esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay');
+
+    return match ($slug) {
+        'pricing' => '<h2>ИИ-агент</h2>
+<p><strong>300 ⭐ Stars / мес</strong> — при покупке Stars в Telegram это примерно <strong>400–720 ₽</strong> (зависит от пакета).</p>
+<p>Для любой ниши — дизайн, тексты, код, маркетинг. ИИ знает твои теги.</p>
+<ul>
+<li>Персональная лента по твоим навыкам</li>
+<li>Черновик отклика за одну кнопку</li>
+<li>Push в Telegram при новом матче</li>
+</ul>
+<h2>Оплата</h2>
+<p><strong>Telegram Stars</strong> — 300 ⭐ в @rawlead_bot или кнопка «Оплатить Stars» в кабинете.</p>
+<p><a href="' . $cabinet . '">Вход в кабинет →</a> · <a href="' . $lenta . '">Смотреть ленту →</a></p>
+<p><a class="rl-btn rl-btn--primary" href="' . $bot_pay . '">Подключить — 300 ⭐ в Telegram →</a></p>',
+        'how'     => '<h2>1. Указываешь навыки</h2>
+<p>Выбери свою нишу и добавь теги — дизайн, копирайт, разработка, маркетинг, SMM, переводы или любая другая специализация. Можно настроить так точно, как нужно тебе.</p>
+<h2>2. Настраиваешь фильтры</h2>
+<p>Минимальная совместимость, источник, категория. Система запоминает твой профиль — менять каждый раз не нужно.</p>
+<h2>3. Радар следит 24/7</h2>
+<p>Десятки источников проверяются автоматически. Дубликаты, спам и нерелевантные объявления не попадают в ленту.</p>
+<h2>4. Нейросеть мэтчит технологии</h2>
+<p>Система не просто ищет ключевые слова. ИИ понимает суть заказа, решает, какие инструменты и библиотеки нужны для выполнения, и сверяет это с твоим стеком.</p>
+<h2>5. Ты откликаешься сам</h2>
+<p>Готовый черновик отклика — поправить и отправить вручную. Мы не пишем заказчикам за тебя и не отправляем ничего автоматически.</p>
+<p><strong>Один поток вместо десятка вкладок.</strong> Ты тратишь время на работу, а не на мониторинг.</p>
+<p><a class="rl-btn rl-btn--primary" href="' . $lenta . '">Смотреть ленту →</a> · <a href="' . $cabinet . '">Войти в кабинет →</a></p>',
+        default   => null,
+    };
 }

@@ -46,6 +46,11 @@
 | Product план | `team/product/LEAD_PRODUCT_PROMPT.md` |
 | Конкурентная разведка + пивот | `team/product/MARKET_INTEL.md` |
 | Design план | `team/design/LEAD_DESIGN_PROMPT.md` |
+| Design спека (активная §) | `team/design/DESIGNER_PROMPT.md` |
+| Design регламент | `team/design/LEAD_DESIGN.md` |
+| WP визуальный канон | `docs/design/wp/REFERENCE.md` |
+| WP техспека волны | `docs/design/wp/wave-*-brief.md` |
+| Пульт desktop | `team/design/DESIGN_BRIEF.md` (**не WP**) |
 | Product регламент | `team/product/LEAD_PRODUCT.md` |
 | Design регламент | `team/design/LEAD_DESIGN.md` |
 | Git / чистота | `team/architect/LEAD.md` § Git |

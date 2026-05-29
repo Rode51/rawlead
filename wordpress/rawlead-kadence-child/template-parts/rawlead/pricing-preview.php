@@ -11,17 +11,14 @@ $contact = rawlead_page_url('contact');
 
 $plan = [
     'name'     => __('ИИ-агент', 'rawlead-kadence-child'),
-    'price'    => __('300 ⭐/мес (~400–720 ₽)', 'rawlead-kadence-child'),
-    'subtitle' => __('Для любой ниши — дизайн, тексты, код, маркетинг. ИИ знает ваши теги.', 'rawlead-kadence-child'),
+    'price'    => __('300 ⭐ Stars / мес (~400–720 ₽)', 'rawlead-kadence-child'),
+    'subtitle' => __('Для любой ниши — дизайн, тексты, код, маркетинг. ИИ знает твои теги.', 'rawlead-kadence-child'),
     'items'    => [
-        __('Персональная лента по вашим навыкам', 'rawlead-kadence-child'),
-        __('ИИ-оценка каждого заказа', 'rawlead-kadence-child'),
+        __('Персональная лента по твоим навыкам', 'rawlead-kadence-child'),
         __('Черновик отклика за одну кнопку', 'rawlead-kadence-child'),
-        __('Рыночная цена заказа', 'rawlead-kadence-child'),
         __('Push в Telegram при новом матче', 'rawlead-kadence-child'),
     ],
-    'badge' => __('Beta', 'rawlead-kadence-child'),
-    'cta'   => __('Вход в кабинет →', 'rawlead-kadence-child'),
+    'cta'   => __('Подключить — 300 ⭐ →', 'rawlead-kadence-child'),
 ];
 ?>
 <section id="pricing-preview" class="rl-section rl-reveal" aria-labelledby="rl-pricing-title">
@@ -29,7 +26,6 @@ $plan = [
 		<h2 id="rl-pricing-title"><?php esc_html_e('Тариф', 'rawlead-kadence-child'); ?></h2>
 		<div class="rl-pricing rl-pricing--single">
 			<article class="rl-price-card">
-				<span class="rl-price-card__badge"><?php echo esc_html($plan['badge']); ?></span>
 				<h3 class="rl-price-card__name"><?php echo esc_html($plan['name']); ?></h3>
 				<p class="rl-price-card__price"><?php echo esc_html($plan['price']); ?></p>
 				<p class="rl-price-card__lead"><em><?php echo esc_html($plan['subtitle']); ?></em></p>
@@ -39,7 +35,7 @@ $plan = [
 					<?php endforeach; ?>
 				</ul>
 				<div class="rl-price-card__cta">
-					<a class="rl-btn rl-btn--primary" href="<?php echo esc_url(rawlead_page_url('cabinet')); ?>">
+					<a class="rl-btn rl-btn--primary" href="<?php echo esc_url(rawlead_page_url('pricing')); ?>">
 						<?php echo esc_html($plan['cta']); ?>
 					</a>
 				</div>

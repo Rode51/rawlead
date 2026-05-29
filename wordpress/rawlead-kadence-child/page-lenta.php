@@ -41,7 +41,12 @@ rawlead_get_part('header');
 				</label>
 				<label class="rl-cat-chip" id="filter-category-marketing">
 					<input type="checkbox" name="category" value="marketing">
-					<span class="rl-cat-chip__icon" aria-hidden="true">◎</span>
+					<span class="rl-cat-chip__icon" aria-hidden="true">
+						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+							<path d="M3 6.5L8 3v10L3 9.5V6.5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+							<path d="M8 5l5 2v4l-5 2V5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+						</svg>
+					</span>
 					<span class="rl-cat-chip__label rl-cat-chip__label--full"><?php esc_html_e('Маркетинг', 'rawlead-kadence-child'); ?></span>
 					<span class="rl-cat-chip__label rl-cat-chip__label--short"><?php esc_html_e('SMM', 'rawlead-kadence-child'); ?></span>
 				</label>
@@ -68,7 +73,8 @@ rawlead_get_part('header');
 						</div>
 						<div class="rl-skills-panel__footer">
 							<button type="button" class="rl-btn rl-btn--primary rl-feed-skills-apply" id="rl-feed-skills-apply" title="<?php esc_attr_e('Порядок изменится. Заказы не исчезнут.', 'rawlead-kadence-child'); ?>"><?php esc_html_e('Применить', 'rawlead-kadence-child'); ?></button>
-							<button type="button" class="rl-feed-skills-clear" id="rl-feed-skills-clear"><?php esc_html_e('Очистить теги', 'rawlead-kadence-child'); ?></button>
+							<button type="button" class="rl-btn rl-btn--ghost rl-feed-skills-my" id="rl-feed-skills-my"><?php esc_html_e('Мои навыки', 'rawlead-kadence-child'); ?></button>
+							<button type="button" class="rl-feed-skills-clear" id="rl-feed-skills-clear"><?php esc_html_e('Сбросить', 'rawlead-kadence-child'); ?></button>
 						</div>
 					</div>
 				</details>
@@ -83,6 +89,7 @@ rawlead_get_part('header');
 			</div>
 		</div>
 	</div>
+	<p class="rl-feed-delay-notice" id="rl-feed-delay-notice" hidden></p>
 	<p class="rl-sort-badge" id="rl-feed-sort-badge" hidden><?php esc_html_e('Сортировка по совместимости', 'rawlead-kadence-child'); ?></p>
 	<div class="rl-container rl-feed-main-wrap">
 		<header class="rl-feed-head">
@@ -94,10 +101,15 @@ rawlead_get_part('header');
 		</header>
 		<div class="rl-feed-banner" id="rl-feed-error" role="alert" hidden></div>
 		<div class="rl-feed-list" id="rl-feed-list" aria-live="polite"></div>
-		<div class="rl-feed-sentinel" id="rl-feed-sentinel" aria-hidden="true"></div>
-		<div class="rl-feed-loading" id="rl-feed-loading" role="status" aria-live="polite" hidden>
-			<span class="rl-feed-loading__spinner" aria-hidden="true"></span>
-			<span class="rl-feed-loading__text"><?php esc_html_e('Загружаем ещё заказы…', 'rawlead-kadence-child'); ?></span>
+		<div class="rl-feed-pagination" id="rl-feed-pagination">
+			<button type="button" class="rl-btn rl-btn--primary rl-btn--load-more" id="rl-feed-load-more">
+				<?php esc_html_e('Ещё лиды', 'rawlead-kadence-child'); ?> <span class="rl-btn__arrow" aria-hidden="true">→</span>
+			</button>
+			<span class="rl-feed-pagination__count" id="rl-feed-pagination-count"><?php esc_html_e('Показано', 'rawlead-kadence-child'); ?> <span id="rl-feed-shown">0</span> <?php esc_html_e('из', 'rawlead-kadence-child'); ?> <span id="rl-feed-total">0</span></span>
+			<div class="rl-feed-loading" id="rl-feed-loading" role="status" aria-live="polite" hidden>
+				<span class="rl-feed-loading__spinner" aria-hidden="true"></span>
+				<span class="rl-feed-loading__text"><?php esc_html_e('Подбираем...', 'rawlead-kadence-child'); ?></span>
+			</div>
 		</div>
 		<p class="rl-feed-end" id="rl-feed-end" hidden><?php esc_html_e('Все заказы показаны', 'rawlead-kadence-child'); ?></p>
 	</div>
@@ -109,18 +121,6 @@ rawlead_get_part('header');
 				<button type="button" class="rl-btn rl-btn--primary" id="rl-feed-sheet-apply"><?php esc_html_e('Применить', 'rawlead-kadence-child'); ?></button>
 				<button type="button" class="rl-btn rl-btn--ghost" id="rl-feed-sheet-reset"><?php esc_html_e('Сбросить', 'rawlead-kadence-child'); ?></button>
 			</div>
-		</div>
-	</div>
-	<button type="button" class="rl-bug-fab" id="rl-bug-fab" title="<?php esc_attr_e('Нашли ошибку?', 'rawlead-kadence-child'); ?>" aria-label="<?php esc_attr_e('Сообщить об ошибке', 'rawlead-kadence-child'); ?>">?</button>
-	<div class="rl-bug-modal" id="rl-bug-modal" hidden>
-		<div class="rl-bug-modal__overlay" id="rl-bug-modal-overlay"></div>
-		<div class="rl-bug-modal__panel" role="dialog" aria-modal="true" aria-labelledby="rl-bug-modal-title">
-			<h2 class="rl-bug-modal__title" id="rl-bug-modal-title"><?php esc_html_e('Сообщить об ошибке', 'rawlead-kadence-child'); ?></h2>
-			<label class="rl-bug-modal__label" for="rl-bug-text"><?php esc_html_e('Что случилось?', 'rawlead-kadence-child'); ?></label>
-			<textarea class="rl-bug-modal__input" id="rl-bug-text" rows="4" placeholder="<?php esc_attr_e('Опиши кратко — поможем разобраться', 'rawlead-kadence-child'); ?>"></textarea>
-			<p class="rl-bug-modal__url"><span><?php esc_html_e('Страница:', 'rawlead-kadence-child'); ?></span> <span id="rl-bug-url"></span></p>
-			<button type="button" class="rl-btn rl-btn--primary" id="rl-bug-submit"><?php esc_html_e('Отправить', 'rawlead-kadence-child'); ?></button>
-			<p class="rl-bug-modal__success" id="rl-bug-success" hidden><?php esc_html_e('Спасибо. Посмотрим.', 'rawlead-kadence-child'); ?></p>
 		</div>
 	</div>
 </main>

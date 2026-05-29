@@ -1,7 +1,12 @@
-"""§ BACKLOG-CLEAR: пометить старый хвост без L1 без OpenRouter.
+"""§ BACKLOG-CLEAR / BACKLOG-TAIL-CLEAR-O40: пометить хвост без L1 без OpenRouter.
 
+Legacy (без --by-age):
   .venv\\Scripts\\python.exe scripts\\clear_l1_backlog.py --profile site --dry-run
   .venv\\Scripts\\python.exe scripts\\clear_l1_backlog.py --profile site --apply
+
+Age-mode (O40):
+  .venv\\Scripts\\python.exe scripts\\clear_l1_backlog.py --profile site --by-age --days-old 7 --dry-run
+  .venv\\Scripts\\python.exe scripts\\clear_l1_backlog.py --profile site --by-age --days-old 7 --apply
 """
 
 from __future__ import annotations
@@ -24,6 +29,18 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true", help="Apply UPDATE to Neon")
     parser.add_argument("--hours-protect", type=int, default=48)
     parser.add_argument("--top-ids-protect", type=int, default=100)
+    parser.add_argument(
+        "--by-age",
+        action="store_true",
+        help="Age mode (O40): clear only rows older than --days-old; "
+             "top_ids_protect ignored",
+    )
+    parser.add_argument(
+        "--days-old",
+        type=int,
+        default=7,
+        help="With --by-age: clear rows older than N days (default 7)",
+    )
     args = parser.parse_args()
 
     if args.apply and args.dry_run:
@@ -50,11 +67,17 @@ def main() -> int:
         top_ids_protect=args.top_ids_protect,
         dry_run=dry_run,
         errors=errors,
+        days_old=args.days_old if args.by_age else None,
+        by_age=args.by_age,
     )
     mode = "dry-run" if dry_run else "apply"
-    print(f"[clear_l1_backlog] mode={mode} profile={args.profile}")
+    print(f"[clear_l1_backlog] mode={mode} profile={args.profile} by_age={args.by_age}")
     print(f"  missing_before={stats['missing_before']}")
-    print(f"  protected={stats['protected']} (48h + top {args.top_ids_protect} id DESC)")
+    if args.by_age:
+        print(f"  older_than_{args.days_old}d={stats['older_than_Nd']}")
+        print(f"  protected_48h={stats['protected']}")
+    else:
+        print(f"  protected={stats['protected']} (48h + top {args.top_ids_protect} id DESC)")
     print(f"  to_clear={stats['to_clear']}")
     if not dry_run:
         print(f"  cleared={stats['cleared']}")

@@ -6,6 +6,7 @@ import json
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
 from storage import ProjectStorage
 
@@ -102,6 +103,7 @@ class NeonCycleStats:
     replay: int = 0
     skip: int = 0
     sqlite_resync: int = 0
+    dup_fast_skip: int = 0
 
 
 _neon_cycle = NeonCycleStats()
@@ -128,12 +130,33 @@ def note_neon_sqlite_resync() -> None:
     _neon_cycle.sqlite_resync += 1
 
 
-def neon_cycle_counts() -> tuple[int, int, int, int]:
+def note_dup_fast_skip() -> None:
+    _neon_cycle.dup_fast_skip += 1
+
+
+def log_pipeline_line(log_path: Path | None, line: str) -> None:
+    """Строка pipeline:* в radar log (O34 hot path)."""
+    if log_path is None:
+        return
+    from config import radar_timestamp
+
+    try:
+        p = Path(log_path)
+        if str(p.parent) not in ("", "."):
+            p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(f"{radar_timestamp()} {line.rstrip()}\n")
+    except OSError:
+        pass
+
+
+def neon_cycle_counts() -> tuple[int, int, int, int, int]:
     return (
         _neon_cycle.insert,
         _neon_cycle.replay,
         _neon_cycle.skip,
         _neon_cycle.sqlite_resync,
+        _neon_cycle.dup_fast_skip,
     )
 
 
@@ -146,7 +169,9 @@ class CycleSummary:
     neon_replay: int = 0
     neon_dup_skip: int = 0
     neon_sqlite_resync: int = 0
+    dup_fast_skip: int = 0
     is_visible: int = 0
+    cycle_sec: float = 0.0
     misc_errors: list[str] = field(default_factory=list)
 
     def ensure(self, source_id: str) -> SourceCycleStats:
@@ -161,11 +186,12 @@ class CycleSummary:
         return f"── Цикл {self.ts} ──"
 
     def sync_neon_from_globals(self) -> None:
-        ins, rep, sk, resync = neon_cycle_counts()
+        ins, rep, sk, resync, fast = neon_cycle_counts()
         self.neon_insert = ins
         self.neon_replay = rep
         self.neon_dup_skip = sk
         self.neon_sqlite_resync = resync
+        self.dup_fast_skip = fast
 
     def format_footer(self, *, elapsed_sec: float | None = None) -> str:
         from ai_analyze import cycle_ai_counts
@@ -180,6 +206,7 @@ class CycleSummary:
             or self.neon_replay
             or self.neon_dup_skip
             or self.neon_sqlite_resync
+            or self.dup_fast_skip
         ):
             parts.append(f"neon_insert: {self.neon_insert}")
             if self.neon_replay:
@@ -188,6 +215,8 @@ class CycleSummary:
                 parts.append(f"neon_sqlite_resync: {self.neon_sqlite_resync}")
             if self.neon_dup_skip:
                 parts.append(f"neon_dup_skip: {self.neon_dup_skip}")
+            if self.dup_fast_skip:
+                parts.append(f"dup_fast_skip: {self.dup_fast_skip}")
         parts.append("лента после L1 — см. Neon is_visible")
         base = " │ ".join(parts)
         if l1 or l2:
@@ -216,7 +245,9 @@ class CycleSummary:
             "neon_replay": self.neon_replay,
             "neon_dup_skip": self.neon_dup_skip,
             "neon_sqlite_resync": self.neon_sqlite_resync,
+            "dup_fast_skip": self.dup_fast_skip,
             "is_visible": self.is_visible,
+            "cycle_sec": round(self.cycle_sec, 1) if self.cycle_sec else 0.0,
             "misc_errors": self.misc_errors[:10],
         }
 
@@ -237,7 +268,12 @@ def load_cycle_summary(storage: ProjectStorage) -> CycleSummary | None:
     summary.neon_replay = int(data.get("neon_replay", 0) or 0)
     summary.neon_dup_skip = int(data.get("neon_dup_skip", 0) or 0)
     summary.neon_sqlite_resync = int(data.get("neon_sqlite_resync", 0) or 0)
+    summary.dup_fast_skip = int(data.get("dup_fast_skip", 0) or 0)
     summary.is_visible = int(data.get("is_visible", 0) or 0)
+    try:
+        summary.cycle_sec = float(data.get("cycle_sec", 0) or 0)
+    except (TypeError, ValueError):
+        summary.cycle_sec = 0.0
     misc = data.get("misc_errors")
     if isinstance(misc, list):
         summary.misc_errors = [str(x) for x in misc[:10]]
@@ -300,6 +336,8 @@ def format_cycle_status_block(storage: ProjectStorage) -> list[str]:
             footer_bits.append(f"neon_sqlite_resync: {summary.neon_sqlite_resync}")
         if summary.neon_dup_skip:
             footer_bits.append(f"neon_dup_skip: {summary.neon_dup_skip}")
+        if summary.dup_fast_skip:
+            footer_bits.append(f"dup_fast_skip: {summary.dup_fast_skip}")
         if summary.is_visible:
             footer_bits.append(f"is_visible: {summary.is_visible}")
     lines.append(" │ ".join(footer_bits))
@@ -513,3 +551,25 @@ def record_site_rollup_line(storage: ProjectStorage, line: str) -> None:
 
 def load_site_rollup_line(storage: ProjectStorage) -> str:
     return storage.get_setting(_STATUS_SITE_ROLLUP, "").strip()
+
+
+def parse_site_rollup_metrics(line: str) -> tuple[int, int, int]:
+    """Из строки site:сводка извлечь (l1, l2, is_visible)."""
+    l1 = l2 = visible = 0
+    if not line.strip():
+        return l1, l2, visible
+    for part in line.split("│"):
+        token = part.strip()
+        for key, slot in (("l1", "l1"), ("l2", "l2"), ("is_visible", "visible")):
+            if token.startswith(f"{key} "):
+                try:
+                    val = int(token.split()[1])
+                except (IndexError, ValueError):
+                    val = 0
+                if slot == "l1":
+                    l1 = val
+                elif slot == "l2":
+                    l2 = val
+                else:
+                    visible = val
+    return l1, l2, visible

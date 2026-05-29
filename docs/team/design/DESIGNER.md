@@ -28,10 +28,13 @@
 
 ## Первый ход в **любом** чате `@designer`
 
-1. Прочитай **этот файл** — [`DESIGNER.md`](DESIGNER.md)
-2. Общие правила: [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)
-3. **Активная задача:** [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md) — без неё только консультация / аудит
-4. Сдай в артефакт задачи (обычно [`DESIGN_BRIEF.md`](DESIGN_BRIEF.md) или `docs/design/<проект>/`)
+1. [`DESIGNER.md`](DESIGNER.md) — этот файл
+2. [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md) — **только § «→ Сейчас»** в шапке (архив § не читать)
+3. [`REFERENCE.md`](../../design/wp/REFERENCE.md) v5 · [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)
+
+**WP-сайт:** сдача → `docs/design/wp/wave-*-brief.md` или § в `DESIGNER_PROMPT` → Lead → Architect → Coder.
+
+**Пульт desktop:** сдача → [`DESIGN_BRIEF.md`](DESIGN_BRIEF.md) **только Tauri** — не путать с лендингом.
 
 ---
 

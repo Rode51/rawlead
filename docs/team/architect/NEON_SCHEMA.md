@@ -88,7 +88,7 @@ final_rank    = round(ai_score * 0.6 + keyword_match * 0.4)
 
 | Компонент | v0 |
 |-----------|-----|
-| `f(...)` | weighted overlap: сумма весов совпавших тегов / сумма весов user_tags × 100, cap 100 |
+| `f(...)` | **F2:** совпавшие теги лида / `len(lead_tags)` × 100, cap 100 · «ИДЕАЛЬНО ✦» только при ≥2 тегах у лида и km=100 · user_tags max **12** |
 | Веса 0.6 / 0.4 | в `settings` или env `RANK_WEIGHT_AI`, `RANK_WEIGHT_TAGS` |
 
 **Позже:** синонимы (`python` ↔ `питон`), эмбеддинги — отдельная задача.

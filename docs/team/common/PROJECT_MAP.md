@@ -24,8 +24,10 @@
 | Мысли / решения владельца | [`architect/OWNER_INTENT.md`](../architect/OWNER_INTENT.md) | чат, дубли в FOR_YOU |
 | Активный план Product | [`product/LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) | новый `TZ_*.md` |
 | Задача Coder | [`architect/CODER_PROMPT.md`](../architect/CODER_PROMPT.md) | TASKS, чат (только копипаст) |
-| Задача Designer | [`design/DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) | DESIGN_BRIEF без промпта |
+| Задача Designer | [`design/DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) § **→ Сейчас** | LEAD_DESIGN_PROMPT · архив § |
 | План Lead Designer | [`design/LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) | |
+| Регламент Design | [`design/LEAD_DESIGN.md`](../design/LEAD_DESIGN.md) | **кто какой файл читает** |
+| WP канон / brief | `docs/design/wp/REFERENCE.md` · `wave-*-brief.md` | DESIGN_BRIEF (не WP) |
 | Снимок / блокеры | [`STATUS.md`](STATUS.md) | не копировать ТЗ |
 | Очередь | [`TASKS.md`](TASKS.md) — одна строка на трек | FOR_YOU |
 | Шаги владельца | [`../FOR_YOU.md`](../FOR_YOU.md) | TASKS, STATUS |
@@ -35,10 +37,10 @@
 | Роль | Пишет | Не пишет |
 |------|-------|----------|
 | **Lead Product** | `PRODUCT_VISION`, `LEAD_PRODUCT_PROMPT` | `ROADMAP`, `CODER_PROMPT`, `FOR_YOU` |
-| **Lead Designer** | `LEAD_DESIGN*`, `DESIGN_SYSTEM`, `docs/design/` | `wordpress/`, `CODER_PROMPT` |
+| **Lead Designer** | `LEAD_DESIGN*`, `DESIGN_SYSTEM`, `docs/design/wp/` | `wordpress/`, `CODER_PROMPT`, WP в `DESIGN_BRIEF` |
 | **Lead Architect** | `ROADMAP`, `TASKS`, `STATUS`, `CODER_PROMPT`, карты | `src/`, commit чужих без сдачи |
-| **Coder** | файлы из § «Файлы» в `CODER_PROMPT` + `STATUS` | любой другой `docs/team/*.md` |
-| **Designer** | `docs/design/`, `DESIGN_BRIEF` по промпту | `src/`, `wordpress/` |
+| **Coder** | файлы из § «Файлы» в `CODER_PROMPT` + `STATUS` | `DESIGNER_PROMPT`, `LEAD_DESIGN_PROMPT`, design docs |
+| **Designer** | `docs/design/**`, § активная в `DESIGNER_PROMPT` | `LEAD_DESIGN_PROMPT`, архив §, `src/`, `wordpress/`, WP в `DESIGN_BRIEF` |
 | **Mechanic** | `docs/problems/*` + код из тикета; модель **Gemini 2.5 (~2M)**; широкий разбор при инциденте | `TASKS`, `FOR_YOU`, vision, активный `CODER_PROMPT` (без дубля) |
 
 **Отменено v0.9 (не возвращать в код/docs):** `contour` owner/saas · демо `/cabinet` на JSON · [`../archive/SOURCES_SAAS.md`](../archive/SOURCES_SAAS.md)
@@ -59,12 +61,12 @@
 
 | Кому | Первый файл |
 |------|-------------|
-| **Lead Product** | `product/PRODUCT_VISION.md` → `product/LEAD_PRODUCT_PROMPT.md` |
-| **Lead Architect** | этот файл → `architect/ROADMAP.md` → `architect/CODER_PROMPT.md` |
-| **Lead Designer** | `design/LEAD_DESIGN_PROMPT.md` → `design/DESIGN_SYSTEM.md` |
+| **Lead Product** | `.cursor/rules/lead-product.mdc` § онбординг **A+B** → `product/PRODUCT_VISION.md` → `LEAD_PRODUCT_PROMPT.md` |
+| **Lead Architect** | `.cursor/rules/lead-architect.mdc` § онбординг **A+B** → `PRODUCT_VISION` v0.11 → `STATUS` → `CODER_PROMPT` |
+| **Lead Designer** | `.cursor/rules/lead-designer.mdc` § онбординг **A+B** → `feed-cabinet-mvp.md` → `LEAD_DESIGN_PROMPT.md` |
 | **Coder** | **`architect/CODER_PROMPT.md`** → § «Зоны» |
 | **Mechanic** | `docs/problems/` → § «Зоны» |
-| **Designer** | `design/DESIGNER_PROMPT.md` → `docs/design/` (макеты) |
+| **Designer** | `design/DESIGNER_PROMPT.md` § **→ Сейчас** → `docs/design/wp/` |
 | **Владелец** | `FOR_YOU.md` |
 
 **Lead обновляет** эту карту после каждой сдачи Coder/Mechanic, если менялись процессы, файлы или lock-правила.  
@@ -74,7 +76,7 @@
 
 ## MCP (внешние tools)
 
-Канон: **[`MCP_POOL.md`](MCP_POOL.md)** — Perplexity, Playwright, Firecrawl, Glif, Chrome; когда использовать; установка в `~/.cursor/mcp.json`.
+Канон: **[`MCP_POOL.md`](MCP_POOL.md)** — Perplexity, Playwright, Firecrawl, Glif, **Recraft**, Chrome; установка в `~/.cursor/mcp.json`.
 
 | Если в сессии нет MCP, а нужен веб/скрейп/медиа | Сказать владельцу: включить сервер из `MCP_POOL.md` |
 | Ключи API | Только у владельца, не в repo |

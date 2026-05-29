@@ -28,7 +28,7 @@
 
 <!-- wp:column -->
 <div class="wp-block-column"><!-- wp:heading {"level":3} -->
-<h3 class="wp-block-heading">03 · Вы решаете</h3>
+<h3 class="wp-block-heading">03 · Ты решаешь</h3>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->

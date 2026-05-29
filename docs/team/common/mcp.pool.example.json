@@ -24,6 +24,9 @@
       "env": {
         "GLIF_API_TOKEN": "PASTE_GLIF_TOKEN"
       }
+    },
+    "recraft": {
+      "url": "https://mcp.recraft.ai/mcp"
     }
   }
 }

@@ -31,7 +31,7 @@
   var SORT_KEY = "rawlead_cabinet_sort";
   var USER_META_KEY = "rawlead_user_meta";
   var GUEST_SKILLS_KEYS = ["rawlead_lenta_skills", "rawlead_guest_skills"];
-  var MAX_USER_TAGS = 6;
+  var MAX_USER_TAGS = 12;
   var TIER_A_BY_NICHE = {
     dev: [
       "python",
@@ -559,6 +559,7 @@
   var notifThresholdEl = document.getElementById("rl-cabinet-notif-threshold");
   var notifEnabledEl = document.getElementById("rl-cabinet-notif-enabled");
   var notifStatusEl = document.getElementById("rl-cabinet-notif-status");
+  var notifHintEl = document.getElementById("rl-cabinet-notif-hint");
 
   function renderUserBar() {
 
@@ -625,7 +626,7 @@
     var map = {
       beta: "Beta",
       free: "Бесплатно",
-      active: "Активна",
+      active: "Подписка активна ✓",
       paused: "Пауза",
       expired: "Истекла",
     };
@@ -701,6 +702,8 @@
           "Сейчас лента и кабинет бесплатны в режиме beta. Оплата через Telegram Stars подключится в следующем релизе.";
       }
     }
+    updateInboxEmptyStates();
+    loadNotificationSettings(data);
   }
 
   function loadSubscription() {
@@ -748,17 +751,51 @@
     });
   }
 
-  function renderNotificationSettings(data) {
+  function hasPushAccess(sub) {
+    if (!sub) {
+      return false;
+    }
+    if (sub.effective_access) {
+      return true;
+    }
+    var st = sub.status || "";
+    return st === "active" || st === "beta";
+  }
+
+  function renderNotificationSettings(data, sub) {
     if (!notifEl) {
       return;
     }
-    if (!data) {
+    if (!getToken()) {
       notifEl.hidden = true;
+      if (notifHintEl) {
+        notifHintEl.hidden = true;
+      }
+      return;
+    }
+    var paid = hasPushAccess(sub || subscriptionState);
+    if (!paid) {
+      notifEl.hidden = true;
+      if (notifHintEl) {
+        notifHintEl.hidden = false;
+      }
+      return;
+    }
+    if (notifHintEl) {
+      notifHintEl.hidden = true;
+    }
+    if (!data) {
+      notifEl.hidden = false;
       return;
     }
     notifEl.hidden = false;
     if (notifThresholdEl) {
-      notifThresholdEl.value = String(data.push_min_match || 60);
+      var threshold = String(data.push_min_match || 60);
+      notifThresholdEl.querySelectorAll(".rl-notif-threshold-chip").forEach(function (chip) {
+        var active = chip.getAttribute("data-value") === threshold;
+        chip.classList.toggle("is-active", active);
+        chip.setAttribute("aria-pressed", active ? "true" : "false");
+      });
     }
     if (notifEnabledEl) {
       var enabled = data.push_enabled !== false;
@@ -767,9 +804,14 @@
     }
   }
 
-  function loadNotificationSettings() {
+  function loadNotificationSettings(sub) {
+    var subState = sub || subscriptionState;
     if (!cfg.restNotificationSettings || !getToken()) {
-      renderNotificationSettings(null);
+      renderNotificationSettings(null, subState);
+      return Promise.resolve(null);
+    }
+    if (!hasPushAccess(subState)) {
+      renderNotificationSettings(null, subState);
       return Promise.resolve(null);
     }
     return fetch(cfg.restNotificationSettings, {
@@ -783,11 +825,11 @@
         return res.json();
       })
       .then(function (data) {
-        renderNotificationSettings(data);
+        renderNotificationSettings(data, subState);
         return data;
       })
       .catch(function () {
-        renderNotificationSettings(null);
+        renderNotificationSettings(null, subState);
         return null;
       });
   }
@@ -814,7 +856,7 @@
         if (!res.ok) {
           throw new Error((data && data.detail) || "patch failed");
         }
-        renderNotificationSettings(data);
+        renderNotificationSettings(data, subscriptionState);
         _notifSetStatus("Сохранено", false);
         setTimeout(function () { _notifSetStatus(""); }, 2000);
         return data;
@@ -825,11 +867,21 @@
   }
 
   if (notifThresholdEl) {
-    notifThresholdEl.addEventListener("change", function () {
-      var val = parseInt(notifThresholdEl.value, 10);
-      if (!isNaN(val)) {
-        patchNotificationSettings({ push_min_match: val });
+    notifThresholdEl.addEventListener("click", function (e) {
+      var chip = e.target.closest(".rl-notif-threshold-chip");
+      if (!chip) {
+        return;
       }
+      var val = parseInt(chip.getAttribute("data-value"), 10);
+      if (isNaN(val)) {
+        return;
+      }
+      notifThresholdEl.querySelectorAll(".rl-notif-threshold-chip").forEach(function (c) {
+        var active = c === chip;
+        c.classList.toggle("is-active", active);
+        c.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      patchNotificationSettings({ push_min_match: val });
     });
   }
 
@@ -951,18 +1003,34 @@
 
     loadSubscription();
 
-    loadNotificationSettings();
+  }
 
+  var PROD_LOGIN_HOSTS = ["rawlead.ru", "www.rawlead.ru"];
+
+  function cfgTruthy(v) {
+    return v === true || v === 1 || v === "1" || v === "true";
+  }
+
+  function cfgFalsy(v) {
+    return v === false || v === 0 || v === "0" || v === "false" || v === "" || v == null;
+  }
+
+  function isProdLoginHost() {
+    var host = (location.hostname || "").toLowerCase();
+    return PROD_LOGIN_HOSTS.indexOf(host) >= 0;
   }
 
   function canMountTelegramWidget() {
-    if (cfg.tgLoginDev) {
+    if (cfgTruthy(cfg.tgLoginDev)) {
       return location.hostname === "127.0.0.1";
     }
-    if (cfg.tgLoginWidgetAllowed === false) {
+    if (cfgFalsy(cfg.tgLoginWidgetAllowed)) {
       return false;
     }
-    return true;
+    if (cfgTruthy(cfg.tgLoginWidgetAllowed) || isProdLoginHost()) {
+      return true;
+    }
+    return false;
   }
 
   function mountTelegramWidget() {
@@ -985,14 +1053,14 @@
 
         loginHintEl.hidden = false;
 
-        if (cfg.tgLoginDev) {
+        if (cfgTruthy(cfg.tgLoginDev)) {
           loginHintEl.textContent =
             "Кнопка Telegram только на http://127.0.0.1:" +
             (cfg.localPort || "10007") +
             "/cabinet/ — нажмите ссылку ниже.";
         } else {
           loginHintEl.textContent =
-            "Виджет Telegram доступен на rawlead.ru. Используйте fallback-вход ниже.";
+            "Виджет Telegram на этом адресе недоступен. Используйте «Войти через Telegram» ниже.";
         }
 
       }
@@ -1217,7 +1285,14 @@
 
   var countEl = document.getElementById("rl-cabinet-count");
 
-  var sentinelEl = document.getElementById("rl-cabinet-sentinel");
+  var paginationEl = document.getElementById("rl-cabinet-pagination");
+
+  var loadMoreBtn = document.getElementById("rl-cabinet-load-more");
+
+  var paginationCountEl = document.getElementById("rl-cabinet-pagination-count");
+  var paginationShownEl = document.getElementById("rl-cabinet-shown");
+  var paginationTotalEl = document.getElementById("rl-cabinet-total");
+  var paginationLoadingEl = document.getElementById("rl-cabinet-loading");
 
   var endEl = document.getElementById("rl-cabinet-end");
 
@@ -1226,6 +1301,7 @@
   var noTagsEl = document.getElementById("rl-cabinet-no-tags");
 
   var noMatchEl = document.getElementById("rl-cabinet-no-match");
+  var noMatchFreeEl = document.getElementById("rl-cabinet-no-match-free");
 
   var sidebar = document.getElementById("rl-cabinet-sidebar");
 
@@ -1276,9 +1352,13 @@
 
     loading: false,
 
+    showLoadSpinner: false,
+
     done: false,
 
     totalShown: 0,
+
+    total: 0,
 
     expandedId: null,
 
@@ -1290,6 +1370,70 @@
 
   };
 
+  var prefersReduced =
+    window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var rlInboxIo = null;
+  if (!prefersReduced && "IntersectionObserver" in window) {
+    rlInboxIo = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            rlInboxIo.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.08, rootMargin: "0px 0px -5% 0px" }
+    );
+  }
+
+  function observeInboxCards(root) {
+    if (!root) {
+      return;
+    }
+    var cards = root.querySelectorAll(".rl-lead-card:not(.is-visible)");
+    if (prefersReduced || !rlInboxIo) {
+      cards.forEach(function (el) {
+        el.classList.add("is-visible");
+      });
+      return;
+    }
+    cards.forEach(function (el) {
+      rlInboxIo.observe(el);
+    });
+  }
+
+  function updatePagination() {
+    var shown = state.totalShown;
+    var total = state.total > 0 ? state.total : (state.done ? shown : 0);
+    var allLoaded = state.total > 0 ? shown >= state.total : state.done;
+
+    if (paginationShownEl) {
+      paginationShownEl.textContent = String(shown);
+    }
+    if (paginationTotalEl) {
+      paginationTotalEl.textContent = String(total > 0 ? total : shown);
+    }
+    if (paginationCountEl) {
+      paginationCountEl.hidden = shown <= 0 || allLoaded;
+    }
+    if (loadMoreBtn) {
+      loadMoreBtn.hidden = shown <= 0 || allLoaded;
+      loadMoreBtn.style.display = allLoaded ? "none" : "";
+      if (!state.showLoadSpinner) {
+        loadMoreBtn.classList.remove("is-loading");
+      }
+    }
+    if (paginationLoadingEl) {
+      paginationLoadingEl.hidden = !state.showLoadSpinner;
+    }
+    if (paginationEl) {
+      paginationEl.hidden = shown <= 0 && !state.showLoadSpinner;
+    }
+  }
+
 
 
   function apiUrl(base, params) {
@@ -1297,6 +1441,102 @@
     var q = new URLSearchParams(params);
 
     return base + (base.indexOf("?") >= 0 ? "&" : "?") + q.toString();
+
+  }
+
+
+
+  function decodeHtmlEntities(str) {
+
+    var s = String(str || "");
+
+    if (!s) {
+
+      return "";
+
+    }
+
+    if (typeof document !== "undefined") {
+
+      var el = document.createElement("textarea");
+
+      el.innerHTML = s;
+
+      return el.value;
+
+    }
+
+    return s
+
+      .replace(/&amp;/g, "&")
+
+      .replace(/&lt;/g, "<")
+
+      .replace(/&gt;/g, ">")
+
+      .replace(/&quot;/g, '"')
+
+      .replace(/&mdash;/g, "—")
+
+      .replace(/&ndash;/g, "–")
+
+      .replace(/&nbsp;/g, " ");
+
+  }
+
+
+
+  function normalizeSingleLine(str) {
+
+    return String(str || "")
+
+      .replace(/\r\n?/g, " ")
+
+      .replace(/\s+/g, " ")
+
+      .trim();
+
+  }
+
+
+
+  function prepForDisplay(str, singleLine) {
+
+    var s = decodeHtmlEntities(str);
+
+    if (singleLine) {
+
+      return normalizeSingleLine(s);
+
+    }
+
+    return s.replace(/\r\n?/g, "\n");
+
+  }
+
+
+
+  function formatBudgetDisplay(s) {
+
+    var text = prepForDisplay(s, true);
+
+    if (!text || text === "—") {
+
+      return "—";
+
+    }
+
+    return text
+
+      .replace(/(\d[\d\s.,]*)\s*Р\b/g, "$1 ₽")
+
+      .replace(/(\d[\d\s.,]*)р\.?(?=\s|$|[,.])/gi, "$1 ₽")
+
+      .replace(/(\d[\d\s.,]*)\s*(?:руб\.?|rub)\b/gi, "$1 ₽")
+
+      .replace(/\s*₽\s*/g, " ₽")
+
+      .trim();
 
   }
 
@@ -1418,7 +1658,7 @@
 
   function taskBodyText(item) {
 
-    var summary = (item.task_summary || "").trim();
+    var summary = prepForDisplay(item.task_summary || "", false).trim();
 
     if (summary) {
 
@@ -1426,7 +1666,7 @@
 
     }
 
-    var raw = (item.body || item.title || "").trim();
+    var raw = prepForDisplay(item.body || item.title || "", false).trim();
 
     return truncateTaskSnippet(stripLeadingTaskLabel(raw), 280);
 
@@ -1439,22 +1679,6 @@
     var task = taskBodyText(item);
 
     var html = "";
-
-    if (item.title) {
-
-      html +=
-
-        '<div class="rl-feed-card__section">' +
-
-        '<h4 class="rl-feed-card__section-title">Полное название</h4>' +
-
-        '<p class="rl-feed-card__task">' +
-
-        escapeHtml(item.title) +
-
-        "</p></div>";
-
-    }
 
     if (task) {
 
@@ -1478,6 +1702,8 @@
 
     }
 
+    var reply = prepForDisplay(item.reply_draft || "", false).trim();
+
     var tools = item.tools_required || [];
 
     if (tools.length) {
@@ -1494,7 +1720,7 @@
 
           .map(function (tool) {
 
-            return "<li>" + escapeHtml(tool) + "</li>";
+            return "<li>" + escapeHtml(prepForDisplay(tool, true)) + "</li>";
 
           })
 
@@ -1502,7 +1728,7 @@
 
         "</ul></div>";
 
-    } else {
+    } else if (reply) {
 
       html +=
 
@@ -1510,13 +1736,11 @@
 
         '<h4 class="rl-feed-card__section-title">Инструменты</h4>' +
 
-        '<p class="rl-feed-card__text rl-feed-card__muted">Список инструментов появится после premium-разбора.</p>' +
+        '<p class="rl-feed-card__text rl-feed-card__muted">Список инструментов появится после генерации отклика.</p>' +
 
         "</div>";
 
     }
-
-    var reply = (item.reply_draft || "").trim();
 
     if (reply) {
 
@@ -1536,21 +1760,7 @@
 
         "</div>";
 
-    } else {
-
-      html +=
-
-        '<div class="rl-feed-card__section">' +
-
-        '<h4 class="rl-feed-card__section-title">Черновик отклика</h4>' +
-
-        '<p class="rl-feed-card__text rl-feed-card__muted">Черновик отклика появится после premium-разбора.</p>' +
-
-        "</div>";
-
     }
-
-    html += '<div class="rl-feed-card__actions">';
 
     if (item.url) {
 
@@ -1560,11 +1770,9 @@
 
         escapeHtml(item.url) +
 
-        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Открыть оригинал ↗</a>';
+        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Читать на бирже ↗</a>';
 
     }
-
-    html += "</div>";
 
     return html;
 
@@ -1588,9 +1796,9 @@
 
     }
 
-    if (s.indexOf("tg") === 0 || s.indexOf("telegram") >= 0) {
+    if (s.indexOf("tg") === 0 || s.indexOf("telegram") === 0) {
 
-      return { key: "tg", label: "Telegram", cls: "tg" };
+      return { key: "tg", label: "TG", cls: "tg" };
 
     }
 
@@ -1715,17 +1923,19 @@
 
 
   function skeletonHtml(n) {
-
     var html = "";
-
-    for (var i = 0; i < n; i++) {
-
-      html += '<div class="rl-feed-skeleton" aria-hidden="true"></div>';
-
+    var i;
+    for (i = 0; i < n; i++) {
+      html +=
+        '<div class="rl-lead-card rl-lead-card--skeleton" aria-hidden="true">' +
+        '<div class="rl-skeleton rl-skeleton--badge"></div>' +
+        '<div class="rl-skeleton rl-skeleton--title"></div>' +
+        '<div class="rl-skeleton rl-skeleton--meta"></div>' +
+        '<div class="rl-skeleton rl-skeleton--bar"></div>' +
+        '<div class="rl-skeleton rl-skeleton--chips"></div>' +
+        "</div>";
     }
-
     return html;
-
   }
 
 
@@ -2332,12 +2542,6 @@
 
         state.tags = data.tags || tags;
 
-        if (!state.tags.length) {
-
-          clearGuestSkillKeys();
-
-        }
-
         renderTags();
 
         resetAndLoad();
@@ -2412,8 +2616,9 @@
 
     for (i = 0; i < tags.length && i < max; i++) {
 
-      html.push('<span class="rl-chip">' + escapeHtml(tags[i]) + "</span>");
-
+      html.push(
+        '<span class="rl-chip">' + escapeHtml(prepForDisplay(tags[i], true)) + "</span>"
+      );
     }
 
     if (tags.length > max) {
@@ -2434,7 +2639,11 @@
 
   function isPerfectMatch(item) {
     var km = item.keyword_match != null ? item.keyword_match : 0;
-    return km >= 100 && hasUserSkills();
+    if (km < 100 || !hasUserSkills()) {
+      return false;
+    }
+    var tags = (item && item.lead_tags) || [];
+    return tags.length >= 2;
   }
 
   var VIEWS_EYE_SVG =
@@ -2459,148 +2668,117 @@
     );
   }
 
-  function renderCard(item) {
+  function hasPaidAccess() {
+    return !!(subscriptionState && subscriptionState.effective_access);
+  }
 
+  function formatRepliedDate(iso) {
+    if (!iso) {
+      return "";
+    }
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) {
+      return "";
+    }
+    return d.toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  function updateInboxEmptyStates() {
+    if (noMatchEl) {
+      noMatchEl.hidden = true;
+    }
+    if (noMatchFreeEl) {
+      noMatchFreeEl.hidden = true;
+    }
+  }
+
+  function repliedBadgeHtml() {
+    return '<span class="rl-badge rl-badge--replied">Отклик ✓</span>';
+  }
+
+  function headBadgesHtml(item, perfect) {
     var src = sourceLabel(item.source);
-
-    var km = item.keyword_match != null ? item.keyword_match : 0;
-
-    var rank = item.keyword_match != null ? item.keyword_match : 0;
-
-    var perfect = isPerfectMatch(item);
-
-    var barPct = perfect ? km : rank;
-
-    var budget = item.budget_text || "—";
-
-    var expanded = state.expandedId === item.id;
-
-    var matchBadge = perfect
-      ? '<span class="rl-feed-card__match-badge">Точное совпадение</span>'
+    var perfectBadge = perfect
+      ? '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>'
       : "";
-
-
-
+    var reply = prepForDisplay(item.reply_draft || "", false).trim();
+    var repliedBadge = reply ? repliedBadgeHtml() : "";
     return (
-
-      '<article class="rl-lead-card' +
-
-      (expanded ? " is-expanded" : "") +
-
-      (perfect ? " rl-lead-card--perfect-match" : "") +
-
-      '" data-id="' +
-
-      item.id +
-
-      '" tabindex="0" role="button">' +
-
-      '<div class="rl-feed-card__head">' +
-
-      '<div class="rl-feed-card__head-start">' +
-
       '<span class="rl-feed-card__source rl-feed-card__source--' +
-
       src.cls +
-
       '">' +
-
       escapeHtml(src.label) +
-
       "</span>" +
-
-      hotBadgeHtml(item) +
-
-      "</div>" +
-
-      '<div class="rl-feed-card__head-meta">' +
-
-      viewsHeadHtml(item) +
-
-      '<span class="rl-feed-card__time">' +
-
-      formatTime(item.created_at) +
-
-      "</span>" +
-
-      "</div>" +
-
-      "</div>" +
-
-      '<h3 class="rl-lead-card__title">' +
-
-      '<span title="' +
-
-      escapeHtml(item.title || "Без названия") +
-
-      '">' +
-
-      escapeHtml(item.title || "Без названия") +
-
-      "</span>" +
-
-      "</h3>" +
-
-      '<p class="rl-lead-card__budget">Бюджет: ' +
-
-      escapeHtml(budget) +
-
-      "</p>" +
-
-      '<div class="rl-match">' +
-
-      '<div class="rl-match__label">' +
-
-      "<span>Совместимость " +
-
-      barPct +
-
-      "%</span>" +
-
-      matchBadge +
-
-      "</div>" +
-
-      '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
-
-      barPct +
-
-      '" aria-valuemin="0" aria-valuemax="100">' +
-
-      '<span class="rl-match__fill" style="--match-value:' +
-
-      barPct +
-
-      '%"></span>' +
-
-      "</div>" +
-
-      "</div>" +
-
-      '<div class="rl-chips">' +
-
-      renderTagChips(item) +
-
-      "</div>" +
-
-      '<div class="rl-feed-card__cta">' +
-
-      '<button type="button" class="rl-btn rl-btn--ghost rl-feed-card__delete-btn">Удалить из ЛК</button>' +
-
-      "</div>" +
-
-      '<div class="rl-feed-card__body">' +
-
-      '<div class="rl-feed-card__body-inner">' +
-
-      renderExpandedBody(item) +
-
-      "</div></div>" +
-
-      "</article>"
-
+      perfectBadge +
+      repliedBadge +
+      hotBadgeHtml(item)
     );
+  }
 
+  function renderCard(item, isNew) {
+    var km = item.keyword_match != null ? item.keyword_match : 0;
+    var perfect = isPerfectMatch(item);
+    var barPct = km;
+    var budget = formatBudgetDisplay(item.budget_text || "—");
+    var titleText = prepForDisplay(item.title || "Без названия", true);
+    var titleHtml = escapeHtml(titleText);
+    return (
+      '<article class="rl-lead-card' +
+      (isNew ? " is-new" : "") +
+      (perfect ? " rl-lead-card--perfect-match" : "") +
+      '" data-id="' +
+      item.id +
+      '" tabindex="0" role="button">' +
+      '<div class="rl-feed-card__head">' +
+      '<div class="rl-feed-card__head-start">' +
+      headBadgesHtml(item, perfect) +
+      "</div>" +
+      '<div class="rl-feed-card__head-meta">' +
+      '<span class="rl-feed-card__time">' +
+      formatTime(item.created_at) +
+      "</span>" +
+      '<button type="button" class="rl-inbox-card__delete" aria-label="Удалить отклик" data-reply-id="' +
+      item.id +
+      '">✕</button>' +
+      "</div>" +
+      "</div>" +
+      '<h3 class="rl-lead-card__title">' +
+      '<span title="' +
+      titleHtml +
+      '">' +
+      titleHtml +
+      "</span>" +
+      "</h3>" +
+      '<p class="rl-lead-card__budget">Бюджет: ' +
+      escapeHtml(budget) +
+      "</p>" +
+      '<div class="rl-match">' +
+      '<div class="rl-match__label">' +
+      "<span>Совместимость " +
+      barPct +
+      "%</span>" +
+      "</div>" +
+      '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
+      barPct +
+      '" aria-valuemin="0" aria-valuemax="100">' +
+      '<span class="rl-match__fill" style="--match-value:' +
+      barPct +
+      '%"></span>' +
+      "</div>" +
+      "</div>" +
+      '<div class="rl-chips">' +
+      renderTagChips(item) +
+      "</div>" +
+      '<div class="rl-feed-card__body">' +
+      '<div class="rl-feed-card__body-inner">' +
+      renderExpandedBody(item) +
+      "</div></div>" +
+      "</article>"
+    );
   }
 
 
@@ -2639,6 +2817,98 @@
 
 
 
+  function showDraftError(msg, retryFn) {
+
+    if (!errorEl) {
+
+      return;
+
+    }
+
+    errorEl.hidden = false;
+
+    var html = escapeHtml(msg);
+
+    if (retryFn) {
+
+      html += ' <button type="button" class="rl-feed-banner__retry">Повторить</button>';
+
+    }
+
+    errorEl.innerHTML = html;
+
+    var btn = errorEl.querySelector(".rl-feed-banner__retry");
+
+    if (btn && retryFn) {
+
+      btn.addEventListener("click", function () {
+
+        errorEl.hidden = true;
+
+        retryFn();
+
+      });
+
+    }
+
+  }
+
+
+
+  function parseDraftApiError(res, data) {
+
+    var err = new Error("HTTP " + res.status);
+
+    err.status = res.status;
+
+    var detail = "";
+
+    var retryAfter = null;
+
+    if (data && typeof data === "object") {
+
+      if (typeof data.detail === "string") {
+
+        detail = data.detail;
+
+      } else if (data.detail && typeof data.detail === "object") {
+
+        detail = String(data.detail.detail || "");
+
+        retryAfter = data.detail.retry_after_sec;
+
+      }
+
+      if (!detail && data.message) {
+
+        detail = String(data.message);
+
+      }
+
+      if (data.data && data.data.retry_after_sec != null) {
+
+        retryAfter = data.data.retry_after_sec;
+
+      }
+
+      if (data.retry_after_sec != null) {
+
+        retryAfter = data.retry_after_sec;
+
+      }
+
+    }
+
+    err.detail = detail;
+
+    err.retryAfterSec = retryAfter;
+
+    return err;
+
+  }
+
+
+
   function updateCount() {
 
     if (!countEl) {
@@ -2654,6 +2924,8 @@
         ? state.totalShown + " откликов"
 
         : "";
+
+    updatePagination();
 
   }
 
@@ -2759,21 +3031,26 @@
 
     state.totalShown = 0;
 
+    state.total = 0;
+
     state.expandedId = null;
 
     state.loading = false;
 
+    state.showLoadSpinner = false;
+
     state.itemsById = {};
 
     if (noMatchEl) {
-
       noMatchEl.hidden = true;
-
+    }
+    if (noMatchFreeEl) {
+      noMatchFreeEl.hidden = true;
     }
 
     if (listEl) {
 
-      listEl.innerHTML = skeletonHtml(2);
+      listEl.innerHTML = skeletonHtml(4);
 
       listEl.hidden = false;
 
@@ -2782,6 +3059,18 @@
     if (endEl) {
 
       endEl.hidden = true;
+
+    }
+
+    if (paginationLoadingEl) {
+
+      paginationLoadingEl.hidden = true;
+
+    }
+
+    if (loadMoreBtn) {
+
+      loadMoreBtn.hidden = true;
 
     }
 
@@ -2808,6 +3097,17 @@
     var gen = state.loadGeneration;
 
     state.loading = true;
+
+    if (!replace) {
+      state.showLoadSpinner = true;
+      if (loadMoreBtn) {
+        loadMoreBtn.hidden = true;
+        loadMoreBtn.classList.add("is-loading");
+      }
+      if (paginationLoadingEl) {
+        paginationLoadingEl.hidden = false;
+      }
+    }
 
     var url = apiUrl(cfg.restReplies, {
 
@@ -2841,14 +3141,14 @@
 
         var items = data.items || [];
 
+        if (data.total != null) {
+          state.total = parseInt(data.total, 10) || 0;
+        }
+
         if (listEl) {
-
-          listEl.querySelectorAll(".rl-feed-skeleton").forEach(function (el) {
-
+          listEl.querySelectorAll(".rl-lead-card--skeleton, .rl-feed-skeleton").forEach(function (el) {
             el.remove();
-
           });
-
         }
 
         if (replace && listEl) {
@@ -2861,25 +3161,24 @@
 
           listEl.innerHTML = "";
 
-          listEl.hidden = true;
-
-          if (noMatchEl) {
-
-            noMatchEl.hidden = false;
-
-          }
+          showInboxEmpty();
 
         } else {
 
           listEl.hidden = false;
 
           if (noMatchEl) {
-
             noMatchEl.hidden = true;
-
+          }
+          if (noMatchFreeEl) {
+            noMatchFreeEl.hidden = true;
           }
 
-          var frag = items.map(renderCard).join("");
+          var frag = items
+            .map(function (item) {
+              return renderCard(item, !replace);
+            })
+            .join("");
 
           listEl.insertAdjacentHTML("beforeend", frag);
 
@@ -2911,21 +3210,9 @@
 
         bindCards();
 
-        requestAnimationFrame(function () {
+        observeInboxCards(listEl);
 
-          document.querySelectorAll("#rl-cabinet-list .rl-lead-card .rl-match__fill").forEach(function (el) {
-
-            var card = el.closest(".rl-lead-card");
-
-            if (card) {
-
-              card.classList.add("rl-match-ready");
-
-            }
-
-          });
-
-        });
+        updatePagination();
 
       })
 
@@ -2950,9 +3237,9 @@
       .finally(function () {
 
         if (gen === state.loadGeneration) {
-
           state.loading = false;
-
+          state.showLoadSpinner = false;
+          updatePagination();
         }
 
       });
@@ -2971,28 +3258,83 @@
 
 
 
-  function fetchDraft(leadId) {
+  var DRAFT_POLL_MS = 2000;
+  var DRAFT_POLL_MAX_MS = 90000;
+  var DRAFT_FAIL_RU = "ИИ временно недоступен — повторите";
 
-    return fetch(draftUrl(leadId), {
+  function draftReadyPayload(data) {
+    if (!data || data.status === "failed") {
+      var err = new Error((data && data.error) || DRAFT_FAIL_RU);
+      err.status = 503;
+      err.detail = (data && data.error) || DRAFT_FAIL_RU;
+      throw err;
+    }
+    if (data.status === "ready" || (data.reply_draft && String(data.reply_draft).trim())) {
+      return data;
+    }
+    return null;
+  }
 
-      method: "POST",
-
-      credentials: "same-origin",
-
-      headers: authHeaders(),
-
-    }).then(function (res) {
-
-      if (!res.ok) {
-
-        throw new Error("HTTP " + res.status);
-
-      }
-
-      return res.json();
-
+  function pollDraftStatus(leadId, startedMs) {
+    if (Date.now() - startedMs > DRAFT_POLL_MAX_MS) {
+      var timeoutErr = new Error(DRAFT_FAIL_RU);
+      timeoutErr.status = 503;
+      timeoutErr.detail = DRAFT_FAIL_RU;
+      throw timeoutErr;
+    }
+    return new Promise(function (resolve) {
+      window.setTimeout(resolve, DRAFT_POLL_MS);
+    }).then(function () {
+      return fetch(draftUrl(leadId), {
+        method: "GET",
+        credentials: "same-origin",
+        headers: authHeaders(),
+      }).then(function (res) {
+        return res.json().catch(function () {
+          return {};
+        }).then(function (data) {
+          if (res.status === 429 || res.status === 403 || res.status === 404) {
+            throw parseDraftApiError(res, data);
+          }
+          var ready = draftReadyPayload(data);
+          if (ready) {
+            return ready;
+          }
+          if (res.status >= 500 && !data.status) {
+            throw parseDraftApiError(res, data);
+          }
+          return pollDraftStatus(leadId, startedMs);
+        });
+      });
     });
+  }
 
+  function fetchDraft(leadId) {
+    var startedMs = Date.now();
+    return fetch(draftUrl(leadId), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: authHeaders(),
+    }).then(function (res) {
+      return res.json().catch(function () {
+        return {};
+      }).then(function (data) {
+        if (res.status === 429 || res.status === 403 || res.status === 404) {
+          throw parseDraftApiError(res, data);
+        }
+        var ready = draftReadyPayload(data);
+        if (ready) {
+          return ready;
+        }
+        if (res.status === 202 || data.status === "pending") {
+          return pollDraftStatus(leadId, startedMs);
+        }
+        if (!res.ok) {
+          throw parseDraftApiError(res, data);
+        }
+        return pollDraftStatus(leadId, startedMs);
+      });
+    });
   }
 
 
@@ -3009,9 +3351,11 @@
 
     bodyInner.innerHTML = renderExpandedBody(item);
 
-    delete card.dataset.bound;
-
-    bindCards();
+    var headStart = card.querySelector(".rl-feed-card__head-start");
+    if (headStart) {
+      headStart.innerHTML = headBadgesHtml(item, isPerfectMatch(item));
+    }
+    card.classList.remove("is-expanded");
 
   }
 
@@ -3053,178 +3397,124 @@
 
 
 
-  function bindCards() {
+  var cabinetDelegationReady = false;
 
-    if (!listEl) {
-
+  function onCabinetListClick(e) {
+    var card = e.target.closest(".rl-lead-card");
+    if (!card || !listEl || !listEl.contains(card)) {
       return;
-
     }
-
-    listEl.querySelectorAll(".rl-lead-card").forEach(function (card) {
-
-      if (card.dataset.bound) {
-
+    var deleteBtn = e.target.closest(".rl-inbox-card__delete");
+    if (deleteBtn && card.contains(deleteBtn)) {
+      e.stopPropagation();
+      var id = parseInt(
+        deleteBtn.getAttribute("data-reply-id") || card.getAttribute("data-id"),
+        10
+      );
+      if (!id || !window.confirm("Удалить отклик из кабинета?")) {
         return;
-
       }
-
-      card.dataset.bound = "1";
-
-      card.addEventListener("click", function (e) {
-
-        if (e.target.closest(".rl-btn--soon, .rl-feed-card__link, .rl-feed-card__delete-btn, .rl-feed-card__copy")) {
-
-          return;
-
-        }
-
-        var id = parseInt(card.getAttribute("data-id"), 10);
-
-        if (state.expandedId === id) {
-
-          state.expandedId = null;
-
-          card.classList.remove("is-expanded");
-
-        } else {
-
-          listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
-
-            c.classList.remove("is-expanded");
-
-          });
-
-          state.expandedId = id;
-
-          card.classList.add("is-expanded");
-
-        }
-
-      });
-
-      card.addEventListener("keydown", function (e) {
-
-        if (e.key === "Enter" || e.key === " ") {
-
-          e.preventDefault();
-
-          card.click();
-
-        }
-
-      });
-
-      var deleteBtn = card.querySelector(".rl-feed-card__delete-btn");
-
-      if (deleteBtn) {
-
-        deleteBtn.addEventListener("click", function (e) {
-
-          e.stopPropagation();
-
-          var id = parseInt(card.getAttribute("data-id"), 10);
-
-          if (!id || !window.confirm("Удалить отклик из кабинета?")) {
-
-            return;
-
-          }
-
-          deleteBtn.disabled = true;
-
-          deleteReply(id)
-
-            .then(function () {
-
-              card.remove();
-
-              delete state.itemsById[id];
-
-              state.totalShown = Math.max(0, state.totalShown - 1);
-
-              updateCount();
-
-              if (state.totalShown === 0 && noMatchEl) {
-
-                noMatchEl.hidden = false;
-
-                if (listEl) {
-
-                  listEl.hidden = true;
-
-                }
-
-              }
-
-            })
-
-            .catch(function () {
-
-              deleteBtn.disabled = false;
-
-              showError("Не удалось удалить");
-
-            });
-
+      deleteBtn.disabled = true;
+      deleteReply(id)
+        .then(function () {
+          card.style.transition = "opacity 200ms ease-out";
+          card.style.opacity = "0";
+          window.setTimeout(function () {
+            card.remove();
+            delete state.itemsById[id];
+            state.totalShown = Math.max(0, state.totalShown - 1);
+            if (state.total > 0) {
+              state.total = Math.max(0, state.total - 1);
+            }
+            updateCount();
+            if (state.totalShown === 0) {
+              showInboxEmpty();
+            }
+          }, 200);
+        })
+        .catch(function () {
+          deleteBtn.disabled = false;
+          showError("Не удалось удалить");
         });
-
+      return;
+    }
+    var copyBtn = e.target.closest("[data-copy-reply], .rl-feed-card__copy");
+    if (copyBtn && card.contains(copyBtn)) {
+      e.stopPropagation();
+      var replyEl = card.querySelector("[data-reply-text]");
+      var text = replyEl ? replyEl.textContent : "";
+      if (!text) {
+        return;
       }
-
-      var copyBtn = card.querySelector("[data-copy-reply]");
-
-      if (copyBtn) {
-
-        copyBtn.addEventListener("click", function (e) {
-
-          e.stopPropagation();
-
-          var replyEl = card.querySelector("[data-reply-text]");
-
-          var text = replyEl ? replyEl.textContent : "";
-
-          if (!text) {
-
-            return;
-
-          }
-
-          function done(ok) {
-
-            copyBtn.textContent = ok ? "Скопировано ✓" : "Скопировать черновик";
-
-            setTimeout(function () {
-
-              copyBtn.textContent = "Скопировать черновик";
-
-            }, 2000);
-
-          }
-
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-
-            navigator.clipboard.writeText(text).then(function () {
-
-              done(true);
-
-            }).catch(function () {
-
-              done(false);
-
-            });
-
-            return;
-
-          }
-
-          done(false);
-
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          copyBtn.textContent = "Скопировано ✓";
+          window.setTimeout(function () {
+            copyBtn.textContent = "Скопировать черновик";
+          }, 2000);
         });
-
       }
-
+      return;
+    }
+    if (
+      e.target.closest(".rl-inbox-card__delete, .rl-feed-card__copy, .rl-feed-card__link, a, button")
+    ) {
+      return;
+    }
+    var wasExpanded = card.classList.contains("is-expanded");
+    listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
+      c.classList.remove("is-expanded");
     });
+    if (!wasExpanded) {
+      card.classList.add("is-expanded");
+    }
+  }
 
+  function onCabinetListKeydown(e) {
+    var card = e.target.closest(".rl-lead-card");
+    if (!card || !listEl.contains(card)) {
+      return;
+    }
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest("button, a, input, textarea")) {
+        return;
+      }
+      e.preventDefault();
+      var wasExpanded = card.classList.contains("is-expanded");
+      listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
+        c.classList.remove("is-expanded");
+      });
+      if (!wasExpanded) {
+        card.classList.add("is-expanded");
+      }
+    }
+  }
+
+  function ensureCabinetDelegation() {
+    if (!listEl || cabinetDelegationReady) {
+      return;
+    }
+    cabinetDelegationReady = true;
+    listEl.addEventListener("click", onCabinetListClick);
+    listEl.addEventListener("keydown", onCabinetListKeydown);
+  }
+
+  function bindCards() {
+    ensureCabinetDelegation();
+  }
+
+  function showInboxEmpty() {
+    updateInboxEmptyStates();
+    var paid = hasPaidAccess();
+    var target = paid
+      ? document.getElementById("rl-cabinet-no-match")
+      : document.getElementById("rl-cabinet-no-match-free");
+    if (target) {
+      target.hidden = false;
+    }
+    if (listEl) {
+      listEl.hidden = true;
+    }
   }
 
 
@@ -3525,29 +3815,19 @@
 
 
 
-  if (sentinelEl && "IntersectionObserver" in window) {
+  if (loadMoreBtn) {
 
-    var io = new IntersectionObserver(
+    loadMoreBtn.addEventListener("click", function () {
 
-      function (entries) {
+      if (state.loading || state.done) {
 
-        entries.forEach(function (entry) {
+        return;
 
-          if (entry.isIntersecting && !state.loading && !state.done) {
+      }
 
-            loadMore(false);
+      loadMore(false);
 
-          }
-
-        });
-
-      },
-
-      { rootMargin: "200px" }
-
-    );
-
-    io.observe(sentinelEl);
+    });
 
   }
 
@@ -3603,6 +3883,8 @@
     bootCabinet();
 
   }
+
+  ensureCabinetDelegation();
 
   if (!getToken()) {
 

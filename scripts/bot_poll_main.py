@@ -18,6 +18,7 @@ from config import (  # noqa: E402
     radar_timestamp,
 )
 from storage import storage_from_config  # noqa: E402
+from telegram_control import ensure_bot_polling_mode  # noqa: E402
 
 _POLL_SEC = 2.0
 
@@ -40,12 +41,21 @@ def main() -> int:
         flush=True,
     )
 
+    for line in ensure_bot_polling_mode(cfg):
+        ts = radar_timestamp()
+        _append_log(log_path, f"{ts} {line}")
+        print(f"{ts} {line}", flush=True)
+
     while True:
         try:
             for line in try_poll_commands(cfg, storage):
                 ts = radar_timestamp()
                 _append_log(log_path, f"{ts} {line}")
-                if line.startswith("тг:команда:") or "тг:бот:" in line:
+                if (
+                    line.startswith("тг:команда:")
+                    or "тг:бот:" in line
+                    or line.startswith("tg:draft:")
+                ):
                     print(f"{ts} {line}", flush=True)
         except KeyboardInterrupt:
             print("bot-poll: стоп", flush=True)

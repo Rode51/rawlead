@@ -17,7 +17,7 @@
   var cfg = window.rawleadFeed;
   var TOKEN_KEY = "rawlead_access_token";
   var GUEST_SKILLS_KEY = "rawlead_lenta_skills";
-  var MAX_USER_TAGS = 6;
+  var MAX_USER_TAGS = 12;
   var TIER_A_BY_NICHE = {
     dev: [
       "python",
@@ -54,7 +54,11 @@
   };
   var listEl = document.getElementById("rl-feed-list");
   var countEl = document.getElementById("rl-feed-count");
-  var sentinelEl = document.getElementById("rl-feed-sentinel");
+  var paginationEl = document.getElementById("rl-feed-pagination");
+  var loadMoreBtn = document.getElementById("rl-feed-load-more");
+  var paginationCountEl = document.getElementById("rl-feed-pagination-count");
+  var paginationShownEl = document.getElementById("rl-feed-shown");
+  var paginationTotalEl = document.getElementById("rl-feed-total");
   var loadingEl = document.getElementById("rl-feed-loading");
   var endEl = document.getElementById("rl-feed-end");
   var errorEl = document.getElementById("rl-feed-error");
@@ -66,6 +70,7 @@
   var skillsHintEl = document.getElementById("rl-feed-skills-hint");
   var skillsApplyBtn = document.getElementById("rl-feed-skills-apply");
   var skillsClearBtn = document.getElementById("rl-feed-skills-clear");
+  var skillsMyBtn = document.getElementById("rl-feed-skills-my");
   var skillsPanelEl = document.getElementById("rl-feed-skills-panel");
   var skillsRareBtn = document.getElementById("rl-feed-skills-rare");
   var skillsTriggerEl = document.getElementById("rl-feed-skills-trigger-label");
@@ -88,14 +93,80 @@
     tagsLimitFlash: false,
     tagsLoading: false,
     loading: false,
+    showLoadSpinner: false,
     done: false,
     totalShown: 0,
+    total: 0,
     expandedId: null,
     loadGeneration: 0,
     itemsById: {},
   };
 
   var subscriptionState = null;
+
+  var prefersReduced =
+    window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var rlCardIo = null;
+  if (!prefersReduced && "IntersectionObserver" in window) {
+    rlCardIo = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            rlCardIo.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.08, rootMargin: "0px 0px -5% 0px" }
+    );
+  }
+
+  function observeLeadCards(root) {
+    if (!root) {
+      return;
+    }
+    var cards = root.querySelectorAll(".rl-lead-card:not(.is-visible)");
+    if (prefersReduced || !rlCardIo) {
+      cards.forEach(function (el) {
+        el.classList.add("is-visible");
+      });
+      return;
+    }
+    cards.forEach(function (el) {
+      rlCardIo.observe(el);
+    });
+  }
+
+  function updatePagination() {
+    var shown = state.totalShown;
+    var total = state.total > 0 ? state.total : (state.done ? shown : 0);
+    var allLoaded = state.total > 0 ? shown >= state.total : state.done;
+
+    if (paginationShownEl) {
+      paginationShownEl.textContent = String(shown);
+    }
+    if (paginationTotalEl) {
+      paginationTotalEl.textContent = String(total > 0 ? total : shown);
+    }
+    if (paginationCountEl) {
+      paginationCountEl.hidden = shown <= 0 || allLoaded;
+    }
+    if (loadMoreBtn) {
+      loadMoreBtn.hidden = shown <= 0 || allLoaded;
+      loadMoreBtn.style.display = allLoaded ? "none" : "";
+      if (!state.showLoadSpinner) {
+        loadMoreBtn.classList.remove("is-loading");
+      }
+    }
+    if (loadingEl) {
+      loadingEl.hidden = !state.showLoadSpinner;
+    }
+    if (paginationEl) {
+      paginationEl.hidden = shown <= 0 && !state.showLoadSpinner;
+    }
+  }
 
   function apiUrl(params) {
     var q = new URLSearchParams(params);
@@ -157,17 +228,84 @@
     return base + "/" + leadId + "/draft";
   }
 
+  var DRAFT_POLL_MS = 2000;
+  var DRAFT_POLL_MAX_MS = 90000;
+  var DRAFT_FAIL_RU = "ИИ временно недоступен — повторите";
+
+  function draftReadyPayload(data) {
+    if (!data || data.status === "failed") {
+      var err = new Error((data && data.error) || DRAFT_FAIL_RU);
+      err.status = 503;
+      err.detail = (data && data.error) || DRAFT_FAIL_RU;
+      throw err;
+    }
+    if (data.status === "ready" || (data.reply_draft && String(data.reply_draft).trim())) {
+      return data;
+    }
+    return null;
+  }
+
+  function pollDraftStatus(leadId, startedMs) {
+    if (Date.now() - startedMs > DRAFT_POLL_MAX_MS) {
+      var timeoutErr = new Error(DRAFT_FAIL_RU);
+      timeoutErr.status = 503;
+      timeoutErr.detail = DRAFT_FAIL_RU;
+      throw timeoutErr;
+    }
+    return new Promise(function (resolve) {
+      window.setTimeout(resolve, DRAFT_POLL_MS);
+    }).then(function () {
+      return fetch(draftUrl(leadId), {
+        method: "GET",
+        credentials: "same-origin",
+        headers: authHeaders(),
+      }).then(function (res) {
+        return res.json().catch(function () {
+          return {};
+        }).then(function (data) {
+          if (res.status === 429 || res.status === 403 || res.status === 404) {
+            throw parseDraftApiError(res, data);
+          }
+          var ready = draftReadyPayload(data);
+          if (ready) {
+            return ready;
+          }
+          if (res.status >= 500 && !data.status) {
+            throw parseDraftApiError(res, data);
+          }
+          return pollDraftStatus(leadId, startedMs);
+        });
+      });
+    });
+  }
+
   function fetchDraft(leadId) {
+    var startedMs = Date.now();
     return fetch(draftUrl(leadId), {
       method: "POST",
       credentials: "same-origin",
       headers: authHeaders(),
-    }).then(function (res) {
-      if (!res.ok) {
-        throw new Error("HTTP " + res.status);
-      }
-      return res.json();
-    });
+    })
+      .then(function (res) {
+        return res.json().catch(function () {
+          return {};
+        }).then(function (data) {
+          if (res.status === 429 || res.status === 403 || res.status === 404) {
+            throw parseDraftApiError(res, data);
+          }
+          var ready = draftReadyPayload(data);
+          if (ready) {
+            return ready;
+          }
+          if (res.status === 202 || data.status === "pending") {
+            return pollDraftStatus(leadId, startedMs);
+          }
+          if (!res.ok) {
+            throw parseDraftApiError(res, data);
+          }
+          return pollDraftStatus(leadId, startedMs);
+        });
+      });
   }
 
   function loadGuestTags() {
@@ -214,8 +352,8 @@
     if (s.indexOf("kwork") >= 0) {
       return { key: "kwork", label: "Kwork", cls: "kwork" };
     }
-    if (s.indexOf("tg") === 0 || s.indexOf("telegram") >= 0) {
-      return { key: "tg", label: "Telegram", cls: "tg" };
+    if (s.indexOf("tg") === 0 || s.indexOf("telegram") === 0) {
+      return { key: "tg", label: "TG", cls: "tg" };
     }
     return { key: "other", label: source || "—", cls: "other" };
   }
@@ -277,6 +415,54 @@
     return '<span class="rl-badge-hot" aria-label="Горячий заказ">Горячий</span>';
   }
 
+  function decodeHtmlEntities(str) {
+    var s = String(str || "");
+    if (!s) {
+      return "";
+    }
+    if (typeof document !== "undefined") {
+      var el = document.createElement("textarea");
+      el.innerHTML = s;
+      return el.value;
+    }
+    return s
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&mdash;/g, "—")
+      .replace(/&ndash;/g, "–")
+      .replace(/&nbsp;/g, " ");
+  }
+
+  function normalizeSingleLine(str) {
+    return String(str || "")
+      .replace(/\r\n?/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function prepForDisplay(str, singleLine) {
+    var s = decodeHtmlEntities(str);
+    if (singleLine) {
+      return normalizeSingleLine(s);
+    }
+    return s.replace(/\r\n?/g, "\n");
+  }
+
+  function formatBudgetDisplay(s) {
+    var text = prepForDisplay(s, true);
+    if (!text || text === "—") {
+      return "—";
+    }
+    return text
+      .replace(/(\d[\d\s.,]*)\s*Р\b/g, "$1 ₽")
+      .replace(/(\d[\d\s.,]*)р\.?(?=\s|$|[,.])/gi, "$1 ₽")
+      .replace(/(\d[\d\s.,]*)\s*(?:руб\.?|rub)\b/gi, "$1 ₽")
+      .replace(/\s*₽\s*/g, " ₽")
+      .trim();
+  }
+
   function escapeHtml(str) {
     return String(str || "")
       .replace(/&/g, "&amp;")
@@ -335,11 +521,11 @@
   }
 
   function taskBodyText(item) {
-    var summary = (item.task_summary || "").trim();
+    var summary = prepForDisplay(item.task_summary || "", false).trim();
     if (summary) {
       return summary;
     }
-    var raw = (item.body || item.title || "").trim();
+    var raw = prepForDisplay(item.body || item.title || "", false).trim();
     return truncateTaskSnippet(stripLeadingTaskLabel(raw), 280);
   }
 
@@ -357,7 +543,7 @@
       html +=
         '<p class="rl-feed-card__text rl-feed-card__muted">Краткое описание появится после следующего цикла радара.</p>';
     }
-    var reply = (item.reply_draft || "").trim();
+    var reply = prepForDisplay(item.reply_draft || "", false).trim();
     var tools = item.tools_required || [];
     if (tools.length) {
       html +=
@@ -366,7 +552,7 @@
         '<ul class="rl-feed-card__tools">' +
         tools
           .map(function (tool) {
-            return "<li>" + escapeHtml(tool) + "</li>";
+            return "<li>" + escapeHtml(prepForDisplay(tool, true)) + "</li>";
           })
           .join("") +
         "</ul></div>";
@@ -401,11 +587,13 @@
       (item && item.lead_tag_labels && item.lead_tag_labels.length
         ? item.lead_tag_labels
         : item && item.lead_tags) || [];
-    var max = 4;
+    var max = 3;
     var html = [];
     var i;
     for (i = 0; i < tags.length && i < max; i++) {
-      html.push('<span class="rl-chip">' + escapeHtml(tags[i]) + "</span>");
+      html.push(
+        '<span class="rl-chip">' + escapeHtml(prepForDisplay(tags[i], true)) + "</span>"
+      );
     }
     if (tags.length > max) {
       html.push('<span class="rl-chip rl-chip--more">+' + (tags.length - max) + "</span>");
@@ -419,7 +607,11 @@
 
   function isPerfectMatch(item) {
     var km = item.keyword_match != null ? item.keyword_match : 0;
-    return km >= 100 && hasUserSkills();
+    if (km < 100 || !hasUserSkills()) {
+      return false;
+    }
+    var tags = (item && item.lead_tags) || [];
+    return tags.length >= 2;
   }
 
   var VIEWS_EYE_SVG =
@@ -444,20 +636,57 @@
     );
   }
 
-  function renderCard(item) {
-    var src = sourceLabel(item.source);
+  function repliedBadgeHtml() {
+    return '<span class="rl-badge rl-badge--replied">Отклик ✓</span>';
+  }
+
+  function replyCtaHtml(item) {
+    var reply = prepForDisplay(item.reply_draft || "", false).trim();
+    if (reply || !hasPaidAccess()) {
+      return "";
+    }
     var km = item.keyword_match != null ? item.keyword_match : 0;
-    var rank = item.final_rank != null ? item.final_rank : 0;
+    if (km <= 0) {
+      return "";
+    }
+    return (
+      '<div class="rl-feed-card__cta">' +
+      '<button type="button" class="rl-btn rl-btn--primary rl-feed-card__reply-btn">Написать отклик</button>' +
+      "</div>"
+    );
+  }
+
+  function headBadgesHtml(item, perfect) {
+    var src = sourceLabel(item.source);
+    var perfectBadge = perfect
+      ? '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>'
+      : "";
+    var reply = prepForDisplay(item.reply_draft || "", false).trim();
+    var repliedBadge = reply ? repliedBadgeHtml() : "";
+    return (
+      '<span class="rl-feed-card__source rl-feed-card__source--' +
+      src.cls +
+      '">' +
+      escapeHtml(src.label) +
+      "</span>" +
+      perfectBadge +
+      repliedBadge +
+      hotBadgeHtml(item)
+    );
+  }
+
+  function renderCard(item, isNew) {
+    var km = item.keyword_match != null ? item.keyword_match : 0;
     var perfect = isPerfectMatch(item);
     var barPct = km;
-    var budget = item.budget_text || "—";
+    var budget = formatBudgetDisplay(item.budget_text || "—");
+    var titleText = prepForDisplay(item.title || "Без названия", true);
+    var titleHtml = escapeHtml(titleText);
     var expanded = state.expandedId === item.id;
-    var matchBadge = perfect
-      ? '<span class="rl-feed-card__match-badge">Точное совпадение</span>'
-      : "";
 
     return (
       '<article class="rl-lead-card' +
+      (isNew ? " is-new" : "") +
       (expanded ? " is-expanded" : "") +
       (perfect ? " rl-lead-card--perfect-match" : "") +
       '" data-id="' +
@@ -465,12 +694,7 @@
       '" tabindex="0" role="button">' +
       '<div class="rl-feed-card__head">' +
       '<div class="rl-feed-card__head-start">' +
-      '<span class="rl-feed-card__source rl-feed-card__source--' +
-      src.cls +
-      '">' +
-      escapeHtml(src.label) +
-      "</span>" +
-      hotBadgeHtml(item) +
+      headBadgesHtml(item, perfect) +
       "</div>" +
       '<div class="rl-feed-card__head-meta">' +
       viewsHeadHtml(item) +
@@ -481,9 +705,9 @@
       "</div>" +
       '<h3 class="rl-lead-card__title">' +
       '<span title="' +
-      escapeHtml(item.title || "Без названия") +
+      titleHtml +
       '">' +
-      escapeHtml(item.title || "Без названия") +
+      titleHtml +
       "</span>" +
       "</h3>" +
       '<p class="rl-lead-card__budget">Бюджет: ' +
@@ -494,7 +718,6 @@
       "<span>Совместимость " +
       barPct +
       "%</span>" +
-      matchBadge +
       "</div>" +
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
       barPct +
@@ -507,11 +730,7 @@
       '<div class="rl-chips">' +
       renderTagChips(item) +
       "</div>" +
-      (hasPaidAccess() && km > 0
-        ? '<div class="rl-feed-card__cta">' +
-          '<button type="button" class="rl-btn rl-btn--primary rl-feed-card__reply-btn">Написать отклик</button>' +
-          "</div>"
-        : "") +
+      replyCtaHtml(item) +
       '<div class="rl-feed-card__body">' +
       '<div class="rl-feed-card__body-inner">' +
       renderExpandedBody(item) +
@@ -522,8 +741,16 @@
 
   function skeletonHtml(n) {
     var html = "";
-    for (var i = 0; i < n; i++) {
-      html += '<div class="rl-feed-skeleton" aria-hidden="true"></div>';
+    var i;
+    for (i = 0; i < n; i++) {
+      html +=
+        '<div class="rl-lead-card rl-lead-card--skeleton" aria-hidden="true">' +
+        '<div class="rl-skeleton rl-skeleton--badge"></div>' +
+        '<div class="rl-skeleton rl-skeleton--title"></div>' +
+        '<div class="rl-skeleton rl-skeleton--meta"></div>' +
+        '<div class="rl-skeleton rl-skeleton--bar"></div>' +
+        '<div class="rl-skeleton rl-skeleton--chips"></div>' +
+        "</div>";
     }
     return html;
   }
@@ -545,6 +772,70 @@
     }
   }
 
+  function showDraftError(msg, retryFn) {
+    if (!errorEl) {
+      return;
+    }
+    errorEl.hidden = false;
+    var html = escapeHtml(msg);
+    if (retryFn) {
+      html += ' <button type="button" class="rl-feed-banner__retry">Повторить</button>';
+    }
+    errorEl.innerHTML = html;
+    var btn = errorEl.querySelector(".rl-feed-banner__retry");
+    if (btn && retryFn) {
+      btn.addEventListener("click", function () {
+        errorEl.hidden = true;
+        retryFn();
+      });
+    }
+  }
+
+  function parseDraftApiError(res, data) {
+    var err = new Error("HTTP " + res.status);
+    err.status = res.status;
+    var detail = "";
+    var retryAfter = null;
+    if (data && typeof data === "object") {
+      if (typeof data.detail === "string") {
+        detail = data.detail;
+      } else if (data.detail && typeof data.detail === "object") {
+        detail = String(data.detail.detail || "");
+        retryAfter = data.detail.retry_after_sec;
+      }
+      if (!detail && data.message) {
+        detail = String(data.message);
+      }
+      if (data.data && data.data.retry_after_sec != null) {
+        retryAfter = data.data.retry_after_sec;
+      }
+      if (data.retry_after_sec != null) {
+        retryAfter = data.retry_after_sec;
+      }
+    }
+    err.detail = detail;
+    err.retryAfterSec = retryAfter;
+    return err;
+  }
+
+  function updateDelayNotice() {
+    var el = document.getElementById("rl-feed-delay-notice");
+    if (!el) {
+      return;
+    }
+    if (hasPaidAccess()) {
+      el.hidden = true;
+      return;
+    }
+    var pricing = (cfg.pricingUrl || "/pricing/").replace(/\/$/, "") + "/";
+    el.innerHTML =
+      "⏱ Лента обновляется раз в 15 мин · " +
+      '<a href="' +
+      escapeHtml(pricing) +
+      '">Ускорить →</a>';
+    el.hidden = false;
+  }
+
   function updateCount() {
     if (!countEl) {
       return;
@@ -553,12 +844,13 @@
       countEl.textContent = "";
       return;
     }
-    countEl.textContent = state.totalShown + " лидов · по совместимости";
+    countEl.textContent = state.totalShown + " заказов · по совместимости";
+    updatePagination();
   }
 
   function categoryEmptyMessage() {
     return (
-      '<p class="rl-feed-empty">В этой нише пока нет заказов — попробуйте «Все»</p>' +
+      '<p class="rl-feed-empty">В этой нише пока нет заказов — попробуй «Все»</p>' +
       '<button type="button" class="rl-btn rl-btn--ghost rl-feed-empty__cta">Сбросить фильтры</button>'
     );
   }
@@ -907,43 +1199,11 @@
     }
     state.tagsLoading = true;
     updateSkillsDraftUi();
-    if (!isLoggedIn()) {
-      saveGuestTags(tags);
-      applyPersistedTags(tags, options);
-      state.tagsLoading = false;
-      updateSkillsDraftUi();
-      return Promise.resolve();
-    }
-    if (!cfg.restTags) {
-      state.tagsLoading = false;
-      updateSkillsDraftUi();
-      return Promise.resolve();
-    }
-    return fetch(cfg.restTags, {
-      method: "PUT",
-      credentials: "same-origin",
-      headers: Object.assign(
-        { "Content-Type": "application/json" },
-        authHeaders()
-      ),
-      body: JSON.stringify({ tags: tags }),
-    })
-      .then(function (res) {
-        if (!res.ok) {
-          throw new Error("HTTP " + res.status);
-        }
-        return res.json();
-      })
-      .then(function (data) {
-        applyPersistedTags(data.tags || tags, options);
-      })
-      .catch(function () {
-        showError("Не удалось сохранить навыки.");
-      })
-      .finally(function () {
-        state.tagsLoading = false;
-        updateSkillsDraftUi();
-      });
+    saveGuestTags(tags);
+    applyPersistedTags(tags, options);
+    state.tagsLoading = false;
+    updateSkillsDraftUi();
+    return Promise.resolve();
   }
 
   function pruneDraftTagsForCategories() {
@@ -982,25 +1242,43 @@
   }
 
   function loadTags() {
+    state.appliedTags = loadGuestTags();
+    state.draftTags = cloneTags(state.appliedTags);
+    return Promise.resolve();
+  }
+
+  function loadMyProfileSkills() {
     if (!isLoggedIn()) {
-      state.appliedTags = loadGuestTags();
-      state.draftTags = cloneTags(state.appliedTags);
-      return Promise.resolve();
+      if (skillsHintEl) {
+        skillsHintEl.hidden = false;
+        skillsHintEl.textContent = "Войди в кабинет, чтобы подставить навыки профиля";
+      }
+      return;
     }
     if (!cfg.restTags) {
-      return Promise.resolve();
+      return;
     }
-    return fetch(cfg.restTags, { credentials: "same-origin", headers: authHeaders() })
+    state.tagsLoading = true;
+    updateSkillsDraftUi();
+    fetch(cfg.restTags, { credentials: "same-origin", headers: authHeaders() })
       .then(function (res) {
         return res.ok ? res.json() : { tags: [] };
       })
       .then(function (data) {
-        state.appliedTags = data.tags || [];
-        state.draftTags = cloneTags(state.appliedTags);
+        state.draftTags = cloneTags(data.tags || []);
+        state.tagsLimitFlash = false;
+        renderSkillsCatalog();
+        if (skillsHintEl) {
+          skillsHintEl.hidden = false;
+          skillsHintEl.textContent = "Навыки профиля подставлены — нажми «Применить»";
+        }
       })
       .catch(function () {
-        state.appliedTags = [];
-        state.draftTags = [];
+        showError("Не удалось загрузить навыки профиля.");
+      })
+      .finally(function () {
+        state.tagsLoading = false;
+        updateSkillsDraftUi();
       });
   }
 
@@ -1054,16 +1332,21 @@
     state.offset = 0;
     state.done = false;
     state.totalShown = 0;
+    state.total = 0;
     state.expandedId = null;
     state.loading = false;
+    state.showLoadSpinner = false;
     if (listEl) {
-      listEl.innerHTML = skeletonHtml(2);
+      listEl.innerHTML = skeletonHtml(4);
     }
     if (endEl) {
       endEl.hidden = true;
     }
     if (loadingEl) {
       loadingEl.hidden = true;
+    }
+    if (loadMoreBtn) {
+      loadMoreBtn.hidden = true;
     }
     loadMore(true);
   }
@@ -1077,11 +1360,18 @@
     }
     var gen = state.loadGeneration;
     state.loading = true;
-    if (!replace && loadingEl) {
-      loadingEl.hidden = false;
-    }
-    if (!replace && endEl) {
-      endEl.hidden = true;
+    if (!replace) {
+      state.showLoadSpinner = true;
+      if (loadMoreBtn) {
+        loadMoreBtn.hidden = true;
+        loadMoreBtn.classList.add("is-loading");
+      }
+      if (loadingEl) {
+        loadingEl.hidden = false;
+      }
+      if (endEl) {
+        endEl.hidden = true;
+      }
     }
     var params = {
       limit: state.limit,
@@ -1111,8 +1401,11 @@
         var items = (data.items || []).filter(function (item) {
           return matchSource(item, state.source);
         });
+        if (data.total != null) {
+          state.total = parseInt(data.total, 10) || 0;
+        }
         if (listEl) {
-          listEl.querySelectorAll(".rl-feed-skeleton").forEach(function (el) {
+          listEl.querySelectorAll(".rl-lead-card--skeleton, .rl-feed-skeleton").forEach(function (el) {
             el.remove();
           });
         }
@@ -1129,13 +1422,17 @@
             state.appliedTags.length
           ) {
             listEl.innerHTML =
-              '<p class="rl-feed-empty">В этой нише пока нет заказов — попробуйте «Все»</p>';
+              '<p class="rl-feed-empty">В этой нише пока нет заказов — попробуй «Все»</p>';
           } else {
             listEl.innerHTML =
               '<p class="rl-feed-empty">Пока нет заказов. Биржи обновляются каждые 15 минут.</p>';
           }
         } else {
-          var frag = items.map(renderCard).join("");
+          var frag = items
+            .map(function (item) {
+              return renderCard(item, !replace);
+            })
+            .join("");
           listEl.insertAdjacentHTML("beforeend", frag);
           items.forEach(function (item) {
             state.itemsById[item.id] = item;
@@ -1152,14 +1449,8 @@
         updateCount();
         updateFilterBarUi();
         bindCards();
-        requestAnimationFrame(function () {
-          document.querySelectorAll(".rl-feed-list .rl-lead-card .rl-match__fill").forEach(function (el) {
-            var card = el.closest(".rl-lead-card");
-            if (card) {
-              card.classList.add("rl-match-ready");
-            }
-          });
-        });
+        observeLeadCards(listEl);
+        updatePagination();
       })
       .catch(function () {
         if (gen !== state.loadGeneration) {
@@ -1173,9 +1464,8 @@
       .finally(function () {
         if (gen === state.loadGeneration) {
           state.loading = false;
-          if (loadingEl) {
-            loadingEl.hidden = true;
-          }
+          state.showLoadSpinner = false;
+          updatePagination();
         }
       });
   }
@@ -1186,106 +1476,149 @@
       return;
     }
     bodyInner.innerHTML = renderExpandedBody(item);
-    delete card.dataset.bound;
-    bindCards();
+    var headStart = card.querySelector(".rl-feed-card__head-start");
+    if (headStart) {
+      headStart.innerHTML = headBadgesHtml(item, isPerfectMatch(item));
+    }
+    var cta = card.querySelector(".rl-feed-card__cta");
+    if (cta) {
+      cta.remove();
+    }
+    state.expandedId = null;
+    card.classList.remove("is-expanded");
+  }
+
+  var cardDelegationReady = false;
+
+  function toggleCardExpand(card) {
+    var id = parseInt(card.getAttribute("data-id"), 10);
+    if (state.expandedId === id) {
+      state.expandedId = null;
+      card.classList.remove("is-expanded");
+    } else {
+      listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
+        c.classList.remove("is-expanded");
+      });
+      state.expandedId = id;
+      card.classList.add("is-expanded");
+    }
+  }
+
+  function runDraftFetchForCard(card, replyBtn) {
+    if (!hasPaidAccess()) {
+      return;
+    }
+    var id = parseInt(card.getAttribute("data-id"), 10);
+    listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
+      c.classList.remove("is-expanded");
+    });
+    state.expandedId = id;
+    card.classList.add("is-expanded");
+    var replyEl = card.querySelector("[data-reply-text]");
+    if (replyEl && replyEl.textContent.trim()) {
+      replyEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      return;
+    }
+    var prevLabel = replyBtn.textContent;
+    replyBtn.disabled = true;
+    replyBtn.textContent = "Генерируем…";
+    fetchDraft(id)
+      .then(function (data) {
+        var base = state.itemsById[id] || { id: id };
+        var merged = Object.assign({}, base, {
+          reply_draft: data.reply_draft,
+          tools_required: data.tools_required || base.tools_required || [],
+        });
+        state.itemsById[id] = merged;
+        updateCardDraft(card, merged);
+      })
+      .catch(function (err) {
+        if (err && err.status === 403) {
+          showError(err.detail || "Нет пересечения с твоими навыками");
+          return;
+        }
+        if (err && err.status === 429) {
+          showError(err.detail || "Лимит: не больше 10 черновиков в час");
+          return;
+        }
+        var msg = (err && err.detail) || DRAFT_FAIL_RU;
+        if (msg.indexOf("draft generation failed") !== -1) {
+          msg = DRAFT_FAIL_RU;
+        }
+        showDraftError(msg, function () {
+          runDraftFetchForCard(card, replyBtn);
+        });
+      })
+      .finally(function () {
+        if (replyBtn && replyBtn.isConnected) {
+          replyBtn.disabled = false;
+          replyBtn.textContent = prevLabel;
+        }
+      });
+  }
+
+  function onFeedListClick(e) {
+    var card = e.target.closest(".rl-lead-card");
+    if (!card || !listEl || !listEl.contains(card)) {
+      return;
+    }
+    var replyBtn = e.target.closest(".rl-feed-card__reply-btn");
+    if (replyBtn && card.contains(replyBtn)) {
+      e.stopPropagation();
+      runDraftFetchForCard(card, replyBtn);
+      return;
+    }
+    var copyBtn = e.target.closest("[data-copy-reply], .rl-feed-card__copy");
+    if (copyBtn && card.contains(copyBtn)) {
+      e.stopPropagation();
+      var replyEl = card.querySelector("[data-reply-text]");
+      var text = replyEl ? replyEl.textContent : "";
+      if (!text) {
+        return;
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          copyBtn.textContent = "Скопировано ✓";
+          setTimeout(function () {
+            copyBtn.textContent = "Скопировать черновик";
+          }, 2000);
+        });
+      }
+      return;
+    }
+    if (
+      e.target.closest(".rl-feed-card__link, a, button, input, textarea, select")
+    ) {
+      return;
+    }
+    toggleCardExpand(card);
+  }
+
+  function onFeedListKeydown(e) {
+    var card = e.target.closest(".rl-lead-card");
+    if (!card || !listEl.contains(card)) {
+      return;
+    }
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest("button, a, input, textarea")) {
+        return;
+      }
+      e.preventDefault();
+      toggleCardExpand(card);
+    }
+  }
+
+  function ensureCardDelegation() {
+    if (!listEl || cardDelegationReady) {
+      return;
+    }
+    cardDelegationReady = true;
+    listEl.addEventListener("click", onFeedListClick);
+    listEl.addEventListener("keydown", onFeedListKeydown);
   }
 
   function bindCards() {
-    listEl.querySelectorAll(".rl-lead-card").forEach(function (card) {
-      if (card.dataset.bound) {
-        return;
-      }
-      card.dataset.bound = "1";
-      card.addEventListener("click", function (e) {
-        if (
-          e.target.closest(
-            ".rl-feed-card__link, .rl-feed-card__reply-btn, .rl-feed-card__copy"
-          )
-        ) {
-          return;
-        }
-        var id = parseInt(card.getAttribute("data-id"), 10);
-        if (state.expandedId === id) {
-          state.expandedId = null;
-          card.classList.remove("is-expanded");
-        } else {
-          listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
-            c.classList.remove("is-expanded");
-          });
-          state.expandedId = id;
-          card.classList.add("is-expanded");
-        }
-      });
-      card.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          card.click();
-        }
-      });
-      var replyBtn = card.querySelector(".rl-feed-card__reply-btn");
-      if (replyBtn) {
-        replyBtn.addEventListener("click", function (e) {
-          e.stopPropagation();
-          if (!hasPaidAccess()) {
-            return;
-          }
-          var id = parseInt(card.getAttribute("data-id"), 10);
-          listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
-            c.classList.remove("is-expanded");
-          });
-          state.expandedId = id;
-          card.classList.add("is-expanded");
-          var replyEl = card.querySelector("[data-reply-text]");
-          if (replyEl && replyEl.textContent.trim()) {
-            replyEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-            return;
-          }
-          var prevLabel = replyBtn.textContent;
-          replyBtn.disabled = true;
-          replyBtn.textContent = "Генерируем…";
-          fetchDraft(id)
-            .then(function (data) {
-              var base = state.itemsById[id] || { id: id };
-              var merged = Object.assign({}, base, {
-                reply_draft: data.reply_draft,
-                tools_required: data.tools_required || base.tools_required || [],
-              });
-              state.itemsById[id] = merged;
-              updateCardDraft(card, merged);
-            })
-            .catch(function (err) {
-              var msg =
-                err && err.message && err.message.indexOf("403") >= 0
-                  ? "Нет пересечения с вашими навыками"
-                  : "Не удалось сгенерировать черновик";
-              showError(msg);
-            })
-            .finally(function () {
-              replyBtn.disabled = false;
-              replyBtn.textContent = prevLabel;
-            });
-        });
-      }
-      var copyBtn = card.querySelector("[data-copy-reply]");
-      if (copyBtn) {
-        copyBtn.addEventListener("click", function (e) {
-          e.stopPropagation();
-          var replyEl = card.querySelector("[data-reply-text]");
-          var text = replyEl ? replyEl.textContent : "";
-          if (!text) {
-            return;
-          }
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function () {
-              copyBtn.textContent = "Скопировано ✓";
-              setTimeout(function () {
-                copyBtn.textContent = "Скопировать черновик";
-              }, 2000);
-            });
-          }
-        });
-      }
-    });
+    ensureCardDelegation();
   }
 
   function bindWheelScroll(el) {
@@ -1359,6 +1692,9 @@
   }
   if (skillsClearBtn) {
     skillsClearBtn.addEventListener("click", clearSkills);
+  }
+  if (skillsMyBtn) {
+    skillsMyBtn.addEventListener("click", loadMyProfileSkills);
   }
   if (skillsRareBtn) {
     skillsRareBtn.addEventListener("click", function () {
@@ -1492,6 +1828,9 @@
       sheetBody.querySelectorAll(".rl-feed-skills-clear").forEach(function (btn) {
         btn.addEventListener("click", clearSkills);
       });
+      sheetBody.querySelectorAll(".rl-feed-skills-my").forEach(function (btn) {
+        btn.addEventListener("click", loadMyProfileSkills);
+      });
       bindSkillsPanels(sheetBody);
       updateSkillsBadge();
       updateSkillsDraftUi();
@@ -1534,21 +1873,19 @@
     }
   }
 
-  if (sentinelEl && "IntersectionObserver" in window) {
-    var io = new IntersectionObserver(
-      function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting && !state.loading && !state.done) {
-            loadMore(false);
-          }
-        });
-      },
-      { rootMargin: "200px" }
-    );
-    io.observe(sentinelEl);
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener("click", function () {
+      if (state.loading || state.done) {
+        return;
+      }
+      loadMore(false);
+    });
   }
 
+  ensureCardDelegation();
+
   loadSubscription().then(function () {
+    updateDelayNotice();
     return Promise.all([loadTags(), loadCatalog()]);
   }).then(function () {
     state.draftCategories = readCategoriesFrom();
@@ -1560,46 +1897,6 @@
     resetAndLoad();
   });
 
-  var bugFab = document.getElementById("rl-bug-fab");
-  var bugModal = document.getElementById("rl-bug-modal");
-  if (bugFab && bugModal) {
-    var bugOverlay = document.getElementById("rl-bug-modal-overlay");
-    var bugUrl = document.getElementById("rl-bug-url");
-    var bugText = document.getElementById("rl-bug-text");
-    var bugSubmit = document.getElementById("rl-bug-submit");
-    var bugSuccess = document.getElementById("rl-bug-success");
-    function openBugModal() {
-      if (bugUrl) {
-        bugUrl.textContent = window.location.href;
-      }
-      if (bugSuccess) {
-        bugSuccess.hidden = true;
-      }
-      if (bugText) {
-        bugText.value = "";
-      }
-      bugModal.hidden = false;
-    }
-    function closeBugModal() {
-      bugModal.hidden = true;
-    }
-    bugFab.addEventListener("click", openBugModal);
-    if (bugOverlay) {
-      bugOverlay.addEventListener("click", closeBugModal);
-    }
-    if (bugSubmit) {
-      bugSubmit.addEventListener("click", function () {
-        if (bugSuccess) {
-          bugSuccess.hidden = false;
-        }
-        if (bugSubmit) {
-          bugSubmit.disabled = true;
-        }
-        window.setTimeout(closeBugModal, 2000);
-      });
-    }
-  }
-
   var siteHeader = document.querySelector(".rl-header");
   if (siteHeader) {
     window.addEventListener(
@@ -1609,5 +1906,9 @@
       },
       { passive: true }
     );
+  }
+
+  if (window.rawleadSyncHeader) {
+    window.rawleadSyncHeader();
   }
 })();

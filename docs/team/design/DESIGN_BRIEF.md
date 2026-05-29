@@ -1,7 +1,10 @@
-# DESIGN_BRIEF — пульт RawLead v2
+# DESIGN_BRIEF — пульт RawLead v2 (**только desktop/Tauri**)
 
-**Статус:** v2 · утверждено Lead 2026-05-23 · canvas `r7` · Coder: [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md)  
-**Задача:** [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md)  
+> **Не путать с WP.** Сайт rawlead.ru (`/`, `/lenta/`, `/cabinet/`) — канон: [`docs/design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) · спеки волн: `docs/design/wp/wave-*-brief.md` · задачи: [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md) § активная.
+
+**WP Wave 2 ✅:** [`wave-2-css-brief.md`](../../design/wp/wave-2-css-brief.md) · O41 ✅ prod · **→ Wave 4:** DESIGNER_PROMPT § WAVE-4-UX-FIX
+
+**Статус пульт:** v2 · утверждено Lead 2026-05-23 · canvas `r7`  
 **Live-превью:** `.cursor/projects/c-Users-hramo-uisness/canvases/fl-radar-pult-v2.canvas.tsx`  
 **Стек:** Tauri 2 + HTML/CSS · **без PyQt6** (решение Lead 2026-05-20, ADR в git history)
 

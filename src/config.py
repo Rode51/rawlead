@@ -57,6 +57,7 @@ class Config:
     ai_model: str
     ai_model_summary: str
     ai_model_premium: str
+    ai_model_shared_draft: str
     ai_provider: str
     min_budget_rub: int
     ai_notify_skip: bool
@@ -69,6 +70,8 @@ class Config:
     site_notify_owner: bool
     radar_conveyor: bool
     l1_batch_per_cycle: int
+    l1_max_workers: int
+    l1_backlog_drain: bool
     match_push_enabled: bool
     stars_enabled: bool
     stars_price_xtr: int
@@ -771,6 +774,15 @@ def load_config() -> Config:
         l1_batch_per_cycle = max(1, min(500, int(l1_batch_raw)))
     except ValueError:
         l1_batch_per_cycle = 40
+    l1_workers_raw = os.environ.get("L1_MAX_WORKERS", "3").strip()
+    try:
+        l1_max_workers = max(1, min(16, int(l1_workers_raw)))
+    except ValueError:
+        l1_max_workers = 3
+    l1_backlog_drain = _parse_bool_flag(
+        os.environ.get("L1_BACKLOG_DRAIN"),
+        default=False,
+    )
 
     token = _require_str("TELEGRAM_BOT_TOKEN")
     chat_id = _require_str("TELEGRAM_CHAT_ID")
@@ -808,6 +820,12 @@ def load_config() -> Config:
         str(premium_raw).strip()
         if premium_raw and str(premium_raw).strip()
         else ai_model
+    )
+    shared_raw = os.environ.get("OPENROUTER_MODEL_SHARED_DRAFT")
+    ai_model_shared_draft = (
+        str(shared_raw).strip()
+        if shared_raw and str(shared_raw).strip()
+        else ai_model_premium
     )
 
     ai_provider = _parse_ai_provider(os.environ.get("AI_PROVIDER"))
@@ -864,6 +882,7 @@ def load_config() -> Config:
         ai_model=ai_model,
         ai_model_summary=ai_model_summary,
         ai_model_premium=ai_model_premium,
+        ai_model_shared_draft=ai_model_shared_draft,
         ai_provider=ai_provider,
         min_budget_rub=min_budget_rub,
         ai_notify_skip=ai_notify_skip,
@@ -876,6 +895,8 @@ def load_config() -> Config:
         site_notify_owner=site_notify_owner,
         radar_conveyor=radar_conveyor,
         l1_batch_per_cycle=l1_batch_per_cycle,
+        l1_max_workers=l1_max_workers,
+        l1_backlog_drain=l1_backlog_drain,
         match_push_enabled=match_push_enabled,
         stars_enabled=stars_enabled,
         stars_price_xtr=stars_price_xtr,

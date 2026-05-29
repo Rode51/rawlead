@@ -27,6 +27,11 @@ def main() -> int:
         "chown -R www-data:www-data /var/www/rawlead.ru/wp-content/themes/rawlead-kadence-child"
     )
     print("rsync -> /var/www/rawlead.ru/wp-content/themes/rawlead-kadence-child")
+    ssh.run(
+        r"find /opt/rawlead/deploy -name '*.sh' -exec sed -i 's/\r$//' {} \; && "
+        "chmod +x /opt/rawlead/deploy/*.sh"
+    )
+    print("CRLF fix: deploy/*.sh")
     _, ver, _ = ssh.run(
         "grep \"define('RAWLEAD_CHILD_VERSION'\" "
         "/var/www/rawlead.ru/wp-content/themes/rawlead-kadence-child/functions.php | head -1",
@@ -45,7 +50,7 @@ def main() -> int:
     print("version:", ver.strip())
     print("GUEST_SKILLS lines:", gs.strip())
     print("auth guard lines:", auth.strip())
-    ok = "1.7.10" in ver and int((gs.strip() or "0").split()[0]) >= 1
+    ok = "1.10.2" in ver and int((gs.strip() or "0").split()[0]) >= 1
     if ok:
         print("DEPLOY OK")
         return 0

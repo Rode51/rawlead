@@ -8,11 +8,11 @@
 <!-- wp:group {"className":"rl-hero rl-section","layout":{"type":"constrained"}} -->
 <div class="wp-block-group rl-hero rl-section"><!-- wp:heading {"level":1,"className":"rl-hero__title"} -->
 <p class="rl-hero__eyebrow">RawLead · фриланс-радар</p>
-<h1 class="wp-block-heading rl-hero__title"><span class="rl-hero__title-line">Заказы</span> <span class="rl-hero__title-line rl-hero__title-line--accent">под ваш стек</span></h1>
+<h1 class="wp-block-heading rl-hero__title"><span class="rl-hero__title-line">Заказы</span> <span class="rl-hero__title-line rl-hero__title-line--accent">под твой стек</span></h1>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph {"className":"rl-hero__lead"} -->
-<p class="rl-hero__lead">FL.ru, Kwork и Telegram — один поток. Фильтры отсекают шум, ИИ показывает совместимость с вашими навыками.</p>
+<p class="rl-hero__lead">Биржи и Telegram — в одной ленте. ИИ убирает мусор до тебя.</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:buttons -->

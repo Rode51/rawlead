@@ -23,6 +23,8 @@
 
 ## Пять серверов (кратко)
 
+> **+ Recraft (#6)** — для Design Wave 2 (2026-05-29, владелец).
+
 | # | Имя | Зачем | OSS | Деньги |
 |---|-----|-------|-----|--------|
 | 1 | **Perplexity** | Поиск и ответы по интернету в реальном времени | [ppl-ai/modelcontextprotocol](https://github.com/perplexityai/modelcontextprotocol) | Нужен **API key** [Perplexity API](https://www.perplexity.ai/settings/api) |
@@ -30,6 +32,7 @@
 | 3 | **Firecrawl** | Скрапинг URL → markdown в контекст (конкуренты, лендинги) | [firecrawl/firecrawl-mcp-server](https://github.com/firecrawl/firecrawl-mcp-server) | API key; есть [free tier](https://firecrawl.dev) |
 | 4 | **Glif** | Картинки/видео через workflow glif.app (много моделей) | [glifxyz/glif-mcp-server](https://github.com/glifxyz/glif-mcp-server) | Токен [glif.app/settings/api-tokens](https://glif.app/settings/api-tokens) |
 | 5 | **Chrome (Claude in Chrome)** | Текущие вкладки, логин, консоль — из Claude Code | Встроено в Claude Code (не отдельный npm) | План Anthropic + расширение Chrome |
+| 6 | **Recraft** | Raster + **vector (SVG)** — hero, иконки, иллюстрации для `docs/design/assets/` | [recraft-ai/mcp-recraft-server](https://github.com/recraft-ai/mcp-recraft-server) · [remote docs](https://www.recraft.ai/docs/mcp-reference/remote-server) | **Кредиты Recraft** (OAuth remote) или API units (local) |
 
 > «Все бесплатные» в постах — **серверы** часто open source, но Perplexity / Firecrawl / Glif **съедают квоты API**. Playwright и Chrome MCP — без отдельного SaaS за скрап (кроме плана Claude для Chrome).
 
@@ -43,7 +46,7 @@
 | Скачать **структурированно** страницу / сайт в markdown | Firecrawl | Playwright `get_page_content` |
 | E2E-тест пульта, клики, регресс UI | Playwright | Chrome MCP |
 | Сайт уже открыт, нужен **ваш** логин / cookies | Chrome MCP | Playwright (чистый профиль) |
-| Иконка, мокап, картинка для `docs/design/` | Glif | Владелец вручную / Designer |
+| Иконка, мокап, картинка для `docs/design/` | **Recraft** (vector/SVG) | Glif · владелец вручную |
 | Данные **только** из этого репо | — (без MCP) | — |
 
 **RawLead-специфика:** runtime TG, `.env`, `data/` — MCP не заменяет; смотри `docs/ops/`, `STATUS.md`.
@@ -74,7 +77,33 @@ claude mcp add firecrawl --env FIRECRAWL_API_KEY="fc-..." -- npx -y firecrawl-mc
 
 # Glif
 claude mcp add glif --env GLIF_API_TOKEN="..." -- npx -y @glifxyz/glif-mcp-server@latest
+
+# Recraft (remote OAuth — кредиты Studio)
+claude mcp add --transport http recraft https://mcp.recraft.ai/mcp
 ```
+
+**Recraft local** (API units + файлы в repo):
+
+```json
+"recraft": {
+  "command": "npx",
+  "args": ["-y", "@recraft-ai/mcp-recraft-server@latest"],
+  "env": {
+    "RECRAFT_API_KEY": "PASTE_RECRAFT_API_KEY",
+    "IMAGE_STORAGE_DIRECTORY": "C:/Users/hramo/uisness/docs/design/assets"
+  }
+}
+```
+
+**Recraft remote** (Cursor — уже в `%USERPROFILE%\.cursor\mcp.json`):
+
+```json
+"recraft": {
+  "url": "https://mcp.recraft.ai/mcp"
+}
+```
+
+Первый вызов → OAuth в браузере. Док: [recraft.ai/docs/mcp-reference/remote-server](https://www.recraft.ai/docs/mcp-reference/remote-server)
 
 Chrome: `claude --chrome` или в сессии `/chrome` → Enabled.  
 Док: [Use Claude Code with Chrome](https://code.claude.com/docs/en/chrome) · расширение [Claude in Chrome](https://chromewebstore.google.com) · CC ≥ 2.0.73, ext ≥ 1.0.36.
@@ -106,6 +135,7 @@ Chrome: `claude --chrome` или в сессии `/chrome` → Enabled.
 - Ключи — только локально; не в `git`, не в `CODER_PROMPT`, не в чат.
 - Firecrawl / Playwright на **чужих** сайтах — уважать ToS и rate limit.
 - Glif — платные генерации на аккаунте glif.app.
+- **Recraft** — кредиты Studio (remote OAuth) или API units (local key).
 - Perplexity — токены API на вашем счёте.
 
 ---
@@ -115,6 +145,7 @@ Chrome: `claude --chrome` или в сессии `/chrome` → Enabled.
 - [x] Node.js 18+ (`node -v`)
 - [x] `perplexity` + `firecrawl` добавлены в `%USERPROFILE%\.cursor\mcp.json` (2026-05-28) · Neon сохранён
 - [ ] **Подставить ключи** вместо `PASTE_…` (см. ниже) → перезапуск Cursor
+- [x] `recraft` remote в `%USERPROFILE%\.cursor\mcp.json` (2026-05-29) · OAuth при первом вызове
 - [ ] Glif / Playwright (по необходимости)
 - [ ] Playwright: `npx @playwright/mcp@latest` один раз отработал без ошибки
 - [ ] Claude Code: при необходимости `claude --chrome` + расширение
@@ -130,6 +161,7 @@ Chrome: `claude --chrome` или в сессии `/chrome` → Enabled.
 | Playwright | https://playwright.dev/docs/getting-started-mcp |
 | Firecrawl | https://github.com/firecrawl/firecrawl-mcp-server |
 | Glif | https://github.com/glifxyz/glif-mcp-server |
+| Recraft | https://www.recraft.ai/docs/mcp-reference/getting-started |
 | Chrome | https://code.claude.com/docs/en/chrome |
 
 ---

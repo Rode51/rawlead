@@ -6,6 +6,7 @@ import csv
 import json
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from config import (
@@ -25,13 +26,15 @@ from health_check import (
     tg_monitor_warmup_remaining_sec,
 )
 from radar_cycle_log import (
-    format_cycle_status_block,
+    SOURCE_LABELS,
+    CycleSummary,
+    SourceCycleStats,
     load_cycle_summary,
     load_site_rollup_line,
+    parse_site_rollup_metrics,
 )
 from storage import ProjectStorage
-from tg_bot_start import is_bot_started, resolve_bot_username
-from tg_client import resolve_telethon_account
+from tg_bot_start import is_bot_started
 
 _STATUS_FL_CYCLE_AT = "status_fl_cycle_at"
 _STATUS_FL = (
@@ -195,7 +198,16 @@ def _profile_label(profile: str) -> str:
 
 
 def _bot_label(cfg: Config) -> str:
-    return f"@{resolve_bot_username()}"
+    if cfg.radar_profile == "site":
+        return f"@{_SITE_BOT_USERNAME}"
+    return f"@{_LEGACY_BOT_USERNAME}"
+
+
+_SITE_BOT_USERNAME = "rawlead_bot"
+_LEGACY_BOT_USERNAME = "FLPARSINGBOT"
+_STATUS_MAX_LEN = 3490
+_L1_BACKLOG_OK = 50
+_L1_BACKLOG_WARN = 100
 
 
 def _control_port() -> int:
@@ -251,6 +263,21 @@ def _query_l1_backlog(cfg: Config) -> int | None:
         return None
 
 
+def _query_l1_backlog_recent(cfg: Config, hours: int = 48) -> int | None:
+    """Без L1 за последние N часов — свежий хвост."""
+    if cfg.radar_profile != "site":
+        return None
+    try:
+        from pg_storage import pg_storage_from_config
+
+        pg = pg_storage_from_config(cfg)
+        if pg is None or not pg.enabled:
+            return None
+        return pg.count_leads_missing_l1_recent(hours=hours)
+    except Exception:
+        return None
+
+
 def build_status_detail(cfg: Config, storage: ProjectStorage) -> dict:
     """JSON-поля для /status и рендера пульта (§ PULT-STATUS-LOGS)."""
     profile = cfg.radar_profile
@@ -290,171 +317,390 @@ def build_status_detail(cfg: Config, storage: ProjectStorage) -> dict:
     return detail
 
 
-def _format_ingest_state_line(
-    storage: ProjectStorage,
-    unit_state: str | None,
-) -> str:
-    """Явное состояние ingest: работает / пауза / остановлен (systemd)."""
-    paused = storage.is_radar_paused()
-    us = (unit_state or "").strip().lower()
-    if us == "active":
-        if paused:
-            return (
-                "⏸ Ingest: ПАУЗА — процесс жив, новые заказы не качаем"
-            )
-        return "▶ Ingest: РАБОТАЕТ — биржи и TG-монитор включены"
-    if us in ("inactive", "failed", "dead"):
-        note = " (флаг паузы в базе)" if paused else ""
-        return f"🛑 Ingest: ОСТАНОВЛЕН — unit rawlead-radar выключен{note}"
-    if us == "activating":
-        return "⏳ Ingest: запускается (systemd activating)…"
-    if us:
-        return f"⚠ Ingest: systemd={us}"
-    if paused:
-        return "⏸ Ingest: ПАУЗА — ⚠ systemd: не удалось проверить"
-    return "⚠ Ingest: systemd не удалось проверить (флаг паузы снят?)"
+def _parse_ts_epoch(ts: str) -> float | None:
+    s = ts.strip()
+    if not s:
+        return None
+    is_utc = s.endswith(" UTC") or s.endswith("Z")
+    s_clean = s.replace(" UTC", "").replace("Z", "").strip()
+    from config import radar_tz
+
+    tz = radar_tz()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            dt = datetime.strptime(s_clean, fmt)
+            if is_utc:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt = dt.replace(tzinfo=tz)
+            return dt.timestamp()
+        except ValueError:
+            continue
+    return None
 
 
-def _format_header_lines(
+def _human_ago(ts: str | None, *, now: float | None = None) -> str | None:
+    if not ts:
+        return None
+    epoch = _parse_ts_epoch(ts)
+    if epoch is None:
+        return ts[:19] if len(ts) > 19 else ts
+    ref = now if now is not None else time.time()
+    delta = max(0.0, ref - epoch)
+    if delta < 60:
+        return f"{int(delta)} сек назад"
+    if delta < 3600:
+        return f"{int(delta // 60)} мин назад"
+    if delta < 86400:
+        return f"{int(delta // 3600)} ч назад"
+    return f"{int(delta // 86400)} д назад"
+
+
+def _ru_new(n: int) -> str:
+    n_abs = abs(n) % 100
+    n1 = n_abs % 10
+    if 11 <= n_abs <= 14:
+        word = "новых"
+    elif n1 == 1:
+        word = "новый"
+    else:
+        word = "новых"
+    return f"{n} {word}"
+
+
+def _neon_status_label(cfg: Config) -> str:
+    try:
+        from pg_storage import pg_storage_from_config
+
+        pg = pg_storage_from_config(cfg)
+        if pg is None or not pg.enabled:
+            return "Neon выкл"
+        return "Neon OK"
+    except Exception:
+        return "Neon ?"
+
+
+def _ingest_headline(
     cfg: Config,
     storage: ProjectStorage,
-    *,
-    unit_state: str | None = None,
+    unit_state: str | None,
+    problems: list[str],
+) -> str:
+    poll = cfg.poll_interval_minutes
+    neon = _neon_status_label(cfg)
+    paused = storage.is_radar_paused()
+    us = (unit_state or "").strip().lower()
+    if us in ("inactive", "failed", "dead"):
+        problems.append(f"systemd rawlead-radar: {us}")
+        return f"🛑 Остановлен · poll {poll} мин · {neon}"
+    if paused:
+        if us == "active":
+            problems.append("Ingest на паузе (флаг в SQLite)")
+        return f"⏸ Пауза · poll {poll} мин · {neon}"
+    if us == "active":
+        return f"▶ Работает · poll {poll} мин · {neon}"
+    if us == "activating":
+        return f"⏳ Запуск · poll {poll} мин · {neon}"
+    if not us:
+        problems.append("systemd: не удалось проверить unit rawlead-radar")
+        return f"▶ Работает? · poll {poll} мин · {neon}"
+    problems.append(f"systemd rawlead-radar: {us}")
+    return f"⚠ systemd={us} · poll {poll} мин · {neon}"
+
+
+def _source_row_label(source_id: str) -> str:
+    if source_id == "fl":
+        return "FL.ru"
+    if source_id == "kwork":
+        return "Kwork"
+    return SOURCE_LABELS.get(source_id, source_id)
+
+
+def _format_exchange_line(st: SourceCycleStats, *, neon_insert: int) -> str:
+    label = _source_row_label(st.source_id).ljust(7)
+    if st.fetch_error:
+        return (
+            f"{label} 🔴 {st.downloaded} скачано · "
+            f"ошибка: {st.fetch_error[:50]}"
+        )
+    parts = [f"{st.downloaded} скачано", _ru_new(st.new_ids)]
+    if st.new_ids > 0 and neon_insert > 0:
+        parts.append(f"{min(st.new_ids, neon_insert)} в Neon")
+    elif st.new_ids == 0:
+        parts.append("fetch OK")
+    return f"{label} 🟢 {' · '.join(parts)}"
+
+
+def _tg_pulse_short(detail: str) -> str:
+    d = detail.strip()
+    if d.startswith("работает (пульс"):
+        return d.replace("работает (", "").rstrip(")")
+    return d
+
+
+def _query_last_visible_feed(cfg: Config) -> tuple[str | None, str | None]:
+    if cfg.radar_profile != "site":
+        return None, None
+    try:
+        from pg_storage import pg_storage_from_config
+
+        pg = pg_storage_from_config(cfg)
+        if pg is None or not pg.enabled:
+            return None, None
+        with pg.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT created_at, source
+                    FROM leads
+                    WHERE is_visible = TRUE
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """
+                )
+                row = cur.fetchone()
+                if not row or row[0] is None:
+                    return None, None
+                ts = row[0]
+                source = str(row[1] or "").strip()
+                if isinstance(ts, datetime):
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
+                    ts_str = ts.astimezone(timezone.utc).strftime(
+                        "%Y-%m-%d %H:%M:%S UTC"
+                    )
+                else:
+                    ts_str = str(ts)
+                src_short = source.split(":")[0] if source else ""
+                return _human_ago(ts_str), src_short or None
+    except Exception:
+        return None, None
+
+
+def _l1_backlog_label(backlog: int) -> str:
+    if backlog <= _L1_BACKLOG_OK:
+        return f"{backlog} (норма)"
+    if backlog <= _L1_BACKLOG_WARN:
+        return f"{backlog} (повышена)"
+    return f"{backlog} (высокая)"
+
+
+def _format_cycle_block_v2(
+    summary: CycleSummary | None,
+    rollup: str | None,
 ) -> list[str]:
-    profile = _profile_label(cfg.radar_profile)
-    lines = [
-        "📊 Статус радара",
-        "",
-        _format_ingest_state_line(storage, unit_state),
-        "",
-        f"Профиль: {profile} · бот {_bot_label(cfg)}",
-        f"TELEGRAM_CHAT_ID: {cfg.telegram_chat_id}",
-        f"Лог: {_log_file_name(cfg)} · пульт :{_control_port()}",
-    ]
-    if cfg.radar_profile == "site":
-        conv = "вкл" if cfg.radar_conveyor else "выкл"
-        lines.append(
-            f"Конвейер: {conv} · опрос {cfg.poll_interval_minutes} мин"
-        )
-    else:
-        mode = "Neon consumer" if legacy_neon_consumer_enabled() else "биржи"
-        lines.append(
-            f"Режим: {mode} · опрос {cfg.poll_interval_minutes} мин"
-        )
-    bot_ok = _bot_start_ok(cfg)
-    if bot_ok is True:
-        lines.append(f"Бот /start (acc): да · {_bot_label(cfg)}")
-    elif bot_ok is False:
-        lines.append(f"Бот /start (acc): нет · напишите /start в {_bot_label(cfg)}")
-    return lines
-
-
-def _format_site_block(cfg: Config, storage: ProjectStorage) -> list[str]:
-    lines: list[str] = ["", "── Лента / Neon ──"]
-    rollup = load_site_rollup_line(storage)
+    lines = ["", "── Цикл ──"]
+    if summary is None or not summary.ts:
+        lines.append("ещё не было цикла")
+        return lines
+    parts: list[str] = []
+    if summary.cycle_sec > 0:
+        parts.append(f"{summary.cycle_sec:.0f} с")
+    if summary.neon_dup_skip:
+        parts.append(f"neon_dup_skip={summary.neon_dup_skip}")
+    if summary.dup_fast_skip:
+        parts.append(f"dup_fast_skip={summary.dup_fast_skip}")
+    if parts:
+        lines.append(" · ".join(parts))
     if rollup:
-        lines.append(f"Сводка 10 мин: {rollup}")
-    else:
-        lines.append("Сводка 10 мин: ещё не было")
-    last_visible = _query_last_visible_at(cfg)
-    if last_visible:
-        lines.append(f"Последний visible в Neon: {last_visible}")
-    backlog = _query_l1_backlog(cfg)
-    if backlog is not None and backlog > 0:
-        lines.append(f"Очередь без L1: {backlog}")
-        if backlog > 100:
-            lines.append("  ⚠ backlog > 100 — свежие fl/kwork ждут L1 (конвейер DESC)")
-    summary = load_cycle_summary(storage)
-    if summary and summary.ts:
-        lines.append(f"Последний цикл: {summary.ts}")
-        for st in summary.iter_sources():
-            bits = [
-                f"скачано {st.downloaded}",
-                f"новых {st.new_ids}",
-                f"neon_insert {summary.neon_insert}",
-            ]
-            if summary.is_visible:
-                bits.append(f"is_visible {summary.is_visible}")
-            if st.to_bot:
-                bits.append(f"в бот {st.to_bot}")
-            lines.append(f"  {st.label}: {' · '.join(bits)}")
+        l1, _l2, visible = parse_site_rollup_metrics(rollup)
+        lines.append(f"За 10 мин: L1={l1} · visible={visible}")
+    elif summary.cycle_sec <= 0 and not summary.neon_dup_skip:
+        lines.append(f"завершён {_human_ago(summary.ts) or summary.ts}")
     return lines
 
 
-def _format_legacy_dogfood_block(storage: ProjectStorage) -> list[str]:
-    lines: list[str] = ["", "── Dogfood / Neon ──"]
+def _format_site_status_v2(
+    cfg: Config,
+    storage: ProjectStorage,
+    problems: list[str],
+    *,
+    unit_state: str | None,
+) -> list[str]:
+    lines = ["", "── Биржи (последний цикл) ──"]
+    summary = load_cycle_summary(storage)
+    neon_ins = summary.neon_insert if summary else 0
+
+    if summary and summary.ts:
+        had_sources = False
+        for st in summary.iter_sources():
+            if st.source_id not in ("fl", "kwork"):
+                continue
+            had_sources = True
+            if st.fetch_error:
+                problems.append(f"{st.label}: {st.fetch_error[:80]}")
+            lines.append(_format_exchange_line(st, neon_insert=neon_ins))
+        if not had_sources:
+            lines.append("биржи выкл в конфиге")
+        if summary.misc_errors:
+            problems.extend(str(e)[:80] for e in summary.misc_errors[:3])
+    else:
+        lines.append("ещё не было цикла")
+
+    if radar_tg_enabled():
+        ingest_down = bool(
+            unit_state
+            and unit_state.strip().lower() not in ("active", "activating")
+        )
+        if ingest_down:
+            lines.append("TG      🔴 ingest остановлен")
+        else:
+            tg_ok, tg_detail = _tg_monitor_state(storage)
+            icon = "🟢" if tg_ok else "🔴"
+            if not tg_ok:
+                problems.append(f"TG-монитор: {tg_detail}")
+            lines.append(f"TG      {icon} {_tg_pulse_short(tg_detail)}")
+
+    rollup = load_site_rollup_line(storage)
+    lines.extend(_format_cycle_block_v2(summary, rollup))
+
+    lines.append("")
+    lines.append("── Лента ──")
+
+    ago, src = _query_last_visible_feed(cfg)
+    if ago:
+        src_part = f" ({src})" if src else ""
+        lines.append(f"Последний заказ на сайте: {ago}{src_part}")
+    else:
+        lines.append("Последний заказ на сайте: ещё не было")
+
+    backlog_total = _query_l1_backlog(cfg)
+    backlog_recent = _query_l1_backlog_recent(cfg, hours=48)
+    drain_on = cfg.l1_backlog_drain
+    if backlog_total is not None and backlog_recent is not None:
+        backlog_hist = max(0, backlog_total - backlog_recent)
+        lines.append(f"Без L1 (48 ч): {backlog_recent}")
+        lines.append(f"Хвост исторический: {backlog_hist}")
+        if backlog_recent > 0 and not drain_on:
+            problems.append(
+                f"Без L1 (48 ч)={backlog_recent} — свежие заказы ждут ИИ"
+            )
+        elif drain_on and backlog_total > _L1_BACKLOG_WARN:
+            problems.append(
+                f"Очередь L1={backlog_total} — drain on, но очередь велика"
+            )
+    elif backlog_total is not None:
+        lines.append(f"Без L1 (48 ч): ?")
+        lines.append(f"Всего без L1: {backlog_total}")
+        if backlog_total > _L1_BACKLOG_WARN and drain_on:
+            problems.append(
+                f"Очередь L1={backlog_total} — drain on, но очередь велика"
+            )
+
+    return lines
+
+
+def _format_legacy_status_v2(storage: ProjectStorage) -> list[str]:
+    lines = ["", "── Neon consumer ──"]
     cycle_at = storage.get_setting(_STATUS_NEON_CYCLE_AT, "").strip()
     session = _int_setting(storage, _STATUS_NEON_SESSION_TO_BOT)
     last_sample = _int_setting(storage, _STATUS_NEON_LAST_SAMPLE)
     last_new = _int_setting(storage, _STATUS_NEON_LAST_NEW)
     last_to_bot = _int_setting(storage, _STATUS_NEON_LAST_TO_BOT)
     if cycle_at:
+        ago = _human_ago(cycle_at) or cycle_at
         lines.append(
-            f"Последний цикл consumer: {cycle_at} · выборка {last_sample} · "
+            f"Последний цикл: {ago} · выборка {last_sample} · "
             f"новых {last_new} · в бот {last_to_bot}"
         )
     else:
-        lines.append("Последний цикл consumer: ещё не было")
+        lines.append("Последний цикл: ещё не было")
     lines.append(f"В бот за сессию: {session}")
     return lines
 
 
-def _account_label(account: str) -> str:
+def _format_acc_compact(
+    acc: str,
+    acfg: TgMonitorAccountConfig | None,
+    *,
+    listen: int,
+    in_file: int,
+    ready: bool,
+    pending: int,
+    msgs: int,
+    storage: ProjectStorage,
+    cfg: Config,
+) -> tuple[str, list[str]]:
+    probs: list[str] = []
+    chats = listen or in_file or (len(acfg.chat_ids) if acfg else 0)
+    last_err = storage.get_setting(_tg_key(acc, "last_err"), "").strip()
+
+    if not acfg or not acfg.chat_ids:
+        if pending:
+            return f"{acc} 🟡 нет chat_ids (join {pending})", probs
+        return f"{acc} 🟡 нет chat_ids (только join)", probs
+
+    if not ready:
+        return f"{acc} 🟡 подключение · {chats} чатов", probs
+
+    icon = "🔴" if last_err else "🟢"
+    if last_err:
+        probs.append(f"{acc}: {last_err[:80]}")
+    if not is_bot_started(acc):
+        probs.append(f"{acc}: нет /start в {_bot_label(cfg)}")
+        icon = "🟡"
+    msg_part = f" · +{msgs} msg" if msgs else ""
+    return f"{acc} {icon} ready · {chats} чатов{msg_part}", probs
+
+
+def _format_tg_accounts_v2(
+    cfg: Config,
+    storage: ProjectStorage,
+    unit_state: str | None,
+    problems: list[str],
+) -> list[str]:
+    ingest_down = bool(
+        unit_state
+        and unit_state.strip().lower() not in ("active", "activating")
+    )
+    if ingest_down:
+        problems.append("Ingest остановлен — TG ниже из прошлой сессии")
+
+    lines = ["── Telegram acc ──"]
     try:
-        _, session_path, _ = resolve_telethon_account(account)
-        name = Path(session_path).name
-        if name.endswith("_telethon"):
-            name = name[: -len("_telethon")]
-        return f"{account} ({name})"
+        tg_cfg = load_tg_monitor_config()
+        account_rows = {ac.account: ac for ac in tg_cfg.accounts}
+        accounts = tuple(ac.account for ac in tg_cfg.accounts)
     except SystemExit:
-        return account
+        account_rows = {}
+        accounts = ("acc1",)
 
+    join_pending = _pending_join_by_account(load_tg_join_config().queue_csv)
 
-def _account_role_line(
-    acfg: TgMonitorAccountConfig,
-    *,
-    listen: int,
-    in_file: int,
-    ready: bool,
-    join_pending: int,
-) -> str:
-    if not acfg.chat_ids:
-        if join_pending:
-            return f"  Роль: только join-очередь ({join_pending} pending)"
-        return "  Роль: нет chat_ids в конфиге — ждёт join или сид чатов"
-    if listen > 0 and ready:
-        return f"  Роль: слушает {listen} чат(ов)"
-    if listen > 0:
-        return f"  Роль: подключает {listen}/{len(acfg.chat_ids)} чат(ов) из файла"
-    if in_file > 0:
-        hint = f", join pending {join_pending}" if join_pending else ""
-        return f"  Роль: {in_file} чат(ов) в файле, сессия не нашла{hint}"
-    if join_pending:
-        return f"  Роль: join-очередь ({join_pending}), чаты пока не в сессии"
-    return "  Роль: чаты в конфиге, ожидание подключения"
-
-
-def _msgs_zero_hint(
-    *,
-    listen: int,
-    in_file: int,
-    join_pending: int,
-    ready: bool,
-    bot_ok: bool,
-) -> str | None:
-    if listen == 0 and in_file == 0 and join_pending == 0:
-        return "  Входящих ещё не было — нет чатов в конфиге; добавьте ids или join"
-    if listen == 0 and join_pending > 0:
-        return (
-            "  Входящих ещё не было — join в очереди; после вступления появятся чаты"
+    for acc in accounts:
+        acfg = account_rows.get(acc)
+        listen = _int_setting(storage, _tg_key(acc, "chats_listen"))
+        in_file = _int_setting(storage, _tg_key(acc, "chats_file"))
+        ready = _int_setting(storage, _tg_key(acc, "ready")) > 0
+        pending = join_pending.get(acc, 0)
+        cfg_ids = len(acfg.chat_ids) if acfg else in_file
+        line, acc_probs = _format_acc_compact(
+            acc,
+            acfg,
+            listen=listen,
+            in_file=in_file or cfg_ids,
+            ready=ready,
+            pending=pending,
+            msgs=_int_setting(storage, _tg_key(acc, "msgs")),
+            storage=storage,
+            cfg=cfg,
         )
-    if listen > 0 and not ready:
-        return "  Входящих ещё не было — acc ещё не ready (подключение)"
-    if listen > 0 and not bot_ok:
-        return "  Входящих ещё не было — бот /start не отправлен; forward заблокирован"
-    if listen > 0:
-        return "  Входящих ещё не было — слушает; ждём пост в группах"
-    return None
+        lines.append(line)
+        problems.extend(acc_probs)
+
+    return lines
+
+
+def _collect_extra_problems(
+    cfg: Config,
+    storage: ProjectStorage,
+    problems: list[str],
+) -> None:
+    bot_ok = _bot_start_ok(cfg)
+    if bot_ok is False:
+        problems.append(f"Acc не отправили /start в {_bot_label(cfg)}")
+    if storage.get_setting("health_check_last_ok", "1") != "1":
+        problems.append("Telethon health check: сбой (см. radar.log)")
 
 
 def _pending_join_by_account(queue_csv: Path) -> dict[str, int]:
@@ -551,106 +797,46 @@ def format_status_message(
     *,
     unit_state: str | None = None,
 ) -> str:
-    lines = _format_header_lines(cfg, storage, unit_state=unit_state)
+    profile_label = _profile_label(cfg.radar_profile)
+    problems: list[str] = []
+
+    lines = [
+        f"📡 RawLead {profile_label} · {_bot_label(cfg)}",
+        _ingest_headline(cfg, storage, unit_state, problems),
+    ]
 
     if cfg.radar_profile == "site":
-        lines.extend(_format_site_block(cfg, storage))
+        lines.extend(
+            _format_site_status_v2(
+                cfg, storage, problems, unit_state=unit_state
+            )
+        )
     else:
-        lines.extend(_format_legacy_dogfood_block(storage))
-
-    ingest_down = bool(
-        unit_state and unit_state.strip().lower() not in ("active", "activating")
-    )
+        lines.extend(_format_legacy_status_v2(storage))
 
     if cfg.radar_profile == "site" or radar_tg_enabled():
         lines.append("")
-        if ingest_down:
-            lines.append(
-                "Telegram-монитор: 🔴 не работает (ingest остановлен; ниже — архив прошлой сессии)"
-            )
-        else:
-            tg_ok, tg_detail = _tg_monitor_state(storage)
-            icon = "🟢" if tg_ok else "🔴"
-            lines.append(f"Telegram-монитор: {icon} {tg_detail}")
+        lines.extend(
+            _format_tg_accounts_v2(cfg, storage, unit_state, problems)
+        )
 
-        try:
-            tg_cfg = load_tg_monitor_config()
-            account_rows = {ac.account: ac for ac in tg_cfg.accounts}
-            accounts = tuple(ac.account for ac in tg_cfg.accounts)
-        except SystemExit:
-            account_rows = {}
-            accounts = ("acc1",)
+    _collect_extra_problems(cfg, storage, problems)
 
-        join_pending = _pending_join_by_account(load_tg_join_config().queue_csv)
-
-        for acc in accounts:
-            lines.append("")
-            lines.append(_account_label(acc))
-            acfg = account_rows.get(acc)
-            listen = _int_setting(storage, _tg_key(acc, "chats_listen"))
-            in_file = _int_setting(storage, _tg_key(acc, "chats_file"))
-            ready = _int_setting(storage, _tg_key(acc, "ready")) > 0
-            pending = join_pending.get(acc, 0)
-            cfg_ids = len(acfg.chat_ids) if acfg else in_file
-            if acfg:
-                lines.append(
-                    _account_role_line(
-                        acfg,
-                        listen=listen,
-                        in_file=in_file or cfg_ids,
-                        ready=ready,
-                        join_pending=pending,
-                    )
-                )
-            lines.append(f"  ready: {'да' if ready else 'нет'}")
-            acc_bot_ok = is_bot_started(acc)
-            lines.append(
-                f"  Бот /start ({_bot_label(cfg)}): {'да' if acc_bot_ok else 'нет'}"
-            )
-            if listen or in_file or cfg_ids:
-                lines.append(
-                    f"  Чатов: слушаем {listen} / в файле {in_file or cfg_ids}"
-                )
-            started = storage.get_setting(_tg_key(acc, "started_at"), "").strip()
-            if started:
-                lines.append(f"  Сессия с: {started}")
-            msgs = _int_setting(storage, _tg_key(acc, "msgs"))
-            lines.append(
-                f"  Сообщений: {msgs} · "
-                f"новых: {_int_setting(storage, _tg_key(acc, 'new'))} · "
-                f"в бот: {_int_setting(storage, _tg_key(acc, 'notified'))}"
-            )
-            if msgs == 0:
-                hint = _msgs_zero_hint(
-                    listen=listen,
-                    in_file=in_file or cfg_ids,
-                    join_pending=pending,
-                    ready=ready,
-                    bot_ok=acc_bot_ok,
-                )
-                if hint:
-                    lines.append(hint)
-            if pending:
-                lines.append(f"  Join в очереди: {pending}")
-            phase = storage.get_setting(_tg_key(acc, "phase"), "").strip()
-            last_action = storage.get_setting(_tg_key(acc, "last_action"), "").strip()
-            if phase:
-                lines.append(f"  phase: {phase}")
-            if last_action:
-                lines.append(f"  last: {last_action[:220]}")
-            last_err = storage.get_setting(_tg_key(acc, "last_err"), "").strip()
-            if last_err:
-                lines.append(f"  ⚠ {last_err[:200]}")
-    elif cfg.radar_profile == "legacy":
+    if problems:
+        seen: set[str] = set()
+        unique: list[str] = []
+        for p in problems:
+            if p not in seen:
+                seen.add(p)
+                unique.append(p)
         lines.append("")
-        lines.append("Telegram-монитор: выкл (Legacy — только Neon → бот)")
-
-    health_ok = storage.get_setting("health_check_last_ok", "1") == "1"
-    if not health_ok:
-        lines.append("")
-        lines.append("⚠ Последняя проверка Telethon: сбой (см. radar.log)")
+        lines.append("── Проблемы ──")
+        for p in unique[:8]:
+            lines.append(f"· {p}")
+        if len(unique) > 8:
+            lines.append(f"· … ещё {len(unique) - 8}")
 
     text = "\n".join(lines)
-    if len(text) > 4000:
-        text = text[:3990] + "\n…"
+    if len(text) > _STATUS_MAX_LEN:
+        text = text[: _STATUS_MAX_LEN - 1] + "…"
     return text

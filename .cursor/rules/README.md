@@ -6,43 +6,48 @@
 
 | Роль в чате | Правило `.mdc` | Файл задачи (шаг 3) |
 |-------------|----------------|----------------------|
-| `@lead-architect` | `lead-architect.mdc` | `team/common/TASKS` · `STATUS` · `team/architect/CODER_PROMPT` |
-| `@lead-product` | `lead-product.mdc` | `team/product/PRODUCT_VISION` · `LEAD_PRODUCT_PROMPT` |
-| `@lead-designer` | `lead-designer.mdc` | `team/design/LEAD_DESIGN_PROMPT` → `DESIGNER_PROMPT` |
-| `@coder` | `coder.mdc` | **`CODER_PROMPT.md`** только (без vision) |
-| `@designer` | `designer.mdc` | **`team/design/DESIGNER_PROMPT.md`** |
-| `@mechanic` | `mechanic.mdc` | **`docs/problems/<тикет>.md`** · **Gemini 2.5 (2M, OpenRouter)** · **редко**, когда застряли |
+| `@lead-architect` | `lead-architect.mdc` | **онбординг A+B+C** · `STATUS` · `TASKS` · `CODER_PROMPT` |
+| `@lead-product` | `lead-product.mdc` | `LEAD_PRODUCT_PROMPT` · **онбординг A+B+C** |
+| `@lead-designer` | `lead-designer.mdc` | **`LEAD_DESIGN_PROMPT`** · регламент **`LEAD_DESIGN.md`** |
+| `@coder` | `coder.mdc` | **`CODER_PROMPT.md`** только (без vision, без design) |
+| `@designer` | `designer.mdc` | **`DESIGNER_PROMPT.md`** § **→ Сейчас** только |
+| `@mechanic` | `mechanic.mdc` | **`docs/problems/<тикет>.md`** |
 | `@owner` | `owner.mdc` | **`docs/FOR_YOU.md`** |
-
-Папки: `docs/team/common/` · `architect/` · `product/` · `design/`
 
 **Always (в каждом чате):** `economy.mdc` · `lead-no-code.mdc` (Lead не кодят)
 
 ---
 
-## Что значит выпадашка в UI
+## Design-отдел — один конвейер (не путать)
 
-| Режим в Cursor | Поле в `.mdc` | Когда подключается |
-|----------------|---------------|-------------------|
-| **Always Apply** | `alwaysApply: true` | В **каждом** чате и cmd-k |
-| **Apply Intelligently** | `alwaysApply: false`, без `globs` | Agent сам решает по `description` |
-| **Apply Manually** | то же + вызываешь **`@имя-файла`** в чате | Только когда ты @-упомянул правило |
-| **Apply to Specific Files** | `globs: src/**,…` | Когда открыт/трогаешь файл под маской |
+```text
+Владелец ↔ @lead-designer → LEAD_DESIGN_PROMPT (решения)
+         → @designer → docs/design/wp/wave-*-brief.md ИЛИ DESIGNER_PROMPT § одна активная
+         → @lead-architect → CODER_PROMPT § (ссылки)
+         → @coder → wordpress/ (не design docs)
+```
 
-**Рекомендация:** в **новом чате** — один `@coder` / `@lead-product` / … Пути и **обязательное чтение** — в § «Включение» + `economy.mdc` § «Обязательное чтение». Агент **не отвечает по сути**, пока не прочитал канон (первая строка: `Прочитал: …`).
+| Файл | Кто | Содержание |
+|------|-----|------------|
+| `LEAD_DESIGN_PROMPT.md` | Lead Designer | Решения владельца · **одна § в шапке** |
+| `DESIGNER_PROMPT.md` | Lead Designer | **одна активная §** · архив ниже — **не читать** |
+| `docs/design/wp/REFERENCE.md` | Lead Designer | Визуальный канон v5 |
+| `docs/design/wp/wave-*-brief.md` | Designer | Техспека для Coder |
+| `DESIGN_BRIEF.md` | Designer | **Только пульт Tauri** — не WP |
+| `DESIGNER.md` / `LEAD_DESIGN.md` | — | Регламент ролей |
 
-**Важно:** `.mdc` даёт роль и **куда читать**; файлы `CODER_PROMPT.md` и т.д. агент **открывает сам** (Read) — они не подгружаются автоматически, если не `@`-упомянуть.
+Подробно: [`docs/team/design/LEAD_DESIGN.md`](../../docs/team/design/LEAD_DESIGN.md)
 
 ---
 
-## Карта файлов
+## Карта `.mdc`
 
-### Всегда (2)
+### Всегда
 
 | Файл | Зачем |
 |------|--------|
-| `economy.mdc` | Старт 1–2–3 · кратко · git Lead · MCP |
-| `lead-no-code.mdc` | Все Lead — запрет кода |
+| `economy.mdc` | Старт · git Lead · MCP · design map |
+| `lead-no-code.mdc` | Lead = 0 кода |
 
 ### Lead — `@…`
 
@@ -52,7 +57,7 @@
 | `lead-product.mdc` | `@lead-product` |
 | `lead-designer.mdc` | `@lead-designer` |
 
-### Исполнители — `@…`
+### Исполнители
 
 | Файл | В чате |
 |------|--------|
@@ -65,16 +70,14 @@
 
 | Файл | Когда |
 |------|--------|
-| `code-guard.mdc` | открыт `src/` · `scripts/` · `desktop/` |
-| `docs-guard.mdc` | открыт `docs/**` |
+| `code-guard.mdc` | `src/` · `scripts/` · `desktop/` |
+| `docs-guard.mdc` | `docs/**` |
 
 ---
 
 ## Быстрый старт владельца
 
 1. **Settings → Rules** — Project Rules включены.
-2. Закладки чатов: Lead PM · Lead Design · Lead Arch · Coder · Designer · Mechanic.
-3. **Первое сообщение в чате** — одна строка, например: `@coder` или `@.cursor/rules/coder.mdc`
-4. Исключение: **Mechanic** — ещё `@docs/problems/<тикет>.md`
-5. [`docs/team/common/HOW_TO_USE_CURSOR.md`](../../docs/team/common/HOW_TO_USE_CURSOR.md)
-6. MCP: [`docs/team/common/MCP_POOL.md`](../../docs/team/common/MCP_POOL.md)
+2. **Новый чат = одна роль** — `@coder` / `@lead-designer` / …
+3. [`docs/team/common/HOW_TO_USE_CURSOR.md`](../../docs/team/common/HOW_TO_USE_CURSOR.md)
+4. MCP: [`docs/team/common/MCP_POOL.md`](../../docs/team/common/MCP_POOL.md)
