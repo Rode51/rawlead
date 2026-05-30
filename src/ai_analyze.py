@@ -64,6 +64,7 @@ _FORBIDDEN_REPLY_GREETING_RE = re.compile(
 _REPLY_DRAFT_BAD_START_RE = re.compile(r"^готов\s", re.IGNORECASE)
 
 _DEFAULT_TIMEOUT_SEC = 60.0
+_SHARED_DRAFT_BACKOFF_SEC = (1, 2, 4, 8)
 _LITE_TIMEOUT_SEC = 45.0
 _MAX_DESCRIPTION_CHARS = 7_000
 _MAX_LITE_SNIPPET_CHARS = 600
@@ -94,6 +95,7 @@ def cycle_ai_counts() -> tuple[int, int]:
 
 
 _draft_events: deque[tuple[float, bool]] = deque()
+_ai_last_error: str = ""
 _DRAFT_STATS_WINDOW_SEC = 86400
 
 
@@ -111,11 +113,32 @@ def note_draft_request(ok: bool) -> None:
     _prune_draft_events(now)
 
 
+def note_ai_error(msg: str) -> None:
+    """O67: последняя ошибка ИИ для /health."""
+    global _ai_last_error
+    s = (msg or "").strip().replace("\n", " ")
+    if s:
+        _ai_last_error = s[:200]
+
+
+def ai_last_error() -> str | None:
+    s = (_ai_last_error or "").strip()
+    return s or None
+
+
 def draft_stats_24h() -> dict[str, int]:
     _prune_draft_events()
     ok = sum(1 for _, success in _draft_events if success)
     fail = sum(1 for _, success in _draft_events if not success)
     return {"draft_ok": ok, "draft_fail": fail}
+
+
+def draft_fail_per_hour() -> int:
+    """O67: fail count за последний час."""
+    _prune_draft_events()
+    now = time.time()
+    hour_ago = now - 3600.0
+    return sum(1 for ts, ok in _draft_events if not ok and ts >= hour_ago)
 
 # docs/AI.md v6.1
 _SYSTEM_PROMPT_HEAD = """Ты — жёсткий ИИ-архитектор фриланс-заказов. Прагматичный техаудитор для Никиты (29). Тон прямой, сухой, на «ты», без соплей.
@@ -1099,7 +1122,7 @@ def analyze_shared_reply_draft(
     use_model = cfg.ai_model_shared_draft.strip()
 
     last_exc: BaseException | None = None
-    for attempt in range(2):
+    for attempt in range(4):
         try:
             raw = _openrouter_chat(
                 cfg,
@@ -1109,6 +1132,8 @@ def analyze_shared_reply_draft(
                 timeout_sec=timeout_sec,
                 json_mode=True,
             )
+            if not raw:
+                raise AiAnalyzeError("OpenRouter: пустой ответ")
             data = _extract_json_object(raw)
             draft = strip_reply_draft_price_deadline(
                 _validate_reply_draft_take(str(data.get("reply_draft", "")).strip())
@@ -1120,9 +1145,11 @@ def analyze_shared_reply_draft(
             requests.RequestException,
             json.JSONDecodeError,
             ValueError,
+            AttributeError,
         ) as exc:
             last_exc = exc
-            if attempt == 0:
+            if attempt < 3:
+                time.sleep(_SHARED_DRAFT_BACKOFF_SEC[min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)])
                 continue
 
     if last_exc is not None:

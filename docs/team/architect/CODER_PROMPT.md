@@ -1,6 +1,770 @@
-# Coder — **→ Следующее:** приёмка O58 · потом **O38** audit
+# Coder — **→ Следующее:** **O72** AI prod audit · owner 5× draft → реклама проекта
 
-**O58 ✅** deploy **v1.10.9** · poll GET работает.
+**O71 ✅ Lead verify 2026-05-30** · S1 **12/12** · k6 **s3_pass** · план: [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md)
+
+---
+
+# § O72 — Аналитика качества откликов ИИ (prod sample)
+
+**Контекст:** O71 infra **✅** · fixtures matrix **12/12** — но это **не** реальные лиды. Нужен отчёт по **всем накопленным** `reply_draft` + `tools_required` в Neon.
+
+**План владельца:** [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md) § O72 · **не блокирует** owner 5× draft, но **желателен до** масштабной рекламы.
+
+## o72-1 — Скрипт выборки + auto-metrics (**P1**)
+
+| # | Задача |
+|---|--------|
+| s1 | Новый `scripts/preprod_ai_prod_audit.py` (или флаг `--prod-sample` у matrix) — читает Neon, **не** дергает OpenRouter на фазе 1 |
+| s2 | Выборка: **N=100–200** последних лидов с `reply_draft IS NOT NULL AND reply_draft != ''` · stratify по `category` (dev/design/marketing/text) и `source_id` |
+| s3 | На каждый lead — повтор **существующих** проверок из `ai_analyze.py`: запретные слова, `reply_draft_sentence_warn`, пустой draft |
+| s4 | **tools_required:** пустой массив · slug не из `/v1/skills/catalog` · дубликаты · эвристика «в описании есть Figma/Python/…, а tools пуст» |
+| s5 | JSON → `data/preprod_ai_prod_audit.json` · markdown → `data/preprod_ai_prod_audit_human.md` |
+
+## o72-2 — LLM judge (опционально, **P2**)
+
+| # | Задача |
+|---|--------|
+| j1 | Флаг `--judge --limit 30` — второй проход OpenRouter на подвыборке |
+| j2 | Промпт: релевантность 1–5 · конкретность 1–5 · tools match да/нет/частично · «отправил бы as-is» да/нет |
+| j3 | В отчёт: avg scores · top-10 worst cases (lead_id, title snippet, draft snippet, reason) |
+
+## o72-3 — Accept O72
+
+| # | Критерий |
+|---|----------|
+| a1 | Скрипт отрабатывает на prod Neon без ручных правок |
+| a2 | Отчёт JSON + human md в `data/` |
+| a3 | **≥85%** auto-pass (нет fail validators + tools ok) |
+| a4 | Если `--judge`: avg **≥3.5/5** по релевантности и конкретности |
+| a5 | STATUS блок + ссылка на отчёт |
+
+**Не в задаче:** дашборд в WP · CI cron (только ручной запуск Lead/владелец).
+
+**Файлы (ожидаемо):** `scripts/preprod_ai_prod_audit.py` · `data/preprod_ai_prod_audit.json` · опц. тест smoke на mock rows.
+
+---
+
+# § O71 — API HTTPS + shared draft gate (**✅ Lead verify 2026-05-30**)
+
+**Контекст:** O37 load FAIL · S6 + O37c UX **✅** · рекламы нет · **shared draft pro уже на VPS**.
+
+## Lead verify (факты prod)
+
+### Env `/opt/rawlead/.env.site`
+
+| Переменная | Значение | Путь |
+|------------|----------|------|
+| `AI_ENABLED` | `1` | — |
+| `OPENROUTER_MODEL_SUMMARY` | `deepseek/deepseek-chat` | L1 ingest |
+| `OPENROUTER_MODEL_PREMIUM` | `google/gemini-2.5-flash-lite` | бот / **preprod_ai_matrix** (≠ сайт) |
+| **`OPENROUTER_MODEL_SHARED_DRAFT`** | **`google/gemini-2.5-pro`** | **сайт «Написать отклик»** ✅ |
+
+**Pro для shared draft уже стоит** — менять модель не задача O71.
+
+### API localhost `:8000` (rawlead-api active)
+
+| URL | HTTP code |
+|-----|-----------|
+| `/health` | **200** |
+| `/v1/feed?limit=1` | **200** |
+| `/v1/skills/catalog` | **200** |
+
+### `api.rawlead.ru` снаружи
+
+| URL | **http** | **https** |
+|-----|----------|-----------|
+| `/health` | **200** | **404** |
+| `/v1/feed?limit=1` | **200** | **301→RSS** (не API!) |
+| `/v1/skills/catalog` | **200** | **404** |
+
+**Root cause k6 50% fail:** nginx `api.rawlead.ru.conf` — только **:80** · **TLS/certbot для api не включён** · k6 и prod-clients идут на **https** → wrong vhost.
+
+Repo-конфиг: `deploy/nginx/api.rawlead.ru.conf` (SSL блок закомментирован).
+
+### O37 S1 (preprod_ai_matrix)
+
+| | |
+|--|--|
+| L1 | **12/12** ✅ |
+| L2 через `analyze_premium` (flash-lite) | **8/12** — **не путь сайта** |
+| Сайт | `analyze_shared_reply_draft` + **pro** + O57 cache |
+
+**Gate S1 для premium:** тест **shared draft path**, не premium-lite.
+
+---
+
+## o71-1 — Infra: HTTPS api.rawlead.ru (**P0**)
+
+| # | Задача |
+|---|--------|
+| n1 | VPS: `certbot --nginx -d api.rawlead.ru` · раскомментировать/добавить `listen 443 ssl` в `deploy/nginx/api.rawlead.ru.conf` |
+| n2 | `nginx -t && reload` |
+| n3 | Accept **https://api.rawlead.ru**: `/health` · `/v1/feed?limit=1` · `/v1/skills/catalog` → **200** JSON (не 404, не RSS 301) |
+| n4 | Re-run k6: `fail rate < 1%` · feed p95 `< 2s` |
+
+**Не трогать:** theme v1.11.15 (UX ok).
+
+---
+
+## o71-2 — Stress: правильный путь draft (**P1**)
+
+| # | Задача |
+|---|--------|
+| t1 | `preprod_ai_matrix.py`: добавить режим **`--shared-draft`** (или отдельный `preprod_shared_draft_matrix.py`) — вызывает **`analyze_shared_reply_draft`** + фикстуры с готовым `lite` · модель = `cfg.ai_model_shared_draft` |
+| t2 | S1 accept: **≥11/12** non-empty `reply_draft` на shared path (без вердиктов «Брать/МИМО» в UI — только «draft не пустой») |
+| t3 | Опц.: retry в `analyze_shared_reply_draft` **2→4** + backoff как `_analyze_shared_ondemand` — только если shared matrix &lt; 11/12 |
+
+---
+
+## o71-3 — Accept O71
+
+| # | Критерий | Lead verify |
+|---|----------|-------------|
+| a1 | **https** api: health + catalog + feed **200** | **✅ 2026-05-30** |
+| a2 | k6 **s3_pass: true** | **✅** fail 0% · p95 **1677 ms** |
+| a3 | shared draft **≥11/12** | **✅ 12/12** · pro path |
+| a4 | STATUS | **✅** |
+
+**Accept O71:** ✅ **Lead verify 2026-05-30** · **→ Владелец:** 5× «Написать отклик» → реклама проекта ok по infra.
+
+---
+
+# § O70 — O37c triage (**✅ · v1.11.15 prod**)
+
+**Re-run (local script, prod URL):** **17/19 pass · 2 critical** (только **U5** «ИИ временно недоступен») · было **8 critical**.
+
+| § | Проверка |
+|---|----------|
+| **f1–f2** | `rawlead-cabinet.js`: `stopPropagation` panel · backdrop click · `skillsPanelEl` ✅ |
+| **a1–a4** | `ux_audit.py`: burger · `_wait_mobile_feed_sheet` · `_tap_cabinet_skills_backdrop` · skip ERR_ABORTED ✅ |
+| **Theme** | **v1.11.15** в repo ✅ · **VPS still 1.11.14** — **deploy pending** |
+| **U1–U4,U6–U10** | desktop + mobile **✅** |
+| **U7** | **✅** re-run (prod без deploy — pass за счёт `_tap_cabinet_skills_backdrop`; cabinet fix → deploy) |
+| **U5** | ❌ OpenRouter intermittent (**O67**, не O70) |
+
+**Accept O70 (код):** ✅ **Lead verify 2026-05-30** · владелец принял · **deploy v1.11.15** → S6 + manual U7 overlay.
+
+**→ Deploy:** `scripts/deploy-wp-theme-vps.py` · grep prod **1.11.15**.
+
+---
+
+# § O69 — Лента: сортировка в счётчике + навыки «Ещё» / 2 ниши (**✅ Lead verify 2026-05-30 · v1.11.14**)
+
+**Симптомы (скрины владельца, prod `/lenta/`):**
+
+| # | Симптом | Ожидание |
+|---|---------|----------|
+| s1 | Строка **«20 заказов · по дате»**, а в bar/sheet активна **«По совместимости»** | Счётчик **всегда** отражает `state.sort` |
+| s2 | 1 специализация (Разработка) → **«Ещё навыки»** не раскрывает Tier B | Tier B по нише после клика · **«Свернуть»** обратно |
+| s3 | 2 специализации (Разработка + Дизайн) → блок навыков **пустой** | Сразу **популярные (Tier A)** обеих ниш · **«Ещё навыки»** → все навыки выбранных category |
+
+**Root cause (Lead code review):**
+
+| # | Где | Почему |
+|---|-----|--------|
+| r1 | `feedCountSuffix()` ~845 | `sort === "match"` без applied tags → fallback **«пo датe»**; bar/sheet берут `state.sort` напрямую |
+| r2 | `renderSkillsInto` + `pickerRowVisible` ~1091 | В `groups[].skills` API **нет `category` на skill** (есть только на group) → multi-cat: `TIER_A_BY_NICHE[row.category]` = `[]` → **0 chips** |
+| r3 | то же r2 | 1 niche + `showRareSkills`: `row.category === niche` **false** (undefined) → Tier B не показывается |
+
+## o69-1 — Fix sort label
+
+| # | Задача |
+|---|--------|
+| f1 | `feedCountSuffix()`: `match` → **«пo совместимости»**, `time` → **«пo датe»** (без зависимости от `appliedTags`) |
+| f2 | После смены sort в sheet (~2024) и sidebar — **`updateCount()`** (если feed уже загружен) |
+| f3 | Regression: sort **time** без tags → «пo датe»; sort **match** с/без tags → «пo совместимости» |
+
+## o69-2 — Fix skills picker
+
+| # | Задача |
+|---|--------|
+| f4 | В `renderSkillsInto`: при фильтре передавать **`category: row.category \|\| group.category`** в `pickerRowVisible` |
+| f5 | **2+ category:** collapsed = Tier A из `TIER_A_BY_NICHE` для каждой выбранной ниши; expanded = все skills групп выбранных category |
+| f6 | **1 category:** collapsed = Tier A; expanded = остальные skills этой category (Tier B+) |
+| f7 | `applySkillsSectionText`: при **2+ category** показывать подпись **«Популярные навыки»** (не `hidden: true`) |
+| f8 | Desktop: кнопка **«Ещё навыки»** доступна и при **2+ category** (сейчас `skillsRareBtn.hidden = catsLengthGt1`) — или явно только sheet; **mobile sheet обязателен** |
+
+**Файлы:** `wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js` · опц. `rawlead.css` · bump **`RAWLEAD_CHILD_VERSION` → v1.11.14+** · deploy prod.
+
+## o69-3 — Accept
+
+| # | Критерий |
+|---|----------|
+| t1 | Sort **match** applied → count **«N заказов · по совместимости»** (desktop + mobile после Apply) |
+| t2 | Sort **time** → **«… · по дате»** |
+| t3 | **Разработка** → Фильтры → 6 popular chips → **Ещё навыки** → доп. chips → **Свернуть** |
+| t4 | **Разработка + Дизайн** → сразу popular dev+design · **Ещё навыки** → полный список обеих ниш |
+| t5 | Deploy prod theme **v1.11.14+** | **✅ VPS grep 2026-05-30** |
+
+**Accept O69:** ✅ **Lead verify 2026-05-30** · владелец принял · prod **v1.11.14**.
+
+**→ Владелец:** S6 глазами (390px + desktop) · re-run O37c U2/U8.
+
+---
+
+# § O67 — ИИ health + draft fail (**P0 · владелец 2026-05-30**)
+
+**Симптом (prod VPS):** `lenta:draft:7578:fail` · **«ИИ временно недоступен»** · L1 site **OK** (`pipeline:L1 visible=1`).
+
+**Не путать:** L1 (lite, лента) ≠ L2 draft (OpenRouter full).
+
+## o67-1 — Диагностика
+
+| # | Шаг |
+|---|-----|
+| d1 | VPS: `OPENROUTER_API_KEY` site · quota · models endpoint |
+| d2 | `journalctl -u rawlead-api` · draft fail rate 24h |
+| d3 | `/status`: **«ИИ: L1 ok · draft fail N/ч»** (см. O64) |
+
+## o67-2 — Fix
+
+| # | Задача |
+|---|--------|
+| f1 | Ключ/429 — ops; код: retry в `draft_async` — регресс? |
+| f2 | `/health`: `draft_ok`/`draft_fail` · `ai_last_error` |
+| f3 | UI «Повторить» при `ai_unavailable` |
+
+**Accept:** fail rate <5% · status строка ИИ.
+
+**Mechanic:** `docs/problems/2026-05-30-ai-draft-unavailable.md` если ключ OK.
+
+---
+
+# § O66 — Legacy @FLPARSINGBOT: не отставать от Neon (**P0 · владелец 2026-05-30**)
+
+**Симптом:** в `/lenta/` часами · в @FLPARSINGBOT — только сейчас.
+
+**Факт VPS:** `neon_legacy_consumer` active · циклы **~10 мин** · cursor `id>after LIMIT 40`.
+
+## o66-1 — Задачи
+
+| # | Задача |
+|---|--------|
+| l1 | Legacy poll **1 мин** (`LEGACY_NEON_POLL_SEC`) |
+| l2 | SELECT `is_visible=true` AND not legacy-notified — не только id-cursor |
+| l3 | Опц. reuse L1 из Neon для legacy (Product) |
+| l4 | `/status`: lag visible→bot |
+| l5 | Test: visible → notify **<180с** |
+
+**Файлы:** `neon_legacy_consumer.py`, `pg_storage.py`, `config.py`, `radar_status.py`.
+
+---
+
+# § O65 — Снятие с ленты: заказ закрыт (**P1 · владелец 2026-05-30**)
+
+| # | Правило |
+|---|---------|
+| d1 | Re-check URL fl/kwork (batch ~1×/ч) |
+| d2 | 404 / «закрыт» / «исполнитель найден» |
+| d3 | `is_visible=false`, `delist_reason='source_gone'` |
+| d4 | Feed API не отдаёт delisted |
+
+**Файлы:** `fl_parser.py`, `lead_pipeline.py`, `pg_storage.py`, `api_server.py`, `main.py`.
+
+---
+
+# § O64 — L1 хвост: breakdown + cleanup + /status (**P0 · владелец 2026-05-30**)
+
+## o64-1 — Ops
+
+```powershell
+.venv\Scripts\python.exe scripts\clear_l1_backlog.py --profile site --by-age --days-old 7 --apply
+```
+
+VPS: `/opt/rawlead` под `sudo -u rawlead`.
+
+## o64-2 — `scripts/l1_backlog_report.py`
+
+COUNT без L1 48h по **source** (fl/kwork/tg) · bucket по age · sample 5 id.
+
+## o64-3 — /status блок
+
+```
+L1 48ч: fl:N kwork:N tg:N │ hot path ждут: M │ хвост: K
+ИИ: L1 ok (10м) · draft fail F/ч
+```
+
+Warn «свежие ждут ИИ» **только** если hot path M>0.
+
+**Файлы:** `clear_l1_backlog.py`, `pg_storage.py`, `radar_status.py`.
+
+---
+
+# § O68 — «Отклик ✓» вниз карточки (**P1 · владелец 2026-05-30**)
+
+**Запрос:** на `/lenta/` у карточек **с откликом** убрать жёлтую плашку **«ОТКЛИК ✓»** из **шапки** (рядом с FL.ru) · поставить **вниз**, на место кнопки **«Написать отклик»** (collapsed). **Стиль плашки — как сейчас** (`.rl-badge--replied`).
+
+## o68-1 — Поведение
+
+| # | Правило |
+|---|---------|
+| a1 | **Нет отклика** → внизу **«Написать отклик»** — без изменений |
+| a2 | **Есть отклик** → внизу **«Отклик ✓»** в `.rl-feed-card__cta` · **не** в head |
+| a3 | Шапка: source · ИДЕАЛЬНО ✦ · HOT — **без** replied |
+| a4 | `updateCardDraft` — CTA → плашка, head **не** получает badge |
+
+## o68-2 — Код
+
+| Место | Fix |
+|-------|-----|
+| `headBadgesHtml()` | убрать `repliedBadgeHtml()` |
+| `replyCtaHtml(item)` | если reply → CTA с плашкой |
+| `updateCardDraft()` | не удалять CTA — заменить на плашку |
+
+## o68-3 — CSS
+
+`.rl-feed-card__cta .rl-badge--replied` — **width 100%**, center (как кнопка). Цвета **не менять**.
+
+## o68-4 — Accept
+
+t1 head без «ОТКЛИК» · t2 плашка вниз · t3 после draft — плашка вниз · deploy **v1.11.13+**
+
+**Файлы:** `rawlead-feed.js` · `rawlead.css` · **только `/lenta/`**
+
+**Accept O68:** ✅ **Lead verify + deploy 2026-05-30** · prod **v1.11.13**
+
+**Accept O64–O67:** ✅ **Lead verify + deploy 2026-05-30** · VPS smoke OK
+
+---
+
+# § O37c-filters — навыки по специализации + highlight (**✅ Lead verify 2026-05-30 · v1.11.12**)
+
+**Проблема (владелец):** на `/lenta/` специализации (Разработка · Дизайн · Маркетинг · Тексты) **остаются в bar**. Кнопка **«Фильтры ▾»** / **«Навыки ▾»** должна показывать **навыки выбранной ниши**. Навыки **кликаются** и **визуально выделяются** (`is-active`). Сейчас на mobile sheet / desktop dropdown — skills не перерисовываются или chip не подсвечивается.
+
+**Deploy:** ✅ **v1.11.12** prod VPS · `buildSheetContent` · `syncChipActiveStates` · `ensureSheetDelegation` · `openSheet→renderSkillsCatalog+loadCatalog`.
+
+## f1 — UX (канон владельца)
+
+| # | Правило |
+|---|---------|
+| a1 | Bar **без изменений состава:** «Все» + **Разработка** · **Дизайн** · **Маркетинг** · **Тексты** (`dev` / `design` / `marketing` / `text`) |
+| a2 | **1 специализация** выбрана → панель навыков = **только эта category** (Tier A + «Ещё навыки» Tier B) |
+| a3 | **«Все»** или **несколько** category → popular / все группы по выбранным |
+| a4 | Клик по skill-chip → **toggle** draft · класс **`is-active`** на chip (desktop + mobile sheet) |
+| a5 | Смена category → список навыков **перерисовывается** · orphan draft-tags **сбрасываются** (`pruneDraftTagsForCategories`) |
+| a6 | **«Применить»** → applied tags + reload feed · badge «N» на триггере |
+
+## f2 — Баги (Lead code review)
+
+| # | Симптом | Fix |
+|---|---------|-----|
+| b1 | Mobile `openSheet()` клонирует HTML, skills **пустые/устаревшие** | После clone: `state.draftCategories = readCategoriesFrom(sheetBody)` · **`renderSkillsCatalog()`** · `loadCatalog()` если catalog пуст |
+| b2 | В sheet **category chips** без `is-active` | `syncCategoryInputs` / `syncChips` для **`.rl-cat-chip`** в sheet (сейчас только `.rl-feed-chip` в openSheet) |
+| b3 | Skill click в sheet не подсвечивает | `toggleDraftTag` → `renderSkillsInto(sheetSkills)` · не терять `bindSkillButtons` при re-render |
+| b4 | Повторное открытие sheet — **дубли listeners** | Idempotent bind (clone без listeners / `once` / replace node) |
+
+## f3 — Desktop + mobile
+
+| Viewport | Поведение |
+|----------|-----------|
+| **≥768px** | Category chips в bar · **«Навыки ▾»** dropdown — те же правила a2–a4 |
+| **<768px** | Category chips в bar (scroll) · **«Фильтры ▾»** sheet — category + skills + sort · sticky **«Применить →»** |
+
+## f4 — Accept
+
+| # | Критерий |
+|---|----------|
+| t1 | Выбрать **Дизайн** → открыть навыки → только design-группа · клик **Figma** → `is-active` |
+| t2 | Сменить на **Разработка** → список меняется · Figma снимается если не dev |
+| t3 | Mobile 390px: **Фильтры ▾** → category + skills · tap chip → highlight · **Применить →** → feed reload |
+| t4 | Desktop: **Навыки ▾** — то же без регресса M1–M5 |
+| t5 | **Deploy prod** theme **v1.11.12** | **✅ VPS** |
+
+**Accept O37c-filters:** ✅ **Lead verify 2026-05-30** — код + prod theme **1.11.12**.
+
+**→ Владелец:** re-run `ux_audit.py` (U2 · U8) или S6 глазами mobile filters.
+
+---
+
+# § O37c — UX audit «как человек» + ИИ (**P0 · владелец 2026-05-30**)
+
+**Проблема:** `ux_review.py` (O37b) — **3 скрина** на viewport · **мобила без кликов** → rating 5/5 **бессмысленен**. Владелец: **моб кривой** · нужны tap-outside, CTA, понятность.
+
+**Gate:** **S6** и **O37 load** — **после** O37c findings → правки (Coder) → re-run.
+
+## Метод (канон)
+
+```
+Playwright (paid test user) → чек-лист жестов → JSON findings + скрины
+→ LLM pass (OpenRouter vision/text) → preprod_ux_audit.md «человеческий»
+→ @lead-designer triage → Coder WAVE-UX-FIX → повтор audit
+```
+
+## c1 — Test-аккаунт (**обязательно, blockers**)
+
+| # | Правило |
+|---|---------|
+| a1 | **Запрещено** gate только на yandex-cdp / браузер владельца |
+| a2 | `RAWLEAD_PREPROD_ACCESS_TOKEN` в `.env.site` — **paid** uuid · отчёт `has_auth: true` + `browser: cdp+token` или `chromium+token` |
+| a3 | Если токена нет — **создать** test user в Neon (`plan=owner`/`agent`) + выдать JWT · описать в `PREPROD_ACCOUNTS.md` (uuid без секрета) |
+| a4 | J5/J8/J10 + audit — **только** с token |
+| a5 | @rawlead_bot: acc1 Telethon на VPS **или** test `tg_chat_id` — ops ticket если lock |
+
+## c2 — `ux_audit.py` (новый, не `ux_review.py`)
+
+Расширить § **PRE-PROD-UX-AUDIT** · база `ux_journey.py`.
+
+**Desktop 1440 + Mobile 390** — **одинаковые сценарии:**
+
+| ID | Жест «как пользователь» | PASS |
+|----|-------------------------|------|
+| U1 | Header: logo → `/` · «Лента» · «Кабинет» · footer links 200 | все ведут куда надо |
+| U2 | `/lenta/` категория chip · **Навыки ▾** → chip → **Применить** · лента обновилась | нет 500 banner |
+| U3 | **Сортировка ▾** → match/time · закрытие **tap outside** / Esc | dropdown закрыт |
+| U4 | Карточка expand · **tap пустое место** → collapse | свернулось |
+| U5 | Paid: **«Написать отkлик»** → draft · **инструменты** видны | не placeholder |
+| U6 | **FAB «?»** → modal · tap overlay → **закрылась** | |
+| U7 | `/cabinet/` logged: навыки modal · tap outside · inbox expand | |
+| U8 | Mobile: **bottom sheet** навыки · sticky **Применить** · scroll категорий | нет horizontal page scroll |
+| U9 | Marketing `/how/` `/pricing/` CTA → `/lenta/` или `/cabinet/` | |
+| U10 | Console: 0 **error** (warn OK) · network 0× 4xx/5xx на API feed/draft | |
+
+**Артефакты:** `data/preprod_ux_audit.json` · `.md` · `data/preprod_ux_audit/` (скрин **до/после** каждого U*).
+
+## c3 — LLM «человеческий» слой (**обязательно**)
+
+| # | Задача |
+|---|--------|
+| l1 | После прогона: OpenRouter (модель из `.env`) — **все mobile скрины** + findings JSON |
+| l2 | Промпт: «Ты UX-редактор. Оцени: понятно ли куда жать? криво на 390px? перекрытия? мелкий tap target?» |
+| l3 | Выход: **`data/preprod_ux_audit_human.md`** — секции **Критично / Раздражает / Ок** · **без** авто-5/5 если не было U8 |
+| l4 | Rating: Lead/Design **не** из `_rating()` скрипта — из LLM + critical count |
+
+## c4 — Цикл правок
+
+| # | Кто |
+|---|-----|
+| f1 | Findings → `@lead-designer` — приоритет P0/P1 |
+| f2 | CSS/JS fixes → **@coder** § **WAVE-UX-FIX** (отдельный чат на волну) |
+| f3 | Re-run O37c → critical=0 → **S6** владелец |
+
+**Accept O37c (код):** ✅ **Lead verify 2026-05-30** — `ux_audit.py` U1–U10 · token blocker · LLM human.md · docs sync.
+
+**Accept O37c (gate):** после прогона — JSON + human.md · test token · U8 mobile прогнан.
+
+**Отменить как gate:** `ux_review.py` rating 4/5 · 5/5 без U8.
+
+---
+
+# § O37c-a — Mint JWT для preprod (**P0 · блокирует прогон**)
+
+**Проблема (владелец 2026-05-30):** token из DevTools — **личный TG** (owner). Gate нужен **test user**, привязанный к **acc1** (Telethon), не к браузеру владельца.
+
+**Почему acc нельзя «войти на сайт»:** acc1/acc2 — **файлы `.session` на ПК**, телефонов нет. Login Widget на `/cabinet/` для них **недоступен**. Token только **программно**.
+
+## ca1 — Скрипт `scripts/preprod_mint_token.py`
+
+| # | Шаг |
+|---|-----|
+| 1 | Telethon `--account acc1` → `get_me()` → `tg_user_id` |
+| 2 | Neon: upsert `users` по `tg_user_id` · `subscriptions` plan=`agent` или paid active |
+| 3 | `issue_access_token(user_id, tg_user_id=…)` — секрет **тот же**, что на prod API (`RAWLEAD_JWT_SECRET` / `RAWLEAD_API_KEY` из `.env`) |
+| 4 | `--write-env-site` — дописать/обновить `RAWLEAD_PREPROD_ACCESS_TOKEN=` в `.env.site` (не git) |
+| 5 | stdout: `user_id` (uuid) · `tg_user_id` · «token written» — **без** печати token в лог CI |
+
+## ca2 — Docs
+
+| Файл | Что |
+|------|-----|
+| `PREPROD_ACCOUNTS.md` | uuid acc1-test · команда mint · «не owner JWT» |
+| `FOR_YOU.md` | владельцу: одна команда mint + audit (без DevTools) |
+
+## ca3 — Accept
+
+| # | Критерий |
+|---|----------|
+| a1 | `preprod_mint_token.py --account acc1 --write-env-site` → `.env.site` |
+| a2 | `ux_audit.py` стартует (не exit 2) · `has_auth: true` · uuid **≠** owner `164786fe-…` |
+| a3 | U5 draft проходит под acc1 user |
+
+**Accept O37c-a (код):** ✅ **Lead verify 2026-05-30** — `preprod_mint_token.py` · uuid acc1 в `PREPROD_ACCOUNTS.md`.
+
+**→ Lead:** после ca3 — владелец или Lead ops запускает `ux_audit.py` (Lead не правит `.env`).
+
+---
+
+# § WAVE-UX-MOBILE — пересборка mobile feed + ЛК (**P0 · D-O40 ✅**)
+
+**Канон (читать целиком):** [`DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) § **WAVE-UX-MOBILE** · wire [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) §7.6
+
+**Тикет:** `docs/problems/2026-05-30-mobile-ux-owner-review.md`
+
+| # | Задача | Источник |
+|---|--------|----------|
+| **M1** | Overflow карточек feed + ЛК | DESIGNER § M1 |
+| **M2** | Burger header + drawer | DESIGNER § M2 |
+| **M3** | Unified sheet «Фильтры» | DESIGNER § M3 |
+| **M4** | Tap-outside card + cabinet modal | DESIGNER § M4 |
+| **M5** | `#rl-feed-filters-open` → sheet | DESIGNER § M3 JS |
+
+**Файлы:** `header.php` · `page-lenta.php` · `page-cabinet.php` · `rawlead-feed.js` · `rawlead-cabinet.js` · `rawlead.css`
+
+**Accept (Design m1–m11):** ✅ **Lead verify код 2026-05-30** · theme **v1.11.4**.
+
+**Gate:** local eyes 390px → Lead deploy → re-run `ux_audit.py` → **S6**.
+
+---
+
+# § O37b — UX deep + tools + бот (**P0 · владелец 2026-05-30**)
+
+**Контекст:** O37-UX 11/11, но через **yandex-cdp владельца** · **не** test-аккаунты · **не** @rawlead_bot · скрин: **черновик есть, инструменты пусто**.
+
+**Gate O37 load / S6:** **после** O37b.
+
+## b1 — Инструменты на карточке (**P0**)
+
+**Симптом:** «Список инструментов появится после генерации отклика» при **готовом** черновике.
+
+**Корень:** draft пишет `reply_draft`, но `tools_required` = **`leads.tools_required` из БД**, L2 tools **не persist** при on-demand.
+
+| # | Fix |
+|---|-----|
+| t1 | On-demand draft → L2 tools → **UPDATE leads.tools_required** + poll JSON |
+| t2 | JS: reply есть, tools пусто → **не** «появится после…» · honest empty-state |
+| t3 | Test + theme **v1.11.3** |
+
+## b2 — Test-аккаунты (программно, не браузер владельца)
+
+| # | Задача |
+|---|--------|
+| a1 | JWT: `RAWLEAD_PREPROD_ACCESS_TOKEN` или test uuid с paid в Neon |
+| a2 | Playwright J5/J8 с **token inject** · отчёт `browser: chromium+token` |
+| a3 | `docs/ops/PREPROD_ACCOUNTS.md` (без секретов в git) |
+
+## b3 — @rawlead_bot
+
+| # | Сценарий |
+|---|----------|
+| bot1 | `/start` test user (Telethon acc / Bot API) |
+| bot2 | `/status` |
+| bot3 | push или callback `draft:{id}` |
+| bot4 | `data/preprod_bot_smoke.json` |
+
+## b4 — UX-отчёт ПК + мобила
+
+| # | Deliverable |
+|---|-------------|
+| u1 | 1440 + 390 · scroll · tap outside · full-page скрины |
+| u2 | **`data/preprod_ux_review.md`** — ПК / Мобила / Критично / OK (1–5) |
+| u3 | Имитация пользователя, не только assert pass |
+
+**Accept:** tools deploy · bot smoke · ux_review.md · J5 test-token.
+
+---
+
+# § O63 — парсеры YouDo · Freelance.ru · FreelanceJob · Пчёл.нет (**📋 backlog · владелец 2026-05-30**)
+
+**Gate:** **после O37-UX PASS** · не блокирует pre-prod.
+
+| source_id | UI | URL старт |
+|-----------|-----|-----------|
+| `youdo` | YouDo | https://youdo.com/ |
+| `freelance_ru` | Freelance.ru | https://freelance.ru/project/ |
+| `freelancejob` | FreelanceJob | URL при ТЗ |
+| `pchyol` | Пчёл.нет | URL при ТЗ |
+
+| # | Задача |
+|---|--------|
+| p1 | Парсеры listing (как `fl_parser.py`) ×4 |
+| p2 | `main.py` + лог цикла |
+| p3 | Neon + `PUBLIC_FEED_SOURCES` |
+| p4 | Proxy env per source |
+| p5 | WP фильтр/badge источника |
+| p6 | VPS smoke ≥1 visible/биржу |
+
+**Accept:** 4 source в env → радар → `/lenta/` с фильтром по source.
+
+## O63 — cross-source dedup (владелец 2026-05-30)
+
+**Риск:** одно задание на FL + YouDo + Freelance.ru → **дубли в ленте**.
+
+**Уже есть (не ломать):**
+
+| Слой | Как |
+|------|-----|
+| **Neon** | `content_hash` = SHA-256 **нормализованного** title+snippet · **UNIQUE глобально** (не per-source) · `ON CONFLICT DO NOTHING` |
+| **SQLite** | только `(source, external_id)` — **не** cross-source |
+
+→ **Одинаковый текст** с двух бирж → **одна** карточка в `/lenta/` (вторая отсекается на ingest).
+
+**Дырки (закрыть в O63):**
+
+| # | Задача |
+|---|--------|
+| d1 | **Нормализация:** единый `listing_content_hash` для всех новых парсеров · title+body без URL/₽/«FL.ru»/«YouDo» в шуме |
+| d2 | **Счётчик в логе:** `cross_source_dup` / `neon_dup_hash` — когда insert отбит hash'ем, лог **какой source выиграл** (первый в Neon) |
+| d3 | **Accept:** один и тот же текст с FL и `youdo` → **1** lead в feed · smoke-тест |
+| d4 | **Backlog O63b (если мало):** fuzzy / эмбеддинги для «пересказанных» дублей — **не блокер** первой волны |
+
+**Не делать:** отдельный dedup per-source · снимать UNIQUE `content_hash`.
+
+---
+
+# § O61 — draft без порога km (**✅ Lead verify + deploy 2026-05-30 · v1.11.2**)
+
+**O62 владелец:** km **информативен** · paid draft на любом visible lead · tests **20/20** · prod JS без `km<=0` gate · API без `no skill overlap`.
+
+---
+
+# § O60 — hotfix приёмки владельца (**✅ Lead verify 2026-05-30**)
+
+**Контекст:** приёмка prod 2026-05-30 · блокирует O37-UX · **deploy v1.11.1 + API** · tests **17/17**.
+
+## O60a — «Отклик ✓» виден anon (**P0 privacy**)
+
+**Корень:** `/v1/feed` отдаёт `leads.reply_draft` (shared) всем · JS `headBadgesHtml` показывает badge если `reply_draft` не пуст.
+
+| # | Fix |
+|---|-----|
+| a1 | **API:** anon/free feed **не** отдавать `reply_draft` (или всегда `""`) · только JWT user + его `user_lead_replies` |
+| a2 | **JS:** badge «Отклик ✓» только если **logged in** и есть **personal** reply (не shared cache) |
+| a3 | Test: anon `/lenta/` после чужого draft — **нет** badge |
+
+## O60b — убрать лимит 10 draft/час (**P0 · решение владельца**)
+
+| # | Fix |
+|---|-----|
+| b1 | `_DRAFT_HOURLY_LIMIT` → env `DRAFT_HOURLY_LIMIT` · **0 = без лимита** (default **0** на prod) |
+| b2 | Убрать/не показывать 429 «10/час» в UI если limit=0 |
+| b3 | `.env.example` + deploy VPS `.env.site` |
+
+## O60c — надпись счётчика = реальный фильтр (**P1**)
+
+**Сейчас:** `rawlead-feed.js` `updateCount()` всегда «· по совместимости».
+
+| sort | Текст |
+|------|-------|
+| `time` | `N заказов · по дате` |
+| `match` + skills | `N заказов · по совместимости` |
+| `match` без skills | `N заказов · по дате` (или «все заказы») |
+
+Синхрон с `#rl-feed-sort-trigger` · center CSS `#rl-feed-count` если владелец просил по центру (см. O60d layout).
+
+## O60d — главная «Последние заказы» = **живая** лента (**P1**)
+
+**Сейчас:** `live-preview.php` — **static** demo O55 (42/100/67) — поэтому «не обновляется».
+
+| # | Fix |
+|---|-----|
+| d1 | WP: fetch `/wp-json/rawlead/v1/feed?limit=3&sort=time` (или JS hydrate) · **реальные** 3 lead |
+| d2 | **Совместимость %** — фиксированная вёрстка: label **по центру** (`.rl-match__label { text-align:center }` в блоке preview) |
+| d3 | Fallback: skeleton → static demo только если API empty |
+| d4 | CTA «Написать отkлик» → `/lenta/` (не генерить draft на главной) |
+
+## O60e — радар / лента не пополняется (**P0 ops**)
+
+**Lead VPS 2026-05-30:** `rawlead-radar` **active** · но циклы: **FL.ru скачано 0** · Kwork dup/filter · `neon_insert: 0` · последний lead в feed ~ `2026-05-30T00:41 UTC`.
+
+| # | Fix |
+|---|-----|
+| e1 | Диагностика **FL.ru** — почему 0 скачано (proxy, URL, 403) · smoke `fl_parser` на VPS |
+| e2 | TG ingest — `radar_site_tg.log` · acc1–3 listen alive · новые TG лиды → Neon `is_visible` |
+| e3 | L1 backlog / `clear_l1_backlog` если зомби без L1 |
+| e4 | STATUS одна строка: last_visible_created_at · inserts/24h |
+
+**Accept O60e:** ≥1 новый visible lead за 2 цикла радара или явный root-cause в `docs/problems/`.
+
+---
+
+# § O37 — PRE-PROD (**→ после O60 P0**)
+
+**Theme:** **v1.11.0** · API+bot-poll **active** · tests **14/14**
+
+## O59a — Draft stability (**P0**)
+
+| # | Fix | Файлы |
+|---|-----|-------|
+| a1 | Worker `draft_async` / `generate_and_store_lead_draft`: при fail писать **`ai_errors`** в `lead_draft_jobs.error_msg` + `logger.warning` полный текст | `draft_async.py`, `match_push.py` |
+| a2 | Poll `status=failed`: body **`error`** с sanitized detail (не только generic) | `draft_async.py`, `api_server.py` |
+| a3 | Sync-path `DraftError ai_fail`: если ещё 503 без detail — пробросить `exc.detail` / ai_errors в JSON | `api_server.py` |
+| a4 | Feed + cabinet JS: на `failed` / 503 — **«Повторить»** (есть частично) · показать `error`/`detail` из API | `rawlead-feed.js`, `rawlead-cabinet.js` |
+| a5 | Опц. 4-й retry только on-demand shared L2 (`max_retries=4` в `_analyze_shared_ondemand`) | `match_push.py`, `ai_analyze.py` |
+| a6 | Tests: mock L2 fail → failed poll · retry → success path | `tests/test_draft_async.py` |
+
+**Accept:** 10× draft на разных leads подряд · 0 необъяснимых 503 · лог содержит причину fail.
+
+## O59b — SaaS-ready owner id (**P2**, быстро)
+
+| # | Fix |
+|---|-----|
+| b1 | Env `RAWLEAD_OWNER_USER_ID` (default seed UUID) · один источник в `config.py` |
+| b2 | `api_server.py` + `pg_storage.py` — импорт из config, не дубли `_OWNER_USER_ID` |
+| b3 | `.env.example` строка + комментарий |
+
+**Не блокирует O37** — можно после a1–a6 если время.
+
+---
+
+# § O37 — PRE-PROD (**→ Coder · prod v1.11.2**)
+
+**Prod baseline:** O60 + **O61** задеплоены · theme **v1.11.2** · draft limit off · km-gate снят.
+
+**Канон:** [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) S1–S6 · runbook [`docs/ops/PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md)  
+**Цель владельца:** понять **реальный UX** — «мышкой потыкать все сценарии», не только k6.
+
+## Порядок (3 слоя — строго)
+
+| Слой | Что | Критерий | Кто смотрит |
+|------|-----|----------|-------------|
+| **O37-UX** | Playwright **клики** по prod | **S2 + S3** | отчёт + скрины |
+| **O37-AI** | L1/L2 матрица | **S1** | JSON отчёт |
+| **O37-LOAD** | k6 + API burst | **S4–S5** | p95, 0% 5xx |
+| **O37-YOU** | 15 мин глазами | **S6** | **ты** |
+
+**Gate:** O37-UX **PASS** (0 critical) → только потом LOAD.
+
+---
+
+## O37-UX — «ИИ-тестировщик» (Playwright · мышь)
+
+**Перед прогоном (O61):** обновить `ux_journey.py` — J5 **не** требует km>0 · `_ensure_feed_draft_ready` / `_cards_with_reply_btn` — только **paid + кнопка** (убрать `_card_match_percent > 0`).
+
+**База:** `scripts/preprod_playwright/smoke.py` (5 сцен.) · **расширить** → `ux_journey.py` (или дополнить smoke).
+
+**Запуск prod:**
+
+```powershell
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_journey.py --base-url https://rawlead.ru
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_journey.py --base-url https://rawlead.ru --headed
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_journey.py --viewport mobile
+```
+
+**На каждый сценарий:** скрин до/после · console errors · failed network (4xx/5xx) → `data/preprod_ux_journey/`.
+
+### User journeys (обязательные)
+
+| ID | Сценарий | Шаги мышью |
+|----|----------|------------|
+| J1 | **Главная** | `/` · hero · **live preview** (API 3 cards) или fallback demo · CTA «Смотреть ленту» → `/lenta/` |
+| J2 | **Лента load** | карточки или empty · нет error banner · счётчик |
+| J3 | **Фильтры** | категория design · навыки ▾ → chip → «Применить» · лента без 500 |
+| J4 | **Карточка** | click expand · task_summary · «Читать на бирже» visible · collapse |
+| J5 | **Draft ×2** | paid · «Написать отклик» A → текст · **B подряд** · km=0 OK (O61) · «Повторить» только ai_fail |
+| J6 | **Draft collapse** | после отклика карточка сворачивается · повторный expand работает |
+| J7 | **ЛК anon** | `/cabinet/` → блок TG Login · header nav |
+| J8 | **ЛК logged** | `--storage-state` (владелец один раз логинится, сохранить state) · inbox карточки · expand черновик |
+| J9 | **Маркeting** | `/how/` `/pricing/` `/faq/` `/contact/` · footer links 200 |
+| J10 | **Mobile 390** | J2–J6 на viewport 390×844 |
+| J11 | **FAB** | «?» открывает support modal · закрыть |
+
+**PASS:** 0 **critical** · draft J5 **2/2 OK** · отчёт `data/preprod_ux_journey.json` + `.md`.
+
+**Опц. LLM pass:** OpenRouter по JSON+скринам — «мертвые кнопки, неудобно, регресс» (не блокер).
+
+**MCP Playwright в Cursor:** владелец включает [`MCP_POOL.md`](../common/MCP_POOL.md) § Playwright — агент может **explore** prod ad-hoc; **канон прогона** = скрипт выше (повторяемо).
+
+---
+
+## O37-AI + O37-LOAD (после UX green)
+
+| # | Задача | Скрипт |
+|---|--------|--------|
+| t1 | L1/L2 по 4 category | `preprod_ai_matrix.py` → S1 |
+| t2 | 50–100 VU feed/catalog | `preprod_k6_feed.js` → S4 |
+| t3 | 50× draft burst (API) | из O38 checklist · не 1000× premium |
+| t4 | Site radar 2–4 цикла VPS | S5 |
+
+**Accept O37:** S1–S6 green в [`PRE_PROD_GATE.md`](PRE_PROD_GATE.md) · Lead обновляет STATUS → **go prod traffic**.
 
 ---
 

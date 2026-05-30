@@ -3,6 +3,7 @@
 Запуск (site, нужен OpenRouter в .env.site):
 
   .venv\\Scripts\\python.exe scripts\\preprod_ai_matrix.py --profile site
+  .venv\\Scripts\\python.exe scripts\\preprod_ai_matrix.py --profile site --shared-draft
   .venv\\Scripts\\python.exe scripts\\preprod_ai_matrix.py --profile site --dry-run
   .venv\\Scripts\\python.exe scripts\\preprod_ai_matrix.py --profile site --category dev --limit 1
 """
@@ -29,7 +30,13 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 sys.path.insert(0, str(_ROOT / "scripts"))
 
-from ai_analyze import AiAnalysis, AiLiteAnalysis, analyze_lite, analyze_premium
+from ai_analyze import (
+    AiAnalysis,
+    AiLiteAnalysis,
+    analyze_lite,
+    analyze_premium,
+    analyze_shared_reply_draft,
+)
 from config import apply_profile_argv, load_config, load_radar_env
 from preprod_fixtures import CATEGORIES, PREPROD_LEAD_FIXTURES, PreprodLeadFixture
 
@@ -53,6 +60,54 @@ def _analysis_to_dict(obj: AiLiteAnalysis | AiAnalysis | None) -> dict | None:
         data["money"] = obj.money
         data["risks"] = obj.risks
     return data
+
+
+def _run_fixture_shared_draft(cfg, fixture: PreprodLeadFixture) -> dict:
+    errors: list[str] = []
+    t0 = time.perf_counter()
+    lite = analyze_lite(
+        cfg,
+        title=fixture.title,
+        budget_text=fixture.budget_text,
+        snippet=fixture.snippet,
+        url=fixture.url,
+        errors=errors,
+        log_prefix=f"{fixture.id}:",
+    )
+    lite_ms = int((time.perf_counter() - t0) * 1000)
+
+    t1 = time.perf_counter()
+    reply_draft = ""
+    if lite is not None:
+        draft = analyze_shared_reply_draft(
+            cfg,
+            title=fixture.title,
+            budget_text=fixture.budget_text,
+            lite=lite,
+            tools_required=[],
+            errors=errors,
+            log_prefix=f"{fixture.id}:",
+            timeout_sec=90.0,
+        )
+        reply_draft = (draft or "").strip()
+    shared_ms = int((time.perf_counter() - t1) * 1000)
+
+    task_summary = (lite.task_summary if lite else "") or ""
+
+    return {
+        "fixture_id": fixture.id,
+        "category": fixture.category,
+        "title": fixture.title,
+        "lite_ok": lite is not None,
+        "shared_draft_ok": bool(reply_draft),
+        "lite_ms": lite_ms,
+        "shared_draft_ms": shared_ms,
+        "task_summary_nonempty": bool(task_summary.strip()),
+        "reply_draft_nonempty": bool(reply_draft),
+        "errors": errors,
+        "lite": _analysis_to_dict(lite),
+        "reply_draft": reply_draft or None,
+    }
 
 
 def _run_fixture(cfg, fixture: PreprodLeadFixture) -> dict:
@@ -100,6 +155,41 @@ def _run_fixture(cfg, fixture: PreprodLeadFixture) -> dict:
         "errors": errors,
         "lite": _analysis_to_dict(lite),
         "premium": _analysis_to_dict(premium),
+    }
+
+
+def _build_shared_draft_summary(results: list[dict]) -> dict:
+    by_cat: dict[str, dict[str, int]] = defaultdict(
+        lambda: {
+            "total": 0,
+            "lite_ok": 0,
+            "shared_draft_ok": 0,
+            "empty_reply_draft": 0,
+        }
+    )
+    for row in results:
+        cat = row["category"]
+        by_cat[cat]["total"] += 1
+        if row["lite_ok"]:
+            by_cat[cat]["lite_ok"] += 1
+        if row["shared_draft_ok"]:
+            by_cat[cat]["shared_draft_ok"] += 1
+        if row["lite_ok"] and not row["reply_draft_nonempty"]:
+            by_cat[cat]["empty_reply_draft"] += 1
+
+    draft_ok = sum(1 for r in results if r["reply_draft_nonempty"])
+    s1_pass = draft_ok >= 11
+
+    return {
+        "total": len(results),
+        "lite_ok": sum(1 for r in results if r["lite_ok"]),
+        "shared_draft_ok": draft_ok,
+        "empty_reply_draft": sum(
+            1 for r in results if r["lite_ok"] and not r["reply_draft_nonempty"]
+        ),
+        "by_category": dict(by_cat),
+        "s1_pass": s1_pass,
+        "mode": "shared_draft",
     }
 
 
@@ -152,6 +242,11 @@ def main() -> int:
     parser.add_argument("--category", action="append", dest="categories")
     parser.add_argument("--limit", type=int, default=0, help="макс. фикстур (0 = все)")
     parser.add_argument(
+        "--shared-draft",
+        action="store_true",
+        help="O71: analyze_shared_reply_draft (site path, pro model)",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=_ROOT / "data" / "preprod_ai_report.json",
@@ -184,6 +279,32 @@ def main() -> int:
     if not cfg.ai_active:
         print("AI_ENABLED=0 или нет ключа OpenRouter — матрица невозможна.", file=sys.stderr)
         return 2
+
+    if args.shared_draft:
+        results = [_run_fixture_shared_draft(cfg, fx) for fx in fixtures]
+        summary = _build_shared_draft_summary(results)
+        report = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "profile": args.profile,
+            "mode": "shared_draft",
+            "models": {
+                "lite": cfg.ai_model_summary,
+                "shared_draft": cfg.ai_model_shared_draft,
+            },
+            "summary": summary,
+            "results": results,
+        }
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(
+            f"shared-draft matrix: {summary['lite_ok']}/{summary['total']} L1, "
+            f"{summary['shared_draft_ok']}/{summary['total']} draft → {args.output}"
+        )
+        print(
+            f"S1: {'PASS' if summary['s1_pass'] else 'FAIL'} "
+            f"(empty reply_draft: {summary['empty_reply_draft']}, need ≥11/12)"
+        )
+        return 0 if summary["s1_pass"] else 1
 
     results = [_run_fixture(cfg, fx) for fx in fixtures]
     summary = _build_summary(results)

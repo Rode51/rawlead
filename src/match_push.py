@@ -18,6 +18,7 @@ import requests
 
 from ai_analyze import (
     AiLiteAnalysis,
+    analyze_premium,
     analyze_shared_reply_draft,
     note_draft_request,
 )
@@ -26,6 +27,7 @@ from public_feed import public_feed_source_sql
 from radar_cycle_log import SOURCE_LABELS
 from rank import keyword_match, parse_lead_tags, tags_as_weights
 from reply_draft_strip import strip_reply_draft_price_deadline, strip_tg_draft_price_deadline
+from draft_limits import draft_hourly_limit
 from skills_catalog import lead_tags_for_feed, normalize_user_tags
 
 logger = logging.getLogger(__name__)
@@ -34,7 +36,6 @@ _LENTA_URL = "https://rawlead.ru/lenta/"
 _CABINET_URL = "https://rawlead.ru/cabinet/"
 _PUSH_MIN_MATCH_DEFAULT = 60
 _DRAFT_CALLBACK_RE = re.compile(r"^draft:(\d+)$")
-_DRAFT_HOURLY_LIMIT = 10
 _DRAFT_WINDOW_SEC = 3600
 _ONDEMAND_L2_SEM = threading.Semaphore(2)
 _ONDEMAND_L2_BACKOFF_SEC = (1, 2, 4, 8, 16)
@@ -64,13 +65,16 @@ class DraftResult:
 
 
 def draft_rate_limit_retry_after(user_id: str) -> int | None:
-    """O48: max 10 on-demand draft/h per user; None if allowed."""
+    """O48/O60b: DRAFT_HOURLY_LIMIT per user; 0 = без лимита."""
+    limit = draft_hourly_limit()
+    if limit <= 0:
+        return None
     now = time.time()
     q = _draft_attempts[user_id]
     cutoff = now - _DRAFT_WINDOW_SEC
     while q and q[0] < cutoff:
         q.popleft()
-    if len(q) >= _DRAFT_HOURLY_LIMIT:
+    if len(q) >= limit:
         return max(1, int(_DRAFT_WINDOW_SEC - (now - q[0])))
     q.append(now)
     return None
@@ -214,6 +218,61 @@ def _parse_tools_required(raw: Any) -> list[str]:
     return []
 
 
+def _persist_lead_tools_required(cur: Any, lead_id: int, tools: list[str]) -> None:
+    """O37b: L2 tools → Neon leads.tools_required."""
+    clean = [str(t).strip() for t in tools if str(t).strip()]
+    if not clean:
+        return
+    tools_json = json.dumps(clean, ensure_ascii=False)
+    cur.execute(
+        "UPDATE leads SET tools_required = %s::jsonb WHERE id = %s",
+        (tools_json, lead_id),
+    )
+
+
+def _lite_from_lead_row(row: tuple[Any, ...]) -> AiLiteAnalysis:
+    tags = _canonical_lead_tags(row[8])
+    return AiLiteAnalysis(
+        verdict=(row[7] or "Сомнительно").strip(),
+        task_summary=(row[12] or "").strip() or (row[3] or "")[:400],
+        lead_tags=tuple(tags),
+        ai_reasons=tuple(_parse_ai_reasons(row[9])),
+    )
+
+
+def _backfill_lead_tools_if_empty(
+    cur: Any,
+    cfg: Config,
+    row: tuple[Any, ...],
+    *,
+    ai_errors: list[str],
+    log_prefix: str,
+    max_retries: int = 2,
+) -> list[str]:
+    """O37b: on-demand / cache-hit — заполнить tools_required, если колонка пуста."""
+    tools = _parse_tools_required(row[13])
+    if tools:
+        return tools
+    lite = _lite_from_lead_row(row)
+    premium = analyze_premium(
+        cfg,
+        title=row[2] or "",
+        budget_text=row[5] or "",
+        description=row[3] or "",
+        url=row[4] or "",
+        lite=lite,
+        errors=ai_errors,
+        log_prefix=log_prefix,
+        max_retries=max(1, min(int(max_retries), 2)),
+    )
+    if not premium:
+        return []
+    tools = [str(t).strip() for t in premium.tools_required if str(t).strip()]
+    if tools:
+        _persist_lead_tools_required(cur, int(row[0]), tools)
+    return tools
+
+
 def _source_label(source: str) -> str:
     key = (source or "").strip().lower()
     return SOURCE_LABELS.get(key, key or "—")
@@ -317,9 +376,9 @@ def _analyze_shared_ondemand(
     tools_required: list[str],
     ai_errors: list[str],
     log_prefix: str,
-    max_retries: int = 5,
+    max_retries: int = 4,
 ) -> str | None:
-    """O57: shared on-demand L2 — без profile, отдельный semaphore + backoff."""
+    """O57/O59a: shared on-demand L2 — без profile, отдельный semaphore + backoff."""
     attempts = max(1, int(max_retries))
     with _ONDEMAND_L2_SEM:
         for attempt in range(attempts):
@@ -379,6 +438,7 @@ def materialize_shared_draft_for_user(
     if not cfg.database_url.strip():
         return None
     prefix = log_prefix or f"draft:{lead_id}:"
+    ai_errors: list[str] = []
     with psycopg.connect(cfg.database_url) as conn:
         with conn.cursor() as cur:
             if not _user_effective_access(cur, user_id):
@@ -389,15 +449,16 @@ def materialize_shared_draft_for_user(
                 row = _fetch_lead_row(cur, lead_id)
                 if row is None:
                     return None
+                tools = _backfill_lead_tools_if_empty(
+                    cur, cfg, row, ai_errors=ai_errors, log_prefix=prefix
+                )
+                if tools:
+                    row = _fetch_lead_row(cur, lead_id) or row
+                    conn.commit()
                 return _draft_result_from_row(cur, user_id, row, saved)
 
             row = _fetch_lead_row(cur, lead_id)
             if row is None:
-                return None
-
-            user_tags = _load_user_tags(cur, user_id)
-            tags = _canonical_lead_tags(row[8])
-            if keyword_match(tags, user_tags) <= 0:
                 return None
 
             shared = (row[14] or "").strip()
@@ -405,9 +466,14 @@ def materialize_shared_draft_for_user(
                 return None
 
             reply = strip_reply_draft_price_deadline(shared)
+            tools = _backfill_lead_tools_if_empty(
+                cur, cfg, row, ai_errors=ai_errors, log_prefix=prefix
+            )
             _insert_user_draft(cur, user_id, lead_id, reply)
             conn.commit()
             logger.info("%scache_hit lead=%s user=%s", prefix, lead_id, user_id[:8])
+            if tools:
+                row = _fetch_lead_row(cur, lead_id) or row
             return _draft_result_from_row(cur, user_id, row, reply)
 
 
@@ -432,7 +498,7 @@ def generate_and_store_lead_draft(
     user_id: str,
     lead_id: int,
     log_prefix: str = "",
-    max_retries: int = 3,
+    max_retries: int = 4,
     enforce_rate_limit: bool = True,
 ) -> DraftResult:
     """O57: shared on-demand L2 → leads.reply_draft + user_lead_replies."""
@@ -442,7 +508,8 @@ def generate_and_store_lead_draft(
     if enforce_rate_limit:
         retry_after = draft_rate_limit_retry_after(user_id)
         if retry_after is not None:
-            raise DraftError("rate_limit", f"max {_DRAFT_HOURLY_LIMIT}/hour")
+            lim = draft_hourly_limit()
+            raise DraftError("rate_limit", f"max {lim}/hour")
 
     prefix = log_prefix or f"draft:{lead_id}:"
     ai_errors: list[str] = []
@@ -456,6 +523,12 @@ def generate_and_store_lead_draft(
                 row = _fetch_lead_row(cur, lead_id)
                 if row is None:
                     raise DraftError("not_found")
+                tools = _backfill_lead_tools_if_empty(
+                    cur, cfg, row, ai_errors=ai_errors, log_prefix=prefix
+                )
+                if tools:
+                    row = _fetch_lead_row(cur, lead_id) or row
+                    conn.commit()
                 return _draft_result_from_row(cur, user_id, row, saved)
 
             row = _fetch_lead_row(cur, lead_id)
@@ -465,53 +538,81 @@ def generate_and_store_lead_draft(
             user_tags = _load_user_tags(cur, user_id)
             tags = _canonical_lead_tags(row[8])
             km = keyword_match(tags, user_tags)
-            if km <= 0:
-                raise DraftError("forbidden", "no skill overlap")
 
             shared = (row[14] or "").strip()
             if shared:
                 reply = strip_reply_draft_price_deadline(shared)
+                tools = _backfill_lead_tools_if_empty(
+                    cur, cfg, row, ai_errors=ai_errors, log_prefix=prefix
+                )
                 _insert_user_draft(cur, user_id, lead_id, reply)
                 conn.commit()
                 logger.info("%scache_hit lead=%s user=%s", prefix, lead_id, user_id[:8])
                 note_draft_request(True)
+                if tools:
+                    row = _fetch_lead_row(cur, lead_id) or row
                 return _draft_result_from_row(cur, user_id, row, reply)
 
-            lite = AiLiteAnalysis(
-                verdict=(row[7] or "Сомнительно").strip(),
-                task_summary=(row[12] or "").strip() or (row[3] or "")[:400],
-                lead_tags=tuple(tags),
-                ai_reasons=tuple(_parse_ai_reasons(row[9])),
-            )
+            lite = _lite_from_lead_row(row)
             tools_existing = _parse_tools_required(row[13])
-            reply_raw = _analyze_shared_ondemand(
-                cfg,
-                title=row[2] or "",
-                budget_text=row[5] or "",
-                lite=lite,
-                tools_required=tools_existing,
-                ai_errors=ai_errors,
-                log_prefix=prefix,
-                max_retries=max_retries,
-            )
-            if not reply_raw:
-                note_draft_request(False)
-                detail = "; ".join(ai_errors) if ai_errors else "draft generation failed"
-                logger.warning("%sfail %s", prefix, detail)
-                raise DraftError("ai_fail", detail)
-
-            reply = strip_reply_draft_price_deadline(reply_raw.strip())
-            cur.execute(
-                """
-                UPDATE leads
-                SET reply_draft = COALESCE(NULLIF(%s, ''), reply_draft)
-                WHERE id = %s
-                """,
-                (reply, lead_id),
-            )
+            if not tools_existing:
+                premium = analyze_premium(
+                    cfg,
+                    title=row[2] or "",
+                    budget_text=row[5] or "",
+                    description=row[3] or "",
+                    url=row[4] or "",
+                    lite=lite,
+                    errors=ai_errors,
+                    log_prefix=prefix,
+                    max_retries=max(1, min(int(max_retries), 2)),
+                )
+                if not premium or not (premium.reply_draft or "").strip():
+                    note_draft_request(False)
+                    detail = "; ".join(ai_errors) if ai_errors else "draft generation failed"
+                    logger.warning("%sfail %s", prefix, detail)
+                    raise DraftError("ai_fail", detail)
+                reply = strip_reply_draft_price_deadline(premium.reply_draft.strip())
+                tools = [
+                    str(t).strip() for t in premium.tools_required if str(t).strip()
+                ]
+                _persist_lead_tools_required(cur, lead_id, tools)
+                cur.execute(
+                    """
+                    UPDATE leads
+                    SET reply_draft = COALESCE(NULLIF(%s, ''), reply_draft)
+                    WHERE id = %s
+                    """,
+                    (reply, lead_id),
+                )
+            else:
+                reply_raw = _analyze_shared_ondemand(
+                    cfg,
+                    title=row[2] or "",
+                    budget_text=row[5] or "",
+                    lite=lite,
+                    tools_required=tools_existing,
+                    ai_errors=ai_errors,
+                    log_prefix=prefix,
+                    max_retries=max_retries,
+                )
+                if not reply_raw:
+                    note_draft_request(False)
+                    detail = "; ".join(ai_errors) if ai_errors else "draft generation failed"
+                    logger.warning("%sfail %s", prefix, detail)
+                    raise DraftError("ai_fail", detail)
+                reply = strip_reply_draft_price_deadline(reply_raw.strip())
+                cur.execute(
+                    """
+                    UPDATE leads
+                    SET reply_draft = COALESCE(NULLIF(%s, ''), reply_draft)
+                    WHERE id = %s
+                    """,
+                    (reply, lead_id),
+                )
+                tools = tools_existing
             _insert_user_draft(cur, user_id, lead_id, reply)
             conn.commit()
-            tools = _parse_tools_required(row[13])
 
     note_draft_request(True)
     return DraftResult(reply_draft=reply, tools_required=tools, keyword_match=km)

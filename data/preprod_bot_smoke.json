@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-05-30T05:37:58.936562+00:00",
+  "bot": {
+    "ok": true,
+    "username": "rawlead_bot",
+    "id": 8989158953,
+    "http_status": 200,
+    "error": null
+  },
+  "start": {
+    "account": "acc1",
+    "ok": false
+  },
+  "status": {
+    "account": "acc1",
+    "ok": false,
+    "last_bot_replies": []
+  },
+  "pass": false
+}

@@ -57,7 +57,7 @@
 
 Направление: **«Neo-Brutalist Color Blocks»** — белая база, жирная типографика, плоские тени, цветные блоки-секции.
 Предыдущее (REVOLUTION тёплый Indigo) — **отменено**.
-Референс: [`../../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) v4 · Спека: [`../../design/wp/feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md)
+Референс: [`../../design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) v4 · Спека ленты/ЛК: [`../../design/wp/feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) · **канон UI = prod `rawlead.css` v1.10.9+** (принято 2026-05-29)
 
 ### Цвет
 

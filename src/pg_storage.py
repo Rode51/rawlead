@@ -6,6 +6,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import psycopg
@@ -22,6 +23,10 @@ if TYPE_CHECKING:
     from ai_analyze import AiAnalysis
 
 logger = logging.getLogger(__name__)
+
+_SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
+_leads_columns_ready = False
+_leads_columns_lock = __import__("threading").Lock()
 
 _OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
 _MIN_AI_SCORE_VISIBLE = 40
@@ -140,6 +145,30 @@ class NeonLeadRow:
         )
 
 
+def _ensure_leads_columns(database_url: str) -> None:
+    global _leads_columns_ready
+    if _leads_columns_ready:
+        return
+    with _leads_columns_lock:
+        if _leads_columns_ready:
+            return
+        sql_path = _SQL_DIR / "014_leads_delist_legacy.sql"
+        ddl = sql_path.read_text(encoding="utf-8") if sql_path.is_file() else ""
+        if ddl.strip():
+            with psycopg.connect(database_url) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(ddl)
+                conn.commit()
+        _leads_columns_ready = True
+
+
+def _source_bucket(source: str) -> str:
+    s = (source or "").strip().lower()
+    if s.startswith("tg"):
+        return "tg"
+    return s.split(":")[0] or s
+
+
 class NeonLeadStorage:
     """Запись лидов в Postgres; ошибки не пробрасываются наружу."""
 
@@ -148,6 +177,7 @@ class NeonLeadStorage:
 
     @contextmanager
     def connection(self):
+        _ensure_leads_columns(self._url)
         with psycopg.connect(self._url) as conn:
             yield conn
 
@@ -992,6 +1022,323 @@ class NeonLeadStorage:
             logger.warning("%s", msg)
             err.append(msg)
             return None
+
+    def count_l1_backlog_by_source(
+        self,
+        *,
+        hours: int = 48,
+        errors: list[str] | None = None,
+    ) -> dict[str, int]:
+        """Без L1 за N часов — breakdown fl/kwork/tg (O64)."""
+        out = {"fl": 0, "kwork": 0, "tg": 0}
+        if not self.enabled:
+            return out
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return out
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT source, COUNT(*)
+                        FROM leads
+                        WHERE ai_verdict IS NULL
+                          AND ai_score IS NULL
+                          AND source = ANY(%s)
+                          AND created_at >= NOW() - make_interval(hours => %s)
+                        GROUP BY source
+                        """,
+                        (sources, int(hours)),
+                    )
+                    for row in cur.fetchall():
+                        bucket = _source_bucket(str(row[0] or ""))
+                        if bucket in out:
+                            out[bucket] += int(row[1] or 0)
+            return out
+        except Exception as exc:
+            msg = f"pg:count_l1_by_source:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return out
+
+    def l1_backlog_age_buckets(
+        self,
+        *,
+        errors: list[str] | None = None,
+    ) -> dict[str, int]:
+        """Без L1 — bucket по возрасту (O64 report)."""
+        buckets = {"0-24h": 0, "1-2d": 0, "2-7d": 0, ">7d": 0}
+        if not self.enabled:
+            return buckets
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return buckets
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT
+                          CASE
+                            WHEN created_at >= NOW() - INTERVAL '24 hours' THEN '0-24h'
+                            WHEN created_at >= NOW() - INTERVAL '2 days' THEN '1-2d'
+                            WHEN created_at >= NOW() - INTERVAL '7 days' THEN '2-7d'
+                            ELSE '>7d'
+                          END AS bucket,
+                          COUNT(*)
+                        FROM leads
+                        WHERE ai_verdict IS NULL
+                          AND ai_score IS NULL
+                          AND source = ANY(%s)
+                        GROUP BY 1
+                        """,
+                        (sources,),
+                    )
+                    for row in cur.fetchall():
+                        key = str(row[0] or "")
+                        if key in buckets:
+                            buckets[key] = int(row[1] or 0)
+            return buckets
+        except Exception as exc:
+            msg = f"pg:l1_age_buckets:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return buckets
+
+    def l1_backlog_sample_ids(
+        self,
+        *,
+        limit: int = 5,
+        errors: list[str] | None = None,
+    ) -> list[int]:
+        if not self.enabled:
+            return []
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return []
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id
+                        FROM leads
+                        WHERE ai_verdict IS NULL
+                          AND ai_score IS NULL
+                          AND source = ANY(%s)
+                        ORDER BY created_at DESC
+                        LIMIT %s
+                        """,
+                        (sources, int(limit)),
+                    )
+                    return [int(r[0]) for r in cur.fetchall()]
+        except Exception as exc:
+            msg = f"pg:l1_sample:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return []
+
+    def fetch_visible_unnotified_legacy(
+        self,
+        *,
+        limit: int = 40,
+        errors: list[str] | None = None,
+    ) -> list[NeonLeadRow]:
+        """Visible leads ещё не отправленные в @FLPARSINGBOT (O66)."""
+        if not self.enabled:
+            return []
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return []
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id, source, external_id, title, body, url,
+                               budget_text, COALESCE(category, '')
+                        FROM leads
+                        WHERE is_visible = TRUE
+                          AND legacy_notified_at IS NULL
+                          AND source = ANY(%s)
+                        ORDER BY id ASC
+                        LIMIT %s
+                        """,
+                        (sources, limit),
+                    )
+                    rows = cur.fetchall()
+            return [
+                NeonLeadRow(
+                    lead_id=int(r[0]),
+                    source=str(r[1]),
+                    external_id=str(r[2]),
+                    title=str(r[3] or ""),
+                    body=str(r[4] or ""),
+                    url=str(r[5] or ""),
+                    budget_text=str(r[6] or ""),
+                    category=str(r[7] or ""),
+                )
+                for r in rows
+            ]
+        except Exception as exc:
+            msg = f"pg:fetch_legacy_visible:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return []
+
+    def mark_legacy_notified(
+        self,
+        lead_id: int,
+        *,
+        errors: list[str] | None = None,
+    ) -> None:
+        if not self.enabled:
+            return
+        err = errors if errors is not None else []
+        notified_at = datetime.now(timezone.utc)
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE leads
+                        SET legacy_notified_at = %s
+                        WHERE id = %s
+                        """,
+                        (notified_at, int(lead_id)),
+                    )
+        except Exception as exc:
+            msg = f"pg:legacy_notify:id={lead_id}:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+
+    def legacy_visible_lag_sec(
+        self,
+        errors: list[str] | None = None,
+    ) -> int | None:
+        """Секунды с created_at самого старого visible без legacy_notified_at."""
+        if not self.enabled:
+            return None
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return None
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT EXTRACT(EPOCH FROM (NOW() - MIN(created_at)))
+                        FROM leads
+                        WHERE is_visible = TRUE
+                          AND legacy_notified_at IS NULL
+                          AND source = ANY(%s)
+                        """,
+                        (sources,),
+                    )
+                    row = cur.fetchone()
+                    if not row or row[0] is None:
+                        return None
+                    return int(float(row[0]))
+        except Exception as exc:
+            msg = f"pg:legacy_lag:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return None
+
+    def fetch_visible_for_source_recheck(
+        self,
+        *,
+        limit: int = 20,
+        errors: list[str] | None = None,
+    ) -> list[tuple[int, str, str]]:
+        """(id, source, url) visible leads для delist batch (O65)."""
+        if not self.enabled:
+            return []
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return []
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id, source, url
+                        FROM leads
+                        WHERE is_visible = TRUE
+                          AND delist_reason IS NULL
+                          AND source = ANY(%s)
+                          AND url <> ''
+                        ORDER BY last_source_check_at NULLS FIRST, created_at DESC
+                        LIMIT %s
+                        """,
+                        (sources, int(limit)),
+                    )
+                    return [
+                        (int(r[0]), str(r[1]), str(r[2] or ""))
+                        for r in cur.fetchall()
+                    ]
+        except Exception as exc:
+            msg = f"pg:fetch_recheck:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return []
+
+    def mark_source_checked(self, lead_id: int, *, errors: list[str] | None = None) -> None:
+        if not self.enabled:
+            return
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE leads
+                        SET last_source_check_at = NOW()
+                        WHERE id = %s
+                        """,
+                        (int(lead_id),),
+                    )
+        except Exception as exc:
+            msg = f"pg:source_check:id={lead_id}:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+
+    def delist_lead(
+        self,
+        lead_id: int,
+        *,
+        reason: str = "source_gone",
+        errors: list[str] | None = None,
+    ) -> bool:
+        if not self.enabled:
+            return False
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE leads
+                        SET is_visible = FALSE,
+                            delist_reason = %s,
+                            last_source_check_at = NOW()
+                        WHERE id = %s AND is_visible = TRUE
+                        """,
+                        (reason, int(lead_id)),
+                    )
+                    return cur.rowcount > 0
+        except Exception as exc:
+            msg = f"pg:delist:id={lead_id}:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return False
 
     def mark_notified(
         self,

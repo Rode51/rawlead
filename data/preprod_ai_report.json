@@ -1,107 +1,368 @@
 {
-  "generated_at": "2026-05-28T06:50:27.119779+00:00",
+  "generated_at": "2026-05-30T09:54:39.239477+00:00",
   "profile": "site",
-  "dry_run": true,
-  "fixtures": [
-    {
-      "id": "dev-1",
-      "category": "dev",
-      "title": "Telegram-бот на Python: парсинг заказов и уведомления",
-      "budget_text": "25 000 ₽",
-      "snippet": "Нужен бот на aiogram 3: подписка на каналы, фильтр по ключевым словам, отправка карточек в личку. БД PostgreSQL, деплой на VPS.",
-      "url": "https://www.fl.ru/projects/5507001/"
-    },
-    {
-      "id": "dev-2",
-      "category": "dev",
-      "title": "REST API на FastAPI + интеграция с CRM",
-      "budget_text": "40 000 ₽",
-      "snippet": "Разработать API для приёма лидов с сайта, валидация, webhook в Bitrix24. Документация OpenAPI, pytest, Docker-compose.",
-      "url": "https://kwork.ru/projects/123456"
-    },
-    {
-      "id": "dev-3",
-      "category": "dev",
-      "title": "Автоматизация Excel → Google Sheets скрипт",
-      "budget_text": "8 000 ₽",
-      "snippet": "Ежедневная выгрузка отчёта из Excel, расчёт KPI, запись в Google Sheets через Apps Script или Python. Без ручного копирования.",
-      "url": "https://freelancehunt.com/project/avtomatizaciya-otcheta/123"
-    },
-    {
-      "id": "design-1",
-      "category": "design",
-      "title": "UI/UX дизайн мобильного приложения в Figma",
-      "budget_text": "35 000 ₽",
-      "snippet": "5 экранов onboarding + главная + профиль. Design system, компоненты, прототип кликабельный. Стиль минимализм, iOS guidelines.",
-      "url": "https://www.fl.ru/projects/5507102/"
-    },
-    {
-      "id": "design-2",
-      "category": "design",
-      "title": "Логотип и фирменный стиль для IT-стартапа",
-      "budget_text": "12 000 ₽",
-      "snippet": "Логотип (3 концепта), палитра, шрифты, варианты для соцсетей. Исходники в векторе, гайд на 2 страницы.",
-      "url": "https://kwork.ru/projects/234567"
-    },
-    {
-      "id": "design-3",
-      "category": "design",
-      "title": "Монтаж Reels 60 сек: продуктовый ролик",
-      "budget_text": "6 000 ₽",
-      "snippet": "Исходники 4K, нужен динамичный монтаж под музыку, субтитры, цветокор. Формат 9:16 для Instagram.",
-      "url": "https://www.fl.ru/projects/5507203/"
-    },
-    {
-      "id": "marketing-1",
-      "category": "marketing",
-      "title": "Настройка Яндекс.Директ: лидогенерация B2B",
-      "budget_text": "20 000 ₽",
-      "snippet": "Семантика, РСЯ + поиск, UTM, цели в Метрике. Бюджет теста 30k. Отчёт по CPA через 2 недели.",
-      "url": "https://www.fl.ru/projects/5507304/"
-    },
-    {
-      "id": "marketing-2",
-      "category": "marketing",
-      "title": "Ведение Instagram: контент-план + stories",
-      "budget_text": "15 000 ₽/мес",
-      "snippet": "Ниша косметика, 12 постов + 20 stories в месяц. Таргет на подписчиков, аналитика охватов.",
-      "url": "https://kwork.ru/projects/345678"
-    },
-    {
-      "id": "marketing-3",
-      "category": "marketing",
-      "title": "SEO-аудит сайта на WordPress + ТЗ исправлений",
-      "budget_text": "10 000 ₽",
-      "snippet": "Технический аудит, Core Web Vitals, семантика 50 запросов, рекомендации по контенту и перелинковке.",
-      "url": "https://freelancehunt.com/project/seo-audit-wp/456"
-    },
-    {
-      "id": "text-1",
-      "category": "text",
-      "title": "Тексты для лендинга SaaS: 5 блоков",
-      "budget_text": "7 000 ₽",
-      "snippet": "Hero, преимущества, тарифы, FAQ, CTA. Тон деловой, без воды. УТП — автоматизация фриланса. Нужен docx + правки 1 раунд.",
-      "url": "https://www.fl.ru/projects/5507405/"
-    },
-    {
-      "id": "text-2",
-      "category": "text",
-      "title": "Перевод технической документации EN → RU",
-      "budget_text": "5 000 ₽",
-      "snippet": "API-документация ~8000 слов, терминология IT сохраняется. Гlossарий согласовать до старта.",
-      "url": "https://kwork.ru/projects/456789"
-    },
-    {
-      "id": "text-3",
-      "category": "text",
-      "title": "Редактура и вычитка статей для блога (10 шт)",
-      "budget_text": "4 000 ₽",
-      "snippet": "Статьи по маркетингу, 3000–5000 знаков каждая. Орфография, стиль, единообразие заголовков.",
-      "url": "https://freelancehunt.com/project/redaktura-blog/789"
-    }
-  ],
+  "mode": "shared_draft",
+  "models": {
+    "lite": "deepseek/deepseek-chat",
+    "shared_draft": "google/gemini-2.5-pro"
+  },
   "summary": {
     "total": 12,
-    "s1_pass": true
-  }
+    "lite_ok": 12,
+    "shared_draft_ok": 12,
+    "empty_reply_draft": 0,
+    "by_category": {
+      "dev": {
+        "total": 3,
+        "lite_ok": 3,
+        "shared_draft_ok": 3,
+        "empty_reply_draft": 0
+      },
+      "design": {
+        "total": 3,
+        "lite_ok": 3,
+        "shared_draft_ok": 3,
+        "empty_reply_draft": 0
+      },
+      "marketing": {
+        "total": 3,
+        "lite_ok": 3,
+        "shared_draft_ok": 3,
+        "empty_reply_draft": 0
+      },
+      "text": {
+        "total": 3,
+        "lite_ok": 3,
+        "shared_draft_ok": 3,
+        "empty_reply_draft": 0
+      }
+    },
+    "s1_pass": true,
+    "mode": "shared_draft"
+  },
+  "results": [
+    {
+      "fixture_id": "dev-1",
+      "category": "dev",
+      "title": "Telegram-бот на Python: парсинг заказов и уведомления",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 5233,
+      "shared_draft_ms": 10983,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "Брать",
+        "lead_tags": [
+          "telegram_bot_dev",
+          "python",
+          "web_scraping",
+          "api_integration"
+        ],
+        "task_summary": "Создать Telegram-бота на Python для парсинга заказов из каналов и отправки уведомлений с фильтрацией по ключевым словам.",
+        "ai_reasons": [
+          "Задача соответствует навыкам разработки Telegram-ботов и парсинга данных.",
+          "Используются популярные технологии: aiogram, PostgreSQL, VPS.",
+          "Бюджет адекватен объёму работы."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте. Заинтересовал ваш проект по созданию Telegram-бота. Для решения задачи сначала настрою подключение к нужным каналам для сбора данных, затем реализую механизм фильтрации по ключевым словам и отправку уведомлений. Готов обсудить детали."
+    },
+    {
+      "fixture_id": "dev-2",
+      "category": "dev",
+      "title": "REST API на FastAPI + интеграция с CRM",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 5424,
+      "shared_draft_ms": 14873,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "Брать",
+        "lead_tags": [
+          "fastapi",
+          "api_integration",
+          "php"
+        ],
+        "task_summary": "Разработать REST API на FastAPI для приёма лидов с сайта, интеграция с CRM Bitrix24, включая валидацию данных и webhook.",
+        "ai_reasons": [
+          "Чётко описана задача разработки API и интеграции с CRM.",
+          "Используются популярные технологии: FastAPI, Bitrix24, Docker-compose.",
+          "Проект включает документацию и тестирование, что указывает на профессиональный подход."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Добрый день. Интересная задача по интеграции с CRM. Сначала разработаю API на FastAPI для приёма и валидации данных с сайта. После этого настрою отправку лидов в Bitrix24 через webhook, чтобы заявки автоматически попадали в систему."
+    },
+    {
+      "fixture_id": "dev-3",
+      "category": "dev",
+      "title": "Автоматизация Excel → Google Sheets скрипт",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 4997,
+      "shared_draft_ms": 10692,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "Брать",
+        "lead_tags": [
+          "python",
+          "api_integration"
+        ],
+        "task_summary": "Автоматизировать ежедневную выгрузку данных из Excel, расчёт KPI и запись в Google Sheets с использованием Apps Script или Python.",
+        "ai_reasons": [
+          "Задача связана с автоматизацией и обработкой данных, что соответствует навыкам разработчика.",
+          "Используются популярные технологии (Python, Apps Script), которые входят в пул разрешённых тегов."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте. Заинтересовал ваш проект по автоматизации отчётности. Для начала нужно будет уточнить структуру данных в Excel и логику расчёта KPI. Затем напишу скрипт, который будет забирать данные, проводить вычисления и переносить результат в Google Sheets. Настрою ежедневный автоматический запуск, чтобы процесс работал без вашего участия."
+    },
+    {
+      "fixture_id": "design-1",
+      "category": "design",
+      "title": "UI/UX дизайн мобильного приложения в Figma",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 3703,
+      "shared_draft_ms": 10350,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "МИМО",
+        "lead_tags": [],
+        "task_summary": "Создать UI/UX дизайн мобильного приложения в Figma, включая экраны и прототип.",
+        "ai_reasons": [
+          "Чистый фронт в Figma без разработки.",
+          "Не требует навыков программирования или интеграций.",
+          "Задача ограничена дизайном, что не соответствует критериям для тегов."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте. Заинтересовал ваш проект по созданию UI/UX дизайна для мобильного приложения. Предлагаю сначала проработать пользовательские сценарии и на их основе спроектировать логику экранов. Затем отрисую чистовой визуал и соберу кликабельный прототип в Figma для наглядной демонстрации."
+    },
+    {
+      "fixture_id": "design-2",
+      "category": "design",
+      "title": "Логотип и фирменный стиль для IT-стартапа",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 4734,
+      "shared_draft_ms": 10865,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "Брать",
+        "lead_tags": [
+          "logo_design",
+          "brand_identity"
+        ],
+        "task_summary": "Создать логотип и фирменный стиль для IT-стартапа, включая палитру, шрифты и варианты для соцсетей.",
+        "ai_reasons": [
+          "Задание соответствует нише дизайна.",
+          "Бюджет указан и соответствует задаче.",
+          "Описание задачи четкое и понятное."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте. Заинтересовал ваш проект по созданию фирменного стиля для IT-стартапа. Предлагаю начать с обсуждения ценностей и позиционирования вашего бренда, чтобы отразить их в дизайне. Затем разработаю несколько вариантов логотипа, а после утверждения лучшего — подготовлю гайдлайн с палитрой, шрифтами и примерами для соцсетей."
+    },
+    {
+      "fixture_id": "design-3",
+      "category": "design",
+      "title": "Монтаж Reels 60 сек: продуктовый ролик",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 10556,
+      "shared_draft_ms": 10909,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "МИМО",
+        "lead_tags": [],
+        "task_summary": "Сделать динамичный монтаж продуктового ролика для Instagram Reels с субтитрами и цветокоррекцией.",
+        "ai_reasons": [
+          "Заказ относится к видеомонтажу, который не входит в основные категории.",
+          "Фокус на Instagram Reels, что не соответствует основным тегам.",
+          "Бюджет и задачи не соответствуют ключевым направлениям."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте. Заинтересовал ваш проект по монтажу продуктового ролика для Reels. Чтобы видео получилось динамичным и удерживало внимание, подберу подходящую музыку и сделаю нарезку в её ритм. Добавлю анимированные субтитры для удобства просмотра без звука и проведу цветокоррекцию, чтобы продукт выглядел максимально привлекательно."
+    },
+    {
+      "fixture_id": "marketing-1",
+      "category": "marketing",
+      "title": "Настройка Яндекс.Директ: лидогенерация B2B",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 8265,
+      "shared_draft_ms": 12488,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "Брать",
+        "lead_tags": [
+          "yandex_direct",
+          "web_analytics",
+          "target_ads"
+        ],
+        "task_summary": "Настроить рекламную кампанию в Яндекс.Директ для B2B, включая семантику, РСЯ, поиск, UTM-метки и цели в Яндекс.Метрике.",
+        "ai_reasons": [
+          "Чётко описаны задачи и бюджет.",
+          "Проект относится к маркетингу и включает настройку рекламы.",
+          "Используются стандартные инструменты Яндекс.Директ и Метрика."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте. Заинтересовал ваш проект по настройке рекламы для B2B. Для начала соберу семантическое ядро, ориентируясь на специфику вашего сегмента, после чего настрою кампании на поиске и в РСЯ. Обязательно проработаю UTM-метки и настрою цели в Метрике для отслеживания лидов."
+    },
+    {
+      "fixture_id": "marketing-2",
+      "category": "marketing",
+      "title": "Ведение Instagram: контент-план + stories",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 5682,
+      "shared_draft_ms": 9490,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "Брать",
+        "lead_tags": [
+          "smm",
+          "content_marketing",
+          "target_ads",
+          "web_analytics"
+        ],
+        "task_summary": "Ведение Instagram-аккаунта в нише косметики: создание контент-плана, постов и stories, таргетирование на подписчиков и анализ охватов.",
+        "ai_reasons": [
+          "Чётко описаны задачи: контент-план, посты, stories, таргет и аналитика.",
+          "Ниша и объёмы работ указаны.",
+          "Бюджет соответствует стандартам рынка."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте. Заинтересовал ваш проект по ведению Instagram-аккаунта. Для начала проанализирую текущую стратегию и конкурентов, чтобы выявить точки роста. Затем предложу контент-план с темами для постов и stories, ориентированный на вовлечение аудитории. Предлагаю обсудить детали и задачи подробнее."
+    },
+    {
+      "fixture_id": "marketing-3",
+      "category": "marketing",
+      "title": "SEO-аудит сайта на WordPress + ТЗ исправлений",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 6556,
+      "shared_draft_ms": 10194,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "Брать",
+        "lead_tags": [
+          "seo",
+          "wordpress_dev",
+          "web_analytics"
+        ],
+        "task_summary": "Провести SEO-аудит сайта на WordPress, включая технические аспекты, Core Web Vitals, семантику запросов и рекомендации по контенту.",
+        "ai_reasons": [
+          "Задача включает SEO-аудит и рекомендации, что соответствует тегам seo и web_analytics.",
+          "Упоминание WordPress указывает на необходимость работы с CMS, что соответствует тегу wordpress_dev.",
+          "Бюджет и описание задачи подходят для фриланс-проекта."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте. Заинтересовал ваш проект по SEO-аудиту. Проанализирую техническое состояние сайта и показатели Core Web Vitals. Затем изучу семантику и контент, чтобы найти точки роста. По итогам подготовлю подробный отчёт с техническим заданием для разработчика и рекомендациями по продвижению."
+    },
+    {
+      "fixture_id": "text-1",
+      "category": "text",
+      "title": "Тексты для лендинга SaaS: 5 блоков",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 6555,
+      "shared_draft_ms": 10846,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "Брать",
+        "lead_tags": [
+          "copywriting",
+          "sales_copywriting",
+          "landing_page_design"
+        ],
+        "task_summary": "Написать тексты для пяти блоков лендинга SaaS в деловом стиле, включая UTP про автоматизацию фриланса.",
+        "ai_reasons": [
+          "Чётко описанные задачи и ожидаемый результат.",
+          "Бюджет соответствует стандартам для подобных задач.",
+          "Просьба о деловом стиле и UTP указывает на профессиональный подход."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте. Заинтересовал ваш проект по текстам для SaaS-лендинга. Чтобы решить задачу, сначала погружусь в специфику вашего сервиса и изучу целевую аудиторию. Затем сформулирую сильное УТП, которое ляжет в основу текстов для пяти блоков, делая акцент на выгодах автоматизации для фрилансеров."
+    },
+    {
+      "fixture_id": "text-2",
+      "category": "text",
+      "title": "Перевод технической документации EN → RU",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 4972,
+      "shared_draft_ms": 15799,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "Брать",
+        "lead_tags": [
+          "translation",
+          "technical_writing"
+        ],
+        "task_summary": "Перевести техническую документацию на API с английского на русский язык, сохраняя IT-терминологию.",
+        "ai_reasons": [
+          "Чётко описанная задача с конкретным объёмом работы.",
+          "Техническая документация и IT-терминология соответствуют тегам."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте.\n\nЗаинтересовал ваш проект по переводу документации на API. Сначала изучу исходный текст, чтобы точно передать контекст и сохранить структуру. Затем выполню перевод, уделяя особое внимание корректной IT-терминологии, и проведу финальную вычитку."
+    },
+    {
+      "fixture_id": "text-3",
+      "category": "text",
+      "title": "Редактура и вычитка статей для блога (10 шт)",
+      "lite_ok": true,
+      "shared_draft_ok": true,
+      "lite_ms": 4325,
+      "shared_draft_ms": 163773,
+      "task_summary_nonempty": true,
+      "reply_draft_nonempty": true,
+      "errors": [],
+      "lite": {
+        "verdict": "Брать",
+        "lead_tags": [
+          "editing_proofreading",
+          "content_marketing"
+        ],
+        "task_summary": "Отредактировать и вычитать 10 статей по маркетингу, каждая объемом 3000–5000 знаков.",
+        "ai_reasons": [
+          "Задача соответствует навыкам редактирования и вычитки текстов.",
+          "Тематика статей — маркетинг, что подходит для тега content_marketing."
+        ],
+        "pending_tags": []
+      },
+      "reply_draft": "Здравствуйте. Заинтересовал ваш проект по редактуре статей для блога. В первую очередь проанализирую структуру и логику повествования в текстах. Затем вычитаю материалы, устраню стилистические, орфографические и пунктуационные ошибки. Готов обсудить детали."
+    }
+  ]
 }

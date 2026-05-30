@@ -1,0 +1,50 @@
+{
+  "generated_at": "2026-05-30T05:36:46.466972+00:00",
+  "base_url": "https://rawlead.ru",
+  "browser": "cdp",
+  "viewport": "desktop",
+  "storage_state": "C:\\Users\\hramo\\uisness\\data\\preprod_playwright\\storage_state.json",
+  "has_auth": true,
+  "journeys_total": 1,
+  "journeys_pass": 1,
+  "critical_count": 0,
+  "j5_draft_ok": true,
+  "pass": true,
+  "results": [
+    {
+      "id": "J5",
+      "title": "Draft ×2",
+      "pass": true,
+      "ms": 50938,
+      "error": null,
+      "screenshots": {
+        "before": "data\\preprod_ux_journey\\J5_before.png",
+        "after": "data\\preprod_ux_journey\\J5_after.png"
+      },
+      "console_errors": [
+        "[warning] MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 close listeners added. Use emitter.setMaxListeners() to increase limit",
+        "[warning] MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 end listeners added. Use emitter.setMaxListeners() to increase limit",
+        "[warning] ObjectMultiplex - orphaned data for stream \"app-init-liveness\"",
+        "[warning] ObjectMultiplex - orphaned data for stream \"app-init-liveness\"",
+        "[warning] ObjectMultiplex - orphaned data for stream \"background-liveness\"",
+        "[warning] ObjectMultiplex - orphaned data for stream \"background-liveness\"",
+        "[warning] ObjectMultiplex - malformed chunk without name \"[object Object]\"",
+        "[warning] ObjectMultiplex - malformed chunk without name \"[object Object]\""
+      ],
+      "network_failures": []
+    }
+  ],
+  "findings": [
+    {
+      "severity": "info",
+      "journey": "J5",
+      "message": "draft 1/2 OK (lead 7546)"
+    },
+    {
+      "severity": "info",
+      "journey": "J5",
+      "message": "draft 2/2 OK (lead 7544)"
+    }
+  ],
+  "artifacts_dir": "data\\preprod_ux_journey"
+}

@@ -187,3 +187,48 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
         )
         for p in projects
     ]
+
+
+_KWORK_GONE_MARKERS = (
+    "заказ закрыт",
+    "проект закрыт",
+    "исполнитель выбран",
+    "страница не найдена",
+    "want not found",
+    "404",
+)
+
+
+def check_project_page_gone(
+    project_url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float = 20.0,
+) -> bool | None:
+    """O65: True — заказ снят/404; False — жив; None — не удалось проверить."""
+    url = (project_url or "").strip()
+    if not url:
+        return None
+    headers = {"User-Agent": cfg.http_user_agent}
+    try:
+        resp = requests.get(
+            url,
+            headers=headers,
+            timeout=timeout_sec,
+            proxies=requests_proxies_for("kwork"),
+        )
+    except requests.RequestException:
+        return None
+
+    if resp.status_code == 404:
+        return True
+    if resp.status_code != 200:
+        return None
+
+    encoding = resp.encoding or "utf-8"
+    html = resp.content.decode(encoding, errors="replace").casefold()
+    if any(m in html for m in _KWORK_GONE_MARKERS):
+        return True
+    if '"want"' in html or "want-description" in html or "wants-page" in html:
+        return False
+    return None

@@ -1,11 +1,14 @@
 # Neon Postgres — схема v1 (лиды + персональный rank)
 
-Версия: **0.3 (3b)** · Lead Architect · 2026-05-25  
+Версия: **0.4 (O39-docs)** · Lead Architect · 2026-05-29  
+Пред.: **0.3 (3b)** · 2026-05-25  
 Решение владельца: **Neon** как облако; WP **не** ходит в Postgres напрямую.
 
-> **v0.9:** поле **`contour`** (`owner`/`saas`) — **отменено**. Вместо него **`is_visible`** после ИИ-модерации — см. [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §0c. Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § 3b.
+> **v0.9:** поле **`contour`** (`owner`/`saas`) — **отменено**. Вместо него **`is_visible`** после ИИ-модерации — см. [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §0c.
 
-Черновик SQL для Coder: [`../../sql/001_neon_schema.sql`](../../sql/001_neon_schema.sql) — расширить по этому документу.
+**Миграции:** `sql/001` … `sql/013` · apply через Neon SQL Editor или auto DDL в `draft_async._ensure_draft_tables`.
+
+Черновик SQL: [`../../sql/001_neon_schema.sql`](../../sql/001_neon_schema.sql) + последующие `sql/00*.sql`.
 
 ---
 
@@ -39,6 +42,10 @@
 | `content_hash` | TEXT | SHA-256 нормализованного текста (`listing_dedup`); NULL — дедуп только по `source`+`external_id` |
 | `notified_at` | TIMESTAMPTZ | legacy / owner |
 | `created_at` | TIMESTAMPTZ | |
+| `category` | TEXT | `dev` / `design` / … (`sql/002`) |
+| `task_summary` | TEXT | L1 краткое описание (`sql/004`) |
+| `tools_required` | JSONB | стек заказа L2 (`sql/005`) |
+| `reply_draft` | TEXT | **shared** on-demand draft O57 (`sql/005`) |
 
 **UNIQUE** `(source, external_id)` · **UNIQUE** `(content_hash)` где hash не NULL · индекс `created_at DESC` · **GIN** на `lead_tags`.
 
@@ -54,6 +61,10 @@ Ingest: `INSERT … ON CONFLICT (content_hash) DO NOTHING` — при дубле
 | `tg_chat_id` | BIGINT | для push в TG |
 | `push_min_match` | INT default 60 | порог % для MATCH_PUSH (O30) |
 | `push_enabled` | BOOL default TRUE | toggle push (O30) |
+| `tg_user_id` | BIGINT | TG Login (`sql/003`) |
+| `tg_username` | TEXT | |
+| `tg_first_name` | TEXT | |
+| `tg_photo_url` | TEXT | |
 | `created_at` | TIMESTAMPTZ | |
 
 ### `user_tags`
@@ -74,6 +85,51 @@ Ingest: `INSERT … ON CONFLICT (content_hash) DO NOTHING` — при дубле
 | `plan` | TEXT | `free` / `pro` / … |
 | `active_until` | TIMESTAMPTZ | |
 | `created_at` | TIMESTAMPTZ | |
+
+### `user_lead_replies` (O23 · `sql/008`)
+
+Per-user inbox / сохранённый отклик.
+
+| Колонка | Тип | Смысл |
+|---------|-----|--------|
+| `user_id` | UUID FK | |
+| `lead_id` | INT FK | |
+| `reply_draft` | TEXT | текст отклика |
+| `created_at` | TIMESTAMPTZ | |
+| `deleted_at` | TIMESTAMPTZ | soft delete |
+
+**PK** `(user_id, lead_id)`.
+
+### `draft_jobs` (O56 · `sql/012`)
+
+Per-user async draft job (legacy path; см. также `lead_draft_jobs`).
+
+| Колонка | Тип | Смысл |
+|---------|-----|--------|
+| `user_id` | UUID FK | |
+| `lead_id` | INT FK | |
+| `status` | TEXT | `pending` \| `failed` |
+| `error_msg` | TEXT | при fail |
+| `created_at` / `updated_at` | TIMESTAMPTZ | |
+
+### `lead_draft_jobs` (O57 · `sql/013`)
+
+**Один** in-flight L2 на lead (shared draft thundering herd).
+
+| Колонка | Тип | Смысл |
+|---------|-----|--------|
+| `lead_id` | INT PK FK | |
+| `status` | TEXT | `pending` \| `failed` |
+| `error_msg` | TEXT | |
+| `created_at` / `updated_at` | TIMESTAMPTZ | |
+
+### `match_push_log` (O28 · `sql/009`)
+
+Dedupe TG push: **PK** `(user_id, lead_id)`.
+
+### `admin_pageviews` (O45 · `sql/011`)
+
+**PK** `(path, day)` · счётчик просмотров для `/ops/`.
 
 ---
 

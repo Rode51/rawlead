@@ -1,10 +1,10 @@
 # WP /lenta/ и /cabinet/ — дизайн-спека v4
 
-**Статус:** NEO-BRUTALIST · обновлено 2026-05-29 (WAVE-4-UX-FIX — карточки ЛК, nav, FAB, копирайт)
-**Токены:** [`../../team/design/DESIGNER_PROMPT.md`](../../team/design/DESIGNER_PROMPT.md) § CSS-переменные
-**Анимации:** [`REFERENCE.md`](REFERENCE.md) § 6
+**Статус:** NEO-BRUTALIST · **принято владельцем 2026-05-29** (prod as-is, theme **v1.10.9**)  
+**Канон UI:** `wordpress/.../assets/css/rawlead.css` · токены — [`REFERENCE.md`](REFERENCE.md) §2  
+**Токены:** [`../../team/design/DESIGN_SYSTEM.md`](../../team/design/DESIGN_SYSTEM.md) § WP NEO-BRUTALIST  
+**Анимации:** [`REFERENCE.md`](REFERENCE.md) § 6  
 **Каталог навыков:** [`../../team/product/SKILLS_TOOLS_CATALOG.md`](../../team/product/SKILLS_TOOLS_CATALOG.md) v0.2
-**Coder-спека:** [`../../team/design/DESIGNER_PROMPT.md`](../../team/design/DESIGNER_PROMPT.md) § WAVE-4-UX-FIX
 
 ---
 
@@ -91,8 +91,8 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 | Маркетинг | `marketing` | `◎` |
 | Тексты | `text` | `Aa` |
 
-- Активный chip: bg `#4F46E5`, text `#FFFFFF`
-- Неактивный: bg `#F3F3EF`, border `#E4E4E7`, text `#3F3F46`
+- Активный chip: bg `#0A0A0A`, text `#FFFFFF` (`.rl-feed-chip.is-active`)
+- Неактивный: text `#0A0A0A`, без pill — список/radio в filter bar
 - Смена категории → сброс `offset=0`; навыки — НЕ сбрасываются (они независимы)
 
 **Правая группа — dropdown-кнопки:**
@@ -100,13 +100,13 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 `[Навыки ▾]` — открывает panel/sheet с навыками из каталога  
 `[Сортировка ▾]` — открывает mini-dropdown: «Новые» / «По совместимости»
 
-Стиль dropdown-кнопок: bg `#F3F3EF`, border `#E4E4E7`, text `#3F3F46`, radius 999px; активный (есть выбор): bg `#EEF2FF`, border `#4F46E5`, text `#4F46E5`
+Стиль dropdown-кнопок: NEO — border `2px solid #0A0A0A`, bg `#FFFFFF`, text `#0A0A0A`, radius `0`; активный (есть выбор): shadow `2px 2px 0 #0A0A0A`
 
 ### 2.3 Навыки — dropdown-panel (из каталога)
 
 Открывается по клику `[Навыки ▾]`.
 
-**Desktop:** выпадающая панель ниже кнопки, `max-width: 420px`, shadow, radius 16px, фон `#FFFFFF`  
+**Desktop:** выпадающая панель ниже кнопки, `max-width: 420px`, border `2px solid #0A0A0A`, shadow `4px 4px 0 #0A0A0A`, radius `4px`, фон `#FFFFFF`  
 **Mobile:** bottom sheet (translateY 300ms ease-out), overlay `rgba(0,0,0,0.4)`
 
 **Внутри панели:**
@@ -140,8 +140,8 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 - Подпись кнопки «Применить» — «Применить (сортировка по совместимости)» → или просто «Применить» с tooltip
 
 **Chip навыка:**
-- Активный: bg `#EEF2FF`, text `#4F46E5`, border `#C7D2FE`
-- Неактивный: bg `#F3F3EF`, border `#E4E4E7`, text `#3F3F46`
+- Активный: bg `#FACC15`, text `#0A0A0A`, border `2px solid #0A0A0A` (`.rl-feed-skill.is-active`)
+- Неактивный: bg `#F5F5F0`, border `#D4D4D4`, text `#525252`
 
 **Глоссарий UX (использовать в тексте панели и tooltip):**
 
@@ -168,23 +168,25 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 Лента заказов                847 лидов за 7 дней
 ```
 
-- H1: Manrope 28px / 800, `#18181B`
-- Счётчик: Manrope 13px / 400, `#71717A`
+- H1: Manrope 28px / 800, `#0A0A0A`
+- Счётчик: Manrope 13px / 400, `#525252`
 - Расположение: под filter bar, margin-bottom 20px
 - Mobile: H1 24px, счётчик под заголовком
 
 ### 2.6 Infinite scroll
 
 - Sentinel последний элемент списка; при 80% viewport → загрузка
-- Во время загрузки: **2 skeleton-карточки** (фон `#F3F3EF`, pulse-анимация, radius `20px`)
-- Конец ленты: «Все заказы показаны» — Manrope 14px, `#71717A`, по центру
+- Во время загрузки: **2 skeleton-карточки** (`.rl-feed-skeleton` · bg `#F5F5F0`, pulse, radius `4px`, height ~140px)
+- Конец ленты: «Все заказы показаны» — Manrope 14px, `#525252`, по центру
 - Ошибка загрузки: «Не удалось загрузить» + [Попробовать снова] — текстовая ссылка
 
 ---
 
 ## 3. Карточка лида — главный компонент
 
-### 3.1 Закрытое состояние (новый стиль)
+### 3.1 Закрытое состояние (NEO · prod v1.10.9)
+
+**Сетка:** `.rl-feed-list` — 2 колонки desktop · 1 col mobile · `align-items: start` · collapsed `min-height: 240px`
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -197,20 +199,20 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 
 | Элемент | Стиль |
 |---------|-------|
-| Карточка | bg `#FFFFFF`, shadow `0 2px 12px rgba(0,0,0,0.07)`, radius `20px`, padding `20px 24px`; **нет** жёсткой рамки |
+| Карточка | bg `#FFFFFF`, **`border: none`**, `box-shadow: 4px 4px 0 #0A0A0A` (`--rl-shadow-card`), `radius: 4px`, padding `20px 24px` |
 | Source dot | 8px круг: FL `#00A65A` · Kwork `#EA580C` · TG `#0088CC` |
-| Время | Manrope 12px, `#71717A`, справа |
-| Заголовок | Manrope 15px / 600, `#18181B`, одна строка с ellipsis; tooltip при hover на Desktop |
-| Бюджет | Manrope 14px / 400, `#3F3F46` |
-| Match-bar | height `4px`, radius `2px`, bg `#E4E4E7`, fill `#4F46E5`; animate при viewport entry |
-| Match % | Manrope 13px / 700, `#18181B` |
-| **100% match** | класс `rl-lead-card--perfect-match`: border `#4F46E5`, badge «Точное совпадение», bar fill `#16A34A` — только при `keyword_match=100` и ≥1 навык пользователя (**O26**) |
-| **Просмотры** | `display_views`: **иконка глаза + число** (без слова «просмотров»); `aria-label` для a11y; **O25b:** «только что» = 1–3, рост с возрастом (**O25**) |
-| AI-чип | «Брать»: bg `#DCFCE7`, text `#16A34A`; «Сомнительно»: bg `#F3F4F6`, text `#6B7280` |
-| Теги | pill 11px/600, bg `#F3F3EF`, text `#71717A`; max 4 тега + «+N» если больше |
+| Время | Manrope 12px, `#525252`, справа |
+| Заголовок | Manrope 15px / 800, `#0A0A0A`, одна строка ellipsis; полный текст при expand |
+| Бюджет | Manrope 14px / 400, `#1A1A1A` |
+| Match-bar | height `4px`, track `#0A0A0A`, fill `#0A0A0A`; animate width 600ms при viewport |
+| Match % | Manrope 13px / 700, `#0A0A0A` |
+| **100% match** | `.rl-lead-card--perfect-match`: border `2px solid #FACC15`, shadow `4px 4px 0 #FACC15`, badge `.rl-badge--perfect` (жёлтый NEO) · pulse 700ms · только `keyword_match=100` + ≥1 навык (**O26**) |
+| **Просмотры** | иконка глаза + число · **O25b:** «только что» = 1–3 |
+| AI-чип | «Брать»: bg `#DCFCE7`, text `#16A34A`; «Сомнительно»: bg `#F5F5F0`, text `#6B7280` |
+| Теги | 11px/600, bg `#F5F5F0`, text `#525252`; max 4 + «+N» |
 | Cursor | pointer — вся карточка кликабельна |
 
-**Hover:** shadow → `0 8px 28px rgba(0,0,0,0.12)` + `translateY(-2px)` (150ms ease-out)
+**Hover:** `box-shadow: 6px 6px 0 #0A0A0A` + `translate(-2px, -2px)` (150ms)
 
 **Mobile:** padding `16px 18px`; заголовок — 2 строки (не ellipsis, больше места)
 
@@ -232,9 +234,9 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 | Элемент | Стиль |
 |---------|-------|
 | Анимация | `grid-template-rows: 0fr → 1fr` + `opacity 0 → 1`, 300ms ease-out |
-| Разделитель | `1px solid #E4E4E7`, margin `12px 0` |
-| Суть (L1) | `task_summary` из API, Manrope 14px / 400, `#3F3F46`; **не** сырой body |
-| Ссылка источника | «Читать на бирже ↗» / «Открыть в Telegram» — ghost link `#4F46E5` |
+| Разделитель | `1px solid #D4D4D4`, margin `12px 0` |
+| Суть (L1) | `task_summary` из API, Manrope 14px / 400, `#1A1A1A` |
+| Ссылка источника | `.rl-link-arrow` «Читать на бирже ↗» — `#0A0A0A`, underline on hover |
 
 Повторный клик — сворачивает. Одновременно открыта только **одна карточка**.  
 При `.is-expanded`: заголовок показывается полностью (без ellipsis).
@@ -252,8 +254,8 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 
 | Элемент | Стиль |
 |---------|-------|
-| Черновик отклика | Manrope 13px / 400, `#3F3F46`; поле из `reply_draft` L2; placeholder «Черновик появится после анализа» если пусто |
-| Ссылка оригинала | ghost link `#4F46E5` |
+| Черновик отклика | Manrope 13px / 400, `#1A1A1A`; `reply_draft` L2; placeholder «Черновик появится после анализа» |
+| Ссылка оригинала | `.rl-link-arrow` · `#0A0A0A` |
 
 ---
 
@@ -378,7 +380,7 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 
 | Элемент | Стиль |
 |---------|-------|
-| Карточка | NEO: border `var(--rl-border-width) solid var(--rl-border)`, shadow `var(--rl-shadow-card)`, radius `var(--rl-radius-card)` |
+| Карточка | NEO: `border: none`, shadow `var(--rl-shadow-card)`, radius `var(--rl-radius-card)` — **та же** разметка что `/lenta/` (O53) |
 | Заголовок | Manrope 15px/600, `var(--rl-text-primary)` |
 | Мета | источник badge + дата Manrope 12px, `var(--rl-text-muted)` |
 | Черновик | Manrope 13px/400, `var(--rl-text-body)`; placeholder «Черновик появится после анализа» |
@@ -402,8 +404,8 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 **Назначение:** пользователь сообщает об ошибке (неправильная карточка / не открывается / скрин).
 
 ```
-Размещение: fixed bottom-right, bottom: 24px, right: 20px
-Вид: круглая кнопка 40×40px, «?», bg #FFFFFF, border 1px #E4E4E7, shadow, #4F46E5 text
+Размещение: fixed bottom-right, bottom: 24px, right: 20px  
+Вид: `.rl-bug-fab` — круг 40×40px, «?», bg `#FFFFFF`, border `1px solid #0A0A0A`, shadow `4px 4px 0 #0A0A0A`, text `#0A0A0A`
 Mobile: bottom: 80px (над thumb-zone), right: 16px
 ```
 
@@ -517,6 +519,122 @@ Mobile: bottom: 80px (над thumb-zone), right: 16px
 - Class: `.rl-tg-login-btn` — full-width, `min-height: 52px`, NEO primary style
 - **Без** `<script async src="https://telegram.org/js/telegram-widget.js">` — не используем
 - Fallback для desktop: та же кнопка, `max-width: 400px`
+
+---
+
+### 7.6 WAVE-UX-MOBILE — полная пересборка (390×844) **D-O40 · 2026-05-30**
+
+**Проблемы (владелец скрин 2026-05-30):** карточки вылезают за экран · header перекрывает filter bar · два отдельных sheet неудобны · tap-outside не работает · sheet не открывается.
+
+**Принцип:** только mobile (< 768px). Desktop — **не трогать**.
+
+#### Wire — /lenta/ mobile
+
+```
+┌────────────────────────────────────────┐
+│ RawLead                [Войти →] [☰]   │ 52px sticky
+├────────────────────────────────────────┤
+│ [Все] [Разработка] [Дизайн] [Фильтры▾] │ 48px sticky (горизонтальный scroll)
+├────────────────────────────────────────┤
+│ ⏱ Обновляется раз в 15 мин · Подробнее │ not sticky
+├────────────────────────────────────────┤
+│                                         │
+│  ┌─────────────────────────────────┐    │
+│  │ ● FL.ru          Верстка лендинга│    │
+│  │ Бюджет: 25 000 – 40 000 ₽       │    │
+│  │ ▓▓▓▓▓▓▓▒  88%    [Брать ✓]      │    │
+│  │ #wordpress  #верстка  #figma    │    │
+│  └─────────────────────────────────┘    │
+│  (следующая карточка 100% ширины)       │
+│                                         │
+│      [Загрузить ещё →]                  │
+│      Показано 20 из 87                  │
+└────────────────────────────────────────┘
+[?] FAB  bottom: 80px, right: 16px
+```
+
+#### Wire — [Фильтры ▾] unified sheet (95vh)
+
+```
+┌────────────────────────────────────────┐ ← handle 40px
+│  Фильтры                      [✕]      │
+├────────────────────────────────────────┤
+│                                        │
+│  СПЕЦИАЛИЗАЦИЯ                         │
+│  [Все ✓] [Разработка] [Дизайн]         │
+│  [Маркетинг] [Тексты]                  │
+│  ──────────────────────────────────    │
+│  НАВЫКИ                                │
+│  [figma] [UI/UX] [Веб-дизайн]         │
+│  [Лендинг]  [+ Ещё ▾]                  │
+│  ──────────────────────────────────    │
+│  СОРТИРОВКА                            │
+│  (●) Новые                             │
+│  ( ) По совместимости                  │
+│                                        │
+├────────────────────────────────────────┤ sticky
+│  [Применить →]     full-width 52px     │
+└────────────────────────────────────────┘
+overlay rgba(0,0,0,0.5) → tap закрывает
+```
+
+#### Wire — burger nav drawer
+
+```
+[☰] клик →
+┌────────────────────────────────────────┐
+│ overlay                   ┌────────────┤
+│                           │   [✕]      │
+│                           │            │
+│                           │  Лента     │
+│                           │  Тарифы    │
+│                           │  Как устр. │
+│                           │            │
+│                           │ [Войти →]  │
+└───────────────────────────┴────────────┘
+panel: width 280px · slide from right · border-left 2px solid #0A0A0A
+```
+
+#### Wire — /cabinet/ mobile
+
+```
+┌────────────────────────────────────────┐
+│ RawLead              Иван И. · Выйти   │ 52px
+├────────────────────────────────────────┤
+│ [python ×] [figma ×]  [+ Добавить]     │ collapsed row
+├────────────────────────────────────────┤
+│ ┌──────────────────────────────────┐   │
+│ │ ✅ ИИ-агент активна · [Пауза]    │   │
+│ └──────────────────────────────────┘   │
+│                                        │
+│ Мои отклики (3)                        │
+│ ┌──────────────────────────────────┐   │
+│ │ Верстка лендинга · FL.ru · 27 мая│   │
+│ │ [▼ Показать черновик]            │   │
+│ └──────────────────────────────────┘   │
+└────────────────────────────────────────┘
+```
+
+#### Токены мобайл (без изменений desktop)
+
+| Элемент | Мобайл |
+|---------|--------|
+| Header | 52px · burger + [Войти] · nav-links скрыты |
+| Filter bar | 48px · `top: 52px` · горизонтальный scroll · [Кат.] + [Фильтры▾] |
+| Карточка | padding `16px 18px` · `box-sizing: border-box` · `overflow: hidden` |
+| Sheet trigger | `[Фильтры▾]` объединяет категорию+навыки+сортировку |
+| Drawer | slide-from-right · 280px · overlay overlay |
+| FAB | `bottom: 80px` · `right: 16px` · только иконка (текст скрыт) |
+
+#### Ключевые JS-фиксы (D-O37c)
+
+| ID | Fix |
+|----|-----|
+| **W1/M5** | `#rl-feed-filters-open` click → `#rl-feed-sheet.classList.add('is-open')` |
+| **W2/M4** | `document.click` вне `.rl-lead-card` → `remove('is-expanded')` |
+| **W3/M4** | `#rl-skills-overlay` click → закрыть `.rl-skills-modal` |
+
+**Полная Coder-спека:** `DESIGNER_PROMPT.md` § WAVE-UX-MOBILE
 
 ---
 

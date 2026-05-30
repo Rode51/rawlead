@@ -6,26 +6,26 @@
 
 ---
 
-## Слой 0 — UX-audit «ИИ-тестировщик» (S2, O21)
+## Слой 0 — UX-audit «как человек» (S2, **O37c**)
 
-**Один прогон** перед stress — все страницы, клики, баги:
+**Один прогон** перед stress — жесты U1–U10 desktop 1440 + mobile 390:
 
 ```powershell
-.venv\Scripts\python.exe scripts\preprod_playwright\ux_audit.py --base-url https://rawlead.ru
+# .env.site: RAWLEAD_PREPROD_ACCESS_TOKEN=… (paid JWT, обязательно)
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_audit.py --base-url https://rawlead.ru --browser chromium
 ```
 
-Отчёты: `data/preprod_ux_audit.json` · `data/preprod_ux_audit.md` · скрины `data/preprod_ux_audit/`
+Отчёты: `data/preprod_ux_audit.json` · `data/preprod_ux_audit.md` · **`preprod_ux_audit_human.md`** (LLM) · скрины `data/preprod_ux_audit/`
 
 | Что делает | Детали |
 |------------|--------|
-| Обход | `/`, `/lenta/`, `/cabinet/`, `/how/`, `/pricing/`, `/faq/`, `/contact/` |
-| Клики | header, footer, CTA, навыки «Применить», pricing→ЛК |
-| Ловит | 404/500, console errors, failed fetch, перекрытия на mobile 390px |
-| ИИ (опц.) | LLM summary по JSON — «неудобно / баг / мёртвая кнопка» |
+| U1–U10 | header/footer · навыки · sort tap-outside · expand · draft+tools · FAB · ЛК · **mobile sheet U8** · marketing CTA · console/network |
+| Auth | `RAWLEAD_PREPROD_ACCESS_TOKEN` — U5/U7/U8 draft и ЛК |
+| LLM | OpenRouter vision — mobile скрины → human.md (Критично / Раздражает / Ок) |
 
-| PASS S2 | 0 critical findings; все footer URL 200 |
+| PASS S2 / O37c | 0 critical · test token · human.md · U8 mobile прогнан |
 
-Debug: `--headed` · опц. `--llm` для markdown-отчёта
+Debug: `--headed` · dev: `--skip-llm` · см. [`PREPROD_ACCOUNTS.md`](PREPROD_ACCOUNTS.md)
 
 **Coder:** § PRE-PROD-UX-AUDIT в `CODER_PROMPT.md` (скрипт **→** после финала UI).
 
@@ -181,7 +181,8 @@ k6 run -e API_URL=https://api.rawlead.ru -e VUS=50 -e DURATION=5m scripts/prepro
 | `scripts/preprod_ai_matrix.py` | S1 |
 | `scripts/preprod_k6_feed.js` | S3 (k6) |
 | `scripts/preprod_load_feed.py` | S3 (Python) |
-| `scripts/preprod_playwright/smoke.py` | S2 |
+| `scripts/preprod_playwright/ux_audit.py` | S2 / O37c (U1–U10 + LLM) |
+| `scripts/preprod_playwright/smoke.py` | S2 smoke (legacy 5 сценариев) |
 
 Отчёты пишутся в `data/preprod_*.json` (gitignore ок).
 

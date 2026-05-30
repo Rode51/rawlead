@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from urllib.parse import urljoin, urlparse, urlunparse
@@ -13,6 +14,8 @@ from config import Config
 from exchange_proxy import proxy_log_hint, requests_proxies_for
 from lead_category import category_from_fl_listing_url
 from listing import SOURCE_FL, ListingProject
+
+logger = logging.getLogger(__name__)
 
 # Сколько страниц ленты запрашивать за один цикл (см. docs/SOURCES.md).
 def _fl_listing_max_pages() -> int:
@@ -118,8 +121,15 @@ def parse_listing_html(html: str, page_url: str) -> list[ListingProject]:
     return projects
 
 
-def _fetch_listing_html(url: str, cfg: Config, *, timeout_sec: float) -> str:
+def _fetch_listing_html(
+    url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float,
+    page: int,
+) -> str | None:
     headers = {"User-Agent": cfg.http_user_agent}
+    hint = proxy_log_hint("fl")
     try:
         resp = requests.get(
             url,
@@ -128,10 +138,18 @@ def _fetch_listing_html(url: str, cfg: Config, *, timeout_sec: float) -> str:
             proxies=requests_proxies_for("fl"),
         )
     except requests.RequestException as exc:
-        raise FlListingError(f"Сетевой сбой при запросе ленты: {exc}") from exc
+        msg = f"Сетевой сбой при запросе ленты (стр. {page}, {hint}): {exc}"
+        if page <= 1:
+            raise FlListingError(msg) from exc
+        logger.warning("fl_listing: %s — partial listing (%s)", msg, hint)
+        return None
 
     if resp.status_code != 200:
-        raise FlListingError(f"HTTP {resp.status_code} для ленты проектов ({url}).")
+        msg = f"HTTP {resp.status_code} для ленты ({url}, {hint})"
+        if page <= 1:
+            raise FlListingError(msg)
+        logger.warning("fl_listing: %s — stop pagination", msg)
+        return None
 
     encoding = resp.encoding or "utf-8"
     return resp.content.decode(encoding, errors="replace")
@@ -145,9 +163,12 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
     merged: list[ListingProject] = []
     seen: set[int] = set()
 
-    for page in range(1, _fl_listing_max_pages() + 1):
+    max_pages = _fl_listing_max_pages()
+    for page in range(1, max_pages + 1):
         page_url = _fl_listing_page_url(cfg.fl_projects_url, page)
-        html = _fetch_listing_html(page_url, cfg, timeout_sec=timeout_sec)
+        html = _fetch_listing_html(page_url, cfg, timeout_sec=timeout_sec, page=page)
+        if html is None:
+            break
         batch = _parse_items(html, page_url)
 
         if not batch:
@@ -235,3 +256,48 @@ def fetch_project_description(
         return max(blocks, key=len), True
 
     return fallback_snippet, False
+
+
+_FL_GONE_MARKERS = (
+    "проект закрыт",
+    "заказ закрыт",
+    "исполнитель уже выбран",
+    "исполнитель найден",
+    "страница не найдена",
+    "проект не найден",
+)
+
+
+def check_project_page_gone(
+    project_url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float = 20.0,
+) -> bool | None:
+    """O65: True — заказ снят/404; False — жив; None — не удалось проверить."""
+    url = (project_url or "").strip()
+    if not url:
+        return None
+    headers = {"User-Agent": cfg.http_user_agent}
+    try:
+        resp = requests.get(
+            url,
+            headers=headers,
+            timeout=timeout_sec,
+            proxies=requests_proxies_for("fl"),
+        )
+    except requests.RequestException:
+        return None
+
+    if resp.status_code == 404:
+        return True
+    if resp.status_code != 200:
+        return None
+
+    encoding = resp.encoding or "utf-8"
+    html = resp.content.decode(encoding, errors="replace").casefold()
+    if any(m in html for m in _FL_GONE_MARKERS):
+        return True
+    if ".fl-project-content__description-text" in html or "fl-project-content" in html:
+        return False
+    return None

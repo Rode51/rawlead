@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -25,6 +26,9 @@ logger = logging.getLogger(__name__)
 _DRAFT_QUICK_WAIT_SEC = 3.0
 _DRAFT_JOB_TTL_SEC = 600
 _DRAFT_USER_FAIL = "ИИ временно недоступен — повторите"
+_SECRET_RE = re.compile(
+    r"(?i)(api[_-]?key|bearer\s+\S+|sk-[a-z0-9]{8,}|openrouter[_-]?api[_-]?key)\s*[:=]?\s*\S+"
+)
 _SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
 
 _tables_ready = False
@@ -176,16 +180,48 @@ def _insert_lead_pending(cur: Any, lead_id: int) -> bool:
     return cur.fetchone() is not None
 
 
+def sanitize_draft_error_detail(raw: str) -> str:
+    """O59a: user-visible hint from ai_errors — no secrets, not only generic."""
+    s = (raw or "").strip()
+    if not s or s == "draft generation failed":
+        return _DRAFT_USER_FAIL
+    low = s.lower()
+    if "timeout" in low or "timed out" in low:
+        return "ИИ не успел ответить — повторите"
+    if "429" in s or "rate limit" in low or "rate_limit" in low:
+        return "ИИ перегружен — повторите через минуту"
+    if "json" in low or "parse" in low or "invalid" in low:
+        return "ИИ вернул некорректный ответ — повторите"
+    if "402" in s or "insufficient" in low or "credit" in low or "balance" in low:
+        return "ИИ временно недоступен — повторите"
+    first = s.split(";")[0].strip()
+    first = _SECRET_RE.sub("[redacted]", first)
+    if len(first) > 120:
+        first = first[:117] + "…"
+    return first if len(first) > 8 else _DRAFT_USER_FAIL
+
+
 def _user_facing_error(exc: DraftError) -> str:
-    if exc.code in ("ai_fail", "ai_unavailable"):
+    if exc.code == "ai_fail":
+        return sanitize_draft_error_detail(exc.detail)
+    if exc.code == "ai_unavailable":
         return _DRAFT_USER_FAIL
     if exc.code == "rate_limit":
-        return "Лимит: не больше 10 черновиков в час"
+        from src.draft_limits import draft_hourly_limit
+
+        lim = draft_hourly_limit()
+        if lim <= 0:
+            return _DRAFT_USER_FAIL
+        return f"Лимит: не больше {lim} черновиков в час"
     if exc.code == "forbidden":
         return exc.detail or "Нет доступа"
     if exc.code == "not_found":
         return "Заказ не найден"
     return _DRAFT_USER_FAIL
+
+
+def _poll_error_from_stored(stored: str) -> str:
+    return sanitize_draft_error_detail(stored) if stored.strip() else _DRAFT_USER_FAIL
 
 
 def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) -> None:
@@ -195,7 +231,7 @@ def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) ->
             user_id=user_id,
             lead_id=lead_id,
             log_prefix=log_prefix,
-            max_retries=5,
+            max_retries=4,
             enforce_rate_limit=False,
         )
         with psycopg.connect(cfg.database_url) as conn:
@@ -203,11 +239,21 @@ def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) ->
                 _delete_lead_job(cur, lead_id)
             conn.commit()
     except DraftError as exc:
-        msg = _user_facing_error(exc)
-        logger.warning("%sfail %s", log_prefix, exc.detail)
+        raw = exc.detail if exc.code == "ai_fail" else ""
+        stored = raw or _user_facing_error(exc)
+        from ai_analyze import note_ai_error, note_draft_request
+
+        note_draft_request(False)
+        note_ai_error(raw or exc.detail or exc.code)
+        logger.warning(
+            "%sfail code=%s detail=%s",
+            log_prefix,
+            exc.code,
+            raw or exc.detail,
+        )
         with psycopg.connect(cfg.database_url) as conn:
             with conn.cursor() as cur:
-                _set_lead_job_failed(cur, lead_id, msg)
+                _set_lead_job_failed(cur, lead_id, stored)
             conn.commit()
     except Exception as exc:
         logger.error("%serror %s", log_prefix, exc)
@@ -271,7 +317,11 @@ def poll_draft(
     status, err = job
     if status == "pending":
         return DraftPollResponse(status="pending", lead_id=lead_id)
-    return DraftPollResponse(status="failed", lead_id=lead_id, error=err or _DRAFT_USER_FAIL)
+    return DraftPollResponse(
+        status="failed",
+        lead_id=lead_id,
+        error=_poll_error_from_stored(err),
+    )
 
 
 def submit_draft(
@@ -346,6 +396,7 @@ def draft_response_body(resp: DraftPollResponse) -> dict[str, Any]:
         body["tools_required"] = resp.tools_required or []
         if resp.keyword_match is not None:
             body["keyword_match"] = resp.keyword_match
-    if resp.status == "failed" and resp.error:
-        body["error"] = resp.error
+    if resp.status == "failed":
+        body["error"] = resp.error or _DRAFT_USER_FAIL
+        body["detail"] = body["error"]
     return body

@@ -4,15 +4,74 @@
 
 | | |
 |--|--|
-| **→ Сейчас** | § **WAVE-4-UX-FIX** — спека в `DESIGNER_PROMPT` · **→ @lead-architect** → `@coder` |
-| **Prod** | theme v1.9.0 · O35/O41/WAVE-4 ✅ prod |
+| **→ Сейчас** | **WAVE-UX-MOBILE** → @coder · re-run O37c |
+| **D-O40** | **✅ Lead verify 2026-05-30** |
 | **Vision** | [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11** |
 
-**Gate:** PRE-PROD stress (O37) — после UI OK владельца.
+**Gate:** O37c audit → fixes → **S6** · stress load после green UX.
 
 ---
 
-## § WAVE-4-UX-FIX — согласовано владельцем 2026-05-29 (**→ СЕЙЧАС**)
+## § D-O37c — Triage O37c findings (**→ после прогона**)
+
+**Вход:** `data/preprod_ux_audit_human.md` + JSON + скрины `data/preprod_ux_audit/`.
+
+**Задача Lead Designer:** разложить LLM + robot findings на **P0 / P1 / P2** · записать сюда таблицу · handoff `@coder` § **WAVE-UX-FIX**.
+
+| P | Критерий | Пример |
+|---|----------|--------|
+| **P0** | Нельзя пользоваться на 390px: не жмётся, не закрывается, 5xx, CTA мёртвый | sheet без tap-outside |
+| **P1** | Работает, но бесит: мелкий tap, перекрытие, непонятно куда жать | sticky «Применить» под fold |
+| **P2** | Косметика · после S6 | отступы, типографика |
+
+**Шаблон (O37c прогон 2026-05-30):**
+
+| ID | Finding | P | Fix hint |
+|----|---------|---|----------|
+| **W1** | U3/U8 mobile: `#rl-feed-sheet` не открывается (hidden) | **P0** | `rawlead-feed.js` — openBtn/sidebar/sheetBody; CSS `[hidden]` |
+| **W2** | U4 mobile+desktop: tap outside не сворачивает карточку | **P0** | `rawlead-feed.js` click overlay / document |
+| **W3** | U7 mobile+desktop: modal навыков ЛК — overlay не закрывает | **P0** | `rawlead-cabinet.js` + overlay handler |
+| **W4** | U10 ERR_ABORTED feed/subscription | **P2** | ложный critical скрипта (U2/U5 OK) — игнор `net::ERR_ABORTED` в audit |
+
+**LLM rating:** 1/5 · совпадает с владельцем («моб кривой»).
+
+---
+
+## § D-O40 — Mobile rebuild feed + ЛК (**→ @lead-designer · владелец 2026-05-30**)
+
+**Решение владельца:** не точечные патчи — **полная пересборка mobile** (390×844).
+
+**Тикет:** [`problems/2026-05-30-mobile-ux-owner-review.md`](../../problems/2026-05-30-mobile-ux-owner-review.md)
+
+| ID | Finding | P | Design direction |
+|----|---------|---|------------------|
+| **M1** | Карточки не влезают (feed + ЛК) | **P0** | Ширина/padding как **hero live preview** на главной · `box-sizing` · без horizontal overflow |
+| **M2** | Header пересекается с category bar | **P0** | Mobile header: **burger** · скрыть desktop nav links · sticky stack без overlap |
+| **M3** | Фильтры неудобные | **P0** | **Один bottom sheet** «Фильтры»: категории + навыки + сортировка + [Применить] — см. `feed-cabinet-mvp.md` §7.2 |
+| **M4** | Tap-outside, modal ЛК | **P0** | Overlay закрывает · карточка collapse · канон §7 |
+| **M5** | Audit W1 sheet не открывается | **P0** | JS `#rl-feed-filters-open` → `#rl-feed-sheet` |
+
+**Deliverable Design:** ✅ **Lead verify 2026-05-30** — `feed-cabinet-mvp.md` §7.6 · `DESIGNER_PROMPT.md` § WAVE-UX-MOBILE (M1–M5 + m1–m11).
+
+**→ @coder** § **WAVE-UX-MOBILE** · desktop **не трогать** (≥768px).
+
+---
+
+## § D-O39 — Design canon sync (**✅ закрыт 2026-05-29**)
+
+**Решение владельца:** дизайн **принимаем как на prod** (v1.10.9) · **не менять UI** · только docs.
+
+| # | Статус |
+|---|--------|
+| d1 | **`feed-cabinet-mvp.md` §2–3** — Lead sync под NEO/prod |
+| d2 | **`REFERENCE.md` §1, §4** — карточка: shadow-only + perfect-match жёлтый |
+| d3 | `wave-2-css-brief.md` — канон = REFERENCE (без правок кода) |
+
+**→ @lead-designer не нужен** для D-O39.
+
+---
+
+## § WAVE-4-UX-FIX — согласовано владельцем 2026-05-29 (**backlog после O59**)
 
 **Статус:** ✅ согласовано · → @coder через Lead Architect
 **Дата:** 2026-05-29

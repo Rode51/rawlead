@@ -1309,6 +1309,8 @@
 
   var skillsModalEl = document.getElementById("rl-cabinet-skills-modal");
   var skillsOverlayEl = document.getElementById("rl-cabinet-skills-modal-overlay");
+  var skillsPanelEl =
+    skillsModalEl && skillsModalEl.querySelector(".rl-cabinet-skills-modal__panel");
   var skillsCatalogEl = document.getElementById("rl-cabinet-skills-catalog");
   var skillsSearchEl = document.getElementById("rl-cabinet-skills-search");
   var skillsApplyBtn = document.getElementById("rl-cabinet-skills-apply");
@@ -1736,7 +1738,7 @@
 
         '<h4 class="rl-feed-card__section-title">Инструменты</h4>' +
 
-        '<p class="rl-feed-card__text rl-feed-card__muted">Список инструментов появится после генерации отклика.</p>' +
+        '<p class="rl-feed-card__text rl-feed-card__muted">ИИ не выделил отдельный список инструментов для этого заказа.</p>' +
 
         "</div>";
 
@@ -2873,9 +2875,15 @@
 
       } else if (data.detail && typeof data.detail === "object") {
 
-        detail = String(data.detail.detail || "");
+        detail = String(data.detail.error || data.detail.detail || "");
 
         retryAfter = data.detail.retry_after_sec;
+
+      }
+
+      if (!detail && data.error) {
+
+        detail = String(data.error);
 
       }
 
@@ -3678,6 +3686,32 @@
   if (changeSkills) {
 
     changeSkills.addEventListener("click", openSkillsPicker);
+
+  }
+
+  function onSkillsModalBackdropClick(e) {
+
+    if (e.target === skillsModalEl || e.target === skillsOverlayEl) {
+
+      closeSkillsPicker();
+
+    }
+
+  }
+
+  if (skillsModalEl) {
+
+    skillsModalEl.addEventListener("click", onSkillsModalBackdropClick);
+
+  }
+
+  if (skillsPanelEl) {
+
+    skillsPanelEl.addEventListener("click", function (e) {
+
+      e.stopPropagation();
+
+    });
 
   }
 

@@ -36,6 +36,11 @@ from radar_cycle_log import (
 from storage import ProjectStorage
 from tg_bot_start import is_bot_started
 
+try:
+    from ai_analyze import draft_fail_per_hour
+except ImportError:
+    from src.ai_analyze import draft_fail_per_hour  # type: ignore[no-redef]
+
 _STATUS_FL_CYCLE_AT = "status_fl_cycle_at"
 _STATUS_FL = (
     "status_fl_cards_fl",
@@ -274,6 +279,50 @@ def _query_l1_backlog_recent(cfg: Config, hours: int = 48) -> int | None:
         if pg is None or not pg.enabled:
             return None
         return pg.count_leads_missing_l1_recent(hours=hours)
+    except Exception:
+        return None
+
+
+def _query_l1_backlog_by_source(cfg: Config, hours: int = 48) -> dict[str, int]:
+    if cfg.radar_profile != "site":
+        return {"fl": 0, "kwork": 0, "tg": 0}
+    try:
+        from pg_storage import pg_storage_from_config
+
+        pg = pg_storage_from_config(cfg)
+        if pg is None or not pg.enabled:
+            return {"fl": 0, "kwork": 0, "tg": 0}
+        return pg.count_l1_backlog_by_source(hours=hours)
+    except Exception:
+        return {"fl": 0, "kwork": 0, "tg": 0}
+
+
+def _format_l1_source_counts(counts: dict[str, int]) -> str:
+    return " ".join(f"{k}:{counts.get(k, 0)}" for k in ("fl", "kwork", "tg"))
+
+
+def _format_ai_health_line(rollup: str | None) -> str:
+    l1_n, _l2, visible = parse_site_rollup_metrics(rollup) if rollup else (0, 0, 0)
+    l1_label = "ok" if (l1_n > 0 or visible > 0) else "—"
+    fail_h = draft_fail_per_hour()
+    return f"ИИ: L1 {l1_label} (10м) · draft fail {fail_h}/ч"
+
+
+def _query_legacy_lag_human(cfg: Config) -> str | None:
+    try:
+        from pg_storage import pg_storage_from_config
+
+        pg = pg_storage_from_config(cfg)
+        if pg is None or not pg.enabled:
+            return None
+        sec = pg.legacy_visible_lag_sec()
+        if sec is None:
+            return None
+        if sec < 60:
+            return f"{sec} сек"
+        if sec < 3600:
+            return f"{int(sec // 60)} мин"
+        return f"{int(sec // 3600)} ч"
     except Exception:
         return None
 
@@ -569,8 +618,12 @@ def _format_site_status_v2(
     drain_on = cfg.l1_backlog_drain
     if backlog_total is not None and backlog_recent is not None:
         backlog_hist = max(0, backlog_total - backlog_recent)
-        lines.append(f"Без L1 (48 ч): {backlog_recent}")
-        lines.append(f"Хвост исторический: {backlog_hist}")
+        by_src = _query_l1_backlog_by_source(cfg, hours=48)
+        lines.append(
+            f"L1 48ч: {_format_l1_source_counts(by_src)} │ "
+            f"hot path ждут: {backlog_recent} │ хвост: {backlog_hist}"
+        )
+        lines.append(_format_ai_health_line(rollup))
         if backlog_recent > 0 and not drain_on:
             problems.append(
                 f"Без L1 (48 ч)={backlog_recent} — свежие заказы ждут ИИ"
@@ -580,8 +633,9 @@ def _format_site_status_v2(
                 f"Очередь L1={backlog_total} — drain on, но очередь велика"
             )
     elif backlog_total is not None:
-        lines.append(f"Без L1 (48 ч): ?")
+        lines.append(f"L1 48ч: ?")
         lines.append(f"Всего без L1: {backlog_total}")
+        lines.append(_format_ai_health_line(rollup))
         if backlog_total > _L1_BACKLOG_WARN and drain_on:
             problems.append(
                 f"Очередь L1={backlog_total} — drain on, но очередь велика"
@@ -590,7 +644,7 @@ def _format_site_status_v2(
     return lines
 
 
-def _format_legacy_status_v2(storage: ProjectStorage) -> list[str]:
+def _format_legacy_status_v2(cfg: Config, storage: ProjectStorage) -> list[str]:
     lines = ["", "── Neon consumer ──"]
     cycle_at = storage.get_setting(_STATUS_NEON_CYCLE_AT, "").strip()
     session = _int_setting(storage, _STATUS_NEON_SESSION_TO_BOT)
@@ -606,6 +660,9 @@ def _format_legacy_status_v2(storage: ProjectStorage) -> list[str]:
     else:
         lines.append("Последний цикл: ещё не было")
     lines.append(f"В бот за сессию: {session}")
+    lag = _query_legacy_lag_human(cfg)
+    if lag:
+        lines.append(f"Lag visible→bot: {lag}")
     return lines
 
 
@@ -812,7 +869,7 @@ def format_status_message(
             )
         )
     else:
-        lines.extend(_format_legacy_status_v2(storage))
+        lines.extend(_format_legacy_status_v2(cfg, storage))
 
     if cfg.radar_profile == "site" or radar_tg_enabled():
         lines.append("")

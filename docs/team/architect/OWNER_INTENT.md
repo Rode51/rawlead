@@ -60,7 +60,8 @@
 | **O49** | **L2 premium v2:** без «Готов…» · шаги · 9/10 quality | § **PRE-STRESS-WAVE-2** |
 | **O50** | **TG push:** полная карточка + callback «Сгенерировать» → draft в TG + ЛК | § **PRE-STRESS-WAVE-2** |
 | **O51** | **ЛК grid 2 col** как лента | § **PRE-STRESS-WAVE-2** |
-| **O38** | **Gemini audit + вся AI-логика** перед stress · strong agent | `problems/2026-05-29-gemini-full-audit.md` |
+| **O62** | **Draft без порога km:** 0% — можно откликнуться · km только информативен | § **O61** · paid draft на любом lead |
+| **O63** | **Новые парсеры:** YouDo · Freelance.ru · FreelanceJob · Пчёл.нет · **cross-source dedup** | § **O63** · после O37-UX |
 
 ---
 
@@ -179,6 +180,7 @@
 | **P1** | PRE-PROD-STRESS S1–S6 | `PRE_PROD_GATE.md` | **после** E-polish + VPS |
 | **P2** | TG в фильтре ленты (`source=tg`) | § TG-FEED-SOURCES | код ✅ |
 | **P2** | Freemium · пауза подписки | ROADMAP 3p, 3q | после 1-го платящего |
+| **P2** | **O63** парсеры YouDo · Freelance.ru · FreelanceJob · Пчёл.нет | § **O63** · ROADMAP | **📋 backlog** |
 | **P2** | **O11** задержка 15 мин на anon `/lenta/` vs instant TG paid | ROADMAP · Product | после 3f + биллинг |
 
 **Волна 2026-05-28 принята Lead** — детали: [`STATUS.md`](../common/STATUS.md) · [`archive/TASKS_HISTORY.md`](../archive/TASKS_HISTORY.md).
@@ -249,7 +251,33 @@
 | 2026-05-29 | **PRE-STRESS-PACK** | Match F1–F4 · Push · L2 · `/ops/` admin | **O42–O45** → приёмка → **O38** → O37 |
 | 2026-05-29 | **O52c отменено** | ИДЕАЛЬНО ✦ только ≥2 тега (F2) — 100% с 1 тегом без ✦ OK |
 | 2026-05-29 | **Wave-2 accept** | O52–O58 · theme v1.10.9 | **✅ закрыта** |
-| 2026-05-29 | **O38 scope+** | Mechanic: код + ИИ + **docs drift** + **product drift** (`PRODUCT_VISION` §0d vs prod) | **→ Mechanic** |
+| 2026-05-29 | **D-O39 ✅** | Design prod as-is · docs sync (feed-cabinet, REFERENCE) | **принято** |
+| 2026-05-30 | **O37b** | tools пусто после draft · test-акки (не yandex влад.) · @rawlead_bot · UX review ПК/моб | **✅ b1** · b4 **❌** |
+| 2026-05-30 | **O37c код** | ux_audit U1–U10 + LLM | **✅ Lead verify** |
+| 2026-05-30 | **O37c-a** | mint JWT acc1 | **✅ Lead verify** |
+| 2026-05-30 | **D-O40** | mobile rebuild brief | **✅ Lead verify** |
+| 2026-05-30 | **WAVE-UX-MOBILE** | код v1.11.4 M1–M5 | **✅ Lead verify** |
+| 2026-05-30 | **O68** | «Отклик ✓» — вниз карточки, не в шапке | **→ Coder** |
+| 2026-05-30 | **S6 ✅** | владелец приёмка глазами | **принято** |
+| 2026-05-30 | **O72** | Аналитика всех AI откликов: качество draft + tools на prod Neon | **→ @coder** |
+| 2026-05-30 | **O73** | Heatmap (Metrika/Clarity) до масштабирования рекламы | **📋 backlog** |
+| 2026-05-30 | **Реклама проекта** | после owner 5× draft + O72 baseline | **⏸** |
+| 2026-05-30 | **O71 ✅** | HTTPS api · k6 0% fail · shared draft 12/12 | **Lead verify** |
+| 2026-05-30 | **O37 load ❌** | k6 https 404 · matrix ≠ site path | **→ O71** |
+| 2026-05-30 | **O37c re-run** | 8→2 critical · mobile green | **✅** |
+| 2026-05-30 | **O69 ✅** | sort count · «Ещё навыки» · 2 ниши · v1.11.14 prod | **принято** |
+| 2026-05-30 | **O69** | count sort mismatch · «Ещё навыки» · 2 ниши пусто | **→ Coder P0** |
+| 2026-05-30 | **O37c-filters ✅** | v1.11.12 prod · Lead verify | **принято** |
+| 2026-05-30 | **O64–O67** | L1/status breakdown · delist · Legacy poll · ИИ draft | **→ Coder** |
+| 2026-05-30 | **Legacy lag** | visible в ленте часами · FLPARSINGBOT поздно · poll ~10 мин | **O66** |
+| 2026-05-30 | **Delist** | снятый с биржи заказ → пропадает из ленты | **O65** |
+| 2026-05-30 | **O37c-filters** | bar: 4 специализации · «Фильтры» → навыки по нише · chip **is-active** · **Coder deploy сразу** | **→ Coder P0** |
+| 2026-05-30 | **Радар жив** | VPS active · FL 90/cycle · новых 0 (dup+filter) · Kwork 0 · TG ok | **не паника** · O63 если Kwork |
+| 2026-05-30 | **Local-first gate** | theme local → deploy once | **принято** |
+| 2026-05-30 | **O37-UX** | 11/11 yandex-cdp — gaps: tools, bot, test accounts | **✅** |
+| 2026-05-30 | **O62** | Draft: убрать блок 0% km | **✅** § O61 |
+| 2026-05-30 | **O60** | Приёмка: anon badge · limit · live preview · FL | **✅** |
+| 2026-05-29 | **O38 scope+** | Mechanic: код + ИИ + **docs drift** + **product drift** | **✅** |
 | 2026-05-29 | **O56+O57 deploy** | async · shared draft · v1.10.8 · pro model VPS | **✅** |
 | 2026-05-29 | **O57 SHARED DRAFT** | Один L2 на lead · всем один черновик · cache `leads.reply_draft` | **→ O56+O57** |
 | 2026-05-29 | **O56 accept v5** | Async draft · uniform collapsed · expand after reply | **O56** |

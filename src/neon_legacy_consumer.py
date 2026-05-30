@@ -155,8 +155,7 @@ def run_neon_cycle(
     pg: NeonLeadStorage,
 ) -> None:
     errors: list[str] = []
-    after_id = _load_cursor(pg, errors)
-    rows = pg.fetch_exchange_leads_after(after_id, limit=40, errors=errors)
+    rows = pg.fetch_visible_unnotified_legacy(limit=40, errors=errors)
     ts = radar_timestamp()
     if not rows:
         _append_log_line(
@@ -170,7 +169,7 @@ def run_neon_cycle(
 
     new_ids = 0
     to_bot = 0
-    max_id = after_id
+    max_id = _load_cursor(pg, errors)
     for row in rows:
         max_id = max(max_id, row.lead_id)
         project = row.to_listing()
@@ -185,6 +184,9 @@ def run_neon_cycle(
             new_ids += 1
         if notified:
             to_bot += 1
+            pg.mark_legacy_notified(row.lead_id, errors=errors)
+        elif not was_new:
+            pg.mark_legacy_notified(row.lead_id, errors=errors)
 
     _save_cursor(max_id)
     record_neon_consumer_cycle(
@@ -229,13 +231,13 @@ def main() -> None:
 
     storage = storage_from_config(cfg)
     word_filter = default_listing_filter()
-    interval_sec = max(1, cfg.poll_interval_minutes * 60)
+    interval_sec = max(1, cfg.legacy_neon_poll_sec)
 
     _echo(f"=== RawLead Neon [{cfg.radar_profile}] ({radar_timestamp()}, Иркутск) ===")
     _echo(f"Лог: {cfg.radar_log_path.resolve()}")
     _echo(f"Курсор: {_CURSOR_PATH.resolve()}")
     _echo(
-        f"Интервал: {cfg.poll_interval_minutes} мин | "
+        f"Интервал: {interval_sec} с (LEGACY_NEON_POLL_SEC) | "
         f"ИИ: {'вкл' if cfg.ai_active else 'выкл'} | "
         f"Фильтр: {'широкий' if cfg.filter_wide else 'узкий'} | "
         f"Neon: read-only"

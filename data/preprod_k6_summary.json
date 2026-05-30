@@ -1,0 +1,8 @@
+{
+  "api_url": "https://api.rawlead.ru",
+  "vus": 50,
+  "duration": "5m",
+  "p95_feed_ms": 1676.5600899999997,
+  "http_req_failed_rate": 0,
+  "s3_pass": true
+}

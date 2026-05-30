@@ -37,6 +37,7 @@ from public_feed import public_feed_sources
 from vc_ru_parser import VcRuListingError, fetch_listing_projects as fetch_vc_ru_listing
 
 from l1_pool import L1Pool
+from delist_checker import run_delist_batch
 from lead_pipeline import drain_l1_backlog, process_new_listing, short_err
 from listing import ListingProject
 from pg_storage import NeonLeadStorage, pg_storage_from_config
@@ -59,6 +60,8 @@ from telegram_control import send_control_panel
 
 # Опрос getUpdates между циклами и во время run_cycle (не ждать POLL_INTERVAL).
 _TG_POLL_INTERVAL_SEC = 2
+_DELIST_INTERVAL_SEC = 3600
+_DELIST_LAST_RUN_KEY = "delist_last_run_epoch"
 
 _LISTING_ERRORS = (
     FlListingError,
@@ -299,6 +302,11 @@ def run_cycle(
         fl_projects = prefetched.get("fl")
         if fl_projects is None and not any(e.startswith("fl:fetch:") for e in errors):
             fl_projects = _fetch_source("fl", fetch_listing_projects, cfg, errors, stats_fl)
+        if fl_projects is None:
+            for err in errors:
+                if err.startswith("fl:fetch:"):
+                    stats_fl.fetch_error = err.split(":", 2)[-1][:120]
+                    break
         _tg_poll_if_due(cfg, storage, tg_poll_state)
         if fl_projects is not None:
             stats_fl.downloaded = len(fl_projects)
@@ -400,6 +408,8 @@ def run_cycle(
                 echo=True,
             )
 
+    _maybe_run_delist_batch(cfg, pg, storage, errors)
+
     _collect_misc_errors(errors, summary)
     summary.sync_neon_from_globals()
     summary.cycle_sec = max(0.0, time.monotonic() - cycle_t0)
@@ -448,6 +458,33 @@ def _tg_poll_if_due(
     if last <= 0.0 or now - last >= _TG_POLL_INTERVAL_SEC:
         _poll_and_log_tg_commands(cfg, storage)
         state["last"] = now
+
+
+def _maybe_run_delist_batch(
+    cfg: Config,
+    pg: NeonLeadStorage | None,
+    storage: ProjectStorage,
+    errors: list[str],
+) -> None:
+    if cfg.radar_profile != "site" or pg is None or not pg.enabled:
+        return
+    now = time.time()
+    raw = storage.get_setting(_DELIST_LAST_RUN_KEY, "0").strip()
+    try:
+        last = float(raw)
+    except ValueError:
+        last = 0.0
+    if now - last < _DELIST_INTERVAL_SEC:
+        return
+    stats = run_delist_batch(cfg, pg, errors=errors)
+    storage.set_setting(_DELIST_LAST_RUN_KEY, str(now))
+    if stats["checked"] or stats["delisted"]:
+        _append_log_line(
+            cfg.radar_log_path,
+            f"delist: checked={stats['checked']} delisted={stats['delisted']} "
+            f"skipped={stats['skipped']}",
+            echo=True,
+        )
 
 
 def _maybe_log_site_rollup(cfg: Config, storage: ProjectStorage) -> None:

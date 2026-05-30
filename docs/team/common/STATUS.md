@@ -6,6 +6,381 @@
 
 ---
 
+## ✅ Deploy O70 (**Lead verify prod · v1.11.15**)
+
+| § | VPS |
+|---|-----|
+| Theme | **1.11.15** ✅ |
+| Cabinet backdrop | `onSkillsModalBackdropClick` ✅ |
+| Lenta | **200** |
+
+**→ Дальше:** owner **5× draft** · **O72** AI audit · план: [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md)
+
+---
+
+## 📋 O72 — AI draft quality audit (**→ @coder**)
+
+| | |
+|--|--|
+| **Зачем** | качество **reply_draft** + **tools_required** на **реальных** лидах Neon (не fixtures) |
+| **Фаза 1** | auto-metrics: validators · tools vs catalog · JSON + human md |
+| **Фаза 2** | LLM judge 20–30 samples |
+| **Accept** | ≥85% auto-pass · judge avg ≥3.5/5 |
+| **Coder** | [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) § **O72** |
+| **Gate** | желателен **до** масштабной рекламы · не блокирует owner 5× draft |
+
+---
+
+## ✅ O71 — API HTTPS + shared draft gate (**Coder 2026-05-30**)
+
+| # | Критерий | Результат |
+|---|----------|-----------|
+| **a1** | https api: health + feed + catalog **200** | **✅** |
+| **a2** | k6 S3 `s3_pass: true` | **✅** · fail **0%** · feed p95 **1677 ms** |
+| **a3** | shared draft matrix **≥11/12** | **✅ 12/12** · `google/gemini-2.5-pro` |
+| **a4** | STATUS блок | этот блок |
+
+### Infra
+
+| | |
+|--|--|
+| **nginx** | `deploy/nginx/api.rawlead.ru.conf` — `listen 443 ssl` · cert `/etc/letsencrypt/live/rawlead.ru/` |
+| **deploy** | `scripts/_coder_o71_api_ssl_vps.py` |
+| **SHARED_DRAFT** | `google/gemini-2.5-pro` на VPS — **не менялось** |
+
+### Отчёты
+
+| Слой | Файл | Результат |
+|------|------|-----------|
+| **S1** shared draft | `data/preprod_ai_report.json` | **12/12** L1 + draft · `mode: shared_draft` · `s1_pass: true` |
+| **S3** k6 50 VU × 5m | `data/preprod_k6_summary.json` | **✅** · `http_req_failed_rate: 0` |
+
+**Код:** `scripts/preprod_ai_matrix.py --shared-draft` · `src/ai_analyze.py` retry 2→4 + empty response guard
+
+**Как проверить:**
+
+```powershell
+.venv\Scripts\python.exe scripts\preprod_ai_matrix.py --profile site --shared-draft
+.tools\k6\k6-v0.57.0-windows-amd64\k6.exe run -e API_URL=https://api.rawlead.ru -e VUS=50 -e DURATION=5m scripts/preprod_k6_feed.js
+```
+
+**→ Lead verify 2026-05-30:** **✅ a1–a4** · готовность к **рекламе проекта** (infra)
+
+---
+
+## (архив) O37 load NO-GO (**2026-05-30**)
+
+| Слой | Отчёт | Результат |
+|------|-------|-----------|
+| **S1** premium-lite matrix | `data/preprod_ai_report.json` (old) | **❌** L1 **12/12** · L2 **8/12** — **не путь сайта** |
+| **S3** k6 (до SSL) | `data/preprod_k6_summary.json` (old) | **❌** fail **50%** — HTTPS wrong vhost |
+
+Root cause закрыт в **O71** (nginx SSL api.rawlead.ru + shared draft path).
+
+---
+
+## ✅ S6 + O37c (**2026-05-30**)
+
+| § | Результат |
+|---|-----------|
+| **S6** | владелец **ок** |
+| **O37c** | **18/19** · U5 desktop ИИ flake · **U5 mobile ✅** |
+
+---
+
+## ✅ O70 cabinet + audit script (**Lead verify 2026-05-30**)
+
+| Метрика | Было → Lead re-run |
+|---------|---------------------|
+| Pass | 11/19 → **17/19** |
+| Critical | 8 → **2** (U5 desktop+mobile — ИИ flake, O67) |
+| Mobile U1–U4,U7–U10 | **✅** |
+| U7 | **✅** audit (prod **1.11.14** — cabinet JS **1.11.15** не на VPS) |
+| Repo theme | **v1.11.15** · VPS **1.11.14** |
+
+**→ Deploy** `deploy-wp-theme-vps.py` · S6 · manual U7 overlay после deploy.
+
+---
+
+## (архив) O37c прогон (**2026-05-30 · NO-GO S2**)
+
+| Метрика | Значение |
+|---------|----------|
+| Pass | **11/19** |
+| Critical | **8** |
+| Desktop U2/U3 | **✅** (O69 подтверждён audit) |
+| Mobile sheet U3/U8 | ❌ triage → **O70** ✅ |
+| U7 cabinet modal | ❌ triage → **O70** ✅ |
+| LLM | **1/5** · `data/preprod_ux_audit_human.md` |
+
+**→ @coder** § O70 ✅ · re-run **18/19** · **→ S6**
+
+---
+
+## ✅ O69 filters/sort (**✅ Lead verify 2026-05-30 · prod v1.11.14 · владелец принял**)
+
+| § | Проверка |
+|---|----------|
+| **Theme** | VPS `RAWLEAD_CHILD_VERSION` **1.11.14** ✅ |
+| **t1–t2** | `feedCountSuffix()` → `state.sort` · `updateCount()` на смену sort ✅ prod JS |
+| **t3–t4** | `row.category \|\| group.category` · «Популярные навыки» 2+ niche · desktop «Ещё навыки» ✅ |
+| **Lenta** | `https://rawlead.ru/lenta/` **200** |
+
+**→ Владелец:** S6 (390px + desktop) · re-run O37c U2/U8
+
+---
+
+## ✅ O64–O68 deploy prod (**Lead verify 2026-05-30**)
+
+| § | VPS после deploy |
+|---|------------------|
+| **Theme** | **v1.11.14** (O69) · до O69 было **v1.11.13** |
+| **Backend** | `delist_checker` · `l1_backlog_report` · `fetch_visible_unnotified_legacy` ✅ |
+| **API** | `/health` → `draft_fail_per_hour:0` ✅ |
+| **Legacy** | цикл **~2–3 мин** (16:07→16:10→16:12) · catch-up **8 в бот** |
+| **Lenta** | `https://rawlead.ru/lenta/` **200** |
+| **→ Владелец** | **S6** + **O37c audit** (O69 ✅ — глазами) |
+
+---
+
+## (архив) → O69 filters/sort (**2026-05-30**)
+
+| Симптом | Статус |
+|---------|--------|
+| Count «пo датe» при sort match | **✅ v1.11.14** |
+| «Ещё навыки» Tier B | **✅** |
+| 2 ниши пустые навыки | **✅** |
+
+---
+
+## (архив) → O64–O68 код (**Coder 2026-05-30**)
+
+| § | Суть | Файлы |
+|---|------|-------|
+| **O64** | `/status` L1 breakdown + ИИ строка | `radar_status.py` · `pg_storage.py` |
+| **O65** | Delist batch | `delist_checker.py` · `sql/014_*` |
+| **O66** | Legacy poll 60s | `neon_legacy_consumer.py` · `config.py` |
+| **O67** | `/health` draft_fail_per_hour | `api_server.py` · `ai_analyze.py` |
+| **O68** | «Отклик ✓» в CTA | `rawlead-feed.js` · **v1.11.13** |
+| **Тесты** | `tests/test_o64_o67.py` **7/7** (Lead verify) | — |
+
+---
+
+## ✅ O37c-filters (**2026-05-30 · prod v1.11.13**)
+| **Код** | `buildSheetContent` · `syncChipActiveStates` · `ensureSheetDelegation` · skills по category |
+| **→ Владелец** | prod: Дизайн → Фильтры → chip highlight → S6 / re-run O37c |
+
+---
+
+## (архив) → O64–O67 (**владелец 2026-05-30**)
+
+| § | Задача | Приоритет |
+|---|--------|-----------|
+| **O64** | L1 breakdown в `/status` + `clear_l1_backlog --by-age` | P0 |
+| **O67** | ИИ draft fail (L1 OK, L2 intermittent) | P0 |
+| **O66** | Legacy poll 1 мин + catch-up visible→@FLPARSINGBOT | P0 |
+| **O65** | Delist: заказ снят с биржи → пропадает из ленты | P1 |
+
+**Факт VPS:** L1 `visible=1` · draft 7578 fail / 7592 OK · legacy цикл **~10 мин**
+
+---
+
+## ✅ O37c-filters mobile bar (**Coder 2026-05-30 · theme v1.11.8 prod**)
+
+| | |
+|--|--|
+| **Sheet build** | отдельные блоки: **Специализация** · **Навыки** (chips) · **Сортировка** — без clone `<details>` |
+| **Fix** | навыки не показывались — hidden dropdown в bar |
+
+---
+
+## ✅ O37c-filters (**Coder 2026-05-30 · theme v1.11.5 prod**)
+
+| | |
+|--|--|
+| **Scope** | навыки по специализации · `is-active` на chip · mobile sheet b1–b4 |
+| **f1** | bar без изменений · skills по category · toggle draft · «Применить» |
+| **f2** | openSheet: `readCategoriesFrom` + `renderSkillsCatalog` + `loadCatalog` · delegation без dup listeners · `.rl-cat-chip.is-active` в sheet |
+| **CSS** | mobile sheet: skills/sort видны flat (не `display:none`) |
+| **Файлы** | `rawlead-feed.js` · `rawlead.css` · `functions.php` · `style.css` |
+| **Deploy** | **v1.11.5** · `deploy-wp-theme-vps.py` |
+| **→ Lead/владелец** | re-run `ux_audit.py` U2 · U8 |
+
+---
+
+## ✅ WAVE-UX-MOBILE код (**Coder 2026-05-30 · theme v1.11.4**)
+
+| | |
+|--|--|
+| **Scope** | M1–M5 · mobile `<768px` · desktop без регресса |
+| **M1** | overflow-x hidden · карточки 100% · inbox padding |
+| **M2** | burger + nav drawer · desktop nav скрыт на mobile |
+| **M3/M5** | `[Фильтры ▾]` в filter bar · unified sheet · fix clone selector |
+| **M4** | tap-outside collapse card · sheet overlay/close/Esc |
+| **Файлы** | `header.php` · `page-lenta.php` · `rawlead-feed.js` · `rawlead.css` · `functions.php` |
+| **→ Lead** | **✅ verify 2026-05-30** · **O37c-filters** → Coder **deploy сразу** → re-run O37c |
+| **→ S6** | ⏸ после audit 0 critical mobile |
+
+---
+
+| | |
+|--|--|
+| **Скрипт** | `scripts/preprod_mint_token.py` — Telethon acc1 → Neon `agent` → `.env.site` |
+| **Mint** | `tg_user_id=8233488286` · `user_id=895912a1-ffb6-46fb-be7e-4e051f2ff8c1` (≠ owner) |
+| **Docs** | `PREPROD_ACCOUNTS.md` · `FOR_YOU.md` § mint + audit |
+| **→ Тебе** | mint + audit ✅ · **→ Coder WAVE-UX-MOBILE** |
+
+---
+
+## ✅ D-O40 Design (**Lead verify 2026-05-30**)
+
+| | |
+|--|--|
+| **Brief** | `DESIGNER_PROMPT.md` § WAVE-UX-MOBILE · `feed-cabinet-mvp.md` §7.6 |
+| **Scope** | M1–M5 · приёмка m1–m11 · только `<768px` |
+| **→ Дальше** | **@coder** WAVE-UX-MOBILE → deploy → re-run O37c |
+
+---
+
+## ✅ O37c код (**Lead verify 2026-05-30**)
+
+| | |
+|--|--|
+| **Скрипт** | `scripts/preprod_playwright/ux_audit.py` — U1–U10 · desktop 1440 + mobile 390 |
+| **Token** | exit 2 без `RAWLEAD_PREPROD_ACCESS_TOKEN` · запрет yandex-cdp без token |
+| **LLM** | OpenRouter → `data/preprod_ux_audit_human.md` |
+| **Docs** | `PREPROD_ACCOUNTS.md` · `PREPROD_STRESS_RUN.md` § O37c |
+
+---
+
+## ✅ O37c прогон (**2026-05-30** · **8 critical · LLM 1/5**)
+
+| | |
+|--|--|
+| **Auth** | `chromium+token` · acc1 `895912a1-…` · **≠ owner** |
+| **PASS** | **11/19** · mobile sheet/tap-outside — главные провалы |
+| **U5 draft** | ✅ desktop + mobile (~19–21 с) |
+| **→ Дальше** | **WAVE-UX-MOBILE** → re-run O37c |
+
+---
+
+## ✅ O37b Lead verify (2026-05-30)
+
+| | |
+|--|--|
+| **b1** | **✅** tools v1.11.3 prod |
+| **b3** | **⚠️** bot getMe OK · acc1 ❌ |
+| **b4** | **❌ отклонён** — `ux_review.py` скрины-only · моб **5/5 ложно** → **O37c** |
+
+---
+
+## ✅ O37b Lead verify (2026-05-30)
+
+| | |
+|--|--|
+| **b1** | On-demand L2 → `UPDATE leads.tools_required` · honest empty-state · theme **v1.11.3** |
+| **b2** | `docs/ops/PREPROD_ACCOUNTS.md` · `ux_journey` **`cdp`/`dolphin-cdp`** · `.env.example` token/CDP |
+| **b3** | `scripts/preprod_bot_smoke.py` → `data/preprod_bot_smoke.json` · **getMe OK** (@rawlead_bot) · Telethon acc1 ❌ (сессия/lock — ops) |
+| **b4** | `data/preprod_ux_review.md` + скрины `data/preprod_ux_review/` · ПК 4/5 · моб 5/5 |
+| **Playwright** | J5 **PASS** `browser: cdp` · draft 2/2 (7546, 7544) · CDP `127.0.0.1:9222` |
+| **Тесты** | **14/14** unittest (+ `test_tools_persist_o37b`) |
+| **→ Lead** | ~~deploy~~ **✅ v1.11.3** 2026-05-30 |
+| **→ Дальше** | **O37 load** · bot acc1 ops · **S6** |
+
+---
+
+## ✅ O61 Lead verify + deploy (2026-05-30)
+
+| | |
+|--|--|
+| **Theme** | **v1.11.2** prod |
+| **API** | `no skill overlap` **удалён** · km=0 draft OK |
+| **JS** | кнопка paid без km-gate |
+| **Тесты** | **20/20** unittest |
+| **→ Дальше** | **O37-UX** (обновить скрипт под O61) |
+
+---
+
+## ✅ O61 draft без km-порога (**Coder 2026-05-30**)
+
+| | |
+|--|--|
+| **O61a** | API: убран `no skill overlap` · shared-cache при km=0 |
+| **O61b** | feed JS: кнопка «Написать отклик» для paid без km>0 |
+| **Theme** | **v1.11.2** · API `src/` |
+| **Тесты** | `test_draft_skill_overlap_o61` 3/3 · draft suite **22/22** |
+| **→ Lead** | ~~deploy~~ **✅** 2026-05-30 |
+| **→ Дальше** | **O37-UX** |
+
+---
+
+## ✅ O60 Lead verify + deploy (2026-05-30)
+
+| | |
+|--|--|
+| **Theme** | **v1.11.1** prod |
+| **API/bot/radar** | **active** · `DRAFT_HOURLY_LIMIT=0` |
+| **O60a** | anon feed `with_reply_draft=0` · badge только logged-in |
+| **O60b** | лимит draft **выключен** (env=0) |
+| **O60c/d** | `feedCountSuffix` + `initLivePreview()` на prod JS |
+| **O60e** | цикл 12:42: `fl:id=5507331 visible=1` · FL page-1 иногда **FlListingError** (proxy) — ops |
+| **Тесты** | **17/17** unittest локально |
+| **→ Дальше** | **O37-UX** J1–J11 (J5 без 429) |
+
+---
+
+## ✅ O60 hotfix приёмки (**Coder + Lead 2026-05-30**)
+
+| | |
+|--|--|
+| **O60a** | API: shared `reply_draft` не в `/v1/feed` · paid — только `user_lead_replies` · JS badge только logged-in |
+| **O60b** | `DRAFT_HOURLY_LIMIT` env · default **0** = без лимита · UI 429 только если limit>0 |
+| **O60c** | счётчик: «по дате» / «по совместимости» по sort+skills |
+| **O60d** | главная live preview: `GET /wp-json/rawlead/v1/feed?limit=3` · fallback demo |
+| **O60e** | FL partial pagination при сбое proxy page-2+ · `fetch_error` в логе |
+| **Theme** | **v1.11.1** (bump) · API `src/` |
+| **Тесты** | `test_feed_privacy_o60` 4/4 · draft 4/4 · `test_draft_async` 9/9 |
+| **→ Lead** | ~~deploy~~ **✅** 2026-05-30 |
+| **→ Дальше** | **O37-UX** (J5 auth, без 429) |
+
+---
+
+## ✅ O37-UX Lead verify (2026-05-30)
+
+| | |
+|--|--|
+| **Gate** | **PASS** · 11/11 · 0 critical · J5 draft 2/2 |
+| **Браузер** | `yandex-cdp` (CDP к Яндексу — **не** отдельное окно Chromium) |
+| **Auth** | `has_auth: true` · cookies из профиля Яндекса |
+| **→ Дальше** | **O37-AI + LOAD** · **S6** — 15 мин глазами владельца |
+
+---
+
+## ✅ O37-UX Playwright prod v1.11.2 (**Coder 2026-05-30**)
+
+| | |
+|--|--|
+| **Скрипт** | `ux_journey.py` — O61: J5 без km>0 · CDP/has_auth fix |
+| **Prod** | **J1–J11 PASS** (0 critical) · J5 draft **2/2** (leads 7566, 7554) |
+| **Браузер** | `--browser yandex-cdp --headed` · auth из сессии Яндекс (CDP) |
+| **Отчёты** | `data/preprod_ux_journey.json` · `.md` · скрины `data/preprod_ux_journey/` |
+| **→ Lead** | UX green **с оговорками** → **O37b** |
+| **→ Дальше** | **O37b** → load → **S6** |
+
+---
+
+## ✅ O59a draft stability (**Lead verify + deploy 2026-05-29**)
+
+| | |
+|--|--|
+| **Theme** | **v1.11.0** prod |
+| **API/bot** | **active** · `sanitize_draft_error_detail` · poll `failed`+`error` · 4× L2 retry |
+| **Tests** | **14/14** unittest (draft_async + reliability + shared) |
+| **→ Тебе** | Ctrl+F5 `/lenta/` · 2× «Написать отклик» · fail → причина + «Повторить» |
+| **→ Дальше** | **O37-UX** green J5 → O37-LOAD |
+
+---
+
 ## ✅ Wave-2 accept (**закрыта 2026-05-29**)
 
 | Волна | Суть | Theme |
@@ -15,7 +390,18 @@
 | O56+O57 | async · shared draft · uniform cards | v1.10.8 |
 | O58 | GET draft poll (WP) | **v1.10.9** |
 
-**→ Дальше:** **O38** (Mechanic) → **O37** (stress).
+**→ Дальше:** **O37-UX** → O37 load → S6.
+
+---
+
+## ✅ O38 Mechanic audit (**закрыт 2026-05-29**)
+
+| | |
+|--|--|
+| **Verdict** | **NO-GO O37** |
+| **P0 code** | flaky draft → **O59a** |
+| **P0 docs** | TZ_API · NEON_SCHEMA · design canon |
+| **Артефакт** | [`problems/2026-05-29-gemini-full-audit.md`](../../problems/2026-05-29-gemini-full-audit.md) § Решение |
 
 ---
 

@@ -85,7 +85,10 @@ rawlead_get_part('header');
 						<label class="rl-sort-option"><input type="radio" name="sort" value="match"> <?php esc_html_e('По совместимости', 'rawlead-kadence-child'); ?></label>
 					</div>
 				</details>
-				<button type="button" class="rl-filter-reset rl-feed-reset" hidden><?php esc_html_e('Сбросить фильтры', 'rawlead-kadence-child'); ?></button>
+				<button type="button" class="rl-filter-dropdown-btn rl-filter-mobile-trigger" id="rl-feed-filters-open" aria-expanded="false" aria-controls="rl-feed-sheet">
+					<?php esc_html_e('Фильтр', 'rawlead-kadence-child'); ?>
+				</button>
+				<button type="button" class="rl-filter-reset rl-feed-reset" hidden><?php esc_html_e('Сбросить фильтр', 'rawlead-kadence-child'); ?></button>
 			</div>
 		</div>
 	</div>
@@ -95,9 +98,6 @@ rawlead_get_part('header');
 		<header class="rl-feed-head">
 			<h1 class="rl-feed-head__title"><?php esc_html_e('Лента заказов', 'rawlead-kadence-child'); ?></h1>
 			<p class="rl-feed-head__count" id="rl-feed-count" aria-live="polite"></p>
-			<button type="button" class="rl-btn rl-btn--ghost rl-feed-filters-btn" id="rl-feed-filters-open" aria-expanded="false">
-				<?php esc_html_e('Фильтры', 'rawlead-kadence-child'); ?>
-			</button>
 		</header>
 		<div class="rl-feed-banner" id="rl-feed-error" role="alert" hidden></div>
 		<div class="rl-feed-list" id="rl-feed-list" aria-live="polite"></div>
@@ -116,9 +116,13 @@ rawlead_get_part('header');
 	<div class="rl-feed-sheet" id="rl-feed-sheet" hidden>
 		<div class="rl-feed-sheet__overlay" id="rl-feed-sheet-overlay"></div>
 		<div class="rl-feed-sheet__panel" role="dialog" aria-modal="true" aria-label="<?php esc_attr_e('Фильтры', 'rawlead-kadence-child'); ?>">
+			<div class="rl-feed-sheet__head">
+				<span class="rl-feed-sheet__title"><?php esc_html_e('Фильтры', 'rawlead-kadence-child'); ?></span>
+				<button type="button" class="rl-feed-sheet__close" id="rl-feed-sheet-close" aria-label="<?php esc_attr_e('Закрыть фильтры', 'rawlead-kadence-child'); ?>">✕</button>
+			</div>
 			<div class="rl-feed-sheet__body" id="rl-feed-sheet-body"></div>
 			<div class="rl-feed-sheet__actions">
-				<button type="button" class="rl-btn rl-btn--primary" id="rl-feed-sheet-apply"><?php esc_html_e('Применить', 'rawlead-kadence-child'); ?></button>
+				<button type="button" class="rl-btn rl-btn--primary" id="rl-feed-sheet-apply"><?php esc_html_e('Применить →', 'rawlead-kadence-child'); ?></button>
 				<button type="button" class="rl-btn rl-btn--ghost" id="rl-feed-sheet-reset"><?php esc_html_e('Сбросить', 'rawlead-kadence-child'); ?></button>
 			</div>
 		</div>

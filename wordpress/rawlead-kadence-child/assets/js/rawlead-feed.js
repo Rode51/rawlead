@@ -560,7 +560,7 @@
       html +=
         '<div class="rl-feed-card__section">' +
         '<h4 class="rl-feed-card__section-title">Инструменты</h4>' +
-        '<p class="rl-feed-card__text rl-feed-card__muted">Список инструментов появится после генерации отклика.</p>' +
+        '<p class="rl-feed-card__text rl-feed-card__muted">ИИ не выделил отдельный список инструментов для этого заказа.</p>' +
         "</div>";
     }
     if (reply) {
@@ -641,12 +641,18 @@
   }
 
   function replyCtaHtml(item) {
-    var reply = prepForDisplay(item.reply_draft || "", false).trim();
-    if (reply || !hasPaidAccess()) {
-      return "";
+    var reply = "";
+    if (isLoggedIn()) {
+      reply = prepForDisplay(item.reply_draft || "", false).trim();
     }
-    var km = item.keyword_match != null ? item.keyword_match : 0;
-    if (km <= 0) {
+    if (reply) {
+      return (
+        '<div class="rl-feed-card__cta">' +
+        repliedBadgeHtml() +
+        "</div>"
+      );
+    }
+    if (!hasPaidAccess()) {
       return "";
     }
     return (
@@ -661,8 +667,6 @@
     var perfectBadge = perfect
       ? '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>'
       : "";
-    var reply = prepForDisplay(item.reply_draft || "", false).trim();
-    var repliedBadge = reply ? repliedBadgeHtml() : "";
     return (
       '<span class="rl-feed-card__source rl-feed-card__source--' +
       src.cls +
@@ -670,7 +674,6 @@
       escapeHtml(src.label) +
       "</span>" +
       perfectBadge +
-      repliedBadge +
       hotBadgeHtml(item)
     );
   }
@@ -800,8 +803,11 @@
       if (typeof data.detail === "string") {
         detail = data.detail;
       } else if (data.detail && typeof data.detail === "object") {
-        detail = String(data.detail.detail || "");
+        detail = String(data.detail.error || data.detail.detail || "");
         retryAfter = data.detail.retry_after_sec;
+      }
+      if (!detail && data.error) {
+        detail = String(data.error);
       }
       if (!detail && data.message) {
         detail = String(data.message);
@@ -836,6 +842,10 @@
     el.hidden = false;
   }
 
+  function feedCountSuffix() {
+    return state.sort === "match" ? "по совместимости" : "по дате";
+  }
+
   function updateCount() {
     if (!countEl) {
       return;
@@ -844,7 +854,8 @@
       countEl.textContent = "";
       return;
     }
-    countEl.textContent = state.totalShown + " заказов · по совместимости";
+    countEl.textContent =
+      state.totalShown + " заказов · " + feedCountSuffix();
     updatePagination();
   }
 
@@ -865,6 +876,34 @@
         resetBtn.click();
       });
     }
+  }
+
+  function applySkillsSectionText(el, categories) {
+    if (!el) {
+      return;
+    }
+    var catLabels = {
+      dev: "Разработка",
+      design: "Дизайн",
+      marketing: "Маркетинг",
+      text: "Тексты",
+    };
+    if (categories.length === 1) {
+      var key = categories[0];
+      el.textContent = "По нише «" + (catLabels[key] || key) + "»:";
+      el.hidden = false;
+    } else if (categories.length === 0) {
+      el.textContent = "Популярные навыки:";
+      el.hidden = false;
+    } else {
+      el.textContent = "Популярные навыки:";
+      el.hidden = false;
+    }
+  }
+
+  function populatedSheetBody() {
+    var body = document.getElementById("rl-feed-sheet-body");
+    return body && body.querySelector(".rl-feed-skills") ? body : null;
   }
 
   function updateFilterBarUi() {
@@ -888,25 +927,30 @@
     if (sortBadgeEl) {
       sortBadgeEl.hidden = !(state.appliedTags.length > 0 && state.sort === "match");
     }
-    var sectionEl = document.getElementById("rl-feed-skills-section");
-    if (sectionEl) {
-      var catLabels = {
-        dev: "Разработка",
-        design: "Дизайн",
-        marketing: "Маркетинг",
-        text: "Тексты",
-      };
-      if (state.appliedCategories.length === 1) {
-        var key = state.appliedCategories[0];
-        sectionEl.textContent =
-          "По нише «" + (catLabels[key] || key) + "»:";
-        sectionEl.hidden = false;
-      } else if (state.appliedCategories.length === 0) {
-        sectionEl.textContent = "Популярные навыки:";
-        sectionEl.hidden = false;
-      } else {
-        sectionEl.hidden = true;
-      }
+    applySkillsSectionText(
+      document.getElementById("rl-feed-skills-section"),
+      state.appliedCategories
+    );
+    var sheetRoot = populatedSheetBody();
+    if (sheetRoot) {
+      applySkillsSectionText(
+        sheetRoot.querySelector(".rl-feed-skills__section"),
+        state.draftCategories
+      );
+    }
+    var mobileFilterBtn = document.getElementById("rl-feed-filters-open");
+    if (mobileFilterBtn) {
+      var filterCount =
+        state.appliedTags.length +
+        (state.appliedCategories.length ? 1 : 0);
+      mobileFilterBtn.textContent =
+        filterCount > 0 ? "Фильтр · " + filterCount : "Фильтр";
+      mobileFilterBtn.classList.toggle(
+        "has-selection",
+        filterCount > 0 ||
+          state.source !== "" ||
+          state.sort !== "time"
+      );
     }
   }
 
@@ -971,10 +1015,9 @@
 
   function updateSkillsBadge() {
     var badges = [skillsBadgeEl];
-    var sheet = document.getElementById("rl-feed-sheet");
-    var sheetBody = document.getElementById("rl-feed-sheet-body");
-    if (sheet && !sheet.hidden && sheetBody) {
-      var sheetBadge = sheetBody.querySelector("#rl-feed-skills-badge");
+    var sheetRoot = populatedSheetBody();
+    if (sheetRoot) {
+      var sheetBadge = sheetRoot.querySelector(".rl-feed-skills-dd__badge");
       if (sheetBadge) {
         badges.push(sheetBadge);
       }
@@ -999,13 +1042,18 @@
     var dirty =
       !tagsEqual(state.draftTags, state.appliedTags) ||
       !categoriesEqual(state.draftCategories, state.appliedCategories);
+    var sortDirty = false;
+    if (sidebar) {
+      var sortInp = sidebar.querySelector('input[name="sort"]:checked');
+      sortDirty = sortInp && sortInp.value !== state.sort;
+    }
+    dirty = dirty || sortDirty;
     var hints = [skillsHintEl];
     var applyBtns = [skillsApplyBtn];
-    var sheet = document.getElementById("rl-feed-sheet");
-    var sheetBody = document.getElementById("rl-feed-sheet-body");
-    if (sheet && !sheet.hidden && sheetBody) {
-      var sheetHint = sheetBody.querySelector(".rl-feed-skills__hint");
-      var sheetApply = sheetBody.querySelector(".rl-feed-skills-apply");
+    var sheetRoot = populatedSheetBody();
+    if (sheetRoot) {
+      var sheetHint = sheetRoot.querySelector(".rl-feed-skills__hint");
+      var sheetApply = sheetRoot.querySelector(".rl-feed-skills-apply");
       if (sheetHint) {
         hints.push(sheetHint);
       }
@@ -1041,31 +1089,72 @@
     }
     var tier = row.tier || "A";
     var cats = state.draftCategories;
-    if (cats.length === 1) {
-      var niche = cats[0];
+    var niche = cats.length === 1 ? cats[0] : null;
+
+    if (niche) {
       var tierA = TIER_A_BY_NICHE[niche] || [];
       if (tierA.indexOf(row.tag) >= 0) {
         return true;
       }
-      return !!(state.showRareSkills && tier === "B" && row.category === niche);
+      if (state.showRareSkills) {
+        return row.category === niche;
+      }
+      return false;
     }
+
     if (cats.length > 1) {
       if (row.category && cats.indexOf(row.category) < 0) {
         return false;
       }
-      return state.showRareSkills || tier === "A";
+      if (state.showRareSkills) {
+        return true;
+      }
+      var popular = TIER_A_BY_NICHE[row.category] || [];
+      return popular.indexOf(row.tag) >= 0;
     }
-    return true;
+
+    return state.showRareSkills || tier === "A";
+  }
+
+  function setSheetActionLabel(btn, text) {
+    if (!btn) {
+      return;
+    }
+    var label = btn.querySelector(".rl-sheet-text-btn__label");
+    if (label) {
+      label.textContent = text;
+    } else {
+      btn.textContent = text;
+    }
   }
 
   function updateRareSkillsUi() {
-    if (!skillsRareBtn) {
+    var rareLabel = state.showRareSkills ? "Свернуть" : "Ещё навыки";
+    var expanded = state.showRareSkills ? "true" : "false";
+    var sheet = document.getElementById("rl-feed-sheet");
+    var sheetRoot = populatedSheetBody();
+    var sheetOpen = sheet && !sheet.hidden && sheetRoot;
+
+    if (sheetOpen) {
+      var rareBtn = sheetRoot.querySelector("#rl-sheet-skills-rare");
+      if (rareBtn) {
+        rareBtn.removeAttribute("hidden");
+        rareBtn.hidden = false;
+        setSheetActionLabel(rareBtn, rareLabel);
+        rareBtn.setAttribute("aria-expanded", expanded);
+      }
       return;
     }
-    var oneNiche = state.draftCategories.length === 1;
-    skillsRareBtn.hidden = !oneNiche;
-    skillsRareBtn.textContent = state.showRareSkills ? "Свернуть" : "Ещё навыки";
-    skillsRareBtn.setAttribute("aria-expanded", state.showRareSkills ? "true" : "false");
+
+    if (skillsRareBtn) {
+      skillsRareBtn.hidden = false;
+      skillsRareBtn.textContent = rareLabel;
+      skillsRareBtn.setAttribute("aria-expanded", expanded);
+    }
+  }
+
+  function catsLengthGt1(cats) {
+    return (cats || []).length > 1;
   }
 
   function toggleDraftTag(tag) {
@@ -1139,7 +1228,13 @@
     if (groups) {
       container.innerHTML = groups
         .map(function (group) {
-          var skills = (group.skills || []).filter(pickerRowVisible);
+          var skills = (group.skills || []).filter(function (row) {
+            return pickerRowVisible({
+              tag: row.tag,
+              tier: row.tier,
+              category: row.category || group.category,
+            });
+          });
           if (!skills.length) {
             return "";
           }
@@ -1165,18 +1260,17 @@
 
   function renderSkillsCatalog() {
     updateSkillsBadge();
-    updateRareSkillsUi();
     updateSkillsDraftUi();
     updateFilterBarUi();
     renderSkillsInto(skillsEl);
-    var sheet = document.getElementById("rl-feed-sheet");
-    var sheetBody = document.getElementById("rl-feed-sheet-body");
-    if (sheet && !sheet.hidden && sheetBody) {
-      var sheetSkills = sheetBody.querySelector(".rl-feed-skills");
+    var sheetRoot = populatedSheetBody();
+    if (sheetRoot) {
+      var sheetSkills = sheetRoot.querySelector(".rl-feed-skills");
       if (sheetSkills) {
         renderSkillsInto(sheetSkills);
       }
     }
+    updateRareSkillsUi();
   }
 
   function setSortMatch() {
@@ -1288,14 +1382,11 @@
     }
     var url = cfg.restSkills;
     var sep = url.indexOf("?") >= 0 ? "&" : "?";
+    url = url + sep + "mode=full&limit=200";
     if (state.draftCategories.length === 1) {
-      url =
-        url +
-        sep +
-        "mode=full&limit=200&category=" +
-        encodeURIComponent(state.draftCategories[0]);
-    } else {
-      url = url + sep + "mode=popular&limit=80";
+      url += "&category=" + encodeURIComponent(state.draftCategories[0]);
+    } else if (state.draftCategories.length > 1) {
+      url += "&category=" + encodeURIComponent(state.draftCategories.join(","));
     }
     return fetch(url, { credentials: "same-origin" })
       .then(function (res) {
@@ -1313,18 +1404,22 @@
       });
   }
 
-  function syncChips() {
-    if (!sidebar) {
+  function syncChipActiveStates(root) {
+    if (!root) {
       return;
     }
-    sidebar.querySelectorAll(".rl-feed-chip, .rl-cat-chip").forEach(function (label) {
+    root.querySelectorAll(".rl-feed-chip, .rl-cat-chip, .rl-sort-option").forEach(function (label) {
       var input = label.querySelector("input");
-      label.classList.toggle("is-active", input && input.checked);
+      label.classList.toggle("is-active", !!(input && input.checked));
     });
-    sidebar.querySelectorAll(".rl-sort-option").forEach(function (label) {
-      var input = label.querySelector('input[name="sort"]');
-      label.classList.toggle("is-active", input && input.checked);
-    });
+  }
+
+  function syncChips() {
+    syncChipActiveStates(sidebar);
+    var sheetRoot = populatedSheetBody();
+    if (sheetRoot) {
+      syncChipActiveStates(sheetRoot);
+    }
   }
 
   function resetAndLoad() {
@@ -1472,16 +1567,25 @@
 
   function updateCardDraft(card, item) {
     var bodyInner = card.querySelector(".rl-feed-card__body-inner");
-    if (!bodyInner) {
-      return;
+    if (bodyInner) {
+      bodyInner.innerHTML = renderExpandedBody(item);
     }
-    bodyInner.innerHTML = renderExpandedBody(item);
     var headStart = card.querySelector(".rl-feed-card__head-start");
     if (headStart) {
       headStart.innerHTML = headBadgesHtml(item, isPerfectMatch(item));
     }
+    var ctaHtml = replyCtaHtml(item);
     var cta = card.querySelector(".rl-feed-card__cta");
-    if (cta) {
+    if (ctaHtml) {
+      if (cta) {
+        cta.outerHTML = ctaHtml;
+      } else {
+        var body = card.querySelector(".rl-feed-card__body");
+        if (body) {
+          body.insertAdjacentHTML("beforebegin", ctaHtml);
+        }
+      }
+    } else if (cta) {
       cta.remove();
     }
     state.expandedId = null;
@@ -1534,15 +1638,20 @@
       })
       .catch(function (err) {
         if (err && err.status === 403) {
-          showError(err.detail || "Нет пересечения с твоими навыками");
+          showError(err.detail || "Нет доступа");
           return;
         }
         if (err && err.status === 429) {
-          showError(err.detail || "Лимит: не больше 10 черновиков в час");
+          var limMsg = err.detail || err.error || "";
+          if (limMsg && limMsg.indexOf("rate limit") !== -1) {
+            showError(limMsg);
+          } else if (limMsg) {
+            showError(limMsg);
+          }
           return;
         }
         var msg = (err && err.detail) || DRAFT_FAIL_RU;
-        if (msg.indexOf("draft generation failed") !== -1) {
+        if (msg === "draft generation failed" || msg === "ai unavailable") {
           msg = DRAFT_FAIL_RU;
         }
         showDraftError(msg, function () {
@@ -1615,6 +1724,18 @@
     cardDelegationReady = true;
     listEl.addEventListener("click", onFeedListClick);
     listEl.addEventListener("keydown", onFeedListKeydown);
+    document.addEventListener("click", function (e) {
+      if (e.target.closest(".rl-lead-card")) {
+        return;
+      }
+      if (!listEl) {
+        return;
+      }
+      listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
+        c.classList.remove("is-expanded");
+      });
+      state.expandedId = null;
+    });
   }
 
   function bindCards() {
@@ -1716,7 +1837,7 @@
     });
     toRoot.querySelectorAll(".rl-feed-chip, .rl-cat-chip, .rl-sort-option").forEach(function (label) {
       var input = label.querySelector("input");
-      label.classList.toggle("is-active", input && input.checked);
+      label.classList.toggle("is-active", !!(input && input.checked));
     });
   }
 
@@ -1765,6 +1886,9 @@
       readFilters();
       if (name === "sort") {
         updateFilterBarUi();
+        if (state.totalShown > 0) {
+          updateCount();
+        }
       }
       resetAndLoad();
     });
@@ -1789,55 +1913,218 @@
   var sheet = document.getElementById("rl-feed-sheet");
   var sheetBody = document.getElementById("rl-feed-sheet-body");
   var openBtn = document.getElementById("rl-feed-filters-open");
-  if (sheet && sheetBody && sidebar && openBtn) {
-    openBtn.addEventListener("click", function () {
-      var scrollBox = sidebar.querySelector(".rl-feed-sidebar__scroll");
-      sheetBody.innerHTML = scrollBox ? scrollBox.innerHTML : sidebar.innerHTML;
-      sheet.hidden = false;
-      openBtn.setAttribute("aria-expanded", "true");
-      sheetBody.querySelectorAll("input").forEach(function (inp) {
-        var name = inp.getAttribute("name");
-        var val = inp.getAttribute("value");
-        var live = sidebar.querySelector(
-          'input[name="' + name + '"][value="' + val + '"]'
-        );
-        if (live) {
-          inp.checked = live.checked;
+  var sheetCloseBtn = document.getElementById("rl-feed-sheet-close");
+  var sheetOverlayEl = document.getElementById("rl-feed-sheet-overlay");
+
+  function closeSheet() {
+    if (!sheet) {
+      return;
+    }
+    sheet.hidden = true;
+    if (openBtn) {
+      openBtn.setAttribute("aria-expanded", "false");
+    }
+    document.body.style.overflow = "";
+  }
+
+  function onSheetCategoryChange(changedInp) {
+    var allInp = sheetBody.querySelector('input[name="category"][value=""]');
+    if (changedInp && changedInp.value === "" && changedInp.checked) {
+      sheetBody.querySelectorAll('input[name="category"]').forEach(function (other) {
+        if (other !== changedInp && other.value) {
+          other.checked = false;
         }
       });
-      sheetBody.querySelectorAll(".rl-feed-chip").forEach(function (label) {
-        var input = label.querySelector("input");
-        label.classList.toggle("is-active", input && input.checked);
+    } else if (changedInp && changedInp.value && changedInp.checked && allInp) {
+      allInp.checked = false;
+    }
+    syncCategoryInputs(sheetBody, sidebar);
+    syncChipActiveStates(sheetBody);
+    state.draftCategories = readCategoriesFrom(sheetBody);
+    state.showRareSkills = false;
+    pruneDraftTagsForCategories();
+    renderSkillsCatalog();
+    loadCatalog();
+    updateSkillsDraftUi();
+    updateFilterBarUi();
+  }
+
+  function ensureSheetDelegation() {
+    if (!sheetBody || sheetBody.dataset.rlSheetBound === "1") {
+      return;
+    }
+    sheetBody.dataset.rlSheetBound = "1";
+    sheetBody.addEventListener("change", function (e) {
+      if (!sheet || sheet.hidden) {
+        return;
+      }
+      var inp = e.target;
+      if (!inp || inp.name !== "category" || !sheetBody.contains(inp)) {
+        return;
+      }
+      onSheetCategoryChange(inp);
+    });
+    sheetBody.addEventListener("click", function (e) {
+      if (!sheet || sheet.hidden) {
+        return;
+      }
+      var skill = e.target.closest(".rl-feed-skill");
+      if (skill && sheetBody.contains(skill)) {
+        toggleDraftTag(skill.getAttribute("data-tag"));
+        return;
+      }
+      var rare = e.target.closest("#rl-sheet-skills-rare, .rl-sheet-text-btn--expand");
+      if (rare && sheetBody.contains(rare)) {
+        e.preventDefault();
+        state.showRareSkills = !state.showRareSkills;
+        renderSkillsCatalog();
+        return;
+      }
+      var applyInner = e.target.closest(".rl-feed-skills-apply");
+      if (applyInner && sheetBody.contains(applyInner)) {
+        applyDraftTags();
+        return;
+      }
+      var clearInner = e.target.closest(".rl-feed-skills-clear");
+      if (clearInner && sheetBody.contains(clearInner)) {
+        clearSkills();
+        return;
+      }
+      var myInner = e.target.closest(".rl-sheet-text-btn--my, .rl-feed-skills-my");
+      if (myInner && sheetBody.contains(myInner)) {
+        loadMyProfileSkills();
+        return;
+      }
+      var chip = e.target.closest(".rl-feed-chip");
+      if (chip && sheetBody.contains(chip)) {
+        var input = chip.querySelector("input");
         if (!input || input.name === "category") {
           return;
         }
-        label.addEventListener("click", function () {
-          sheetBody.querySelectorAll('input[name="' + input.name + '"]').forEach(function (r) {
-            r.checked = false;
+        sheetBody.querySelectorAll('input[name="' + input.name + '"]').forEach(function (r) {
+          r.checked = false;
+          if (r.parentElement) {
             r.parentElement.classList.remove("is-active");
-          });
-          input.checked = true;
-          label.classList.add("is-active");
+          }
         });
-      });
-      bindCategoryFilters(sheetBody);
-      bindSkillButtons(sheetBody.querySelector(".rl-feed-skills"));
-      sheetBody.querySelectorAll(".rl-feed-skills-apply").forEach(function (btn) {
-        btn.addEventListener("click", applyDraftTags);
-      });
-      sheetBody.querySelectorAll(".rl-feed-skills-clear").forEach(function (btn) {
-        btn.addEventListener("click", clearSkills);
-      });
-      sheetBody.querySelectorAll(".rl-feed-skills-my").forEach(function (btn) {
-        btn.addEventListener("click", loadMyProfileSkills);
-      });
-      bindSkillsPanels(sheetBody);
-      updateSkillsBadge();
-      updateSkillsDraftUi();
+        input.checked = true;
+        chip.classList.add("is-active");
+        return;
+      }
+      var sortOpt = e.target.closest(".rl-sort-option");
+      if (sortOpt && sheetBody.contains(sortOpt)) {
+        var sortInp = sortOpt.querySelector('input[name="sort"]');
+        if (!sortInp) {
+          return;
+        }
+        sheetBody.querySelectorAll('input[name="sort"]').forEach(function (r) {
+          r.checked = false;
+          if (r.parentElement) {
+            r.parentElement.classList.remove("is-active");
+          }
+        });
+        sortInp.checked = true;
+        sortOpt.classList.add("is-active");
+        state.sort = sortInp.value;
+        updateSkillsDraftUi();
+        updateFilterBarUi();
+        if (state.totalShown > 0) {
+          updateCount();
+        }
+      }
     });
-    document.getElementById("rl-feed-sheet-overlay").addEventListener("click", function () {
-      closeSkillsDropdown();
-      closeSheet();
+  }
+
+  function buildSheetContent() {
+    sheetBody.innerHTML = "";
+    var catField = sidebar.querySelector(".rl-feed-filter--category");
+    if (catField) {
+      var catBlock = document.createElement("section");
+      catBlock.className = "rl-sheet-block rl-sheet-block--cats";
+      catBlock.innerHTML = '<p class="rl-sheet-block__label">Специализация</p>';
+      catBlock.appendChild(catField.cloneNode(true));
+      sheetBody.appendChild(catBlock);
+    }
+    var skillsBlock = document.createElement("section");
+    skillsBlock.className = "rl-sheet-block rl-sheet-block--skills";
+    skillsBlock.innerHTML =
+      '<p class="rl-sheet-block__label">Навыки</p>' +
+      '<p class="rl-feed-skills__section"></p>' +
+      '<div class="rl-sheet-skills-actions">' +
+      '<button type="button" id="rl-sheet-skills-rare" class="rl-sheet-text-btn rl-sheet-text-btn--expand" aria-expanded="false">' +
+      '<span class="rl-sheet-text-btn__label">Ещё навыки</span></button>' +
+      '<button type="button" class="rl-sheet-text-btn rl-sheet-text-btn--muted rl-sheet-text-btn--my">' +
+      '<span class="rl-sheet-text-btn__label">Мои навыки</span></button>' +
+      "</div>" +
+      '<div class="rl-feed-skills" aria-live="polite"></div>' +
+      '<p class="rl-feed-skills__hint" hidden>Выберите навыки и нажмите Применить</p>';
+    sheetBody.appendChild(skillsBlock);
+    var sortPanel = sidebar.querySelector(".rl-sort-panel");
+    if (sortPanel) {
+      var sortBlock = document.createElement("section");
+      sortBlock.className = "rl-sheet-block rl-sheet-block--sort";
+      sortBlock.innerHTML = '<p class="rl-sheet-block__label">Сортировка</p>';
+      sortBlock.appendChild(sortPanel.cloneNode(true));
+      sheetBody.appendChild(sortBlock);
+    }
+    sheetBody.querySelectorAll("input").forEach(function (inp) {
+      var name = inp.getAttribute("name");
+      var val = inp.getAttribute("value");
+      var live = sidebar.querySelector(
+        'input[name="' + name + '"][value="' + val + '"]'
+      );
+      if (live) {
+        inp.checked = live.checked;
+      }
+    });
+    syncChipActiveStates(sheetBody);
+    state.draftCategories = readCategoriesFrom(sheetBody);
+    state.showRareSkills = false;
+  }
+
+  function openSheet() {
+    if (!sheet || !sheetBody || !sidebar) {
+      return;
+    }
+    buildSheetContent();
+    ensureSheetDelegation();
+    bindSkillsPanels(sheetBody);
+    updateFilterBarUi();
+    renderSkillsCatalog();
+    if (!state.catalog.length && !state.catalogGroups.length) {
+      loadCatalog().then(function () {
+        renderSkillsCatalog();
+      });
+    }
+    sheet.hidden = false;
+    if (openBtn) {
+      openBtn.setAttribute("aria-expanded", "true");
+    }
+    document.body.style.overflow = "hidden";
+    updateSkillsBadge();
+    updateSkillsDraftUi();
+    updateRareSkillsUi();
+  }
+
+  if (sheet && sheetBody && sidebar && openBtn) {
+    openBtn.addEventListener("click", openSheet);
+    if (sheetOverlayEl) {
+      sheetOverlayEl.addEventListener("click", function () {
+        closeSkillsDropdown();
+        closeSheet();
+      });
+    }
+    if (sheetCloseBtn) {
+      sheetCloseBtn.addEventListener("click", function () {
+        closeSkillsDropdown();
+        closeSheet();
+      });
+    }
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && sheet && !sheet.hidden) {
+        closeSkillsDropdown();
+        closeSheet();
+      }
     });
     document.getElementById("rl-feed-sheet-apply").addEventListener("click", function () {
       sheetBody.querySelectorAll("input").forEach(function (inp) {
@@ -1853,12 +2140,13 @@
       state.draftCategories = readCategoriesFrom(sidebar);
       syncChips();
       readFilters();
+      updateFilterBarUi();
       closeSheet();
+      state.appliedCategories = cloneCategories(state.draftCategories);
       if (!tagsEqual(state.draftTags, state.appliedTags)) {
-        applyDraftTags();
+        persistTags(cloneTags(state.draftTags), { setSortMatch: true, reload: true });
         return;
       }
-      state.appliedCategories = cloneCategories(state.draftCategories);
       resetAndLoad();
     });
     document.getElementById("rl-feed-sheet-reset").addEventListener("click", function () {
@@ -1867,10 +2155,6 @@
       }
       closeSheet();
     });
-    function closeSheet() {
-      sheet.hidden = true;
-      openBtn.setAttribute("aria-expanded", "false");
-    }
   }
 
   if (loadMoreBtn) {

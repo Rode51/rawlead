@@ -1,8 +1,11 @@
 # ТЗ — HTTP API (RawLead backend)
 
-Версия: **0.3g** · Lead · 2026-05-23 · Coder 2026-05-25
+Версия: **0.4 (O39-docs)** · Lead · 2026-05-29 · sync post-O38  
+Пред.: **0.3g** · Coder 2026-05-25
 
 Связано: [`NEON_SCHEMA.md`](NEON_SCHEMA.md) · [`TZ_WP.md`](TZ_WP.md) · [`ARCHITECTURE.md`](ARCHITECTURE.md)
+
+**Канон кода:** `src/api_server.py` · порт `RAWLEAD_API_PORT` (prod **8000**, local **18766**)
 
 **Решение владельца:** сайт (WP) + подписки + Telegram-бот; **отдельного mobile app нет**.
 
@@ -28,24 +31,71 @@
 
 ---
 
-## 2. MVP эндпоинты
+## 2. MVP эндпоинты (сводная таблица)
 
 | Method | Path | Кто | Действие | Статус |
 |--------|------|-----|----------|--------|
-| `GET` | `/health` | мониторинг | ok + версия | ✅ 3c |
-| `GET` | `/v1/skills/catalog` | WP | топ-50 `lead_tags` из лидов с `notified_at` | ✅ 3g |
-| `GET` | `/v1/feed` | WP | лиды из бота + `skills` + `sort=time\|match` | ✅ 3g |
-| `GET` | `/v1/leads/{id}` | WP | одна карточка + breakdown score | ✅ 3c |
-| `GET` | `/v1/me/feed` | WP кабинет | персональная лента, sort `final_rank` DESC, `min_score` по `final_rank` | ✅ 3e |
-| `PUT` | `/v1/me/tags` | WP | сохранить `user_tags[]` (replace, lowercase) | ✅ 3e |
-| `GET` | `/v1/me/tags` | WP | текущие теги owner | ✅ 3e |
-| `GET` | `/v1/me/subscription` | WP | заглушка `free` | ✅ 3e |
-| `POST` | `/v1/internal/leads` | radar (API key) | upsert lead + ai_score + lead_tags | ✅ 3c |
-| `GET` | `/v1/internal/digest` | bot (API key) | top-K leads per user where rank ≥ threshold | ⏳ 3e |
+| `GET` | `/health` | мониторинг | ok + версия | ✅ |
+| `GET` | `/v1/skills/catalog` | WP | топ `lead_tags` | ✅ |
+| `GET` | `/v1/feed` | WP | открытая лента | ✅ |
+| `GET` | `/v1/leads/{id}` | WP | одна карточка | ✅ |
+| `GET` | `/v1/me/feed` | WP кабинет | персональная лента | ✅ |
+| `GET` | `/v1/me/tags` | WP | теги user | ✅ |
+| `PUT` | `/v1/me/tags` | WP | replace тегов | ✅ |
+| `GET` | `/v1/me/subscription` | WP | plan + pause | ✅ |
+| `POST` | `/v1/me/subscription/pause` | WP/TG | пауза подписки | ✅ |
+| `GET` | `/v1/me/notification-settings` | WP | push threshold | ✅ |
+| `PATCH` | `/v1/me/notification-settings` | WP | push toggle/threshold | ✅ |
+| `GET` | `/v1/me/leads/{id}/draft` | WP | **poll** async draft (O56/O58) | ✅ |
+| `POST` | `/v1/me/leads/{id}/draft` | WP | submit draft → **202** pending / **200** ready | ✅ |
+| `GET` | `/v1/me/replies` | WP cabinet | inbox откликов | ✅ |
+| `DELETE` | `/v1/me/replies/{id}` | WP cabinet | soft-delete inbox | ✅ |
+| `POST` | `/v1/auth/telegram` | WP | TG Login → user JWT/session | ✅ |
+| `POST` | `/v1/internal/leads` | radar (API key) | ingest lead | ✅ |
+| `GET` | `/v1/internal/digest` | bot (API key) | top-K digest | ⏳ |
+| `GET` | `/ops/` | owner | HTML ops dashboard | ✅ O45 |
+| `GET` | `/v1/admin/dashboard` | owner | JSON metrics | ✅ O45 |
+| `POST` | `/v1/admin/pageview` | WP | pageview counter | ✅ O45 |
 
-**3c–3e — файл:** `src/api_server.py`, `src/rank.py` · порт `18766` · `/internal/*` → `X-API-Key` · кабинет MVP → `X-RawLead-User-Id: 00000000-0000-0000-0000-000000000001` (без JWT).
+**Auth MVP:** заголовок `X-RawLead-User-Id: <uuid>` (default owner `00000000-0000-0000-0000-000000000001`). JWT — backlog multi-user.
+
+**Draft (O56/O57/O58):** POST создаёт/возвращает job · GET poll до `ready` | `failed` · shared cache `leads.reply_draft` · rate limit **429** · AI off → **503** `ai unavailable`.
 
 **Логика read (v0.9 / 3g):** Read-ленты (`/v1/feed`, `/v1/me/feed`) — только `is_visible = true` **и** `notified_at IS NOT NULL` (заказ уже был в TG-боте). Ingest/радар до notify: `is_visible = false`. `/v1/feed`: `sort=time` → `created_at DESC`, `min_score` по **`ai_score`**; `sort=match` → `final_rank DESC`, `min_score` по **`final_rank`**; query `skills=python,fastapi` — фильтр `lead_tags ∩ skills ≠ ∅`, rank по skills. `/v1/me/feed` — rank по `user_tags` (или `skills` в query), те же `sort`/`skills`. Dogfood-бот — все лиды (включая `is_visible=false`, без notify). _Устарело: `contour` — не использовать._
+
+---
+
+## 3d. Draft `GET`/`POST /v1/me/leads/{id}/draft` (O56–O58)
+
+**Headers:** `X-RawLead-User-Id`
+
+**POST:** fast path cache → **200** `{status:"ready", reply_draft, …}` · иначе enqueue → **202** `{status:"pending"}` · rate limit **429** · overlap km=0 → **403**.
+
+**GET (poll):** `{status:"ready"|"pending"|"failed", reply_draft?, error?}` · HTTP **202** если pending · **200** если ready/failed body.
+
+**Shared draft (O57):** первый L2 пишет `leads.reply_draft` · последующие users — cache hit без L2.
+
+---
+
+## 3e. Inbox `/v1/me/replies`
+
+**GET** — список сохранённых откликов (не soft-deleted). **DELETE** `/{lead_id}` — `deleted_at`.
+
+---
+
+## 3f. Auth `/v1/auth/telegram`
+
+Body: TG Login widget payload → upsert `users` (tg_user_id, …) → session token для WP.
+
+---
+
+## 3g. Admin / ops (owner)
+
+| Path | Назначение |
+|------|------------|
+| `GET /ops/` | HTML dashboard |
+| `GET /v1/admin/dashboard` | JSON stats |
+| `POST /v1/admin/pageview` | `{path}` → `admin_pageviews` |
 
 ---
 

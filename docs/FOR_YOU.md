@@ -12,6 +12,7 @@
 | **Запуск** | [`ops/RUN.md`](ops/RUN.md) |
 | **Пульт** | [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md) |
 | **Перед продом (стресс на хосте)** | [`team/architect/PRE_PROD_GATE.md`](team/architect/PRE_PROD_GATE.md) § PRE-PROD-STRESS |
+| **Перед рекламой проекта** | [`ops/PRE_LAUNCH_MARKETING.md`](ops/PRE_LAUNCH_MARKETING.md) |
 | **TG acc + @FLPARSINGBOT** | [`ops/TELEGRAM_ACCOUNTS.md`](ops/TELEGRAM_ACCOUNTS.md) |
 | **Схема (картинка)** | [`design/rawlead/project-map-owner.png`](design/rawlead/project-map-owner.png) |
 
@@ -221,17 +222,116 @@ Get-CimInstance Win32_Process | Where-Object {
 
 ---
 
-## Твои шаги (2026-05-29)
+## Твои шаги (2026-05-30)
 
-**План:** O35+O41 prod ✅ → **ты проверяешь UI** → stress → Mechanic audit.
+**Infra gate ✅** (O71). **На сегодня закрыто** — дальше по плану [`PRE_LAUNCH_MARKETING.md`](ops/PRE_LAUNCH_MARKETING.md).
 
 | # | Сейчас | Действие |
 |---|--------|----------|
-| **1** | **Ты** | Ctrl+F5 https://rawlead.ru/ — hero «Лиды без шума» · белый live preview · «Тарифы ↓» · 390px |
-| **2** | **@coder** | § PRE-PROD-STRESS — **после** твоего OK |
-| **3** | **@mechanic** | O38 audit — после stress |
+| **1** | **Ты** | **5× «Написать отклик»** на prod — чеклист в PRE_LAUNCH_MARKETING § owner |
+| **2** | **@coder** | **O72** — аудит всех draft/tools в Neon → отчёт JSON |
+| **3** | **Потом** | Metrika/Clarity (O73) → soft реклама проекта |
 
-Theme **v1.9.0** · O41 deploy Lead **2026-05-29** · радар **active**.
+Theme prod **v1.11.15** · k6 **0% fail** · shared draft **12/12**.
+
+### ИИ «недоступен» — что это
+
+| | |
+|--|--|
+| **L1 (лenta, теги)** | **работает** на VPS |
+| **L2 (черновик отклика)** | **иногда падает** — OpenRouter; другие draft сразу после OK |
+| **Тебе** | «Повторить» через минуту; если часто — проверь баланс **OpenRouter** (ключ в `.env.site`) |
+
+Тикет: [`problems/2026-05-30-ai-draft-unavailable.md`](problems/2026-05-30-ai-draft-unavailable.md)
+
+### @FLPARSINGBOT опоздал — почему
+
+Legacy consumer на VPS ходит в Neon **раз ~10 мин** (не каждую секунду). Заказ мог быть в ленте раньше, бот догнал позже. **O66** — poll 1 мин + «догонять visible». См. `CODER_PROMPT` § O66.
+
+### «Без L1 (48 ч)=95» в /status
+
+**Не задержка ленты на 48 ч.** Счётчик строк в БД без штампа ИИ. **O64** — разбивка fl/tg/kwork + чистка хвоста.
+
+| Факт | Значение |
+|------|----------|
+| Сервис | `rawlead-radar` **active** · цикл **~13 с** |
+| FL.ru | скачано **90** · **новых 0** · много `dup_fast_skip` + `pipeline:skip filter` |
+| Kwork | скачано **0** — подозрительно, но не «упал весь радар» |
+| TG acc1 | **здравье:ок** · пульс ~77 с |
+| Почему тихо в ленте | filter/dup/L1 МИМО — заказ мог уйти в **Legacy-бот** или отсечься **до** `is_visible` |
+
+Если Kwork долго **0** — скажи Lead → **O63** / Mechanic отдельно от UX.
+
+### Local-first — theme на radarzakaz.local
+
+**Зачем:** правим CSS/JS локально, на prod — **один deploy** когда ок.
+
+1. **Local** → **radarzakaz** → **Start**
+2. PowerShell:
+
+```powershell
+cd C:\Users\hramo\uisness
+.venv\Scripts\python.exe scripts\wp_install_rawlead_theme.py
+```
+
+3. **http://radarzakaz.local/lenta/** · F12 → **390×844** · Ctrl+F5  
+   Burger · [Фильтры] · карточки не обрезаны · `/cabinet/`
+
+**Важно:** slug **`/lenta/`** — не `/feed/` (это RSS WordPress).
+
+### Local → «сеть» (чтобы лента грузилась)
+
+Local WP **сам по себе** Neon не видит. Браузер → WP → **API** → Neon.
+
+**Способ B — локальный API (Neon, рекомендуется для local):**
+
+Окно PowerShell **из корня repo** (`.env` с `DATABASE_URL`). **Важно:** `PYTHONPATH=src`:
+
+```powershell
+cd C:\Users\hramo\uisness
+$env:PYTHONPATH="C:\Users\hramo\uisness\src"
+.venv\Scripts\uvicorn.exe src.api_server:app --host 127.0.0.1 --port 18766
+```
+
+Проверка: `http://127.0.0.1:18766/health` → `{"status":"ok"}`.
+
+В `wp-config.php` radarzakaz (уже добавлено Lead):
+
+```php
+define('RAWLEAD_API_URL', 'http://127.0.0.1:18766');
+```
+
+Проверка WP: `http://radarzakaz.local/wp-json/rawlead/v1/feed?limit=2` → JSON `items`.
+
+**Способ A (prod API):** `https://api.rawlead.ru` с ПК **не работает** (404/RSS) — не использовать.
+
+**Пока uvicorn запущен** — лента на local живая. Закрыл окно → снова команда выше.
+
+[`ops/WP_CURSOR_CONNECT.md`](ops/WP_CURSOR_CONNECT.md)
+
+### O37c — прогон UX audit (после deploy)
+
+```powershell
+cd C:\Users\hramo\uisness
+.venv\Scripts\python.exe scripts\preprod_mint_token.py --account acc1 --write-env-site
+```
+
+В stdout: `user_id=895912a1-...` (не `164786fe-...`) · `token written → .env.site`.
+
+**Шаг 1 — audit:**
+
+```powershell
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_audit.py --base-url https://rawlead.ru --browser chromium --headed
+```
+
+| Файл | Что смотреть |
+|------|--------------|
+| `data/preprod_ux_audit_human.md` | **Критично / Раздражает** |
+| `data/preprod_ux_audit.json` | U1–U10 pass/fail |
+
+Напиши `@lead-architect` «прогон готов».
+
+~~DevTools / ручной token~~ — не для gate. [`ops/PREPROD_ACCOUNTS.md`](ops/PREPROD_ACCOUNTS.md).
 
 ~~stress до Wave 2~~ — отменено владельцем 2026-05-29.
 
@@ -305,12 +405,13 @@ Gate принят. Чеклист: `CODER_PROMPT.md` § **SITE-ACCEPT-GATE** (а
 2. `clear_l1_backlog.py --profile site --apply`
 3. Theme v1.8.2 уже на prod — **ты:** реальный вход TG на `/cabinet/`
 
-### Mechanic — **аудит O38**
+### O38 ✅ · O59 → O37
+
+O38 Mechanic audit **закрыт** · verdict **NO-GO O37**. Design **принят as-is** (D-O39 docs ✅).
 
 ```
-@mechanic
-Тикет: docs/problems/2026-05-29-gemini-full-audit.md (создаст Lead)
-Цель: слабые места код+docs+ops; не дублировать PRE-PROD stress
+@coder
+docs/team/architect/CODER_PROMPT.md — § O59a draft stability (post-O38 P0)
 ```
 
 ---

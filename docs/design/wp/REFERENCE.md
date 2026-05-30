@@ -16,7 +16,7 @@
 |---------|---------|
 | Атмосфера | Смелый, прямой, запоминается — не «ещё один SaaS» |
 | Визуальный удар | Жёлтый `#FACC15` hero — первое, что видишь; потом белая чистота |
-| Карточки | `border: 2px solid #0A0A0A` + `box-shadow: 4px 4px 0px #0A0A0A` (плоская смещённая, без blur) |
+| Карточки (лента/кабинет) | `border: none` · `box-shadow: 4px 4px 0 #0A0A0A` · radius `4px` · hover offset shadow · **100%:** жёлтая рамка `#FACC15` |
 | Кнопки | Чёрные прямоугольные; hover: заливка жёлтая `#FACC15`, текст чёрный |
 | Углы | `4px` (карточки), `0px` (кнопки, chips) — без pill |
 | Фон | `#FFFFFF` страницы; `#F5F5F0` секции; `#0A0A0A` footer |
@@ -150,13 +150,13 @@ Footer (background: #0A0A0A, color: #FFFFFF)
 
 ### 3.3 Лента `/lenta/`
 
-Детальная спека: [`feed-cabinet-mvp.md`](feed-cabinet-mvp.md) (обновить под Neo-Brutalist)
+Детальная спека: [`feed-cabinet-mvp.md`](feed-cabinet-mvp.md) · **sync prod v1.10.9 (2026-05-29)**
 
 Ключевые принципы:
 - Фон `#FFFFFF`
 - Filter bar горизонтальная sticky под header, `border-bottom: 2px solid #0A0A0A`
 - Chips: `border: 2px solid #0A0A0A`, `radius: 2px`; active: black fill, white text
-- Карточки: `border: 2px solid #0A0A0A`, `box-shadow: 4px 4px 0 #0A0A0A`, hover: `6px 6px 0 #0A0A0A` + `translate(-2px, -2px)`
+- Карточки: **`border: none`**, `box-shadow: 4px 4px 0 #0A0A0A`, hover: `6px 6px 0` + `translate(-2px, -2px)` · perfect-match: жёлтая рамка
 - Mobile: 1 col; Desktop: 2 col max-width 900px
 - **O11 (copy-волна):** info-strip `.rl-feed-delay-notice` под счётчиком — «~15 мин на бесплатной ленте · подписка мгновенно» (см. Product § TWO-SPEEDS-COPY)
 
@@ -269,7 +269,7 @@ Footer
 | **Кнопка primary** | bg `#0A0A0A`, text `#FFFFFF`, radius `0px`, border `2px solid #0A0A0A`; hover: bg `#FACC15`, text `#0A0A0A`; active: scale 0.97 |
 | **Кнопка secondary** | border `2px solid #0A0A0A`, text `#0A0A0A`, bg transparent; hover: bg `#F5F5F0` |
 | **Кнопка ghost** | text `#0A0A0A`, underline при hover, без рамки |
-| **Карточка лида** | bg `#FFFFFF`, `border: 2px solid #0A0A0A`, `box-shadow: 4px 4px 0 #0A0A0A`, `radius: 4px`, padding `20px 24px`; hover: `box-shadow: 6px 6px 0 #0A0A0A` + `transform: translate(-2px, -2px)` |
+| **Карточка лида** | bg `#FFFFFF`, **`border: none`**, `box-shadow: 4px 4px 0 #0A0A0A`, `radius: 4px`, padding `20px 24px`; hover: `6px 6px 0` + `translate(-2px,-2px)` · **perfect-match:** border `2px #FACC15` + жёлтая тень |
 | **Chip категории** | active: bg `#0A0A0A` + text `#FFFFFF`; inactive: bg `#FFFFFF` + `border: 2px solid #0A0A0A` + text `#0A0A0A` |
 | **Chip навыка** | active: bg `#FACC15` + text `#0A0A0A` + `border: 2px solid #0A0A0A`; inactive: bg `#FFFFFF` + `border: 2px solid #D4D4D4` |
 | **Match-bar** | bg `#D4D4D4`, fill `#0A0A0A`, height `4px`, radius `0px`; animate width 500ms |

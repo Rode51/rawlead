@@ -1,22 +1,18 @@
 # TASKS (активное)
 
-Снимок: [`STATUS.md`](STATUS.md)
+Снимок: [`STATUS.md`](STATUS.md) · план рекламы: [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md)
 
 ---
 
-## Сейчас — **O38** audit → **O37** stress
+## Сейчас — **готовность к рекламе проекта**
 
 | # | Задача | Статус |
 |---|--------|--------|
-| **Wave-2 accept** | O52–O58 мелкие правки | **✅ принято владельцем** |
-| **38** | **O38** Gemini audit (код + **docs drift** + **product drift**) | **→ @mechanic** |
-| **14** | **O37** PRE-PROD stress | **⏸ после O38** |
-| **58** | O58 GET draft poll | **✅ v1.10.9** |
-| **56+57** | async + shared draft | **✅ v1.10.8** |
-
-**Активная линия:** **O38 Mechanic** → **O37 stress** → prod-ready.
-
-**Prod snapshot:** theme **v1.10.9** · shared draft **gemini-2.5-pro** · async poll OK.
+| **O71** | HTTPS api + shared draft + k6 | **✅ Lead verify 2026-05-30** |
+| **→ Ты** | 5× «Написать отклик» на prod | **→** |
+| **O72** | Аналитика draft + tools (Neon sample) | **📋 → @coder** |
+| **O73** | Metrika / Clarity heatmap | **📋 backlog** |
+| **Реклама проекта** | после приёмки draft + O72 baseline | **⏸** |
 
 ---
 
@@ -24,11 +20,10 @@
 
 | # | Задача |
 |---|--------|
-| 31 | FL visibility |
-| 32 | `/status` v2 |
-| 34 | Pipeline instant |
-| 40 | Хвост L1 clear |
+| **O63** | Парсеры + cross-source dedup |
+| **O59b** | owner UUID env |
+| draft burst 50× | под нагрузкой — перед большой кампанией |
 
 ---
 
-_Lead · Wave-2 accept закрыта · 2026-05-29_
+_Lead · infra gate закрыт · 2026-05-30_

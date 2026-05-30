@@ -18,6 +18,7 @@ from src.ai_analyze import (  # noqa: E402
     draft_stats_24h,
     note_draft_request,
 )
+from src.draft_limits import draft_hourly_limit  # noqa: E402
 from src.match_push import draft_rate_limit_retry_after  # noqa: E402
 
 
@@ -33,13 +34,42 @@ class TestDraftStats(unittest.TestCase):
 
 
 class TestDraftRateLimit(unittest.TestCase):
-    def test_rate_limit_blocks_eleventh(self) -> None:
+    def test_default_limit_disabled(self) -> None:
+        import os
+
+        old = os.environ.pop("DRAFT_HOURLY_LIMIT", None)
+        try:
+            from importlib import reload
+
+            import src.draft_limits as dl
+
+            reload(dl)
+            self.assertEqual(dl.draft_hourly_limit(), 0)
+            uid = "00000000-0000-0000-0000-000000000010"
+            for _ in range(20):
+                self.assertIsNone(draft_rate_limit_retry_after(uid))
+        finally:
+            if old is not None:
+                os.environ["DRAFT_HOURLY_LIMIT"] = old
+
+    def test_rate_limit_blocks_when_configured(self) -> None:
+        import os
+
+        os.environ["DRAFT_HOURLY_LIMIT"] = "10"
+        from importlib import reload
+
+        import src.draft_limits as dl
+
+        reload(dl)
+        self.assertEqual(draft_hourly_limit(), 10)
         uid = "00000000-0000-0000-0000-000000000099"
         for _ in range(10):
             self.assertIsNone(draft_rate_limit_retry_after(uid))
         retry = draft_rate_limit_retry_after(uid)
         self.assertIsNotNone(retry)
         self.assertGreater(retry, 0)
+        os.environ.pop("DRAFT_HOURLY_LIMIT", None)
+        reload(dl)
 
 
 class TestAnalyzePremiumRetries(unittest.TestCase):

@@ -46,6 +46,7 @@ class Config:
     fl_projects_url: str
     kwork_projects_url: str
     poll_interval_minutes: int
+    legacy_neon_poll_sec: int
     telegram_bot_token: str
     telegram_chat_id: str
     sqlite_path: Path
@@ -769,6 +770,14 @@ def load_config() -> Config:
     radar_conveyor = _parse_bool_flag(os.environ.get("RADAR_CONVEYOR"), default=False)
     min_poll = 1 if profile == "site" and radar_conveyor else 10
     poll_minutes = _parse_poll_interval_minutes(poll_raw, min_minutes=min_poll)
+    if profile == "legacy":
+        legacy_poll_raw = os.environ.get("LEGACY_NEON_POLL_SEC", "60").strip()
+        try:
+            legacy_neon_poll_sec = max(30, min(3600, int(legacy_poll_raw)))
+        except ValueError:
+            legacy_neon_poll_sec = 60
+    else:
+        legacy_neon_poll_sec = max(60, poll_minutes * 60)
     l1_batch_raw = os.environ.get("L1_BATCH_PER_CYCLE", "40").strip()
     try:
         l1_batch_per_cycle = max(1, min(500, int(l1_batch_raw)))
@@ -871,6 +880,7 @@ def load_config() -> Config:
         fl_projects_url=fl_url,
         kwork_projects_url=kwork_url,
         poll_interval_minutes=poll_minutes,
+        legacy_neon_poll_sec=legacy_neon_poll_sec,
         telegram_bot_token=token,
         telegram_chat_id=chat_id,
         sqlite_path=sqlite_path,

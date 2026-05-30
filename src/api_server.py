@@ -54,9 +54,10 @@ from src.rank import (
     parse_lead_tags,
     tags_as_weights,
 )
-from src.ai_analyze import draft_stats_24h
+from src.ai_analyze import draft_stats_24h, ai_last_error, draft_fail_per_hour
 from src.stars_billing import stars_available
 from src.draft_async import draft_response_body, poll_draft, submit_draft
+from src.draft_limits import draft_rate_limit_detail
 from src.match_push import (
     DraftError,
     draft_rate_limit_retry_after,
@@ -87,7 +88,6 @@ _FEED_RETENTION_DAYS = 7
 _FEED_DELAY_MINUTES = 15
 _BOT_FEED_WHERE = "is_visible = TRUE"
 _HOT_MAX_AGE_SEC = 300
-_DRAFT_HOURLY_LIMIT = 10
 _DRAFT_RETRY_AFTER_SEC = 5
 
 
@@ -170,6 +170,7 @@ def _row_to_item(
     tools: list[str] = []
     if isinstance(tools_required, list):
         tools = [str(t).strip() for t in tools_required if str(t).strip()]
+    rd = strip_reply_draft_price_deadline((reply_draft or "").strip())
     return {
         "id": lead_id,
         "source": source,
@@ -189,9 +190,50 @@ def _row_to_item(
         "created_at": created_at.isoformat() if created_at else None,
         "is_hot": _lead_is_hot(created_at),
         "tools_required": tools,
-        "reply_draft": strip_reply_draft_price_deadline((reply_draft or "").strip()),
+        "reply_draft": rd,
         "display_views": display_views(lead_id, created_at, feed_delayed=feed_delayed),
     }
+
+
+def _strip_shared_reply_drafts(items: list[dict[str, Any]]) -> None:
+    """O60a: never expose shared leads.reply_draft in public feed JSON."""
+    for it in items:
+        it["reply_draft"] = ""
+
+
+def _attach_personal_replies(cur: Any, user_id: str, items: list[dict[str, Any]]) -> None:
+    """O60a: badge/draft only from user_lead_replies for this user."""
+    ids = [int(it["id"]) for it in items if it.get("id") is not None]
+    if not ids:
+        return
+    cur.execute(
+        """
+        SELECT lead_id, reply_draft
+        FROM user_lead_replies
+        WHERE user_id = %s::uuid
+          AND lead_id = ANY(%s)
+          AND deleted_at IS NULL
+        """,
+        (user_id, ids),
+    )
+    by_lead = {
+        int(row[0]): strip_reply_draft_price_deadline((row[1] or "").strip())
+        for row in cur.fetchall()
+    }
+    for it in items:
+        lid = int(it["id"])
+        it["reply_draft"] = by_lead.get(lid, "")
+
+
+def _finalize_feed_items(
+    cur: Any,
+    items: list[dict[str, Any]],
+    *,
+    user_id: str | None,
+) -> None:
+    _strip_shared_reply_drafts(items)
+    if user_id:
+        _attach_personal_replies(cur, user_id, items)
 
 
 _SELECT_COLS = """
@@ -318,6 +360,7 @@ def _feed_page_time(
     categories: list[str],
     tag_weights: dict[str, float],
     apply_delay: bool = False,
+    user_id: str | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     cat_sql, cat_params = _category_sql(categories)
     sql_min = min_score
@@ -354,6 +397,7 @@ def _feed_page_time(
                 feed_delayed=apply_delay,
             )
         )
+    _finalize_feed_items(cur, items, user_id=user_id)
     return items, len(items)
 
 
@@ -367,6 +411,7 @@ def _feed_page_match(
     categories: list[str],
     tag_weights: dict[str, float],
     apply_delay: bool = False,
+    user_id: str | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     cat_sql, cat_params = _category_sql(categories)
     feed_where, feed_params = _feed_where_sql(apply_delay=apply_delay)
@@ -389,6 +434,7 @@ def _feed_page_match(
         feed_delayed=apply_delay,
     )
     page = ranked[offset : offset + limit]
+    _finalize_feed_items(cur, page, user_id=user_id)
     return page, len(page)
 
 
@@ -442,6 +488,7 @@ def _personal_feed_page(
             feed_delayed=False,
         )
     page = ranked[offset : offset + limit]
+    _finalize_feed_items(cur, page, user_id=user_id)
     return page, len(page)
 
 
@@ -664,7 +711,16 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
 @app.get("/health")
 def health() -> dict[str, Any]:
     stats = draft_stats_24h()
-    return {"status": "ok", "version": _VERSION, **stats}
+    last_err = ai_last_error()
+    out: dict[str, Any] = {
+        "status": "ok",
+        "version": _VERSION,
+        **stats,
+        "draft_fail_per_hour": draft_fail_per_hour(),
+    }
+    if last_err:
+        out["ai_last_error"] = last_err
+    return out
 
 
 # 3c2 ─────────────────────────────────────────────────────────────────────────
@@ -754,12 +810,14 @@ def feed(
     tag_weights = tags_as_weights(skill_list)
     apply_delay = True
     user_id = _try_user_from_bearer(authorization)
+    feed_user_id: str | None = None
     if user_id:
         try:
             with psycopg.connect(_db_url()) as conn:
                 with conn.cursor() as cur:
                     if _user_effective_access(cur, user_id):
                         apply_delay = False
+                        feed_user_id = user_id
         except Exception as exc:
             logger.warning("feed: effective_access check failed: %s", exc)
     try:
@@ -775,6 +833,7 @@ def feed(
                         categories=category_list,
                         tag_weights=tag_weights,
                         apply_delay=apply_delay,
+                        user_id=feed_user_id,
                     )
                 else:
                     items, count = _feed_page_time(
@@ -786,6 +845,7 @@ def feed(
                         categories=category_list,
                         tag_weights=tag_weights,
                         apply_delay=apply_delay,
+                        user_id=feed_user_id,
                     )
     except Exception as exc:
         logger.error("feed: %s", exc)
@@ -821,7 +881,9 @@ def get_lead(lead_id: int) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail="db error")
     if row is None:
         raise HTTPException(status_code=404, detail="not found")
-    return _row_to_item(row)
+    item = _row_to_item(row)
+    item["reply_draft"] = ""
+    return item
 
 
 # 3e — me (cabinet) ───────────────────────────────────────────────────────────
@@ -937,6 +999,10 @@ def _parse_ai_reasons(raw: Any) -> list[str]:
 
 def _draft_http_error(exc: DraftError, *, lead_id: int) -> HTTPException:
     if exc.code == "ai_unavailable":
+        from ai_analyze import note_ai_error, note_draft_request
+
+        note_draft_request(False)
+        note_ai_error(exc.detail or "ai unavailable")
         return HTTPException(status_code=503, detail="ai unavailable")
     if exc.code == "forbidden":
         return HTTPException(status_code=403, detail=exc.detail)
@@ -945,6 +1011,10 @@ def _draft_http_error(exc: DraftError, *, lead_id: int) -> HTTPException:
     if exc.code == "rate_limit":
         return HTTPException(status_code=429, detail=exc.detail)
     if exc.code == "ai_fail":
+        from ai_analyze import note_ai_error, note_draft_request
+
+        note_draft_request(False)
+        note_ai_error(exc.detail)
         stats = draft_stats_24h()
         logger.warning("lenta:draft:%d:fail %s", lead_id, exc.detail)
         logger.info(
@@ -952,12 +1022,14 @@ def _draft_http_error(exc: DraftError, *, lead_id: int) -> HTTPException:
             stats["draft_ok"],
             stats["draft_fail"],
         )
-        from src.draft_async import _DRAFT_USER_FAIL
+        from src.draft_async import sanitize_draft_error_detail
 
+        user_msg = sanitize_draft_error_detail(exc.detail)
         return HTTPException(
             status_code=503,
             detail={
-                "detail": _DRAFT_USER_FAIL,
+                "detail": user_msg,
+                "error": user_msg,
                 "retry_after_sec": _DRAFT_RETRY_AFTER_SEC,
             },
         )
@@ -1025,10 +1097,11 @@ def me_lead_draft(
 
     retry_after = draft_rate_limit_retry_after(user_id)
     if retry_after is not None:
+        msg = draft_rate_limit_detail() or "draft rate limit"
         raise HTTPException(
             status_code=429,
             detail={
-                "detail": f"draft rate limit: max {_DRAFT_HOURLY_LIMIT}/hour",
+                "detail": msg,
                 "retry_after_sec": retry_after,
             },
         )

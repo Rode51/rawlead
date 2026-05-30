@@ -1,0 +1,260 @@
+{
+  "generated_at": "2026-05-30T08:58:05.668564+00:00",
+  "base_url": "https://rawlead.ru",
+  "browser": "chromium+token",
+  "has_auth": true,
+  "viewports": [
+    "desktop",
+    "mobile"
+  ],
+  "scenarios_total": 19,
+  "scenarios_pass": 18,
+  "critical_count": 1,
+  "pass": false,
+  "results": [
+    {
+      "id": "U1",
+      "title": "Header + footer links",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 3047,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U1_desktop_before.png",
+        "after": "data/preprod_ux_audit/U1_desktop_after.png"
+      }
+    },
+    {
+      "id": "U2",
+      "title": "Лента: категория + навыки",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 8044,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U2_desktop_before.png",
+        "after": "data/preprod_ux_audit/U2_desktop_after.png"
+      }
+    },
+    {
+      "id": "U3",
+      "title": "Сортировка + закрытие",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 6147,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U3_desktop_before.png",
+        "after": "data/preprod_ux_audit/U3_desktop_after.png"
+      }
+    },
+    {
+      "id": "U4",
+      "title": "Expand + tap outside",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 6238,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U4_desktop_before.png",
+        "after": "data/preprod_ux_audit/U4_desktop_after.png"
+      }
+    },
+    {
+      "id": "U5",
+      "title": "Draft + инструменты",
+      "viewport": "desktop",
+      "pass": false,
+      "ms": 39166,
+      "error": "ИИ временно недоступен — повторите Повторить",
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U5_desktop_before.png",
+        "after": "data/preprod_ux_audit/U5_desktop_after.png"
+      }
+    },
+    {
+      "id": "U6",
+      "title": "FAB support modal",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 5283,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U6_desktop_before.png",
+        "after": "data/preprod_ux_audit/U6_desktop_after.png"
+      }
+    },
+    {
+      "id": "U7",
+      "title": "ЛК: навыки + inbox",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 12132,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U7_desktop_before.png",
+        "after": "data/preprod_ux_audit/U7_desktop_after.png"
+      }
+    },
+    {
+      "id": "U9",
+      "title": "Marketing CTA",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 446,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U9_desktop_before.png",
+        "after": "data/preprod_ux_audit/U9_desktop_after.png"
+      }
+    },
+    {
+      "id": "U10",
+      "title": "Console + network",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 67,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U10_desktop_before.png",
+        "after": "data/preprod_ux_audit/U10_desktop_after.png"
+      }
+    },
+    {
+      "id": "U1",
+      "title": "Header + footer links",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 3026,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U1_mobile_before.png",
+        "after": "data/preprod_ux_audit/U1_mobile_after.png"
+      }
+    },
+    {
+      "id": "U2",
+      "title": "Лента: категория + навыки",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 8061,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U2_mobile_before.png",
+        "after": "data/preprod_ux_audit/U2_mobile_after.png"
+      }
+    },
+    {
+      "id": "U3",
+      "title": "Сортировка + закрытие",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 6654,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U3_mobile_before.png",
+        "after": "data/preprod_ux_audit/U3_mobile_after.png"
+      }
+    },
+    {
+      "id": "U4",
+      "title": "Expand + tap outside",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 5815,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U4_mobile_before.png",
+        "after": "data/preprod_ux_audit/U4_mobile_after.png"
+      }
+    },
+    {
+      "id": "U5",
+      "title": "Draft + инструменты",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 31898,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U5_mobile_before.png",
+        "after": "data/preprod_ux_audit/U5_mobile_after.png"
+      }
+    },
+    {
+      "id": "U6",
+      "title": "FAB support modal",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 5399,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U6_mobile_before.png",
+        "after": "data/preprod_ux_audit/U6_mobile_after.png"
+      }
+    },
+    {
+      "id": "U7",
+      "title": "ЛК: навыки + inbox",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 12102,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U7_mobile_before.png",
+        "after": "data/preprod_ux_audit/U7_mobile_after.png"
+      }
+    },
+    {
+      "id": "U8",
+      "title": "Mobile bottom sheet",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 7127,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U8_mobile_before.png",
+        "after": "data/preprod_ux_audit/U8_mobile_after.png"
+      }
+    },
+    {
+      "id": "U9",
+      "title": "Marketing CTA",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 388,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U9_mobile_before.png",
+        "after": "data/preprod_ux_audit/U9_mobile_after.png"
+      }
+    },
+    {
+      "id": "U10",
+      "title": "Console + network",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 33,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U10_mobile_before.png",
+        "after": "data/preprod_ux_audit/U10_mobile_after.png"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "severity": "critical",
+      "scenario": "U5",
+      "viewport": "desktop",
+      "message": "Draft + инструменты: ИИ временно недоступен — повторите Повторить"
+    }
+  ],
+  "artifacts_dir": "data/preprod_ux_audit",
+  "human_md": "data/preprod_ux_audit_human.md",
+  "llm": {
+    "path": "data/preprod_ux_audit_human.md",
+    "model": "google/gemini-2.5-flash-lite",
+    "mobile_screenshots": 12,
+    "llm_rating": 2
+  }
+}
