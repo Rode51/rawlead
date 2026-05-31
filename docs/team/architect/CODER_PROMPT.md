@@ -1,22 +1,30 @@
-# Coder — **→ Следующее:** **O72** AI prod audit · owner 5× draft → реклама проекта
+# Coder — **→ Следующее:** **O75** лента 7d · backlog O63/O74
 
-**O71 ✅ Lead verify 2026-05-30** · S1 **12/12** · k6 **s3_pass** · план: [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md)
+**O72b ✅ Lead verify 2026-05-31** · draft-only **97.8%** · `src/tools_catalog.py`
 
 ---
 
-# § O72 — Аналитика качества откликов ИИ (prod sample)
+# § O72b — (**✅ Lead verify 2026-05-31**)
 
-**Контекст:** O71 infra **✅** · fixtures matrix **12/12** — но это **не** реальные лиды. Нужен отчёт по **всем накопленным** `reply_draft` + `tools_required` в Neon.
+**Сдача:** `draft_only_pass` **97.8%** (45/46) · tools bucket **89.1%** · combined **87%** · canonical **51** без изменений · 8/8 unittest OK.
 
-**План владельца:** [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md) § O72 · **не блокирует** owner 5× draft, но **желателен до** масштабной рекламы.
+**Остаток (не блокер O72b):** 1× `L2:reply_draft` (#7051 «Готов…») · 5× `tools:empty_but_desc_hints` · 25 L1 empty — отдельно.
+
+---
+
+# § O72 — (**✅ фаза 1 · Lead verify 2026-05-31**)
+
+**Контекст:** Owner **9/10** draft OK · 1 завис · 1 «разбор недоступен» → O72 **+ L1** + top fail cases для правки промпта.
+
+**План:** [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md) § O72
 
 ## o72-1 — Скрипт выборки + auto-metrics (**P1**)
 
 | # | Задача |
 |---|--------|
 | s1 | Новый `scripts/preprod_ai_prod_audit.py` (или флаг `--prod-sample` у matrix) — читает Neon, **не** дергает OpenRouter на фазе 1 |
-| s2 | Выборка: **N=100–200** последних лидов с `reply_draft IS NOT NULL AND reply_draft != ''` · stratify по `category` (dev/design/marketing/text) и `source_id` |
-| s3 | На каждый lead — повтор **существующих** проверок из `ai_analyze.py`: запретные слова, `reply_draft_sentence_warn`, пустой draft |
+| s2 | Выборка: **N=100–200** лидов · stratify category + source · **+** лиды с пустым L1/`task_summary` |
+| s3 | **L2:** validators `reply_draft` · **L1:** пустой разбор при visible lead · tools vs catalog |
 | s4 | **tools_required:** пустой массив · slug не из `/v1/skills/catalog` · дубликаты · эвристика «в описании есть Figma/Python/…, а tools пуст» |
 | s5 | JSON → `data/preprod_ai_prod_audit.json` · markdown → `data/preprod_ai_prod_audit_human.md` |
 
@@ -26,7 +34,8 @@
 |---|--------|
 | j1 | Флаг `--judge --limit 30` — второй проход OpenRouter на подвыборке |
 | j2 | Промпт: релевантность 1–5 · конкретность 1–5 · tools match да/нет/частично · «отправил бы as-is» да/нет |
-| j3 | В отчёт: avg scores · top-10 worst cases (lead_id, title snippet, draft snippet, reason) |
+| j3 | В отчёт: avg scores · **top-10 worst** · **рекомендации правок промпта** (1 абзац на паттерн) |
+| j4 | Если owner дал lead_id проблемных карточек — **root cause** в отчёте |
 
 ## o72-3 — Accept O72
 
@@ -66,7 +75,38 @@
 
 **Accept:** 4 source в env → радар → `/lenta/` с фильтром по source.
 
-## O63 — cross-source dedup (владелец 2026-05-30)
+---
+
+# § O74 — TG: прямая ссылка на заказ (**📋 backlog · владелец 2026-05-30**)
+
+**Суть:** в push @rawlead_bot / @FLPARSINGBOT — **кликабельная ссылка** на заказ на бирже (или первоисточник), не только текст карточки.
+
+| # | Задача |
+|---|--------|
+| t1 | Кнопка URL / inline link · `project.url` или canonical source URL |
+| t2 | Site push + Legacy consumer · единый формат |
+| t3 | Accept: push на TG-лид → ссылка открывает биржу |
+
+**Gate:** после O72 · параллельно O63 ok.
+
+---
+
+# § O75 — Лента: закрытые + старше 7 дней (**📋 backlog · владелец 2026-05-30**)
+
+**Суть:** в `/lenta/` **не показывать** заказы закрытые на бирже и **старше 7 суток** (от `created_at` или published на source).
+
+| # | Задача |
+|---|--------|
+| f1 | **Закрытые:** усилить **O65** `delist_checker` — все source_id · smoke |
+| f2 | **>7d:** API `/v1/feed` + `/v1/me/feed` — filter или `is_visible=false` batch |
+| f3 | Не путать с **purge** БД (RETENTION) — здесь только **скрытие из ленты** |
+| f4 | Accept: в ленте нет лидов `age>7d` · delisted не в feed |
+
+**O65 ✅ код** — verify на prod + f2.
+
+---
+
+## O63 — cross-source dedup
 
 **Риск:** одно задание на FL + YouDo + Freelance.ru → **дубли в ленте**.
 

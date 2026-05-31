@@ -1,15 +1,50 @@
+# --- Secrets & environment (never commit) ---
 .env
 .env.*
 !.env.example
+
+# Local MCP keys (copy from docs/team/common/mcp.pool.example.json)
+mcp.pool.json
+**/mcp.pool.json
+!**/mcp.pool.example.json
+
+# SSH / TLS / deploy keys
+*.pem
+*.p12
+id_rsa
+id_ed25519
+*.ppk
+
+# Credentials dumps (VPS/WP install scripts write here)
+*credentials*.txt
+*-credentials.txt
+wp-vps-credentials.txt
+
+# Telethon sessions
 *.session
 *.session-journal
+
+# Python / venv
 __pycache__/
 .venv/
+.tools/
+
+# Cursor: ignore all except team rules (must ship in git)
 .cursor/
 !.cursor/rules/
 !.cursor/rules/**
 
-# Данные и логи (только на ПК)
+# --- data/ — local runtime; whitelist only safe reports ---
+data/*
+!data/.gitkeep
+!data/sessions/
+data/sessions/*
+!data/sessions/README.txt
+!data/preprod_*.json
+!data/preprod_*.md
+!data/vps-staging/
+
+# Legacy explicit paths (redundant with data/* — kept for clarity)
 data/*.log
 data/*.db
 data/*.lock
@@ -25,9 +60,14 @@ data/.tg_main.lock
 data/.main.lock
 data/.bot_poll.lock
 data/.radar_desktop.lock
+data/.radar_ops_site.lock
 data/.tg_bot_started_acc*
 data/_*
 data/tg_relay_allowlist.json
+data/vps-*.txt
+data/*.txt
+!data/sessions/README.txt
+
 src/data/
 
 scripts/backup.config.json

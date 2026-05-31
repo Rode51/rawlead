@@ -15,12 +15,14 @@
 | **Theme prod** | **v1.11.15** |
 | **API** | https://api.rawlead.ru **✅** · k6 fail **0%** · p95 ~1.7 s |
 | **Draft** | `gemini-2.5-pro` · matrix **12/12** · shared cache O57 |
-| **UX gate** | O37c **18/19** · S6 owner **✅** · U5 desktop flake (OpenRouter) |
-| **→ Владелец** | 5× «Написать отклик» — [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md) |
-| **→ Coder** | **O72** — аудит draft + tools на prod Neon |
-| **Реклама проекта** | **⏸** после O72 baseline |
+| **UX gate** | O37c **18/19** · S6 owner **✅** |
+| **Owner draft** | **9/10 OK** ⚠️ · 1 завис · 1 разбор недоступен · [`problems/…`](../../problems/2026-05-30-owner-draft-accept-9of10.md) |
+| **→ Coder** | **O75** — лента 7d · backlog O63/O74 |
+| **O72b** | **✅** draft-only **97.8%** · tools **89.1%** · KNOWN_TOOLS · canonical **51** без изменений |
+| **O72 фаза 1** | **✅ Lead verify** · combined **87%** после O72b |
+| **Реклама** | **⏸ soft** — можно после O75 или параллельно |
 
-**Отчёты:** `data/preprod_k6_summary.json` · `data/preprod_ai_report.json` · `data/preprod_ux_audit_human.md`
+**Отчёты:** `data/preprod_k6_summary.json` · `data/preprod_ai_report.json` · `data/preprod_ai_prod_audit.json` · `data/preprod_ux_audit_human.md`
 
 ---
 
@@ -32,9 +34,13 @@
 |--|--|
 | **Цель** | качество `reply_draft` + `tools_required` на **реальных** лидах |
 | **Фаза 1** | auto-metrics · tools vs catalog · JSON + human md |
-| **Фаза 2** | LLM judge 20–30 samples |
+| **Фаза 2** | LLM judge 20–30 samples (`--judge`) |
 | **Accept** | ≥85% auto-pass · judge avg ≥3.5/5 |
 | **Coder** | [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md) § **O72** |
+| **Статус** | **✅ O72b** · draft-only **97.8%** · tools bucket **89.1%** · `tools:not_in_catalog` снят (KNOWN_TOOLS) |
+| **Отчёт** | `data/preprod_ai_prod_audit.json` · `…_human.md` |
+
+**O72b 2026-05-31:** разделены `draft_only_pass` / tools · whitelist `src/tools_catalog.py` (~30 имён) · synonyms skill-only (wordpress, html/css, aiogram 3, google ads) · re-audit prod.
 
 ---
 

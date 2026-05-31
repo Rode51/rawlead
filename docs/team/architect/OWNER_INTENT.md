@@ -259,9 +259,14 @@
 | 2026-05-30 | **WAVE-UX-MOBILE** | код v1.11.4 M1–M5 | **✅ Lead verify** |
 | 2026-05-30 | **O68** | «Отклик ✓» — вниз карточки, не в шапке | **→ Coder** |
 | 2026-05-30 | **S6 ✅** | владелец приёмка глазами | **принято** |
-| 2026-05-30 | **O72** | Аналитика всех AI откликов: качество draft + tools на prod Neon | **→ @coder** |
+| 2026-05-30 | **Owner draft 9/10** | 1 draft завис · 1 разбор недоступен · soft ads после O72 | **⚠️** |
+| 2026-05-30 | **O75** | Лента: delist закрытых + скрыть **>7 дней** | **→ backlog** |
+| 2026-05-30 | **O74** | TG push: **прямая ссылка** на заказ на бирже | **→ backlog** |
+| 2026-05-30 | **O63** | YouDo · FL.ru · FreelanceJob · Пчёл.нет | **backlog** |
+| 2026-05-30 | **O72+** | Аудит разборов ИИ + **подгон промпта** по отчёту | **→ Coder** |
 | 2026-05-30 | **O73** | Heatmap (Metrika/Clarity) до масштабирования рекламы | **📋 backlog** |
 | 2026-05-30 | **Реклама проекта** | после owner 5× draft + O72 baseline | **⏸** |
+| 2026-05-31 | **O72b tools** | **не** auto-expand canonical 51; tools ≠ skills; правим **метрику аудита** + KNOWN_TOOLS whitelist | **✅ Lead verify** |
 | 2026-05-30 | **O71 ✅** | HTTPS api · k6 0% fail · shared draft 12/12 | **Lead verify** |
 | 2026-05-30 | **O37 load ❌** | k6 https 404 · matrix ≠ site path | **→ O71** |
 | 2026-05-30 | **O37c re-run** | 8→2 critical · mobile green | **✅** |

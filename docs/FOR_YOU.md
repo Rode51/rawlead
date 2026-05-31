@@ -20,6 +20,24 @@
 
 ---
 
+## Секреты и Git
+
+| Файл | В Git? | Где хранить |
+|------|--------|-------------|
+| `.env` · `.env.site` · `.env.legacy` | **нет** (`.gitignore`) | только на ПК / VPS |
+| `*.session` Telethon | **нет** | Desktop или `data/sessions/` |
+| `data/wp-vps-credentials.txt` | **нет** | локальный блокнот после `install-wp-vps.py` |
+| `mcp.pool.json` (MCP ключи) | **нет** | копия из `mcp.pool.example.json` |
+| `.env.example` | **да** | шаблон без реальных значений |
+
+**Перед `git add .`:** `git status` — не должно быть `.env`, `*credentials*`, `*.session`, `mcp.pool.json`.
+
+**Если ключ уже улетел в GitHub:** сменить ключ/пароль на сервисе → не полагаться только на удаление из истории.
+
+**Проверка:** `git check-ignore -v .env data/wp-vps-credentials.txt` — оба должны показать правило из `.gitignore`.
+
+---
+
 ## Два радара (legacy + site)
 
 | Ярлык | Профиль | Бот | Зачем |
@@ -224,15 +242,15 @@ Get-CimInstance Win32_Process | Where-Object {
 
 ## Твои шаги (2026-05-30)
 
-**Infra gate ✅** (O71). **На сегодня закрыто** — дальше по плану [`PRE_LAUNCH_MARKETING.md`](ops/PRE_LAUNCH_MARKETING.md).
+**Draft приёмка ⚠️ 9/10** — см. [`problems/2026-05-30-owner-draft-accept-9of10.md`](problems/2026-05-30-owner-draft-accept-9of10.md)
 
 | # | Сейчас | Действие |
 |---|--------|----------|
-| **1** | **Ты** | **5× «Написать отклик»** на prod — чеклист в PRE_LAUNCH_MARKETING § owner |
-| **2** | **@coder** | **O72** — аудит всех draft/tools в Neon → отчёт JSON |
-| **3** | **Потом** | Metrika/Clarity (O73) → soft реклама проекта |
+| **1** | **Опционально** | lead_id или заголовок **2 проблемных** карточек → Coder в O72 |
+| **2** | **@coder** | **O72** — аудит ИИ + промпт |
+| **3** | **Потом** | soft реклама · O63 парсеры · O74 TG-ссылка |
 
-Theme prod **v1.11.15** · k6 **0% fail** · shared draft **12/12**.
+Theme prod **v1.11.15**.
 
 ### ИИ «недоступен» — что это
 

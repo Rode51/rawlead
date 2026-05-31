@@ -10,14 +10,15 @@
 
 | # | Что | Кто | Статус |
 |---|-----|-----|--------|
-| **O71** | HTTPS api · k6 · shared draft 12/12 | @coder | **✅** |
-| **→ Ты** | 5× draft глазами | владелец | **→** |
-| **O72** | Аналитика reply_draft + tools (prod) | @coder | **📋** |
-| **O73** | Heatmap Metrika/Clarity | @coder / владелец | **📋** |
-| **Реклама** | soft-launch трафика | владелец | **⏸ после O72** |
-| **O63** | Парсеры YouDo · FL.ru · … | @coder | **📋 backlog** |
+| **Owner draft** | 9/10 OK | владелец | **⚠️ условно** |
+| **O72** | Аудит ИИ + промпт (draft + L1 + tools) | @coder | **→** |
+| **O75** | Закрытые + >7d в ленте | @coder | **📋** |
+| **O74** | TG ссылка на заказ | @coder | **📋** |
+| **O63** | 4 парсера | @coder | **📋** |
+| **O73** | Heatmap | владелец/coder | **📋** |
+| **Реклама** | soft-launch | владелец | **⏸ после O72** |
 
-**Порядок:** owner 5× draft → **O72 audit** → Metrika → soft ads → O63 parallel.
+**Порядок:** **O72** → O75 verify → soft ads → O63 + O74 parallel.
 
 ---
 

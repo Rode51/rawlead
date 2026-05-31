@@ -1,0 +1,683 @@
+"""§ O72: prod sample audit — reply_draft, tools_required, L1 task_summary.
+
+Фаза 1 (auto-metrics, без OpenRouter):
+  .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site
+  .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --limit 150
+
+Фаза 2 (LLM judge, опционально):
+  .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --judge --judge-limit 30
+  .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --lead-ids 7051,7019
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+import time
+from collections import Counter, defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+for _stream in (sys.stdout, sys.stderr):
+    enc = getattr(_stream, "encoding", None) or ""
+    if enc.lower() != "utf-8":
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except (AttributeError, OSError, ValueError):
+            pass
+
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT / "src"))
+
+import psycopg
+
+from ai_analyze import (
+    AiAnalyzeError,
+    _extract_json_object,
+    _openrouter_chat,
+    _validate_reply_draft_maybe,
+    _validate_reply_draft_take,
+    reply_draft_sentence_warn,
+)
+from config import apply_profile_argv, load_config, load_radar_env
+from lead_category import CATEGORIES
+from public_feed import public_feed_source_sql
+from rank import normalize_tags
+from skills_catalog import CANONICAL_TAGS, resolve_canonical_tag
+from tools_catalog import is_known_tool
+
+_SELECT_COLS = """
+    id, source, title, body, url, budget_text,
+    ai_score, ai_verdict, lead_tags, ai_reasons, created_at, category,
+    task_summary, tools_required, reply_draft
+"""
+
+_SKIP_VERDICTS = frozenset({"мимо", "пропустить", "skip"})
+_TAKE_VERDICTS = frozenset({"брать", "брат", "take"})
+_MAYBE_VERDICTS = frozenset({"сомнительно", "maybe"})
+
+_TOOL_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\bfigma\b|\bфигма\b", re.I), "figma"),
+    (re.compile(r"\bpython\b|\bпитон\b|\bpy\b", re.I), "python"),
+    (re.compile(r"\bphp\b|\blaravel\b|\bwordpress\b|\bwp\b|\bвордпресс\b", re.I), "wordpress_dev"),
+    (re.compile(r"\bjavascript\b|\breact\b|\bvue\b|\bjs\b", re.I), "javascript"),
+    (re.compile(r"\btelegram\b|\bтелеграм\b|\btg\b|\baiogram\b|\btelethon\b", re.I), "telegram_bot_dev"),
+    (re.compile(r"\bпарсинг\b|\bscraping\b|\bscraper\b|\bпарсер\b", re.I), "web_scraping"),
+    (re.compile(r"\bseo\b|\bсео\b", re.I), "seo"),
+    (re.compile(r"\bsmm\b|\bсмм\b", re.I), "smm"),
+    (re.compile(r"\bкопирайт\b|\bcopywriting\b", re.I), "copywriting"),
+)
+
+_JUDGE_SYSTEM = """Ты — аудитор качества фриланс-откликов RawLead.
+Оцени reply_draft относительно заказа (title, body, task_summary, tools_required).
+
+Верни один JSON-объект без markdown:
+relevance — 1–5 (релевантность отклика ТЗ)
+specificity — 1–5 (конкретность: шаги, не вода)
+tools_match — «да» | «нет» | «частично» (tools_required соответствуют задаче)
+send_as_is — true | false (готов отправить клиенту as-is)
+reason — одно предложение на русском
+prompt_fix — если send_as_is=false: один абзац — что править в промпте (паттерн), иначе ""
+"""
+
+
+def _norm_verdict(raw: str) -> str:
+    v = (raw or "").strip().casefold()
+    if v in _SKIP_VERDICTS:
+        return "мимо"
+    if v in _MAYBE_VERDICTS:
+        return "сомнительно"
+    if v in _TAKE_VERDICTS:
+        return "брать"
+    return v
+
+
+def _parse_tools(raw: Any) -> list[str]:
+    if raw is None:
+        return []
+    items: list[str] = []
+    if isinstance(raw, list):
+        items = [str(t) for t in raw if str(t).strip()]
+    elif isinstance(raw, str) and raw.strip():
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                items = [str(t) for t in data if str(t).strip()]
+            else:
+                items = [raw.strip()]
+        except json.JSONDecodeError:
+            items = [raw.strip()]
+    expanded: list[str] = []
+    for item in items:
+        for part in re.split(r"[,;/|]+", item):
+            s = part.strip()
+            if s:
+                expanded.append(s)
+    return normalize_tags(expanded)[:8]
+
+
+def _hinted_tools(title: str, body: str) -> set[str]:
+    hay = f"{title or ''}\n{body or ''}"
+    out: set[str] = set()
+    for pat, tag in _TOOL_HINTS:
+        if pat.search(hay):
+            out.add(tag)
+    return out
+
+
+def _row_to_lead(row: tuple[Any, ...]) -> dict[str, Any]:
+    cat_raw = (row[11] or "other").strip() or "other"
+    category = cat_raw if cat_raw in CATEGORIES else "other"
+    return {
+        "lead_id": int(row[0]),
+        "source": row[1] or "",
+        "title": row[2] or "",
+        "body": row[3] or "",
+        "url": row[4] or "",
+        "budget_text": row[5] or "",
+        "ai_verdict": row[7] or "",
+        "category": category,
+        "task_summary": (row[12] or "").strip(),
+        "tools_required": _parse_tools(row[13]),
+        "reply_draft": (row[14] or "").strip(),
+        "sample_bucket": "main",
+    }
+
+
+def _fetch_leads_by_ids(conn: psycopg.Connection, lead_ids: list[int]) -> list[dict[str, Any]]:
+    if not lead_ids:
+        return []
+    sql = f"SELECT {_SELECT_COLS} FROM leads WHERE id = ANY(%s)"
+    with conn.cursor() as cur:
+        cur.execute(sql, (lead_ids,))
+        rows = cur.fetchall()
+    by_id = {int(r[0]): _row_to_lead(r) for r in rows}
+    out: list[dict[str, Any]] = []
+    for lid in lead_ids:
+        if lid in by_id:
+            lead = dict(by_id[lid])
+            lead["sample_bucket"] = "owner_ids"
+            out.append(lead)
+    return out
+
+
+def _fetch_empty_l1(conn: psycopg.Connection, *, limit: int, src_sql: str, src_params: list[Any]) -> list[dict]:
+    sql = f"""
+        SELECT {_SELECT_COLS}
+        FROM leads
+        WHERE is_visible = TRUE
+          {src_sql}
+          AND COALESCE(NULLIF(TRIM(task_summary), ''), '') = ''
+        ORDER BY id DESC
+        LIMIT %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, [*src_params, limit])
+        rows = cur.fetchall()
+    out = [_row_to_lead(r) for r in rows]
+    for lead in out:
+        lead["sample_bucket"] = "empty_l1"
+    return out
+
+
+def _stratified_sample(
+    conn: psycopg.Connection,
+    *,
+    n: int,
+    src_sql: str,
+    src_params: list[Any],
+    pool_size: int = 2500,
+) -> list[dict]:
+    sql = f"""
+        SELECT {_SELECT_COLS}
+        FROM leads
+        WHERE is_visible = TRUE
+          {src_sql}
+          AND COALESCE(NULLIF(TRIM(reply_draft), ''), '') <> ''
+        ORDER BY id DESC
+        LIMIT %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, [*src_params, pool_size])
+        rows = cur.fetchall()
+
+    pool = [_row_to_lead(r) for r in rows]
+    buckets: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for lead in pool:
+        cat = lead["category"] if lead["category"] in CATEGORIES else "other"
+        buckets[(cat, lead["source"] or "?")].append(lead)
+
+    if not buckets:
+        return []
+
+    per_bucket = max(1, n // len(buckets))
+    picked: list[dict] = []
+    seen: set[int] = set()
+    for key in sorted(buckets.keys()):
+        for lead in buckets[key][:per_bucket]:
+            if lead["lead_id"] not in seen:
+                seen.add(lead["lead_id"])
+                picked.append(lead)
+    # top-up from pool if under n
+    for lead in pool:
+        if len(picked) >= n:
+            break
+        if lead["lead_id"] not in seen:
+            seen.add(lead["lead_id"])
+            picked.append(lead)
+    return picked[:n]
+
+
+def audit_lead(lead: dict[str, Any]) -> dict[str, Any]:
+    fails: list[str] = []
+    warns: list[str] = []
+    verdict = _norm_verdict(lead["ai_verdict"])
+    task_summary = lead["task_summary"]
+    reply_draft = lead["reply_draft"]
+    tools = lead["tools_required"]
+    bucket = lead.get("sample_bucket", "main")
+    audit_l2 = bucket != "empty_l1"
+    audit_tools = audit_l2 and bool(reply_draft)
+
+    if verdict != "мимо" and not task_summary:
+        fails.append("L1:empty_task_summary")
+
+    if audit_l2 and verdict in ("брать", "сомнительно"):
+        if not reply_draft:
+            fails.append("L2:empty_reply_draft")
+        else:
+            try:
+                if verdict == "брать":
+                    _validate_reply_draft_take(reply_draft)
+                else:
+                    _validate_reply_draft_maybe(reply_draft)
+            except AiAnalyzeError as exc:
+                fails.append(f"L2:{exc}")
+            v_label = "Брать" if verdict == "брать" else "Сомнительно"
+            sw = reply_draft_sentence_warn(v_label, reply_draft)
+            if sw:
+                warns.append(sw)
+    elif audit_l2 and verdict == "мимо" and reply_draft:
+        warns.append("warn:reply_draft_nonempty_for_mimo")
+
+    if audit_tools and tools:
+        if len(tools) < 2:
+            fails.append("tools:min_2_required")
+        elif len(tools) > 8:
+            fails.append("tools:max_8_exceeded")
+
+        if len(tools) != len(set(t.lower() for t in tools)):
+            fails.append("tools:duplicates")
+
+        invalid_tools = [t for t in tools if not is_known_tool(t)]
+        if invalid_tools:
+            fails.append(f"tools:not_in_catalog:{','.join(invalid_tools[:5])}")
+
+    if audit_tools and verdict == "брать":
+        hinted = _hinted_tools(lead["title"], lead["body"])
+        if hinted and not tools:
+            fails.append(f"tools:empty_but_desc_hints:{','.join(sorted(hinted)[:5])}")
+        elif hinted and tools:
+            resolved = {resolve_canonical_tag(t) for t in tools}
+            missing = sorted(h for h in hinted if h not in resolved)
+            if missing:
+                warns.append(f"warn:tools_missing_hints:{','.join(missing[:5])}")
+
+    draft_fails = [f for f in fails if f.startswith(("L1:", "L2:"))]
+    tools_fails = [f for f in fails if f.startswith("tools:")]
+    draft_only_pass = not draft_fails
+    tools_pass = not tools_fails
+    auto_pass = draft_only_pass and tools_pass
+    return {
+        **lead,
+        "verdict_norm": verdict,
+        "fails": fails,
+        "draft_fails": draft_fails,
+        "tools_fails": tools_fails,
+        "warns": warns,
+        "draft_only_pass": draft_only_pass,
+        "tools_pass": tools_pass,
+        "auto_pass": auto_pass,
+    }
+
+
+def _build_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
+    l2_rows = [
+        r for r in results
+        if r.get("sample_bucket") != "empty_l1" and (r.get("reply_draft") or "").strip()
+    ]
+    l1_empty_rows = [r for r in results if r.get("sample_bucket") == "empty_l1"]
+    total = len(l2_rows)
+    passed = sum(1 for r in l2_rows if r["auto_pass"])
+    draft_passed = sum(1 for r in l2_rows if r["draft_only_pass"])
+    tools_passed = sum(1 for r in l2_rows if r["tools_pass"])
+    by_fail_type: Counter[str] = Counter()
+    by_draft_fail_type: Counter[str] = Counter()
+    by_tools_fail_type: Counter[str] = Counter()
+    for r in results:
+        if r.get("sample_bucket") == "empty_l1":
+            continue
+        for f in r["fails"]:
+            key = f.split(":", 2)[0] + (":" + f.split(":", 2)[1] if ":" in f else "")
+            if f.startswith("tools:not_in_catalog"):
+                key = "tools:not_in_catalog"
+            elif f.startswith("tools:empty_but_desc_hints"):
+                key = "tools:empty_but_desc_hints"
+            by_fail_type[key] += 1
+            if f.startswith(("L1:", "L2:")):
+                dk = f.split(":", 2)[0] + (":" + f.split(":", 2)[1] if ":" in f else "")
+                by_draft_fail_type[dk] += 1
+            elif f.startswith("tools:"):
+                by_tools_fail_type[key] += 1
+
+    by_cat: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "pass": 0, "draft_pass": 0})
+    by_source: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "pass": 0, "draft_pass": 0})
+    for r in l2_rows:
+        cat = r["category"]
+        src = r["source"] or "?"
+        by_cat[cat]["total"] += 1
+        by_source[src]["total"] += 1
+        if r["auto_pass"]:
+            by_cat[cat]["pass"] += 1
+            by_source[src]["pass"] += 1
+        if r["draft_only_pass"]:
+            by_cat[cat]["draft_pass"] += 1
+            by_source[src]["draft_pass"] += 1
+
+    worst = sorted(
+        [r for r in l2_rows if not r["draft_only_pass"]],
+        key=lambda x: (len(x["draft_fails"]), x["lead_id"]),
+        reverse=True,
+    )[:10]
+
+    tools_worst = sorted(
+        [r for r in l2_rows if not r["tools_pass"]],
+        key=lambda x: (len(x["tools_fails"]), x["lead_id"]),
+        reverse=True,
+    )[:10]
+
+    l1_missing = sum(
+        1 for r in l1_empty_rows if any(f.startswith("L1:") for f in r["fails"])
+    )
+    rate = (passed / total) if total else 0.0
+    draft_rate = (draft_passed / total) if total else 0.0
+    tools_rate = (tools_passed / total) if total else 0.0
+    return {
+        "total": total,
+        "merged_total": len(results),
+        "l1_empty_sample": len(l1_empty_rows),
+        "l1_empty_fail": l1_missing,
+        "draft_only_pass": draft_passed,
+        "draft_only_fail": total - draft_passed,
+        "draft_only_pass_rate": round(draft_rate, 4),
+        "draft_only_pass_pct": round(draft_rate * 100, 1),
+        "accept_draft_95pct": draft_rate >= 0.95 if total else False,
+        "tools_pass": tools_passed,
+        "tools_fail": total - tools_passed,
+        "tools_pass_rate": round(tools_rate, 4),
+        "tools_pass_pct": round(tools_rate * 100, 1),
+        "auto_pass": passed,
+        "auto_fail": total - passed,
+        "auto_pass_rate": round(rate, 4),
+        "auto_pass_pct": round(rate * 100, 1),
+        "accept_85pct": rate >= 0.85 if total else False,
+        "fail_types": dict(by_fail_type.most_common(20)),
+        "draft_fail_types": dict(by_draft_fail_type.most_common(20)),
+        "tools_fail_types": dict(by_tools_fail_type.most_common(20)),
+        "by_category": dict(by_cat),
+        "by_source": dict(by_source),
+        "top_fail_leads": [
+            {
+                "lead_id": r["lead_id"],
+                "title": r["title"][:80],
+                "fails": r["draft_fails"],
+                "source": r["source"],
+                "category": r["category"],
+                "sample_bucket": r.get("sample_bucket"),
+            }
+            for r in worst
+        ],
+        "top_tools_fail_leads": [
+            {
+                "lead_id": r["lead_id"],
+                "title": r["title"][:80],
+                "fails": r["tools_fails"],
+                "source": r["source"],
+                "category": r["category"],
+                "sample_bucket": r.get("sample_bucket"),
+            }
+            for r in tools_worst
+        ],
+    }
+
+
+def _run_judge(cfg, leads: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+    if not cfg.ai_active:
+        return []
+    model = cfg.ai_model_shared_draft.strip() or cfg.ai_model_premium.strip()
+    judged: list[dict[str, Any]] = []
+    targets = [r for r in leads if r.get("reply_draft")][:limit]
+    for lead in targets:
+        user = (
+            f"Заголовок: {lead['title']}\n"
+            f"Описание:\n{lead['body'][:3000]}\n\n"
+            f"task_summary: {lead['task_summary']}\n"
+            f"tools_required: {', '.join(lead['tools_required']) or '—'}\n\n"
+            f"reply_draft:\n{lead['reply_draft']}\n"
+        )
+        entry: dict[str, Any] = {"lead_id": lead["lead_id"], "model": model}
+        try:
+            raw = _openrouter_chat(
+                cfg,
+                model=model,
+                system=_JUDGE_SYSTEM,
+                user=user,
+                timeout_sec=60.0,
+                json_mode=True,
+            )
+            data = _extract_json_object(raw or "")
+            entry.update(
+                relevance=int(data.get("relevance", 0)),
+                specificity=int(data.get("specificity", 0)),
+                tools_match=str(data.get("tools_match", "")),
+                send_as_is=bool(data.get("send_as_is")),
+                reason=str(data.get("reason", ""))[:300],
+                prompt_fix=str(data.get("prompt_fix", ""))[:500],
+            )
+        except Exception as exc:  # noqa: BLE001 — audit script
+            entry["error"] = str(exc)[:200]
+        judged.append(entry)
+        time.sleep(0.5)
+    return judged
+
+
+def _judge_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
+    ok = [j for j in judged if "error" not in j and j.get("relevance")]
+    if not ok:
+        return {"count": len(judged), "avg_relevance": 0, "avg_specificity": 0, "accept_3_5": False}
+    rel = sum(j["relevance"] for j in ok) / len(ok)
+    spec = sum(j["specificity"] for j in ok) / len(ok)
+    worst = sorted(ok, key=lambda x: (x["relevance"], x["specificity"]))[:10]
+    patterns: list[str] = []
+    for j in worst:
+        if j.get("prompt_fix"):
+            patterns.append(j["prompt_fix"])
+    return {
+        "count": len(judged),
+        "scored": len(ok),
+        "avg_relevance": round(rel, 2),
+        "avg_specificity": round(spec, 2),
+        "accept_3_5": rel >= 3.5 and spec >= 3.5,
+        "top_worst": worst,
+        "prompt_recommendations": patterns[:10],
+    }
+
+
+def _render_human_md(report: dict[str, Any]) -> str:
+    s = report["summary"]
+    lines = [
+        "# O72 — AI prod audit (human)",
+        "",
+        f"- **Time:** {report['generated_at']}",
+        f"- **L2 sample (reply_draft):** {s['total']} leads",
+        f"- **Draft quality (L1+L2, без tools):** **{s['draft_only_pass_pct']}%** "
+        f"({'✅ ≥95%' if s['accept_draft_95pct'] else '❌ <95%'}) · "
+        f"{s['draft_only_pass']}/{s['total']} pass",
+        f"- **Tools bucket (отдельно):** **{s['tools_pass_pct']}%** · "
+        f"{s['tools_pass']}/{s['total']} pass · KNOWN_TOOLS + canonical aliases",
+        f"- **Combined auto-pass (draft+tools):** {s['auto_pass_pct']}% "
+        f"({'✅ ≥85%' if s['accept_85pct'] else '❌ <85%'})",
+        f"- **L1 empty bucket:** {s.get('l1_empty_sample', 0)} leads · "
+        f"missing summary **{s.get('l1_empty_fail', 0)}**",
+        f"- **Merged rows:** {s.get('merged_total', s['total'])}",
+        f"- **Profile:** {report.get('profile', 'site')}",
+        "",
+        "> **O72b:** draft-only % — gate качества отклика (L1+L2); tools — отдельная строка "
+        "(KNOWN_TOOLS whitelist + canonical aliases, без раздувания picker 51).",
+        "",
+        "---",
+        "",
+        "## Draft fail types (L1+L2)",
+        "",
+    ]
+    if s.get("draft_fail_types"):
+        for k, v in s["draft_fail_types"].items():
+            lines.append(f"- `{k}`: **{v}**")
+    else:
+        lines.append("- _(none)_")
+
+    lines.extend(["", "## Tools fail types", ""])
+    if s.get("tools_fail_types"):
+        for k, v in s["tools_fail_types"].items():
+            lines.append(f"- `{k}`: **{v}**")
+    else:
+        lines.append("- _(none)_")
+
+    lines.extend(["", "## Top draft fail cases", ""])
+    for item in s.get("top_fail_leads", []):
+        lines.append(
+            f"- **#{item['lead_id']}** [{item['source']}/{item['category']}] "
+            f"{item['title']!r}"
+        )
+        lines.append(f"  - fails: {', '.join(item['fails'])}")
+
+    lines.extend(["", "## Top tools fail cases", ""])
+    for item in s.get("top_tools_fail_leads", []):
+        lines.append(
+            f"- **#{item['lead_id']}** [{item['source']}/{item['category']}] "
+            f"{item['title']!r}"
+        )
+        lines.append(f"  - fails: {', '.join(item['fails'])}")
+
+    if report.get("judge_summary"):
+        js = report["judge_summary"]
+        lines.extend(
+            [
+                "",
+                "## LLM judge",
+                "",
+                f"- Scored: {js.get('scored', 0)}/{js.get('count', 0)}",
+                f"- Avg relevance: **{js.get('avg_relevance', 0)}**/5",
+                f"- Avg specificity: **{js.get('avg_specificity', 0)}**/5",
+                f"- Accept ≥3.5: {'✅' if js.get('accept_3_5') else '❌'}",
+                "",
+                "### Prompt fix patterns",
+                "",
+            ]
+        )
+        for p in js.get("prompt_recommendations", [])[:5]:
+            lines.append(f"- {p}")
+
+    if report.get("owner_lead_ids"):
+        lines.extend(["", "## Owner lead_ids (root cause)", ""])
+        for r in report.get("owner_root_cause", []):
+            lines.append(f"- **#{r['lead_id']}**: {', '.join(r['fails']) or 'auto_pass'}")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_sample_and_audit(
+    leads: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Pure audit path for tests and CLI."""
+    results = [audit_lead(lead) for lead in leads]
+    summary = _build_summary(results)
+    return results, summary
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="O72 prod AI quality audit")
+    parser.add_argument("--profile", default="site", choices=("site", "legacy"))
+    parser.add_argument("--limit", type=int, default=150, help="main stratified sample size")
+    parser.add_argument("--empty-l1-limit", type=int, default=25, help="extra empty task_summary rows")
+    parser.add_argument("--judge", action="store_true", help="phase 2: LLM judge")
+    parser.add_argument("--judge-limit", type=int, default=30)
+    parser.add_argument("--lead-ids", default="", help="comma lead_id for owner root-cause")
+    parser.add_argument(
+        "--json-out",
+        type=Path,
+        default=_ROOT / "data" / "preprod_ai_prod_audit.json",
+    )
+    parser.add_argument(
+        "--md-out",
+        type=Path,
+        default=_ROOT / "data" / "preprod_ai_prod_audit_human.md",
+    )
+    args = parser.parse_args()
+    apply_profile_argv(["--profile", args.profile])
+
+    load_radar_env()
+    cfg = load_config()
+    db_url = (cfg.database_url or "").strip()
+    if not db_url:
+        print("DATABASE_URL не задан — нужен Neon (.env.site)", file=sys.stderr)
+        return 2
+
+    owner_ids = [int(x.strip()) for x in args.lead_ids.split(",") if x.strip().isdigit()]
+    src_sql, src_params = public_feed_source_sql()
+
+    with psycopg.connect(db_url) as conn:
+        main_sample = _stratified_sample(conn, n=args.limit, src_sql=src_sql, src_params=src_params)
+        empty_l1 = _fetch_empty_l1(conn, limit=args.empty_l1_limit, src_sql=src_sql, src_params=src_params)
+        owner_leads = _fetch_leads_by_ids(conn, owner_ids)
+
+    seen: set[int] = set()
+    merged: list[dict] = []
+    for batch in (owner_leads, empty_l1, main_sample):
+        for lead in batch:
+            if lead["lead_id"] not in seen:
+                seen.add(lead["lead_id"])
+                merged.append(lead)
+
+    results, summary = build_sample_and_audit(merged)
+
+    owner_root: list[dict] = []
+    if owner_ids:
+        by_id = {r["lead_id"]: r for r in results}
+        for lid in owner_ids:
+            if lid in by_id:
+                owner_root.append(by_id[lid])
+
+    judge_rows: list[dict] = []
+    judge_summary: dict[str, Any] | None = None
+    if args.judge:
+        if not cfg.ai_active:
+            print("--judge: AI_ENABLED=0 или нет ключа OpenRouter", file=sys.stderr)
+            return 2
+        judge_rows = _run_judge(cfg, results, limit=args.judge_limit)
+        judge_summary = _judge_summary(judge_rows)
+
+    report: dict[str, Any] = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "profile": args.profile,
+        "sample": {
+            "main_limit": args.limit,
+            "empty_l1_limit": args.empty_l1_limit,
+            "merged_total": len(merged),
+        },
+        "summary": summary,
+        "results": results,
+        "owner_lead_ids": owner_ids,
+        "owner_root_cause": owner_root,
+    }
+    if judge_summary is not None:
+        report["judge_summary"] = judge_summary
+        report["judge_results"] = judge_rows
+
+    args.json_out.parent.mkdir(parents=True, exist_ok=True)
+    args.json_out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    args.md_out.write_text(_render_human_md(report), encoding="utf-8")
+
+    print(
+        f"O72 audit: draft-only {summary['draft_only_pass']}/{summary['total']} "
+        f"({summary['draft_only_pass_pct']}%) · tools {summary['tools_pass']}/{summary['total']} "
+        f"({summary['tools_pass_pct']}%) → {args.json_out}"
+    )
+    print(f"Human md → {args.md_out}")
+    if summary["accept_draft_95pct"]:
+        print("Accept O72b: PASS (draft_only_pass ≥95%)")
+    else:
+        print("Accept O72b: FAIL (draft_only_pass <95%)")
+    if summary["accept_85pct"]:
+        print("Accept O72 combined: PASS (≥85% auto-pass)")
+    else:
+        print("Accept O72 combined: FAIL (<85% auto-pass)")
+
+    if judge_summary is not None:
+        print(
+            f"Judge: rel={judge_summary['avg_relevance']} spec={judge_summary['avg_specificity']} "
+            f"({'PASS' if judge_summary['accept_3_5'] else 'FAIL'})"
+        )
+
+    ok = summary["accept_draft_95pct"]
+    if judge_summary is not None:
+        ok = ok and judge_summary["accept_3_5"]
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -26,7 +26,7 @@ _CATALOG_ROWS: tuple[tuple[str, str, str, str, bool, tuple[str, ...]], ...] = (
         "A",
         "WordPress разработка",
         True,
-        ("wp dev", "вордпресс разработка", "плагин wp"),
+        ("wp dev", "вордпресс разработка", "плагин wp", "wordpress"),
     ),
     (
         "telegram_bot_dev",
@@ -50,7 +50,7 @@ _CATALOG_ROWS: tuple[tuple[str, str, str, str, bool, tuple[str, ...]], ...] = (
         "B",
         "aiogram (Python)",
         False,
-        ("aiogram bot", "python telegram bot", "asyncio telegram", "телеграм бот aiogram"),
+        ("aiogram bot", "python telegram bot", "asyncio telegram", "телеграм бот aiogram", "aiogram 3"),
     ),
     (
         "telethon",
@@ -63,7 +63,7 @@ _CATALOG_ROWS: tuple[tuple[str, str, str, str, bool, tuple[str, ...]], ...] = (
     ("react", "dev", "B", "React", False, ("reactjs", "реакт")),
     ("django", "dev", "B", "Django", False, ("джанго", "django rest", "drf")),
     ("fastapi", "dev", "B", "FastAPI", False, ("фастапи", "python api")),
-    ("html_css", "dev", "B", "HTML/CSS", False, ("верстка", "вёрстка", "frontend markup")),
+    ("html_css", "dev", "B", "HTML/CSS", False, ("верстка", "вёрстка", "frontend markup", "html", "css")),
     ("tilda_dev", "dev", "B", "Tilda", False, ("tilda site", "тильда", "tilda разработка")),
     (
         "llm_integration",
@@ -130,7 +130,7 @@ _CATALOG_ROWS: tuple[tuple[str, str, str, str, bool, tuple[str, ...]], ...] = (
         True,
         ("директ", "yandex ads", "яндекс.директ", "я.директ", "контекстная реклама", "яндекс директ"),
     ),
-    ("google_ads", "marketing", "A", "Google Ads", True, ("google adwords", "гугл реклама", "ppc google")),
+    ("google_ads", "marketing", "A", "Google Ads", True, ("google adwords", "гугл реклама", "ppc google", "google ads")),
     ("seo", "marketing", "A", "SEO", True, ("сео", "search optimization", "продвижение сайта")),
     (
         "email_marketing",

@@ -16,7 +16,7 @@
 | k6 read load (~50 concurrent) | **✅** O71 · fail **0%** · p95 ~1.7 s | `data/preprod_k6_summary.json` |
 | Shared draft matrix | **✅** **12/12** · `gemini-2.5-pro` | `data/preprod_ai_report.json` |
 | Theme prod | **v1.11.15** | STATUS O70 |
-| **Owner 5× draft глазами** | **→** | см. ниже |
+| **Owner 5× draft глазами** | **⚠️ 9/10** · см. [`problems/2026-05-30-owner-draft-accept-9of10.md`](../problems/2026-05-30-owner-draft-accept-9of10.md) |
 | **O72 AI audit (prod sample)** | **📋 backlog** | § O72 |
 | **Heatmap (Metrika / Clarity)** | **📋 backlog** | § O73 |
 | Draft burst под нагрузкой | **не тестировали** | опционально перед большой кампанией |
