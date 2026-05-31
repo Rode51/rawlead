@@ -4,7 +4,15 @@
 
 ---
 
-## 2026-05-30 — Lead: CODER_PROMPT slim + guards
+## 2026-05-30 — Cursor Team Kit v1.0 + DESIGNER slim
+
+**Kit:** `docs/team/templates/cursor-team-kit/` — rules + docs-skeleton + `bootstrap.ps1` для других repo.
+
+**DESIGNER_PROMPT** ~1900 → **~35 hot** + `DESIGNER_PROMPT_ARCHIVE.md`.
+
+**`.gitignore`:** `!.cursor/rules/**` — правила в git.
+
+---
 
 **CODER_PROMPT** ~4500 строк → **~130 hot** + [`CODER_PROMPT_ARCHIVE.md`](CODER_PROMPT_ARCHIVE.md).
 

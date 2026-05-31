@@ -1,0 +1,28 @@
+---
+description: Docs guard — не плодить md; hot-лимиты; архив
+globs: docs/**
+alwaysApply: false
+---
+
+# Docs guard
+
+Канон: `docs/team/common/DOCS_ARCHITECTURE.md`
+
+## Кто пишет
+
+| Роль | Зона |
+|------|------|
+| **Lead** | `docs/team/**` · новый `.md` — с согласия владельца |
+| **Coder** | § «Файлы» + `STATUS` сдача |
+| **Mechanic** | `docs/problems/*.md` |
+| **Designer** | `docs/design/**` |
+
+## Запрещено
+
+- Дубли в FOR_YOU / TASKS / STATUS / CODER_PROMPT
+- Hot > лимита без архива (`economy.mdc`)
+- `NOTES.md`, `TODO.md` вне TASKS
+
+## Архив
+
+Закрытое → `docs/team/archive/*_ARCHIVE.md` · не обновлять старое без Lead.

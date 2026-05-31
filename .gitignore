@@ -6,6 +6,8 @@
 __pycache__/
 .venv/
 .cursor/
+!.cursor/rules/
+!.cursor/rules/**
 
 # Данные и логи (только на ПК)
 data/*.log

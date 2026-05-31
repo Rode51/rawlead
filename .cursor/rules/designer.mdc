@@ -21,11 +21,11 @@ alwaysApply: false
 
 | # | Файл | Зачем |
 |---|------|--------|
-| 1 | [`DESIGNER_PROMPT.md`](docs/team/design/DESIGNER_PROMPT.md) | **только § «→ Сейчас»** в шапке + одна активная § |
+| 1 | [`DESIGNER_PROMPT.md`](docs/team/design/DESIGNER_PROMPT.md) | **hot ~80 строк** · § «→ Сейчас» · **не** `DESIGNER_PROMPT_ARCHIVE` |
 | 2 | [`REFERENCE.md`](docs/design/wp/REFERENCE.md) **v5** | визуальный канон |
 | 3 | [`DESIGN_SYSTEM.md`](docs/team/design/DESIGN_SYSTEM.md) | токены |
 
-**Не читать без указания Lead:** `LEAD_DESIGN_PROMPT.md` · `PRODUCT_VISION` · **архив §** в `DESIGNER_PROMPT` · `CODER_PROMPT`.
+**Не читать без указания Lead:** `LEAD_DESIGN_PROMPT.md` · `PRODUCT_VISION` · **`DESIGNER_PROMPT_ARCHIVE`** · `CODER_PROMPT`.
 
 **Пустая шапка / нет активной §** → стоп → `@lead-designer`.
 

@@ -12,6 +12,8 @@
 
 Промпт задачи — **только в файле**; в чат владельцу — копипаст `@роль` + `.mdc` + путь к промпту ([`team/architect/LEAD.md`](team/architect/LEAD.md)).
 
+**Новый проект с той же командой AI:** [`team/templates/cursor-team-kit/README.md`](team/templates/cursor-team-kit/README.md)
+
 ---
 
 ## Три файла в корне (открывай их)

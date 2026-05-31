@@ -10,7 +10,7 @@
 | `@lead-product` | `lead-product.mdc` | `LEAD_PRODUCT_PROMPT` · **онбординг A+B+C** |
 | `@lead-designer` | `lead-designer.mdc` | **`LEAD_DESIGN_PROMPT`** · регламент **`LEAD_DESIGN.md`** |
 | `@coder` | `coder.mdc` | **`CODER_PROMPT.md`** только (без vision, без design) |
-| `@designer` | `designer.mdc` | **`DESIGNER_PROMPT.md`** § **→ Сейчас** только |
+| `@designer` | `designer.mdc` | **`DESIGNER_PROMPT.md` hot** (~80 строк) |
 | `@mechanic` | `mechanic.mdc` | **`docs/problems/<тикет>.md`** |
 | `@owner` | `owner.mdc` | **`docs/FOR_YOU.md`** |
 
@@ -84,6 +84,8 @@
 | `TASKS.md` | активное | `TASKS_HISTORY.md` | одна строка на трек |
 
 **Coder** читает § шапки, не архив. **Lead** не читает архив без grep. Канон: `economy.mdc` § «Бюджет контекста».
+
+**Перенос в другой repo:** [`docs/team/templates/cursor-team-kit/README.md`](../../docs/team/templates/cursor-team-kit/README.md)
 
 ---
 

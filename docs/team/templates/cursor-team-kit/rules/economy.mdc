@@ -1,0 +1,43 @@
+---
+description: Экономия контекста — hot vs архив, кратко, без галлюцинаций
+alwaysApply: true
+---
+
+# Economy
+
+**Проект:** **[PROJECT]** — канон vision: `docs/team/product/PRODUCT_VISION.md` (или `docs/VISION.md`).
+
+## Обязательное чтение
+
+**Lead** — блок онбординга в своём `.mdc` · первый ответ: `Прочитал: …` + **`Сейчас: …`** → дело.
+
+**Coder / Mechanic / Designer** — **только** промпт задачи + `STATUS` hot. **Не читать** `*_ARCHIVE.md`, vision, если не в промпте.
+
+## Бюджет контекста (hot vs архив)
+
+| Файл | Лимит hot | Архив |
+|------|-----------|-------|
+| `STATUS.md` | ≤ ~80 строк | `archive/STATUS_ARCHIVE.md` |
+| `CODER_PROMPT.md` | ≤ ~120 строк | `archive/CODER_PROMPT_ARCHIVE.md` |
+| `DESIGNER_PROMPT.md` | ≤ ~80 строк | `archive/DESIGNER_PROMPT_ARCHIVE.md` |
+| `TASKS.md` | активное | `archive/TASKS_HISTORY.md` |
+
+**Lead после ✅:** § → архив · в hot — одна строка · не дублировать ТЗ в чат.
+
+**Coder:** только § шапки + § «Файлы» · не grep «для понимания».
+
+## Старт
+
+| Шаг | Куда |
+|-----|------|
+| 1 | `docs/README.md` |
+| 2 | `docs/team/common/PROJECT_MAP.md` |
+| 3 | Промпт роли / `docs/problems/…` |
+
+- Факты только из файлов repo
+- Промпт только в файле — не в чате
+- **Lead = 0 кода** · код — `@coder` / `@mechanic`
+- **Git commit** — Lead (или владелец в solo)
+- Один чат Coder = одна задача · `docs/team/common/SCALE.md`
+
+Карта правил: `.cursor/rules/README.md`

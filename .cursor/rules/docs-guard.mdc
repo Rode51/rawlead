@@ -23,7 +23,7 @@ alwaysApply: false
 | **Lead** | правка канона; **новый `.md` — только после «да» от владельца** + строка в DOCS_ARCHITECTURE |
 | **Coder** | только файлы из **`CODER_PROMPT.md` § «Файлы»** + **`team/common/STATUS.md`** (сдача) · **не** раздувать промпт — закрытое → `archive/CODER_PROMPT_ARCHIVE.md` |
 | **Mechanic** | только **`docs/problems/YYYY-MM-DD-*.md`** (тикет) + § Решение в том же файле |
-| **Designer** | только **`docs/design/**`** + § в **`DESIGNER_PROMPT`** · **`DESIGN_BRIEF.md`** только **desktop/пульт** |
+| **Designer** | только **`docs/design/**`** + `DESIGNER_PROMPT` hot · закрытое → `DESIGNER_PROMPT_ARCHIVE` · `DESIGN_BRIEF.md` = desktop |
 | **Владелец** | не создавать docs — правки через Lead |
 
 ## Запрещено без Lead
@@ -31,7 +31,7 @@ alwaysApply: false
 - Новый файл в **`docs/` корне** (только README, FOR_YOU, KAK_ETO)
 - `docs/team/architect/TZ_*.md`, `CODER_PROMPT_*.md`, копии ROADMAP/STATUS
 - Дубли в FOR_YOU / TASKS / STATUS / CODER_PROMPT (только ссылка `→ см. …`)
-- Раздувание hot-файлов: STATUS >80 строк · CODER_PROMPT >120 строк без переноса в `team/archive/`
+- Раздувание hot: STATUS >80 · CODER_PROMPT >120 · DESIGNER_PROMPT >80 без `team/archive/`
 - «Памятка на всякий случай», `NOTES.md`, `TODO.md` вне TASKS
 
 ## Куда класть

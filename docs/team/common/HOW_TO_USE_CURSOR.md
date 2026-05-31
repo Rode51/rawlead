@@ -105,10 +105,12 @@
 
 ## Один раз в Cursor
 
-1. **Open Folder** → `uisness`
+1. **Open Folder** → repo
 2. **Settings → Rules** → Project Rules включены
 3. Закладки чатов: **Lead PM**, **Lead Design**, **Lead Arch**, **Coder**, **Designer**, **Mechanic**
-4. **MCP (опционально):** [`MCP_POOL.md`](MCP_POOL.md) — скопировать [`mcp.pool.example.json`](mcp.pool.example.json) в `%USERPROFILE%\.cursor\mcp.json`, подставить API-ключи
+4. **MCP (опционально):** [`MCP_POOL.md`](MCP_POOL.md)
+
+**Новый проект с той же командой:** [`templates/cursor-team-kit/README.md`](templates/cursor-team-kit/README.md) · `bootstrap.ps1`
 
 ---
 

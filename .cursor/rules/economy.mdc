@@ -13,7 +13,7 @@ alwaysApply: true
 
 **Design — не путать файлы:** [`docs/team/design/LEAD_DESIGN.md`](docs/team/design/LEAD_DESIGN.md) § «Один активный план» · WP = `docs/design/wp/` · `DESIGN_BRIEF.md` = **только пульт**.
 
-**Coder / Mechanic / Designer-исполнитель** — **только** промпт задачи + `STATUS` hot (и тикет для Mechanic). **Не читать** `STATUS_ARCHIVE`, `CODER_PROMPT_ARCHIVE`, vision и `KAK_ETO`, если не указано в промпте.
+**Coder / Mechanic / Designer-исполнитель** — **только** промпт задачи + `STATUS` hot (и тикет для Mechanic). **Не читать** `STATUS_ARCHIVE`, `CODER_PROMPT_ARCHIVE`, `DESIGNER_PROMPT_ARCHIVE`, vision и `KAK_ETO`, если не указано в промпте.
 
 ## Бюджет контекста (hot vs архив)
 
@@ -21,6 +21,7 @@ alwaysApply: true
 |------|-----------|-------|----------------|
 | `STATUS.md` | **≤ ~80 строк** | `archive/STATUS_ARCHIVE.md` | все роли |
 | `CODER_PROMPT.md` | **≤ ~120 строк** | `archive/CODER_PROMPT_ARCHIVE.md` | Coder, Lead |
+| `DESIGNER_PROMPT.md` | **≤ ~80 строк** | `archive/DESIGNER_PROMPT_ARCHIVE.md` | Designer, Lead |
 | `TASKS.md` | активная очередь | `archive/TASKS_HISTORY.md` | Lead, владелец |
 | `FOR_YOU.md` | ≤ 1 экран «Твои шаги» | детали → README, ops | владелец |
 

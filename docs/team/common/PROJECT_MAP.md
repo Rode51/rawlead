@@ -24,7 +24,7 @@
 | Мысли / решения владельца | [`architect/OWNER_INTENT.md`](../architect/OWNER_INTENT.md) | чат, дубли в FOR_YOU |
 | Активный план Product | [`product/LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) | новый `TZ_*.md` |
 | Задача Coder | [`architect/CODER_PROMPT.md`](../architect/CODER_PROMPT.md) hot · [`archive/CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) | TASKS, чат (только копипаст) |
-| Задача Designer | [`design/DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) § **→ Сейчас** | LEAD_DESIGN_PROMPT · архив § |
+| Задача Designer | [`design/DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) hot · [`archive/DESIGNER_PROMPT_ARCHIVE.md`](../archive/DESIGNER_PROMPT_ARCHIVE.md) | LEAD_DESIGN архив |
 | План Lead Designer | [`design/LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) | |
 | Регламент Design | [`design/LEAD_DESIGN.md`](../design/LEAD_DESIGN.md) | **кто какой файл читает** |
 | WP канон / brief | `docs/design/wp/REFERENCE.md` · `wave-*-brief.md` | DESIGN_BRIEF (не WP) |
@@ -57,7 +57,8 @@
 | **`architect/`** | Lead Architect, Coder (промпт) | ROADMAP, CODER_PROMPT, ARCHITECTURE, CODE_STRUCTURE, TZ_*, NEON |
 | **`product/`** | Lead Product | PRODUCT_VISION, LEAD_PRODUCT_PROMPT |
 | **`design/`** | Lead Designer, Designer | LEAD_DESIGN*, DESIGN_SYSTEM, DESIGNER_PROMPT |
-| **`archive/`** | — | история, исследования (не обновлять) |
+| **`archive/`** | — | `*_ARCHIVE.md`, TASKS_HISTORY (не обновлять старое) |
+| **`templates/`** | Lead | **cursor-team-kit** — bootstrap других проектов |
 
 | Кому | Первый файл |
 |------|-------------|

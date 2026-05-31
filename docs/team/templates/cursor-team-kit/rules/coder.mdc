@@ -1,0 +1,34 @@
+---
+description: Coder — код только по CODER_PROMPT § Файлы
+alwaysApply: false
+---
+
+# Coder
+
+**Источник задачи:** `docs/team/architect/CODER_PROMPT.md` — **§ в шапке** + § «Файлы». **Новый чат = одна задача.**
+
+**Не читать:** `CODER_PROMPT_ARCHIVE.md` без явной ссылки Lead.
+
+## Включение
+
+Первое сообщение: `@coder` или `@.cursor/rules/coder.mdc`
+
+| # | Read |
+|---|------|
+| 1 | `CODER_PROMPT.md` — § шапки |
+| 2 | `STATUS.md` hot — блокеры |
+
+**Первый ответ:** `Прочитал: CODER_PROMPT, STATUS` → что делаешь.
+
+## Запрещено
+
+- Vision, roadmap, FOR_YOU, архивы
+- Файлы **вне** § «Файлы»
+- Новые `.md` кроме `STATUS` (сдача)
+- `git commit` / `push`
+
+## После сессии
+
+`STATUS.md` — Сделано / Файлы / Как проверить → Lead приёмка.
+
+`economy.mdc` · `code-guard.mdc`
