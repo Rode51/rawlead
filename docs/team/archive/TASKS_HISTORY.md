@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-05-30 — Lead: CODER_PROMPT slim + guards
+
+**CODER_PROMPT** ~4500 строк → **~130 hot** + [`CODER_PROMPT_ARCHIVE.md`](CODER_PROMPT_ARCHIVE.md).
+
+**Правила `.mdc`:** `economy` § бюджет · `coder` — § шапки only · `code-guard` + `wordpress/` · `docs-guard` — anti-bloat.
+
+---
+
+## 2026-05-30 — Lead: STATUS slim + STATUS_ARCHIVE
+
+**STATUS** снова раздулся (~1280 строк, ~60 KB) → **~80 строк hot** + [`STATUS_ARCHIVE.md`](STATUS_ARCHIVE.md) (~1200 строк холодного архива).
+
+**Правило:** агенты читают только hot STATUS; архив — по явному запросу или grep по задаче (O71, O37c, …).
+
+**Hot содержит:** Сейчас · активное (O72) · prod gates · сводка принятого · блокеры.
+
+---
+
 ## 2026-05-28 — Lead: ревизия docs, волна SITE-POLISH принята
 
 **STATUS** урезан (~80 строк): один снимок «Сейчас» + таблица принятых блоков; детальные § BACKLOG-CLEAR … 3x убраны из STATUS (не дублировать ТЗ).

@@ -16,7 +16,9 @@ alwaysApply: false
 
 
 
-**Один источник задачи:** [`CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) — цель, § «Файлы», «Как проверить». **Новый чат = одна задача.**
+**Один источник задачи:** [`CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) — **§ в шапке** + § «Файлы», «Как проверить». **Новый чат = одна задача.**
+
+**Не читать:** [`CODER_PROMPT_ARCHIVE.md`](docs/team/archive/CODER_PROMPT_ARCHIVE.md) — только если Lead явно дал grep/номер закрытой задачи.
 
 
 
@@ -36,9 +38,9 @@ alwaysApply: false
 
 |---|------|
 
-| 1 | **`docs/team/architect/CODER_PROMPT.md`** целиком |
+| 1 | **`docs/team/architect/CODER_PROMPT.md`** — **§ в шапке** (O72 и т.д.) + backlog если в промпте · **не** архив целиком |
 
-| 2 | `docs/team/common/STATUS.md` — блокеры |
+| 2 | `docs/team/common/STATUS.md` — hot (~80 строк), блокеры · **не** `STATUS_ARCHIVE` |
 
 
 
@@ -92,11 +94,13 @@ alwaysApply: false
 
 
 
-- Читать «для общего понимания» vision, roadmap, product/design промпты
+- Читать «для общего понимания» vision, roadmap, product/design промпты, **CODER_PROMPT_ARCHIVE**
 
-- `TASKS.md`, `FOR_YOU.md`, `ARCHITECTURE.md` без Lead
+- `TASKS.md`, `FOR_YOU.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `OWNER_INTENT.md` без Lead
 
-- Файлы **вне** § «Файлы» в `CODER_PROMPT.md`
+- Файлы **вне** § «Файлы» в активном § `CODER_PROMPT.md` — **стоп**, спросить Lead
+
+- Правки в `src/`, `scripts/`, `wordpress/`, `deploy/`, `sql/` без пункта в § «Файлы»
 
 - **Новые `.md` в `docs/`** — кроме `STATUS.md` · `docs-guard.mdc`
 

@@ -21,7 +21,7 @@ alwaysApply: false
 | Роль | Разрешено писать |
 |------|------------------|
 | **Lead** | правка канона; **новый `.md` — только после «да» от владельца** + строка в DOCS_ARCHITECTURE |
-| **Coder** | только файлы из **`CODER_PROMPT.md` § Файлы** + **`team/common/STATUS.md`** (сдача) |
+| **Coder** | только файлы из **`CODER_PROMPT.md` § «Файлы»** + **`team/common/STATUS.md`** (сдача) · **не** раздувать промпт — закрытое → `archive/CODER_PROMPT_ARCHIVE.md` |
 | **Mechanic** | только **`docs/problems/YYYY-MM-DD-*.md`** (тикет) + § Решение в том же файле |
 | **Designer** | только **`docs/design/**`** + § в **`DESIGNER_PROMPT`** · **`DESIGN_BRIEF.md`** только **desktop/пульт** |
 | **Владелец** | не создавать docs — правки через Lead |
@@ -30,7 +30,8 @@ alwaysApply: false
 
 - Новый файл в **`docs/` корне** (только README, FOR_YOU, KAK_ETO)
 - `docs/team/architect/TZ_*.md`, `CODER_PROMPT_*.md`, копии ROADMAP/STATUS
-- Дубли в FOR_YOU / TASKS / STATUS (только ссылка `→ см. …`)
+- Дубли в FOR_YOU / TASKS / STATUS / CODER_PROMPT (только ссылка `→ см. …`)
+- Раздувание hot-файлов: STATUS >80 строк · CODER_PROMPT >120 строк без переноса в `team/archive/`
 - «Памятка на всякий случай», `NOTES.md`, `TODO.md` вне TASKS
 
 ## Куда класть
@@ -38,7 +39,7 @@ alwaysApply: false
 | Тип | Папка |
 |-----|--------|
 | Тикет бага | `docs/problems/` |
-| Старое / исследование | `docs/archive/` или `docs/team/archive/` |
+| Старое / исследование | `docs/archive/` или `docs/team/archive/` (`STATUS_ARCHIVE`, `CODER_PROMPT_ARCHIVE`, `TASKS_HISTORY`) |
 | Запуск, TG, фильтры | `docs/ops/` (если уже есть канон — **правка**, не новый) |
 | Общее (STATUS, TASKS, MCP) | `docs/team/common/` |
 | Архитектор, Coder ТЗ | `docs/team/architect/` |

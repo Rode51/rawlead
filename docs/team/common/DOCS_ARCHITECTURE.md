@@ -41,8 +41,8 @@
 | Шаги владельца | `FOR_YOU.md` |
 | Как устроено | `KAK_ETO_RABOTAET.md` |
 | Очередь | `team/common/TASKS.md` |
-| Снимок | `team/common/STATUS.md` |
-| Coder ТЗ | `team/architect/CODER_PROMPT.md` |
+| Снимок | `team/common/STATUS.md` (**≤~80 строк**, hot) · детали → `team/archive/STATUS_ARCHIVE.md` |
+| Coder ТЗ | `team/architect/CODER_PROMPT.md` (**hot ≤120 строк**) · архив → `team/archive/CODER_PROMPT_ARCHIVE.md` |
 | Product план | `team/product/LEAD_PRODUCT_PROMPT.md` |
 | Конкурентная разведка + пивот | `team/product/MARKET_INTEL.md` |
 | Design план | `team/design/LEAD_DESIGN_PROMPT.md` |
@@ -79,7 +79,7 @@
 
 1. Одна тема = один канон (таблица выше).
 2. FOR_YOU ≤ 1 экран; детали → README или KAK_ETO.
-3. STATUS без копипаста ТЗ.
+3. **STATUS ≤ ~80 строк** · **CODER_PROMPT ≤ ~120 строк** — hot-only; без копипаста ТЗ; закрытое → `team/archive/*_ARCHIVE.md`.
 4. Новый `.md` — только с согласия владельца + строка в § Канон.
 5. **Coder/Designer/Mechanic** — не создают файлы вне своей зоны (см. PROJECT_MAP § «Агентам»).
 

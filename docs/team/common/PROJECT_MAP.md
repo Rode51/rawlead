@@ -23,12 +23,12 @@
 | Фазы «сейчас» | [`architect/ROADMAP.md`](../architect/ROADMAP.md) | FOR_YOU, TASKS простынёй |
 | Мысли / решения владельца | [`architect/OWNER_INTENT.md`](../architect/OWNER_INTENT.md) | чат, дубли в FOR_YOU |
 | Активный план Product | [`product/LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) | новый `TZ_*.md` |
-| Задача Coder | [`architect/CODER_PROMPT.md`](../architect/CODER_PROMPT.md) | TASKS, чат (только копипаст) |
+| Задача Coder | [`architect/CODER_PROMPT.md`](../architect/CODER_PROMPT.md) hot · [`archive/CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) | TASKS, чат (только копипаст) |
 | Задача Designer | [`design/DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) § **→ Сейчас** | LEAD_DESIGN_PROMPT · архив § |
 | План Lead Designer | [`design/LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) | |
 | Регламент Design | [`design/LEAD_DESIGN.md`](../design/LEAD_DESIGN.md) | **кто какой файл читает** |
 | WP канон / brief | `docs/design/wp/REFERENCE.md` · `wave-*-brief.md` | DESIGN_BRIEF (не WP) |
-| Снимок / блокеры | [`STATUS.md`](STATUS.md) | не копировать ТЗ |
+| Снимок / блокеры | [`STATUS.md`](STATUS.md) hot · [`archive/STATUS_ARCHIVE.md`](../archive/STATUS_ARCHIVE.md) | не копировать ТЗ |
 | Очередь | [`TASKS.md`](TASKS.md) — одна строка на трек | FOR_YOU |
 | Шаги владельца | [`../FOR_YOU.md`](../FOR_YOU.md) | TASKS, STATUS |
 | Поломка | [`../problems/`](../problems/) один файл | новый md в `team/` |
@@ -64,7 +64,7 @@
 | **Lead Product** | `.cursor/rules/lead-product.mdc` § онбординг **A+B** → `product/PRODUCT_VISION.md` → `LEAD_PRODUCT_PROMPT.md` |
 | **Lead Architect** | `.cursor/rules/lead-architect.mdc` § онбординг **A+B** → `PRODUCT_VISION` v0.11 → `STATUS` → `CODER_PROMPT` |
 | **Lead Designer** | `.cursor/rules/lead-designer.mdc` § онбординг **A+B** → `feed-cabinet-mvp.md` → `LEAD_DESIGN_PROMPT.md` |
-| **Coder** | **`architect/CODER_PROMPT.md`** → § «Зоны» |
+| **Coder** | **`architect/CODER_PROMPT.md`** → § в шапке · **не** архив |
 | **Mechanic** | `docs/problems/` → § «Зоны» |
 | **Designer** | `design/DESIGNER_PROMPT.md` § **→ Сейчас** → `docs/design/wp/` |
 | **Владелец** | `FOR_YOU.md` |
@@ -162,7 +162,7 @@ flowchart TB
 | **Секреты** | `.env` | **владелец** | — |
 | **Product docs** | `LEAD_PRODUCT*`, `PRODUCT_VISION`, `ROADMAP` | Lead Product | план с владельцем |
 | **Design docs** | `LEAD_DESIGN*`, `DESIGN_SYSTEM`, `docs/design/` | Lead Designer | план с владельцем |
-| **Инженерия docs** | `CODER_PROMPT`, `TASKS`, `STATUS` | Lead Architect | после сдачи |
+| **Инженерия docs** | `CODER_PROMPT` hot, `TASKS`, `STATUS` hot | Lead Architect | после сдачи → архив |
 | **Docs ops** | `docs/ops/*`, `FOR_YOU.md` | Lead Architect + владелец | |
 | **Тикеты** | `docs/problems/*` | Mechanic | один инцидент |
 | **WP** | `wordpress/rawlead-kadence-child/` | Coder | `CODER_PROMPT` § WP |

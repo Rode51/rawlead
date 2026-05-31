@@ -1,24 +1,41 @@
 ---
-description: Гард — код в src/scripts/desktop только @coder или @mechanic (не роль Coder)
-globs: src/**,scripts/**,tests/**,requirements.txt,desktop/**
+description: Гард — код только @coder или @mechanic; пути вне § «Файлы» — стоп
+globs: src/**,scripts/**,tests/**,requirements.txt,desktop/**,wordpress/**,sql/**,deploy/**
 alwaysApply: false
 ---
 
 # Код — только Coder / Mechanic
 
-## Старт (перед правкой кода)
+## Старт (перед правкой)
 
 1. [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) § «Зоны»
-2. **Coder:** [`docs/team/architect/CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) § «Файлы» · **Mechanic:** `docs/problems/<тикет>.md`
-3. [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) — блокеры
+2. **Coder:** активный § [`CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) · § **«Файлы»** · **Mechanic:** `docs/problems/<тикет>.md` § «Изменённые файлы»
+3. [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) hot — блокеры
 
-Правки в этих путях — **не для Lead и не для Designer**.
+**Не читать для правки:** `CODER_PROMPT_ARCHIVE`, `STATUS_ARCHIVE`.
 
-| Роль | Можно |
-|------|--------|
-| **Coder** | `@coder` + активный `docs/team/architect/CODER_PROMPT.md` |
-| **Mechanic** | `@mechanic` + тикет `docs/problems/*.md` |
+| Роль | Можно править |
+|------|----------------|
+| **Coder** | **только** пути из § «Файлы» активного § `CODER_PROMPT` |
+| **Mechanic** | **только** пути из тикета `docs/problems/*.md` |
 | **Lead** | **Нет** → пишет `CODER_PROMPT.md` |
-| **Designer** | **Нет** → только `docs/` |
+| **Designer** | **Нет** → только `docs/design/**` |
+| **Lead Product / Designer** | **Нет** |
 
-Перед правкой: есть ли промпт/тикет? Если нет — остановись, направь к Lead.
+## Зоны (globs этого гарда)
+
+| Путь | Кто |
+|------|-----|
+| `src/`, `scripts/`, `tests/` | Coder / Mechanic по промпту/тикету |
+| `wordpress/rawlead-kadence-child/` | Coder § WP в `CODER_PROMPT` |
+| `sql/`, `deploy/` | Coder § в промпте · иначе Lead ops |
+| `desktop/` | Coder § пульт |
+| `data/`, `.env*` | **никто из AI** |
+
+Перед правкой: **есть ли промпт/тикет и этот файл в § «Файлы»?** Если нет — **остановись**, направь к Lead.
+
+## Запрещено всем кроме Coder/Mechanic
+
+- «Попутно» рефакторить соседние модули
+- Менять `config.py` / `filters.py` без пункта в промпте
+- Трогать LEGACY-контур при задаче SITE (и наоборот) — см. `PROJECT_MAP` § профили

@@ -25,7 +25,7 @@ alwaysApply: false
 | # | Файл |
 |---|------|
 | 1 | **`docs/problems/<тикет>.md`** |
-| 2 | `docs/team/common/STATUS.md` |
+| 2 | `docs/team/common/STATUS.md` hot · **не** `STATUS_ARCHIVE` · **не** `CODER_PROMPT` (если не в тикете) |
 
 `PROJECT_MAP` — только если тикет ссылается на зоны вне очевидного пути.
 
@@ -44,7 +44,7 @@ alwaysApply: false
 | 1 | [`docs/README.md`](docs/README.md) | дерево docs |
 | 2 | [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) | § «Агентам» + § «Зоны» |
 | 3 | **`docs/problems/<тикет>.md`** | владелец даёт `@docs/problems/…` |
-| 4 | [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) | смежные блокеры |
+| 4 | [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) hot | смежные блокеры |
 | 5 | [`docs/team/common/MCP_POOL.md`](docs/team/common/MCP_POOL.md) | браузер — нет MCP → владельцу |
 
 После фикса в **том же** тикете: **Решение**, **Изменённые файлы**, **Как проверить**, **Статус: решено** → Lead Architect коммитит.

@@ -109,7 +109,7 @@ Lead **не** «помогает быстро» править Python — даж
 1. **`ROADMAP.md`** — **ответственность Lead Architect**; фазы и «сейчас» **только из** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) (канон Lead Product)
 2. Приоритеты инженерии → согласовать с **Lead Product** (`PRODUCT_VISION` + `LEAD_PRODUCT_PROMPT.md`)
 3. Очередь → `team/common/TASKS.md`
-4. Сводка → `team/common/STATUS.md` (коротко, без дублей)
+4. Сводка → `team/common/STATUS.md` (**≤~80 строк**, hot) · детали сдачи → `archive/STATUS_ARCHIVE.md`
 5. ТЗ для Coder → **`team/architect/CODER_PROMPT.md`** (один файл, см. ниже)
 6. UI/UX → план у **Lead Designer** → **`CODER_PROMPT.md`**
 7. Тикеты → `problems/*.md` → Mechanic

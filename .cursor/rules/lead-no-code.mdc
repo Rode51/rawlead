@@ -19,6 +19,7 @@ alwaysApply: true
 ## Разрешено только
 
 - `docs/**` (включая `docs/team/architect/CODER_PROMPT.md`, `docs/problems/`)
+- `.cursor/rules/*.mdc` — правила агентов (экономия токенов, гарды)
 - Ответ владельцу: куда идти (`@coder`, `@mechanic`, `@designer`, другой Lead)
 
 ## На любую просьбу «сделай в коде»

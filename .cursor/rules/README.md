@@ -70,8 +70,20 @@
 
 | Файл | Когда |
 |------|--------|
-| `code-guard.mdc` | `src/` · `scripts/` · `desktop/` |
+| `code-guard.mdc` | `src/` · `scripts/` · `wordpress/` · `deploy/` · `sql/` · `desktop/` |
 | `docs-guard.mdc` | `docs/**` |
+
+---
+
+## Экономия токенов (2026-05-30)
+
+| Файл | Hot | Архив | Правило |
+|------|-----|-------|---------|
+| `STATUS.md` | ~80 строк | `STATUS_ARCHIVE.md` | Lead: после ✅ → архив |
+| `CODER_PROMPT.md` | ~120 строк | `CODER_PROMPT_ARCHIVE.md` | одна § в шапке |
+| `TASKS.md` | активное | `TASKS_HISTORY.md` | одна строка на трек |
+
+**Coder** читает § шапки, не архив. **Lead** не читает архив без grep. Канон: `economy.mdc` § «Бюджет контекста».
 
 ---
 

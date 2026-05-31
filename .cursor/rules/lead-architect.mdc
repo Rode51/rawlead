@@ -47,7 +47,7 @@ alwaysApply: false
 | # | Файл | Зачем |
 |---|------|--------|
 | C1 | [`docs/team/architect/LEAD.md`](docs/team/architect/LEAD.md) | регламент Lead Architect |
-| C2 | [`docs/team/architect/CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) § шапка | **активное ТЗ** Coder |
+| C2 | [`docs/team/architect/CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) § шапка | **активное ТЗ** (~120 строк hot) · архив не читать |
 | C3 | [`docs/team/architect/ROADMAP.md`](docs/team/architect/ROADMAP.md) | фазы — **ты правишь** из vision |
 | C4 | [`docs/team/architect/CODE_STRUCTURE.md`](docs/team/architect/CODE_STRUCTURE.md) | карта `src/` |
 | C5 | [`docs/team/common/DOCS_ARCHITECTURE.md`](docs/team/common/DOCS_ARCHITECTURE.md) | каноны, новые `.md` |
@@ -254,10 +254,11 @@ alwaysApply: false
 
 ## После сдачи Coder / Mechanic
 
-1. Обновить **`docs/team/common/STATUS.md`** (отметить ✅).
-2. Обновить **`docs/team/common/TASKS.md`** (отметить ✅).
-3. Обновить **`docs/team/architect/OWNER_INTENT.md`** (перенести из backlog, обновить статус).
-4. **`git commit`** — сообщение **по-русски**, по сути сдачи; **`git push`** — **только** по просьбе владельца.
+1. Обновить **`docs/team/common/STATUS.md`** (отметить ✅) — **≤~80 строк**; детальный блок → **`archive/STATUS_ARCHIVE.md`**, в hot — одна строка.
+2. Обновить **`docs/team/architect/CODER_PROMPT.md`** — закрытый § → **`archive/CODER_PROMPT_ARCHIVE.md`**; в hot — строка в «Закрыто»; активная § одна в шапке.
+3. Обновить **`docs/team/common/TASKS.md`** (отметить ✅).
+4. Обновить **`docs/team/architect/OWNER_INTENT.md`** (перенести из backlog).
+5. **`git commit`** — по-русски; **`git push`** — только по просьбе владельца.
 
 ## Анти-дубли
 
