@@ -6,19 +6,17 @@
 
 ---
 
-## Сейчас (2026-05-30)
+## Сейчас (2026-06-01)
 
 | # | Что | Кто | Статус |
 |---|-----|-----|--------|
-| **Owner draft** | 9/10 OK | владелец | **⚠️ условно** |
-| **O72** | Аудит ИИ + промпт (draft + L1 + tools) | @coder | **→** |
-| **O75** | Закрытые + >7d в ленте | @coder | **📋** |
-| **O74** | TG ссылка на заказ | @coder | **📋** |
-| **O63** | 4 парсера | @coder | **📋** |
+| **O63-w1** | YouDo + Freelance.ru | @coder | **→** |
+| **O82** | Match UX v2 (moat до ads) | @coder + @lead-designer | **📋 после w1** |
+| **O72e** | Judge ≥4 на свежих | @coder | **цикл** |
 | **O73** | Heatmap | владелец/coder | **📋** |
-| **Реклама** | soft-launch | владелец | **⏸ после O72** |
+| **Реклама** | soft-launch | владелец | **⏸ после O63+O82** |
 
-**Порядок:** **O72** → O75 verify → soft ads → O63 + O74 parallel.
+**Порядок:** **O63-w1** → **O63-w2** → **O82-w1→w2** → soft ads.
 
 ---
 
@@ -45,12 +43,30 @@ Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § **O72**
 |-----------|-------|-------------|-----------|
 | `youdo` | YouDo | https://youdo.com/ | P1 |
 | `freelance_ru` | Freelance.ru | https://freelance.ru/project/ | P1 |
-| `freelancejob` | FreelanceJob | URL уточнить | P1 |
-| `pchyol` | Пчёл.нет | URL уточнить | P1 |
+| `freelancejob` | FreelanceJob | https://www.freelancejob.ru/projects/ |
+| `pchyol` | Пчёл.нет | https://pchel.net/jobs/ |
 
 **Dedup:** `content_hash` + усилить нормализацию · fuzzy — O63b.
 
 **Coder:** [`CODER_PROMPT.md`](CODER_PROMPT.md) § **O63**
+
+---
+
+## O82 — Match UX v2 (moat · владелец 2026-06-01)
+
+**Проблема:** F2 даёт мало градаций (33/50/67/100) · `ai_score` — 3 корзины · UI без breakdown — пользователь не верит «совместимости».
+
+**Цель:** прозрачная персональная оценка (vision §5) + более «живой» rank — **дифференциатор** vs агрегаторы «просто лента».
+
+| Волна | Суть |
+|-------|------|
+| **w1** | Breakdown на карточке · zero-state без навыков · copy «не оценка качества» |
+| **w2** | Synonyms · granular ai_score · F2+ формула · tests на разброс % |
+| **w3** | Embeddings · веса навыков — backlog |
+
+**Gate:** **до soft ads** · после **O63-w1**.
+
+Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § **O82** · Design: **D-O82**
 
 ---
 
@@ -67,7 +83,8 @@ Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § **O72**
 | **3f** ИИ-агент | **→** | draft + tools · **O72 метрики** |
 | **3g–3h** Auth + биллинг | → | один тариф |
 | **4** Аналитика поведения | **→ O73** | Metrika/Clarity |
-| **5** Портфолио | потом | после метрик |
+| **5** **P-PORTFOLIO** (личное на VPS) | **после O72d+O76** | интерактив · FL · параллельно soft ads |
+| **5b** RawLead GTM | **после гейтов** | `PRE_LAUNCH_MARKETING` |
 
 Coder ТЗ: [`CODER_PROMPT.md`](CODER_PROMPT.md) · решения: [`OWNER_INTENT.md`](OWNER_INTENT.md).
 

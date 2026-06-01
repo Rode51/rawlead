@@ -1798,6 +1798,30 @@
 
     }
 
+    if (s === "youdo") {
+
+      return { key: "youdo", label: "YouDo", cls: "youdo" };
+
+    }
+
+    if (s === "freelance_ru") {
+
+      return { key: "freelance_ru", label: "Freelance.ru", cls: "freelance_ru" };
+
+    }
+
+    if (s === "freelancejob") {
+
+      return { key: "freelancejob", label: "FreelanceJob", cls: "freelancejob" };
+
+    }
+
+    if (s === "pchyol") {
+
+      return { key: "pchyol", label: "Пчёл.нет", cls: "pchyol" };
+
+    }
+
     if (s.indexOf("tg") === 0 || s.indexOf("telegram") === 0) {
 
       return { key: "tg", label: "TG", cls: "tg" };
@@ -2635,17 +2659,107 @@
 
 
 
+  function leadTagKeys(item) {
+    var raw =
+      (item && item.lead_tags) ||
+      (item && item.lead_tag_labels) ||
+      [];
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return raw
+      .map(function (t) {
+        return String(t).trim().toLowerCase().replace(/^#/, "");
+      })
+      .filter(Boolean);
+  }
+
+  function countMatchedSkills(item) {
+    var leadTags = leadTagKeys(item);
+    var userTags = (state.tags || []).map(function (t) {
+      return String(t).trim().toLowerCase().replace(/^#/, "");
+    });
+    var userSet = {};
+    var i;
+    for (i = 0; i < userTags.length; i++) {
+      userSet[userTags[i]] = true;
+    }
+    var matched = 0;
+    for (i = 0; i < leadTags.length; i++) {
+      if (userSet[leadTags[i]]) {
+        matched += 1;
+      }
+    }
+    return { matched: matched, total: leadTags.length };
+  }
+
   function hasUserSkills() {
     return state.tags && state.tags.length > 0;
   }
 
   function isPerfectMatch(item) {
     var km = item.keyword_match != null ? item.keyword_match : 0;
-    if (km < 100 || !hasUserSkills()) {
-      return false;
+    return km >= 100 && hasUserSkills() && leadTagKeys(item).length >= 2;
+  }
+
+  function renderPerfectBadge(perfect) {
+    if (perfect) {
+      return '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>';
     }
-    var tags = (item && item.lead_tags) || [];
-    return tags.length >= 2;
+    return "";
+  }
+
+  function renderMatchBreakdown(item) {
+    if (hasUserSkills()) {
+      var counts = countMatchedSkills(item);
+      var km = item.keyword_match != null ? item.keyword_match : 0;
+      var text =
+        counts.total > 0
+          ? "Совпало " + counts.matched + " из " + counts.total + " навыков заказа"
+          : "Совпадение навыков " + km + "%";
+      return '<div class="rl-match-breakdown">' + escapeHtml(text) + "</div>";
+    }
+    return (
+      '<div class="rl-match-breakdown">' +
+      escapeHtml("Укажи навыки в кабинете") +
+      "</div>"
+    );
+  }
+
+  function renderMatchBlock(item) {
+    if (!hasUserSkills()) {
+      return (
+        '<div class="rl-match rl-match--no-skills">' +
+        renderMatchBreakdown(item) +
+        "</div>"
+      );
+    }
+    var km = item.keyword_match != null ? item.keyword_match : 0;
+    var perfect = isPerfectMatch(item);
+    var compatTitle =
+      ' title="Насколько ваш стек совпадает с заказом — не оценка качества заказа"';
+    return (
+      '<div class="rl-match">' +
+      '<div class="rl-match-row">' +
+      '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
+      km +
+      '" aria-valuemin="0" aria-valuemax="100">' +
+      '<span class="rl-match__fill" style="--match-value:' +
+      km +
+      '%"></span>' +
+      "</div>" +
+      '<div class="rl-match__label">' +
+      '<span class="rl-match__pct">' +
+      km +
+      "%</span> " +
+      '<span class="rl-match__name"' +
+      compatTitle +
+      ">Совместимость</span>" +
+      renderPerfectBadge(perfect) +
+      "</div></div>" +
+      renderMatchBreakdown(item) +
+      "</div>"
+    );
   }
 
   var VIEWS_EYE_SVG =
@@ -2702,11 +2816,8 @@
     return '<span class="rl-badge rl-badge--replied">Отклик ✓</span>';
   }
 
-  function headBadgesHtml(item, perfect) {
+  function headBadgesHtml(item) {
     var src = sourceLabel(item.source);
-    var perfectBadge = perfect
-      ? '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>'
-      : "";
     var reply = prepForDisplay(item.reply_draft || "", false).trim();
     var repliedBadge = reply ? repliedBadgeHtml() : "";
     return (
@@ -2715,16 +2826,13 @@
       '">' +
       escapeHtml(src.label) +
       "</span>" +
-      perfectBadge +
       repliedBadge +
       hotBadgeHtml(item)
     );
   }
 
   function renderCard(item, isNew) {
-    var km = item.keyword_match != null ? item.keyword_match : 0;
     var perfect = isPerfectMatch(item);
-    var barPct = km;
     var budget = formatBudgetDisplay(item.budget_text || "—");
     var titleText = prepForDisplay(item.title || "Без названия", true);
     var titleHtml = escapeHtml(titleText);
@@ -2737,7 +2845,7 @@
       '" tabindex="0" role="button">' +
       '<div class="rl-feed-card__head">' +
       '<div class="rl-feed-card__head-start">' +
-      headBadgesHtml(item, perfect) +
+      headBadgesHtml(item) +
       "</div>" +
       '<div class="rl-feed-card__head-meta">' +
       '<span class="rl-feed-card__time">' +
@@ -2758,20 +2866,7 @@
       '<p class="rl-lead-card__budget">Бюджет: ' +
       escapeHtml(budget) +
       "</p>" +
-      '<div class="rl-match">' +
-      '<div class="rl-match__label">' +
-      "<span>Совместимость " +
-      barPct +
-      "%</span>" +
-      "</div>" +
-      '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
-      barPct +
-      '" aria-valuemin="0" aria-valuemax="100">' +
-      '<span class="rl-match__fill" style="--match-value:' +
-      barPct +
-      '%"></span>' +
-      "</div>" +
-      "</div>" +
+      renderMatchBlock(item) +
       '<div class="rl-chips">' +
       renderTagChips(item) +
       "</div>" +
@@ -3363,7 +3458,9 @@
     if (headStart) {
       headStart.innerHTML = headBadgesHtml(item, isPerfectMatch(item));
     }
-    card.classList.remove("is-expanded");
+    var id = parseInt(card.getAttribute("data-id"), 10) || item.id;
+    state.expandedId = id;
+    card.classList.add("is-expanded");
 
   }
 
@@ -3444,6 +3541,12 @@
           deleteBtn.disabled = false;
           showError("Не удалось удалить");
         });
+      return;
+    }
+    var skillsLink = e.target.closest("[data-open-skills]");
+    if (skillsLink && card.contains(skillsLink)) {
+      e.stopPropagation();
+      openSkillsPicker();
       return;
     }
     var copyBtn = e.target.closest("[data-copy-reply], .rl-feed-card__copy");

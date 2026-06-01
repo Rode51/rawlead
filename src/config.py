@@ -59,6 +59,7 @@ class Config:
     ai_model_summary: str
     ai_model_premium: str
     ai_model_shared_draft: str
+    ai_model_judge: str
     ai_provider: str
     min_budget_rub: int
     ai_notify_skip: bool
@@ -836,6 +837,12 @@ def load_config() -> Config:
         if shared_raw and str(shared_raw).strip()
         else ai_model_premium
     )
+    judge_raw = os.environ.get("OPENROUTER_MODEL_JUDGE")
+    ai_model_judge = (
+        str(judge_raw).strip()
+        if judge_raw and str(judge_raw).strip()
+        else "anthropic/claude-sonnet-4"
+    )
 
     ai_provider = _parse_ai_provider(os.environ.get("AI_PROVIDER"))
     min_budget_rub = _parse_min_budget_rub()
@@ -893,6 +900,7 @@ def load_config() -> Config:
         ai_model_summary=ai_model_summary,
         ai_model_premium=ai_model_premium,
         ai_model_shared_draft=ai_model_shared_draft,
+        ai_model_judge=ai_model_judge,
         ai_provider=ai_provider,
         min_budget_rub=min_budget_rub,
         ai_notify_skip=ai_notify_skip,

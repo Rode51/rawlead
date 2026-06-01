@@ -43,13 +43,16 @@ function rawlead_render_demo_preview_card(array $card, string $lenta_url): void 
 		: '';
 	?>
 	<article class="<?php echo esc_attr(implode(' ', $classes)); ?>">
-		<div class="rl-lead-card__head">
-			<span class="rl-badge rl-badge--source rl-badge--<?php echo esc_attr($source); ?>">
-				<?php echo esc_html($source_label); ?>
-			</span>
-			<?php echo $perfect_badge; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static badge ?>
+		<div class="rl-feed-card__head">
+			<div class="rl-feed-card__head-start">
+				<span class="rl-feed-card__source rl-feed-card__source--<?php echo esc_attr($source); ?>">
+					<?php echo esc_html($source_label); ?>
+				</span>
+				<?php echo $perfect_badge; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static badge ?>
+			</div>
 		</div>
 		<h3 class="rl-lead-card__title"><?php echo esc_html($title); ?></h3>
+		<p class="rl-lead-card__budget"><?php esc_html_e('Бюджет: —', 'rawlead-kadence-child'); ?></p>
 		<div class="rl-match">
 			<div class="rl-match__label">
 				<span><?php echo esc_html(sprintf('Совместимость %d%%', $pct)); ?></span>
@@ -76,7 +79,7 @@ function rawlead_render_demo_preview_card(array $card, string $lenta_url): void 
 
 $demo_cards = [
 	[
-		'pct' => 42,
+		'pct' => 50,
 		'source' => 'fl',
 		'source_label' => 'FL.ru',
 		'title' => 'Доработка CRM под отчёты',
@@ -92,7 +95,7 @@ $demo_cards = [
 		'hero' => true,
 	],
 	[
-		'pct' => 67,
+		'pct' => 80,
 		'source' => 'kwork',
 		'source_label' => 'Kwork',
 		'title' => 'Лендинг на WordPress + форма',

@@ -6,6 +6,10 @@ from dataclasses import dataclass
 
 SOURCE_FL = "fl"
 SOURCE_KWORK = "kwork"
+SOURCE_YOUDO = "youdo"
+SOURCE_FREELANCE_RU = "freelance_ru"
+SOURCE_FREELANCEJOB = "freelancejob"
+SOURCE_PCHYOL = "pchyol"
 SOURCE_TELEGRAM = "telegram"
 SOURCE_VC_RU = "vc_ru"
 SOURCE_FREELANCEHUNT = "freelancehunt"

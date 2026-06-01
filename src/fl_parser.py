@@ -11,9 +11,10 @@ import requests
 from bs4 import BeautifulSoup
 
 from config import Config
-from exchange_proxy import proxy_log_hint, requests_proxies_for
+from exchange_proxy import exchange_fetch_begin, exchange_fetch_end, exchange_get, proxy_log_hint
 from lead_category import category_from_fl_listing_url
 from listing import SOURCE_FL, ListingProject
+from radar_cycle_log import log_pipeline_line
 
 logger = logging.getLogger(__name__)
 
@@ -131,12 +132,7 @@ def _fetch_listing_html(
     headers = {"User-Agent": cfg.http_user_agent}
     hint = proxy_log_hint("fl")
     try:
-        resp = requests.get(
-            url,
-            headers=headers,
-            timeout=timeout_sec,
-            proxies=requests_proxies_for("fl"),
-        )
+        resp = exchange_get("fl", url, headers=headers, timeout_sec=timeout_sec)
     except requests.RequestException as exc:
         msg = f"Сетевой сбой при запросе ленты (стр. {page}, {hint}): {exc}"
         if page <= 1:
@@ -164,6 +160,21 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
     seen: set[int] = set()
 
     max_pages = _fl_listing_max_pages()
+    exchange_fetch_begin("fl")
+    log_pipeline_line(cfg.radar_log_path, f"fetch:fl proxy={proxy_log_hint('fl')}")
+    try:
+        return _fetch_listing_pages(cfg, timeout_sec, max_pages, merged, seen)
+    finally:
+        exchange_fetch_end("fl")
+
+
+def _fetch_listing_pages(
+    cfg: Config,
+    timeout_sec: float,
+    max_pages: int,
+    merged: list[ListingProject],
+    seen: set[int],
+) -> list[ListingProject]:
     for page in range(1, max_pages + 1):
         page_url = _fl_listing_page_url(cfg.fl_projects_url, page)
         html = _fetch_listing_html(page_url, cfg, timeout_sec=timeout_sec, page=page)
@@ -224,12 +235,7 @@ def fetch_project_description(
 
     headers = {"User-Agent": cfg.http_user_agent}
     try:
-        resp = requests.get(
-            url,
-            headers=headers,
-            timeout=timeout_sec,
-            proxies=requests_proxies_for("fl"),
-        )
+        resp = exchange_get("fl", url, headers=headers, timeout_sec=timeout_sec)
     except requests.RequestException:
         return fallback_snippet, False
 
@@ -280,12 +286,7 @@ def check_project_page_gone(
         return None
     headers = {"User-Agent": cfg.http_user_agent}
     try:
-        resp = requests.get(
-            url,
-            headers=headers,
-            timeout=timeout_sec,
-            proxies=requests_proxies_for("fl"),
-        )
+        resp = exchange_get("fl", url, headers=headers, timeout_sec=timeout_sec)
     except requests.RequestException:
         return None
 

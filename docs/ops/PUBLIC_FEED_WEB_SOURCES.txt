@@ -22,8 +22,8 @@ habr_career                          | https://career.habr.com/vacancies    | �
 # Не в публичку: старые MVP-TG-чаты, TG без allowlist.
 # TG для ленты — отдельно: docs/ops/TG_PUBLIC_FEED_ALLOWLIST.txt
 #
-# ── O63 planned (владелец 2026-05-30) — после O37-UX / § CODER_PROMPT O63 ──
-# youdo          | https://youdo.com/                   | 📋 planned
-# freelance_ru   | https://freelance.ru/project/        | 📋 planned
-# freelancejob   | (URL при ТЗ)                         | 📋 planned
-# pchyol         | Пчёл.нет (URL при ТЗ)                | 📋 planned
+# ── O63 w1 ✅ · w2 📋 (URL 2026-06-01) ──
+# youdo          | https://youdo.com/                   | ✅ w1
+# freelance_ru   | https://freelance.ru/project/        | ✅ w1
+# freelancejob   | https://www.freelancejob.ru/projects/ | 📋 w2 · только page1/new
+# pchyol         | https://pchel.net/jobs/              | 📋 w2 · skip Закрыт/В работе · page1

@@ -40,18 +40,35 @@ class TestMatchPushO50(TestCase):
         self.assertIn("Инструменты:", text)
 
     def test_push_keyboard_paid_has_callback(self) -> None:
-        raw = _push_keyboard(show_generate=True, lead_id=7019)
+        raw = _push_keyboard(
+            show_generate=True, lead_id=7019, order_url="https://fl.ru/projects/123/"
+        )
         data = json.loads(raw)
-        row = data["inline_keyboard"][0]
-        self.assertEqual(row[0]["callback_data"], "draft:7019")
-        self.assertEqual(row[1]["text"], "Открыть ленту")
+        rows = data["inline_keyboard"]
+        self.assertEqual(rows[0][0]["callback_data"], "draft:7019")
+        self.assertEqual(rows[1][0]["text"], "Открыть заказ")
+        self.assertEqual(rows[1][0]["url"], "https://fl.ru/projects/123/")
+        self.assertEqual(rows[1][1]["text"], "Лента")
 
     def test_push_keyboard_free_no_generate(self) -> None:
-        raw = _push_keyboard(show_generate=False, lead_id=42)
+        raw = _push_keyboard(show_generate=False, lead_id=42, order_url="https://kwork.ru/project/1")
         data = json.loads(raw)
         row = data["inline_keyboard"][0]
-        self.assertEqual(len(row), 1)
-        self.assertIn("url", row[0])
+        self.assertEqual(len(row), 2)
+        self.assertEqual(row[0]["url"], "https://kwork.ru/project/1")
+
+    def test_format_push_uses_order_url(self) -> None:
+        text = _format_push_text(
+            title="Тест",
+            source="fl",
+            budget_text="10 000 ₽",
+            task_summary="",
+            match_pct=80,
+            lead_tags=[],
+            tools_required=[],
+            order_url="https://fl.ru/projects/999/",
+        )
+        self.assertIn("https://fl.ru/projects/999/", text)
 
     def test_draft_callback_pattern(self) -> None:
         m = _DRAFT_CALLBACK_RE.match("draft:12345")

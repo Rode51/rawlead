@@ -11,6 +11,7 @@ from typing import Any
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_SOURCES = ("fl", "kwork")
 _PUBLIC_FEED_SOURCES_ENV = "PUBLIC_FEED_SOURCES"
+FEED_VISIBILITY_DAYS = 7
 _ALLOWLIST_PATH = _PROJECT_ROOT / "docs" / "ops" / "TG_PUBLIC_FEED_ALLOWLIST.txt"
 _TME_RE = re.compile(
     r"^https?://t\.me/(?:joinchat/)?([A-Za-z0-9_+/-]+)/?$",
@@ -47,6 +48,29 @@ def public_feed_source_sql() -> tuple[str, list[Any]]:
     """SQL-фрагмент + params для фильтра source (один param = массив source)."""
     sources = sorted(public_feed_sources())
     return " AND source = ANY(%s::text[])", [sources]
+
+
+def feed_visibility_where_sql(
+    *,
+    alias: str = "",
+    apply_delay_minutes: int | None = None,
+    delay_minutes: int = 15,
+) -> tuple[str, list[Any]]:
+    """O75: is_visible + public sources + created_at within FEED_VISIBILITY_DAYS."""
+    prefix = f"{alias}." if alias else ""
+    src_sql, src_params = public_feed_source_sql()
+    if prefix:
+        src_sql = src_sql.replace(" AND source", f" AND {prefix}source", 1)
+    sql = (
+        f"{prefix}is_visible = TRUE"
+        + src_sql
+        + f" AND {prefix}created_at >= NOW() - make_interval(days => %s)"
+    )
+    params: list[Any] = [*src_params, FEED_VISIBILITY_DAYS]
+    if apply_delay_minutes is not None:
+        sql += f" AND {prefix}created_at <= NOW() - make_interval(mins => %s)"
+        params.append(int(apply_delay_minutes))
+    return sql, params
 
 
 def _normalize_tg_username(value: str) -> str:

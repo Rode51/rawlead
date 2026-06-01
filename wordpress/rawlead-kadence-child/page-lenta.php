@@ -19,6 +19,10 @@ rawlead_get_part('header');
 				<label class="rl-feed-chip is-active"><input type="radio" name="source" value="" checked> <?php esc_html_e('Все', 'rawlead-kadence-child'); ?></label>
 				<label class="rl-feed-chip"><input type="radio" name="source" value="fl"> FL.ru</label>
 				<label class="rl-feed-chip"><input type="radio" name="source" value="kwork"> Kwork</label>
+				<label class="rl-feed-chip"><input type="radio" name="source" value="youdo"> YouDo</label>
+				<label class="rl-feed-chip"><input type="radio" name="source" value="freelance_ru"> Freelance.ru</label>
+				<label class="rl-feed-chip"><input type="radio" name="source" value="freelancejob"> FreelanceJob</label>
+				<label class="rl-feed-chip"><input type="radio" name="source" value="pchyol"> Пчёл.нет</label>
 				<label class="rl-feed-chip"><input type="radio" name="source" value="tg"> Telegram</label>
 			</fieldset>
 			<fieldset class="rl-feed-filter rl-feed-filter--category rl-filter-bar__cats">

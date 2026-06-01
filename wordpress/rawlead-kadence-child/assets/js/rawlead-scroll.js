@@ -14,6 +14,9 @@
     window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  /** Demo km on homepage: card1 50%, card2 100% ideal, card3 80% — real titles from feed. */
+  var PREVIEW_KM = [50, 100, 80];
+
   document.documentElement.classList.add("rl-smooth-root");
 
   /* Progress bar */
@@ -102,52 +105,108 @@
       .replace(/"/g, "&quot;");
   }
 
+  function decodeHtmlEntities(str) {
+    var s = String(str || "");
+    if (!s) {
+      return "";
+    }
+    if (typeof document !== "undefined") {
+      var el = document.createElement("textarea");
+      el.innerHTML = s;
+      return el.value;
+    }
+    return s;
+  }
+
+  function prepForDisplay(str, singleLine) {
+    var s = decodeHtmlEntities(str);
+    if (singleLine) {
+      return String(s).replace(/\r\n?/g, " ").replace(/\s+/g, " ").trim();
+    }
+    return s.replace(/\r\n?/g, "\n");
+  }
+
+  function formatBudgetDisplay(s) {
+    var text = prepForDisplay(s, true);
+    if (!text || text === "—") {
+      return "—";
+    }
+    return text
+      .replace(/(\d[\d\s.,]*)\s*Р\b/g, "$1 ₽")
+      .replace(/(\d[\d\s.,]*)р\.?(?=\s|$|[,.])/gi, "$1 ₽")
+      .replace(/(\d[\d\s.,]*)\s*(?:руб\.?|rub)\b/gi, "$1 ₽")
+      .replace(/\s*₽\s*/g, " ₽")
+      .trim();
+  }
+
   function sourceMeta(source) {
     var s = (source || "fl").toLowerCase();
-    if (s === "kwork") {
+    if (s.indexOf("kwork") >= 0) {
       return { cls: "kwork", label: "Kwork" };
     }
-    if (s === "tg" || s === "telegram") {
+    if (s.indexOf("tg") === 0 || s.indexOf("telegram") === 0) {
       return { cls: "tg", label: "TG" };
     }
     return { cls: "fl", label: "FL.ru" };
   }
 
-  function previewCardHtml(item, lentaUrl, hero) {
-    var src = sourceMeta(item.source);
-    var km = item.keyword_match != null ? item.keyword_match : 0;
-    var tags = item.lead_tag_labels || item.lead_tags || [];
-    var perfect = km >= 100 && tags.length >= 2;
-    var title = escapeHtml(item.title || "Без названия");
-    var chips = "";
-    var list = Array.isArray(tags) ? tags.slice(0, 4) : [];
-    list.forEach(function (tag) {
-      chips += '<span class="rl-chip">' + escapeHtml(String(tag)) + "</span>";
-    });
-    if (tags.length > 4) {
-      chips +=
-        '<span class="rl-chip rl-chip--more">+' + (tags.length - 4) + "</span>";
+  function renderTagChips(item) {
+    var tags =
+      (item && item.lead_tag_labels && item.lead_tag_labels.length
+        ? item.lead_tag_labels
+        : item && item.lead_tags) || [];
+    var max = 3;
+    var html = [];
+    var i;
+    for (i = 0; i < tags.length && i < max; i++) {
+      html.push(
+        '<span class="rl-chip">' + escapeHtml(prepForDisplay(tags[i], true)) + "</span>"
+      );
     }
+    if (tags.length > max) {
+      html.push(
+        '<span class="rl-chip rl-chip--more">+' + (tags.length - max) + "</span>"
+      );
+    }
+    return html.join("");
+  }
+
+  function previewKm(idx) {
+    return PREVIEW_KM[idx] != null ? PREVIEW_KM[idx] : 50;
+  }
+
+  function previewCardHtml(item, lentaUrl, idx) {
+    var src = sourceMeta(item.source);
+    var km = previewKm(idx);
+    var perfect = idx === 1;
+    var title = escapeHtml(prepForDisplay(item.title || "Без названия", true));
+    var budget = escapeHtml(formatBudgetDisplay(item.budget_text || "—"));
     var perfectBadge = perfect
       ? '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>'
       : "";
-    var heroCls = hero ? " rl-lead-card--demo-hero" : "";
+    var heroCls = idx === 1 ? " rl-lead-card--demo-hero" : "";
     return (
       '<article class="rl-lead-card is-visible' +
       (perfect ? " rl-lead-card--perfect-match" : "") +
       heroCls +
       '">' +
-      '<div class="rl-lead-card__head">' +
-      '<span class="rl-badge rl-badge--source rl-badge--' +
+      '<div class="rl-feed-card__head">' +
+      '<div class="rl-feed-card__head-start">' +
+      '<span class="rl-feed-card__source rl-feed-card__source--' +
       src.cls +
       '">' +
       escapeHtml(src.label) +
       "</span>" +
       perfectBadge +
-      "</div>" +
-      "<h3 class=\"rl-lead-card__title\">" +
+      "</div></div>" +
+      '<h3 class="rl-lead-card__title"><span title="' +
       title +
-      "</h3>" +
+      '">' +
+      title +
+      "</span></h3>" +
+      '<p class="rl-lead-card__budget">Бюджет: ' +
+      budget +
+      "</p>" +
       '<div class="rl-match">' +
       '<div class="rl-match__label"><span>Совместимость ' +
       km +
@@ -159,7 +218,7 @@
       km +
       '%"></span></div></div>' +
       '<div class="rl-chips">' +
-      chips +
+      renderTagChips(item) +
       "</div>" +
       '<div class="rl-live-preview__cta">' +
       '<a class="rl-btn rl-btn--primary" href="' +
@@ -220,7 +279,7 @@
         box.innerHTML = items
           .slice(0, 3)
           .map(function (item, idx) {
-            return previewCardHtml(item, lentaUrl, idx === 1);
+            return previewCardHtml(item, lentaUrl, idx);
           })
           .join("");
       })

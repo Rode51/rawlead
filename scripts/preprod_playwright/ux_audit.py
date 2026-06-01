@@ -57,6 +57,7 @@ class AuditCtx:
     console_errors: list[str] = field(default_factory=list)
     network_failures: list[dict[str, Any]] = field(default_factory=list)
     findings: list[dict[str, Any]] = field(default_factory=list)
+    draft_reviews: list[dict[str, Any]] = field(default_factory=list)
 
     def journey_ctx(self) -> ux_journey.JourneyCtx:
         return ux_journey.JourneyCtx(base=self.base, page=self.page)
@@ -159,6 +160,19 @@ def _shot(ctx: AuditCtx, scenario_id: str, phase: str) -> str:
     path = _ARTIFACT_DIR / fname
     ctx.page.screenshot(path=str(path), full_page=False)
     return str(path.relative_to(_ROOT)).replace("\\", "/")
+
+
+def _shot_named(ctx: AuditCtx, name: str) -> str:
+    _ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    path = _ARTIFACT_DIR / f"{name}.png"
+    ctx.page.screenshot(path=str(path), full_page=False)
+    return str(path.relative_to(_ROOT)).replace("\\", "/")
+
+
+_VENDOR_TOOL_RE = re.compile(
+    r"\b(neon|telethon|aiogram|supabase|cursor|openrouter|gemini_deep_research)\b",
+    re.I,
+)
 
 
 def _feed_error(ctx: AuditCtx) -> str | None:
@@ -368,26 +382,50 @@ def u4_card_tap_outside(ctx: AuditCtx) -> None:
 
 def u5_draft_tools(ctx: AuditCtx) -> None:
     jctx = ctx.journey_ctx()
-    ux_journey._ensure_feed_draft_ready(jctx)
-    cards = ux_journey._cards_with_reply_btn(jctx)
-    if not cards:
-        raise RuntimeError("no card with «Написать отклик»")
-    card = cards[0]
-    card.scroll_into_view_if_needed()
-    if not card.locator(".rl-feed-card__body-inner").count():
-        card.locator(".rl-lead-card__title").first.click()
-        ctx.page.wait_for_timeout(400)
-    btn = card.locator(".rl-feed-card__reply-btn")
-    if not btn.count():
-        raise RuntimeError("reply button missing")
-    btn.first.click()
-    ux_journey._wait_draft_text(jctx, card)
-    body = card.inner_text().casefold()
-    if "появится после генерации" in body:
-        raise RuntimeError("tools placeholder «появится после генерации»")
-    reply = card.locator("[data-reply-text]")
-    if not reply.count() or len((reply.first.inner_text() or "").strip()) < 40:
-        raise RuntimeError("draft text too short after generate")
+    ux_journey._wait_feed_logged_in(jctx)
+    ux_journey._wait_effective_access(jctx)
+    ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
+
+    pool = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]")
+    n_pool = min(pool.count(), 12)
+    last_err = "no card with draft/tools"
+    for i in range(n_pool):
+        card = pool.nth(i)
+        card.scroll_into_view_if_needed()
+        if not card.locator(".rl-feed-card__body-inner").count():
+            card.locator(".rl-lead-card__title").first.click()
+            ctx.page.wait_for_timeout(400)
+        reply = card.locator("[data-reply-text]")
+        existing = (reply.first.inner_text() or "").strip() if reply.count() else ""
+        if len(existing) >= 40:
+            body = card.inner_text().casefold()
+            if "появится после генерации" in body:
+                continue
+            if _VENDOR_TOOL_RE.search(", ".join(
+                (card.locator(".rl-feed-card__tools li").nth(ti).inner_text() or "").strip()
+                for ti in range(card.locator(".rl-feed-card__tools li").count())
+            )):
+                continue
+            return
+        btn = card.locator(".rl-feed-card__reply-btn")
+        if not btn.count():
+            continue
+        btn.first.click()
+        try:
+            ux_journey._wait_draft_text(jctx, card)
+        except RuntimeError as exc:
+            last_err = str(exc)
+            continue
+        body = card.inner_text().casefold()
+        if "появится после генерации" in body:
+            last_err = "tools placeholder «появится после генерации»"
+            continue
+        draft = card.locator("[data-reply-text]")
+        if not draft.count() or len((draft.first.inner_text() or "").strip()) < 40:
+            last_err = "draft text too short after generate"
+            continue
+        return
+    raise RuntimeError(last_err)
 
 
 def u6_fab_modal(ctx: AuditCtx) -> None:
@@ -528,11 +566,166 @@ def u10_console_network(ctx: AuditCtx) -> None:
         raise RuntimeError(f"API feed/draft failures: {sample}")
 
 
+def u10b_draft_tools_batch(ctx: AuditCtx) -> None:
+    """O80: «Написать отклик» до 5 карточек — блоки Инструменты + Черновик."""
+    jctx = ctx.journey_ctx()
+    ux_journey._wait_feed_logged_in(jctx)
+    ux_journey._wait_effective_access(jctx)
+    ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
+
+    pool = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]")
+    n_pool = min(pool.count(), 15)
+    candidates: list[Any] = []
+    for i in range(n_pool):
+        card = pool.nth(i)
+        card.scroll_into_view_if_needed()
+        if not card.locator(".rl-feed-card__body-inner").count():
+            card.locator(".rl-lead-card__title").first.click()
+            ctx.page.wait_for_timeout(350)
+        reply = card.locator("[data-reply-text]")
+        text = (reply.first.inner_text() or "").strip() if reply.count() else ""
+        btn = card.locator(".rl-feed-card__reply-btn")
+        if len(text) >= 40 or btn.count():
+            candidates.append(card)
+
+    if len(candidates) < 3:
+        raise RuntimeError(f"U10b: need ≥3 draft cards, got {len(candidates)}")
+
+    reviewed = 0
+    for card in candidates:
+        if reviewed >= 5:
+            break
+        lead_id = card.get_attribute("data-id") or str(reviewed + 1)
+        card.scroll_into_view_if_needed()
+        if not card.locator(".rl-feed-card__body-inner").count():
+            card.locator(".rl-lead-card__title").first.click()
+            ctx.page.wait_for_timeout(400)
+        btn = card.locator(".rl-feed-card__reply-btn")
+        reply = card.locator("[data-reply-text]")
+        existing = (reply.first.inner_text() or "").strip() if reply.count() else ""
+        if len(existing) < 40:
+            if not btn.count():
+                continue
+            btn.first.click()
+            try:
+                ux_journey._wait_draft_text(jctx, card)
+            except RuntimeError as exc:
+                if "недоступ" in str(exc).casefold() or "timeout" in str(exc).casefold():
+                    continue
+                raise
+
+        tools_el = card.locator(".rl-feed-card__tools li")
+        tools_list: list[str] = []
+        if tools_el.count():
+            for ti in range(tools_el.count()):
+                tools_list.append((tools_el.nth(ti).inner_text() or "").strip())
+        tools_text = ", ".join(tools_list)
+        locked = _VENDOR_TOOL_RE.findall(tools_text)
+        if locked:
+            raise RuntimeError(
+                f"U10b card {lead_id}: vendor lock in tools ({', '.join(sorted(set(locked))[:5])})"
+            )
+
+        draft_text = (reply.first.inner_text() or "").strip() if reply.count() else ""
+        if len(draft_text) < 40:
+            continue
+
+        reviewed += 1
+        section = card.locator(".rl-feed-card__section").first
+        if section.count():
+            section.first.scroll_into_view_if_needed()
+        shot_tools = _shot_named(ctx, f"U10b_{ctx.viewport}_card{reviewed}_tools")
+        shot_draft = _shot_named(ctx, f"U10b_{ctx.viewport}_card{reviewed}_draft")
+
+        ctx.draft_reviews.append(
+            {
+                "lead_id": lead_id,
+                "index": reviewed,
+                "tools": tools_list,
+                "draft_preview": draft_text[:500],
+                "screenshots": {"tools": shot_tools, "draft": shot_draft},
+            }
+        )
+        ctx.page.wait_for_timeout(3000)
+
+    if reviewed < 3:
+        raise RuntimeError(f"U10b: only {reviewed}/3 drafts OK (AI fail on other cards)")
+
+
+def u11_match_breakdown(ctx: AuditCtx) -> None:
+    """O82-w1b: stack compatibility breakdown; no verdict/quality on card."""
+    jctx = ctx.journey_ctx()
+    ux_journey._goto_lenta(jctx)
+    ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
+    pool = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]")
+    n = min(3, pool.count())
+    if n < 1:
+        raise RuntimeError("U11: no feed cards")
+    forbidden = ("брать", "сомнительно", "качество заказа", "навыки: 0%")
+    for i in range(n):
+        card = pool.nth(i)
+        card.scroll_into_view_if_needed()
+        if not card.locator(".rl-match-breakdown").count():
+            raise RuntimeError("U11: .rl-match-breakdown missing")
+        if card.locator(".rl-chip--take, .rl-chip--maybe").count():
+            raise RuntimeError("U11: verdict chip still visible")
+        match_text = (card.locator(".rl-match").first.inner_text() or "").casefold()
+        bd = (card.locator(".rl-match-breakdown").first.inner_text() or "").casefold()
+        for bad in forbidden:
+            if bad in match_text or bad in bd:
+                raise RuntimeError(f"U11: forbidden copy «{bad}»")
+        if card.locator(".rl-match--no-skills").count():
+            if card.locator(".rl-match__pct").count():
+                raise RuntimeError("U11: zero-skills card shows % bar")
+            if not card.locator("[data-open-skills]").count():
+                raise RuntimeError("U11: anon zero-skills missing skills CTA")
+
+
+def u12_tools_auth_only(ctx: AuditCtx) -> None:
+    """O83: anon — no «Инструменты»; paid JWT — tools block present."""
+    jctx = ctx.journey_ctx()
+    if ctx.access_token:
+        ux_journey._wait_feed_logged_in(jctx)
+        ux_journey._wait_effective_access(jctx)
+        ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
+        pool = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]")
+        for i in range(min(12, pool.count())):
+            card = pool.nth(i)
+            card.scroll_into_view_if_needed()
+            if not card.locator(".rl-feed-card__body-inner *").count():
+                card.locator(".rl-lead-card__title").first.click()
+                ctx.page.wait_for_timeout(400)
+            titles = card.locator(".rl-feed-card__section-title")
+            for ti in range(titles.count()):
+                t = (titles.nth(ti).inner_text() or "").strip()
+                if t == "Инструменты":
+                    return
+        raise RuntimeError("U12: paid feed — no «Инструменты» block on expanded cards")
+
+    ux_journey._goto_lenta(jctx)
+    ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
+    pool = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]")
+    for i in range(min(3, pool.count())):
+        card = pool.nth(i)
+        card.scroll_into_view_if_needed()
+        if not card.locator(".rl-feed-card__body-inner *").count():
+            card.locator(".rl-lead-card__title").first.click()
+            ctx.page.wait_for_timeout(350)
+        titles = card.locator(".rl-feed-card__section-title")
+        for ti in range(titles.count()):
+            t = (titles.nth(ti).inner_text() or "").strip()
+            if t == "Инструменты":
+                raise RuntimeError("U12: anon sees «Инструменты» block")
+
+
 SCENARIOS: dict[str, tuple[str, str, Callable[[AuditCtx], None]]] = {
     "U1": ("Header + footer links", "critical", u1_header_footer),
     "U2": ("Лента: категория + навыки", "critical", u2_lenta_skills),
     "U3": ("Сортировка + закрытие", "critical", u3_sort_dropdown),
     "U4": ("Expand + tap outside", "critical", u4_card_tap_outside),
+    "U10b": ("Draft×5 tools audit", "critical", u10b_draft_tools_batch),
+    "U11": ("Match breakdown", "critical", u11_match_breakdown),
+    "U12": ("Tools auth-only", "critical", u12_tools_auth_only),
     "U5": ("Draft + инструменты", "critical", u5_draft_tools),
     "U6": ("FAB support modal", "warn", u6_fab_modal),
     "U7": ("ЛК: навыки + inbox", "critical", u7_cabinet_skills_inbox),
@@ -620,10 +813,23 @@ def _llm_human_review(
             "u8_ran_mobile": any(
                 r["id"] == "U8" and r["viewport"] == "mobile" for r in report["results"]
             ),
+            "draft_reviews": report.get("draft_reviews") or [],
         },
         ensure_ascii=False,
         indent=2,
     )
+
+    draft_block = report.get("draft_reviews") or []
+    draft_prompt = ""
+    if draft_block:
+        draft_prompt = (
+            "\n\n## U10b — отклики и инструменты (до 5 карточек)\n"
+            "Для **каждой** карточки в draft_reviews оцени:\n"
+            "- **draft_as_is** 1–5 — отправил бы отклик as-is на FL?\n"
+            "- **tools_too_narrow** да/нет — neon/telethon/aiogram/supabase/cursor в tools = **да (fail)**\n"
+            "- **tools_match_tz** 1–5 — инструменты из ТЗ заказа, не стек исполнителя?\n"
+            "В конце секция **## Draft/tools summary** со средним draft_as_is и count vendor-lock fails.\n"
+        )
 
     user_parts: list[dict[str, Any]] = [
         {
@@ -633,11 +839,20 @@ def _llm_human_review(
                 "Вопросы: понятно ли куда жать? криво на 390px? перекрытия? мелкий tap target?\n"
                 "Формат ответа — markdown с секциями:\n"
                 "## Критично\n## Раздражает\n## Ок\n"
-                "В конце: **Rating (1–5)** одной строкой — НЕ ставь 5/5 если U8 mobile не прогонялся или есть critical.\n\n"
+                + draft_prompt
+                + "В конце: **Rating (1–5)** одной строкой — НЕ ставь 5/5 если U8 mobile не прогонялся или есть critical.\n\n"
                 f"Findings JSON:\n```json\n{findings_json}\n```"
             ),
         }
     ]
+    for review in draft_block:
+        for key in ("tools", "draft"):
+            rel = (review.get("screenshots") or {}).get(key)
+            if not rel:
+                continue
+            p = _ROOT / rel.replace("/", os.sep)
+            if p.is_file() and len(unique) < 12:
+                unique.append(p)
     for p in unique:
         user_parts.append(
             {
@@ -682,12 +897,13 @@ def _llm_human_review(
         )
 
     header = [
-        "# Pre-prod UX audit — human (O37c LLM)",
+        "# Pre-prod UX audit — human (O80 LLM)",
         "",
         f"- **Time:** {report['generated_at']}",
         f"- **Model:** {model}",
         f"- **Mobile screenshots:** {len(unique)}",
         f"- **Script critical count:** {report['critical_count']}",
+        f"- **U10b draft cards:** {len(report.get('draft_reviews') or [])}",
         "",
         "---",
         "",
@@ -719,6 +935,7 @@ def run_audit(
     )
     results: list[dict[str, Any]] = []
     all_findings: list[dict[str, Any]] = []
+    all_draft_reviews: list[dict[str, Any]] = []
 
     with sync_playwright() as p:
         for vp_label, width, height in viewports:
@@ -746,7 +963,9 @@ def run_audit(
             for sid, (title, sev, fn) in SCENARIOS.items():
                 if sid == "U8" and vp_label != "mobile":
                     continue
-                if sid in ("U5", "U7") and not access_token:
+                if sid == "U10b" and vp_label != "desktop":
+                    continue
+                if sid in ("U5", "U7", "U10b") and not access_token:
                     results.append(
                         {
                             "id": sid,
@@ -764,6 +983,8 @@ def run_audit(
                 row = _run_scenario(sid, title, sev, fn, ctx)
                 results.append(row)
                 all_findings.extend(ctx.findings)
+                if ctx.draft_reviews:
+                    all_draft_reviews = list(ctx.draft_reviews)
                 ctx.findings.clear()
 
             if browser_name in ("yandex-cdp", "cdp", "dolphin-cdp"):
@@ -777,6 +998,9 @@ def run_audit(
     critical = sum(1 for f in all_findings if f["severity"] == "critical")
     passed = sum(1 for r in results if r["pass"])
     ok = critical == 0 and passed == len(results)
+    draft_reviews = [
+        r for r in results if r.get("id") == "U10b" and r.get("pass")
+    ]
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -790,6 +1014,7 @@ def run_audit(
         "pass": ok,
         "results": results,
         "findings": all_findings,
+        "draft_reviews": all_draft_reviews,
         "artifacts_dir": str(_ARTIFACT_DIR.relative_to(_ROOT)).replace("\\", "/"),
     }
 

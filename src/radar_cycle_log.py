@@ -19,6 +19,10 @@ _STATUS_CYCLE_SUMMARY = "status_cycle_summary"
 SOURCE_LABELS: dict[str, str] = {
     "fl": "FL.ru",
     "kwork": "Kwork",
+    "youdo": "YouDo",
+    "freelance_ru": "Freelance.ru",
+    "freelancejob": "FreelanceJob",
+    "pchyol": "Пчёл.нет",
     "vc_ru": "VC.ru",
     "habr_career": "Habr Career",
 }
@@ -26,6 +30,10 @@ SOURCE_LABELS: dict[str, str] = {
 ALL_CYCLE_SOURCES: tuple[str, ...] = (
     "fl",
     "kwork",
+    "youdo",
+    "freelance_ru",
+    "freelancejob",
+    "pchyol",
     "vc_ru",
     "habr_career",
 )

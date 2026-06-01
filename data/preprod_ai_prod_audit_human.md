@@ -1,12 +1,12 @@
 # O72 — AI prod audit (human)
 
-- **Time:** 2026-05-31T05:59:57.736830+00:00
-- **L2 sample (reply_draft):** 46 leads
-- **Draft quality (L1+L2, без tools):** **97.8%** (✅ ≥95%) · 45/46 pass
-- **Tools bucket (отдельно):** **89.1%** · 41/46 pass · KNOWN_TOOLS + canonical aliases
-- **Combined auto-pass (draft+tools):** 87.0% (✅ ≥85%)
-- **L1 empty bucket:** 25 leads · missing summary **25**
-- **Merged rows:** 71
+- **Time:** 2026-06-01T10:22:53.771651+00:00
+- **L2 sample (reply_draft):** 22 leads
+- **Draft quality (L1+L2, без tools):** **100.0%** (✅ ≥95%) · 22/22 pass
+- **Tools bucket (отдельно):** **27.3%** · 6/22 pass · KNOWN_TOOLS + canonical aliases
+- **Combined auto-pass (draft+tools):** 27.3% (❌ <85%)
+- **L1 empty bucket:** 0 leads · missing summary **0**
+- **Merged rows:** 22
 - **Profile:** site
 
 > **O72b:** draft-only % — gate качества отклика (L1+L2); tools — отдельная строка (KNOWN_TOOLS whitelist + canonical aliases, без раздувания picker 51).
@@ -15,26 +15,41 @@
 
 ## Draft fail types (L1+L2)
 
-- `L2:reply_draft`: **1**
+- _(none)_
 
 ## Tools fail types
 
-- `tools:empty_but_desc_hints`: **5**
+- `tools:not_in_catalog`: **14**
+- `tools:vendor_lock`: **2**
+- `tools:min_2_required`: **2**
 
 ## Top draft fail cases
 
-- **#7051** [kwork/design] 'Заменить Google recaptcha &mdash; на Yandex SmartCaptcha'
-  - fails: L2:reply_draft: запрещённое начало «Готов…»
 
 ## Top tools fail cases
 
-- **#7546** [fl/dev] 'Починить прежний скрипт отправщик файлов эксель в Телеграм и на почту.'
-  - fails: tools:empty_but_desc_hints:telegram_bot_dev
-- **#7218** [kwork/dev] 'WP Настройка главных страниц мобильной и версии для ПК'
-  - fails: tools:empty_but_desc_hints:wordpress_dev
-- **#6661** [kwork/dev] 'Сделать логику отправки товара после оплаты wordpress'
-  - fails: tools:empty_but_desc_hints:python,wordpress_dev
-- **#6655** [kwork/design] 'Оповещения wordpress, удалить лишние плагины, бекап'
-  - fails: tools:empty_but_desc_hints:wordpress_dev
-- **#6381** [fl/dev] 'Telegram-бот: персональный график ухода за волосами + PDF-протокол (Python)'
-  - fails: tools:empty_but_desc_hints:python,telegram_bot_dev
+- **#8764** [kwork/dev] 'Консультация по Авито'
+  - fails: tools:min_2_required, tools:not_in_catalog:avito
+- **#8752** [kwork/design] 'Платформа для учебного центра'
+  - fails: tools:vendor_lock:telethon,neon, tools:not_in_catalog:aiogram_3
+- **#8925** [fl/dev] 'Скрипты из Google-таблиц перестали работать. Нужно адаптировать сценарии к новой'
+  - fails: tools:not_in_catalog:google_sheets
+- **#8902** [kwork/dev] 'Сделать футажи'
+  - fails: tools:not_in_catalog:after_effects,cinema_4d
+- **#8812** [kwork/dev] 'Помощь в работе с блогерами'
+  - fails: tools:min_2_required
+- **#8794** [kwork/design] 'Ускорьте сайт WP-Elementor'
+  - fails: tools:not_in_catalog:elementor
+- **#8788** [kwork/design] 'Есть сайт на неткате'
+  - fails: tools:not_in_catalog:netcat
+- **#8782** [kwork/marketing] 'SEO оптимизация сайта'
+  - fails: tools:not_in_catalog:robots_txt,sitemap_xml
+- **#8776** [kwork/design] 'Улучшить скорость работы сайта Elementor, WC, Tutor'
+  - fails: tools:not_in_catalog:elementor,woocommerce,tutor_lms,pagespeed_insights,wp_rocket
+- **#8774** [kwork/design] 'Разместить на саите каталог автопитера'
+  - fails: tools:vendor_lock:telethon,neon
+
+## LLM judge (O72c)
+
+- L2 scored: 22/22 · combined **4.03**/5 · send_as_is **31.8%** · ❌
+- Подробно: `data/preprod_ai_prod_audit_judge.md`

@@ -272,10 +272,13 @@ Footer
 | **Карточка лида** | bg `#FFFFFF`, **`border: none`**, `box-shadow: 4px 4px 0 #0A0A0A`, `radius: 4px`, padding `20px 24px`; hover: `6px 6px 0` + `translate(-2px,-2px)` · **perfect-match:** border `2px #FACC15` + жёлтая тень |
 | **Chip категории** | active: bg `#0A0A0A` + text `#FFFFFF`; inactive: bg `#FFFFFF` + `border: 2px solid #0A0A0A` + text `#0A0A0A` |
 | **Chip навыка** | active: bg `#FACC15` + text `#0A0A0A` + `border: 2px solid #0A0A0A`; inactive: bg `#FFFFFF` + `border: 2px solid #D4D4D4` |
-| **Match-bar** | bg `#D4D4D4`, fill `#0A0A0A`, height `4px`, radius `0px`; animate width 500ms |
+| **Match-bar** | bg `#D4D4D4`, fill `#0A0A0A`, height `4px`, radius `0px`; animate width 500ms; zero state: fill `#525252` |
+| **Match breakdown** | `.rl-match-breakdown` · Manrope 12px/400 · color `#525252` · 1 строка под match row; **с навыками:** `Качество заказа: {ai_score} · Навыки: {keyword_match}%`; **zero state:** `Добавь навыки, чтобы увидеть совместимость →` (ghost link → `[Навыки ▾]`); mobile: 11px, overflow ellipsis |
 | **Source badge** | dot 8px + label 12px/700: FL `#00A65A` · Kwork `#EA580C` · TG `#0088CC` |
-| **AI-чип «Брать»** | bg `#DCFCE7`, text `#16A34A`, border `1.5px solid #16A34A`, radius `2px` |
+| **AI-чип «Брать»** | bg `#DCFCE7`, text `#16A34A`, border `1.5px solid #16A34A`, radius `2px`; при 100% match — **скрыт**, показывается `ИДЕАЛЬНО ✦` |
 | **AI-чип «Сомнительно»** | bg `#F5F5F5`, text `#6B7280`, border `1.5px solid #D4D4D4`, radius `2px` |
+| **Match label (режим A)** | «Совместимость» · Manrope 13px/700 · `#0A0A0A`; tooltip (title): «Качество × 60% + Навыки × 40%» |
+| **Match label (режим B)** | «Качество заказа» · Manrope 13px/700 · `#525252`; показывается когда `user_skills = []` |
 | **Report bug FAB** | `?` round 40px, bg `#FFFFFF`, border `2px solid #0A0A0A`, shadow `2px 2px 0 #0A0A0A`, bottom-right fixed |
 | **Skeleton-карточка** | bg `#F5F5F0`, `border: 2px solid #D4D4D4`, `box-shadow: 4px 4px 0 #D4D4D4`, radius `4px`, pulse animation |
 | **Input / Textarea** | border `2px solid #0A0A0A`, radius `0px`; focus: `box-shadow: 2px 2px 0 #0A0A0A` |

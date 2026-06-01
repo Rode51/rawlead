@@ -106,7 +106,37 @@ RADAR_TG_ENABLED=1
 
 Права: `chmod 600 .env .env.site .env.legacy`
 
-### Telethon-сессии (E2)
+### Карта прокси (5 IP, 2026-06-01)
+
+**Решение владельца:** один пул оплаченных HTTP-прокси; часть закреплена за Telethon/Bot API, остальные — **ротация FL/Kwork** каждый цикл (~1 мин) + **failover** при 403/429/timeout (§ O79 Coder).
+
+| IP | Роль | Переменные |
+|----|------|------------|
+| 45.152.197.25 | Bot API + acc1 | `TG_PROXY_URL`, `TELETHON_PROXY_ACC1` |
+| 38.154.16.60 | acc2 + биржи (pool) | `TELETHON_PROXY_ACC2` · `FL_PROXY_URLS`, `KWORK_PROXY_URLS` |
+| 168.90.199.99 | acc3 + биржи (pool) | `TELETHON_PROXY_ACC3` · `FL_PROXY_URLS`, `KWORK_PROXY_URLS` |
+| 212.102.151.153 | биржи (pool) | `FL_PROXY_URLS`, `KWORK_PROXY_URLS` |
+| 185.147.131.15 | биржи (pool) | то же |
+
+**45.152 не класть в `FL_PROXY_URLS`** — там же Bot API и acc1.
+
+Пример **`.env` на VPS** (логины/пароли — из вашего блокнота, **не в git**):
+
+```env
+TG_PROXY_URL=http://45.152.197.25:8000:USER:PASS
+TELETHON_PROXY_ACC1=http://45.152.197.25:8000:USER:PASS
+TELETHON_PROXY_ACC2=http://38.154.16.60:8000:USER:PASS
+TELETHON_PROXY_ACC3=http://168.90.199.99:8000:USER:PASS
+FL_PROXY_URLS=http://212.102.151.153:8000:U:P,http://185.147.131.15:8000:U:P,http://38.154.16.60:8000:U:P,http://168.90.199.99:8000:U:P
+KWORK_PROXY_URLS=http://212.102.151.153:8000:U:P,http://185.147.131.15:8000:U:P,http://38.154.16.60:8000:U:P,http://168.90.199.99:8000:U:P
+TELETHON_PROXY_PROBE=1
+```
+
+После правки: `sudo systemctl restart rawlead-radar` · в `radar_site.log` — `fetch:fl proxy=212.102…` (host без пароля).
+
+**ПК / Cursor:** те же `TG_*` / `TELETHON_*` в локальном `.env`; `FL_PROXY_URLS` на ПК **не нужны**, если Site ■ (парсинг только VPS).
+
+---
 
 С ПК скопировать **без git**:
 

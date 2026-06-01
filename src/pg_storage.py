@@ -16,7 +16,7 @@ from ai_analyze import AiLiteAnalysis
 from config import Config
 from lead_category import category_for_listing
 from listing import ListingProject
-from public_feed import is_public_feed_source, public_feed_sources
+from public_feed import FEED_VISIBILITY_DAYS, is_public_feed_source, public_feed_sources
 from reply_draft_strip import strip_reply_draft_price_deadline
 
 if TYPE_CHECKING:
@@ -249,6 +249,23 @@ class NeonLeadStorage:
                             params,
                         )
                     inserted = cur.fetchone() is not None
+                    if not inserted and h:
+                        cur.execute(
+                            """
+                            SELECT source FROM leads
+                            WHERE content_hash = %s
+                            LIMIT 1
+                            """,
+                            (h,),
+                        )
+                        row = cur.fetchone()
+                        if row and row[0] != project.source:
+                            msg = (
+                                f"cross_source_dup:winner={row[0]} "
+                                f"hash={h[:8]} skip={project.source}:id={project.project_id}"
+                            )
+                            logger.info("%s", msg)
+                            errors.append(msg)
                 return inserted
         except Exception as exc:
             msg = f"pg:record:{project.source}:id={project.project_id}:{_short_pg_err(exc)}"
@@ -681,6 +698,93 @@ class NeonLeadStorage:
             logger.warning("%s", msg)
             err.append(msg)
             return []
+
+    def fetch_leads_missing_tools(
+        self,
+        *,
+        limit: int = 20,
+        errors: list[str] | None = None,
+    ) -> list[NeonLeadRow]:
+        """Visible leads без tools_required (Site L2 backfill)."""
+        if not self.enabled:
+            return []
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return []
+        err = errors if errors is not None else []
+        lim = max(1, min(int(limit), 100))
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id, source, external_id, title,
+                               COALESCE(NULLIF(task_summary, ''), body) AS body,
+                               url, budget_text, COALESCE(category, '')
+                        FROM leads
+                        WHERE is_visible = TRUE
+                          AND source = ANY(%s)
+                          AND ai_verdict IS NOT NULL
+                          AND (
+                            tools_required IS NULL
+                            OR tools_required = '[]'::jsonb
+                            OR jsonb_array_length(tools_required) = 0
+                          )
+                          AND COALESCE(task_summary, '') <> ''
+                        ORDER BY id DESC
+                        LIMIT %s
+                        """,
+                        (sources, lim),
+                    )
+                    rows = cur.fetchall()
+            return [
+                NeonLeadRow(
+                    lead_id=int(r[0]),
+                    source=str(r[1]),
+                    external_id=str(r[2]),
+                    title=str(r[3] or ""),
+                    body=str(r[4] or ""),
+                    url=str(r[5] or ""),
+                    budget_text=str(r[6] or ""),
+                    category=str(r[7] or ""),
+                )
+                for r in rows
+            ]
+        except Exception as exc:
+            msg = f"pg:fetch_missing_tools:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return []
+
+    def update_tools_required(
+        self,
+        source: str,
+        external_id: str,
+        tools: list[str],
+        *,
+        errors: list[str] | None = None,
+    ) -> bool:
+        if not self.enabled or not tools:
+            return False
+        err = errors if errors is not None else []
+        tools_json = json.dumps(list(tools), ensure_ascii=False)
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE leads
+                        SET tools_required = %s::jsonb
+                        WHERE source = %s AND external_id = %s
+                        """,
+                        (tools_json, source, external_id),
+                    )
+                    return cur.rowcount > 0
+        except Exception as exc:
+            msg = f"pg:tools:{source}:{external_id}:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return False
 
     def count_leads_missing_l1(self, errors: list[str] | None = None) -> int:
         """Очередь без L1 (PUBLIC_FEED_SOURCES) — для § FEED-FRESHNESS."""
@@ -1251,6 +1355,42 @@ class NeonLeadStorage:
             err.append(msg)
             return None
 
+    def hide_feed_older_than(
+        self,
+        *,
+        days: int = FEED_VISIBILITY_DAYS,
+        limit: int = 200,
+        errors: list[str] | None = None,
+    ) -> int:
+        """O75: скрыть из ленты лиды старше days (не DELETE)."""
+        if not self.enabled:
+            return 0
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE leads
+                        SET is_visible = FALSE,
+                            delist_reason = 'feed_retention_7d'
+                        WHERE id IN (
+                            SELECT id FROM leads
+                            WHERE is_visible = TRUE
+                              AND created_at < NOW() - make_interval(days => %s)
+                            ORDER BY created_at ASC
+                            LIMIT %s
+                        )
+                        """,
+                        (int(days), int(limit)),
+                    )
+                    return int(cur.rowcount or 0)
+        except Exception as exc:
+            msg = f"pg:hide_feed_age:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return 0
+
     def fetch_visible_for_source_recheck(
         self,
         *,
@@ -1275,10 +1415,11 @@ class NeonLeadStorage:
                           AND delist_reason IS NULL
                           AND source = ANY(%s)
                           AND url <> ''
+                          AND created_at >= NOW() - make_interval(days => %s)
                         ORDER BY last_source_check_at NULLS FIRST, created_at DESC
                         LIMIT %s
                         """,
-                        (sources, int(limit)),
+                        (sources, FEED_VISIBILITY_DAYS, int(limit)),
                     )
                     return [
                         (int(r[0]), str(r[1]), str(r[2] or ""))

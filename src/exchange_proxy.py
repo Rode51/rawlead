@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 import os
-from typing import Any
+from dataclasses import dataclass
+from urllib.parse import urlparse
+
+import requests
 
 from config import DIRECT_REQUESTS_PROXIES, normalize_proxy_url
 
+logger = logging.getLogger(__name__)
+
 _indexes: dict[str, int] = {}
+_sessions: dict[str, "ExchangeFetchSession"] = {}
+
+_FAILOVER_HTTP = frozenset({403, 429})
 
 
 def _parse_proxy_list(env_plural: str, env_single: str) -> list[str]:
@@ -26,6 +35,93 @@ def _parse_proxy_list(env_plural: str, env_single: str) -> list[str]:
     return out
 
 
+def _shared_exchange_pool() -> list[str]:
+    """Общий pool FL/Kwork — fallback для новых бирж O63."""
+    return _parse_proxy_list("FL_PROXY_URLS", "FL_PROXY_URL")
+
+
+def _urls_for_source(source: str) -> tuple[str, list[str]]:
+    if source == "fl":
+        return "fl", _parse_proxy_list("FL_PROXY_URLS", "FL_PROXY_URL")
+    if source == "kwork":
+        return "kwork", _parse_proxy_list("KWORK_PROXY_URLS", "KWORK_PROXY_URL")
+    if source == "youdo":
+        urls = _parse_proxy_list("YOUDO_PROXY_URLS", "YOUDO_PROXY_URL")
+        return "youdo", urls or _shared_exchange_pool()
+    if source == "freelance_ru":
+        urls = _parse_proxy_list("FREELANCE_RU_PROXY_URLS", "FREELANCE_RU_PROXY_URL")
+        return "freelance_ru", urls or _shared_exchange_pool()
+    if source == "freelancejob":
+        urls = _parse_proxy_list("FREELANCEJOB_PROXY_URLS", "FREELANCEJOB_PROXY_URL")
+        return "freelancejob", urls or _shared_exchange_pool()
+    if source == "pchyol":
+        urls = _parse_proxy_list("PCHYOL_PROXY_URLS", "PCHYOL_PROXY_URL")
+        return "pchyol", urls or _shared_exchange_pool()
+    return source, []
+
+
+def _hint_from_url(url: str | None) -> str:
+    if not url:
+        return "direct"
+    try:
+        p = urlparse(url)
+        return f"{p.hostname}:{p.port or ''}".rstrip(":")
+    except Exception:
+        return "proxy"
+
+
+def _proxies_dict(url: str | None) -> dict[str, str | None]:
+    if not url:
+        return DIRECT_REQUESTS_PROXIES
+    return {"http": url, "https": url}
+
+
+@dataclass
+class ExchangeFetchSession:
+    source: str
+    urls: list[str]
+    start_idx: int = 0
+    try_offset: int = 0
+
+    @property
+    def current_url(self) -> str | None:
+        if not self.urls:
+            return None
+        return self.urls[(self.start_idx + self.try_offset) % len(self.urls)]
+
+    def current_proxies(self) -> dict[str, str | None]:
+        return _proxies_dict(self.current_url)
+
+    def log_hint(self) -> str:
+        return _hint_from_url(self.current_url)
+
+    def advance_failover(self) -> bool:
+        if not self.urls:
+            return False
+        self.try_offset += 1
+        return self.try_offset < len(self.urls)
+
+
+def exchange_fetch_begin(source: str) -> ExchangeFetchSession:
+    """Round-robin pick one proxy for the whole listing fetch."""
+    key, urls = _urls_for_source(source)
+    start = 0
+    if urls:
+        start = _indexes.get(key, 0) % len(urls)
+        _indexes[key] = start + 1
+    session = ExchangeFetchSession(source=source, urls=urls, start_idx=start)
+    _sessions[source] = session
+    return session
+
+
+def exchange_fetch_end(source: str) -> None:
+    _sessions.pop(source, None)
+
+
+def _active_session(source: str) -> ExchangeFetchSession | None:
+    return _sessions.get(source)
+
+
 def _pick_url(key: str, urls: list[str]) -> str | None:
     if not urls:
         return None
@@ -35,32 +131,79 @@ def _pick_url(key: str, urls: list[str]) -> str | None:
     return url
 
 
+def exchange_primary_proxy_url(source: str) -> str:
+    """Первый URL из pool источника (для Playwright)."""
+    _key, urls = _urls_for_source(source)
+    if not urls:
+        return ""
+    idx = _indexes.get(_key, 0) % len(urls)
+    return urls[idx]
+
+
 def requests_proxies_for(source: str) -> dict[str, str | None]:
-    """source: fl | kwork. Пустой env → DIRECT (домашний IP)."""
-    if source == "fl":
-        urls = _parse_proxy_list("FL_PROXY_URLS", "FL_PROXY_URL")
-        key = "fl"
-    elif source == "kwork":
-        urls = _parse_proxy_list("KWORK_PROXY_URLS", "KWORK_PROXY_URL")
-        key = "kwork"
-    else:
+    """source: fl | kwork | youdo | freelance_ru. Пустой env → DIRECT (домашний IP)."""
+    session = _active_session(source)
+    if session:
+        return session.current_proxies()
+    key, urls = _urls_for_source(source)
+    if not urls:
         return DIRECT_REQUESTS_PROXIES
-    url = _pick_url(key, urls)
-    if not url:
-        return DIRECT_REQUESTS_PROXIES
-    return {"http": url, "https": url}
+    return _proxies_dict(_pick_url(key, urls))
 
 
 def proxy_log_hint(source: str) -> str:
     """Хост:порт для лога (без пароля)."""
+    session = _active_session(source)
+    if session:
+        return session.log_hint()
     proxies = requests_proxies_for(source)
     url = proxies.get("https") or proxies.get("http") or ""
     if not url or url == DIRECT_REQUESTS_PROXIES.get("https"):
         return "direct"
-    try:
-        from urllib.parse import urlparse
+    return _hint_from_url(url)
 
-        p = urlparse(url)
-        return f"{p.hostname}:{p.port or ''}".rstrip(":")
-    except Exception:
-        return "proxy"
+
+def exchange_get(
+    source: str,
+    url: str,
+    *,
+    headers: dict[str, str],
+    timeout_sec: float,
+) -> requests.Response:
+    """GET через пул прокси; 403/429/timeout → следующий URL до исчерпания."""
+    session = _active_session(source)
+    own_session = session is None
+    if own_session:
+        session = exchange_fetch_begin(source)
+    assert session is not None
+    try:
+        while True:
+            try:
+                resp = requests.get(
+                    url,
+                    headers=headers,
+                    timeout=timeout_sec,
+                    proxies=session.current_proxies(),
+                )
+            except requests.RequestException as exc:
+                if session.advance_failover():
+                    logger.warning(
+                        "fetch:%s proxy=%s failover after timeout: %s",
+                        source,
+                        session.log_hint(),
+                        exc,
+                    )
+                    continue
+                raise
+            if resp.status_code in _FAILOVER_HTTP and session.advance_failover():
+                logger.warning(
+                    "fetch:%s proxy=%s failover after HTTP %s",
+                    source,
+                    session.log_hint(),
+                    resp.status_code,
+                )
+                continue
+            return resp
+    finally:
+        if own_session:
+            exchange_fetch_end(source)

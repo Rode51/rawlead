@@ -23,7 +23,7 @@ from ai_analyze import (
     note_draft_request,
 )
 from config import Config, telegram_requests_proxies
-from public_feed import public_feed_source_sql
+from public_feed import feed_visibility_where_sql
 from radar_cycle_log import SOURCE_LABELS
 from rank import keyword_match, parse_lead_tags, tags_as_weights
 from reply_draft_strip import strip_reply_draft_price_deadline, strip_tg_draft_price_deadline
@@ -177,8 +177,7 @@ def _user_effective_access(cur: Any, user_id: str) -> bool:
 
 
 def _feed_where_sql() -> tuple[str, list[Any]]:
-    src_sql, src_params = public_feed_source_sql()
-    return "is_visible = TRUE" + src_sql, list(src_params)
+    return feed_visibility_where_sql()
 
 
 def _load_user_tags(cur: Any, user_id: str) -> dict[str, float]:
@@ -204,18 +203,23 @@ def _parse_ai_reasons(raw: Any) -> list[str]:
 
 
 def _parse_tools_required(raw: Any) -> list[str]:
+    from tools_catalog import normalize_tools_required
+
     if raw is None:
         return []
+    items: list[str] = []
     if isinstance(raw, list):
-        return [str(t).strip() for t in raw if str(t).strip()]
-    if isinstance(raw, str) and raw.strip():
+        items = [str(t).strip() for t in raw if str(t).strip()]
+    elif isinstance(raw, str) and raw.strip():
         try:
             data = json.loads(raw)
             if isinstance(data, list):
-                return [str(t).strip() for t in data if str(t).strip()]
+                items = [str(t).strip() for t in data if str(t).strip()]
+            else:
+                items = [raw.strip()]
         except json.JSONDecodeError:
-            return [raw.strip()]
-    return []
+            items = [raw.strip()]
+    return list(normalize_tools_required(items))
 
 
 def _persist_lead_tools_required(cur: Any, lead_id: int, tools: list[str]) -> None:
@@ -287,6 +291,7 @@ def _format_push_text(
     match_pct: int,
     lead_tags: list[str],
     tools_required: list[str],
+    order_url: str = "",
 ) -> str:
     head = (title or "Новый заказ").strip()[:120]
     summary = (task_summary or "").strip()
@@ -309,20 +314,25 @@ def _format_push_text(
     if tools_required:
         lines.append("Инструменты: " + ", ".join(tools_required[:5]))
     lines.append("")
-    lines.append(f"→ {_LENTA_URL}")
+    link = (order_url or "").strip() or _LENTA_URL
+    lines.append(f"→ {link}")
     return "\n".join(lines)
 
 
-def _push_keyboard(*, show_generate: bool, lead_id: int) -> str:
-    row: list[dict[str, str]] = [
-        {"text": "Открыть ленту", "url": _LENTA_URL},
-    ]
+def _push_keyboard(*, show_generate: bool, lead_id: int, order_url: str = "") -> str:
+    order = (order_url or "").strip() or _LENTA_URL
+    rows: list[list[dict[str, str]]] = []
     if show_generate:
-        row.insert(
-            0,
-            {"text": "Сгенерировать отклик", "callback_data": f"draft:{lead_id}"},
+        rows.append(
+            [{"text": "Сгенерировать отклик", "callback_data": f"draft:{lead_id}"}]
         )
-    return json.dumps({"inline_keyboard": [row]}, ensure_ascii=False)
+    rows.append(
+        [
+            {"text": "Открыть заказ", "url": order},
+            {"text": "Лента", "url": _LENTA_URL},
+        ]
+    )
+    return json.dumps({"inline_keyboard": rows}, ensure_ascii=False)
 
 
 def _send_push_message(
@@ -332,10 +342,13 @@ def _send_push_message(
     *,
     lead_id: int,
     show_generate: bool,
+    order_url: str = "",
 ) -> bool:
     proxies = telegram_requests_proxies(cfg)
     api_url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/sendMessage"
-    markup = _push_keyboard(show_generate=show_generate, lead_id=lead_id)
+    markup = _push_keyboard(
+        show_generate=show_generate, lead_id=lead_id, order_url=order_url
+    )
     try:
         session = requests.Session()
         session.trust_env = False
@@ -372,6 +385,7 @@ def _analyze_shared_ondemand(
     *,
     title: str,
     budget_text: str,
+    description: str,
     lite: AiLiteAnalysis,
     tools_required: list[str],
     ai_errors: list[str],
@@ -388,6 +402,7 @@ def _analyze_shared_ondemand(
                 budget_text=budget_text,
                 lite=lite,
                 tools_required=tools_required,
+                description=description,
                 errors=ai_errors,
                 log_prefix=log_prefix,
                 timeout_sec=90.0,
@@ -590,6 +605,7 @@ def generate_and_store_lead_draft(
                     cfg,
                     title=row[2] or "",
                     budget_text=row[5] or "",
+                    description=row[3] or "",
                     lite=lite,
                     tools_required=tools_existing,
                     ai_errors=ai_errors,
@@ -858,6 +874,7 @@ def push_match_for_lead(
                 lead_summary = (row[12] or task_summary or "").strip()
                 lead_source = str(row[1] or "")
                 lead_budget = str(row[5] or "")
+                lead_order_url = str(row[4] or "").strip()
                 tools = _parse_tools_required(row[13])
                 card_tags = _canonical_lead_tags(row[8]) or lead_tags
 
@@ -913,6 +930,7 @@ def push_match_for_lead(
                         match_pct=km,
                         lead_tags=card_tags,
                         tools_required=tools,
+                        order_url=lead_order_url,
                     )
                     if not _send_push_message(
                         cfg,
@@ -920,6 +938,7 @@ def push_match_for_lead(
                         text,
                         lead_id=lead_id,
                         show_generate=show_generate,
+                        order_url=lead_order_url,
                     ):
                         err.append(f"push:match:fail user={user_id[:8]} lead={lead_id}")
                         continue

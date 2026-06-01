@@ -17,7 +17,9 @@
 | Shared draft matrix | **✅** **12/12** · `gemini-2.5-pro` | `data/preprod_ai_report.json` |
 | Theme prod | **v1.11.15** | STATUS O70 |
 | **Owner 5× draft глазами** | **⚠️ 9/10** · см. [`problems/2026-05-30-owner-draft-accept-9of10.md`](../problems/2026-05-30-owner-draft-accept-9of10.md) |
-| **O72 AI audit (prod sample)** | **📋 backlog** | § O72 |
+| **O72** prod audit (auto) | **✅ O72b** | `preprod_ai_prod_audit.json` |
+| **O72c LLM judge + промпты** | **📋 перед рекламой** | § O72c |
+| **O76 UX re-audit** | **📋 gate soft ads** | § O76 · re-run O37c |
 | **Heatmap (Metrika / Clarity)** | **📋 backlog** | § O73 |
 | Draft burst под нагрузкой | **не тестировали** | опционально перед большой кампанией |
 
@@ -110,7 +112,7 @@
 |----------|-----------------|----------|
 | ~50 concurrent **читателей** ленты/API | **✅** k6 O71 | повтор после крупного deploy API |
 | **50× draft** одновременно | **❌** | опционально `preprod_k6` расширение или ручной burst перед большой рекламой |
-| Playwright UX | **✅** 18/19 | re-run после theme **≥1.11.x** или mobile правок |
+| Playwright UX | **✅** 18/19 (O37c) | **O76 re-run** перед soft ads (theme v1.11.15 + O75) |
 
 Runbook stress: [`PREPROD_STRESS_RUN.md`](PREPROD_STRESS_RUN.md)
 
@@ -119,7 +121,7 @@ Runbook stress: [`PREPROD_STRESS_RUN.md`](PREPROD_STRESS_RUN.md)
 ## Порядок (сводка)
 
 ```
-O71 infra ✅ → owner 5× draft → O72 prod audit → Metrika/Clarity → soft ads → O63 парсеры (parallel backlog)
+O71 ✅ → O72b ✅ → O75 ✅ → O72c judge → O76 UX re-audit → soft ads → O63 (parallel)
 ```
 
 ---

@@ -42,7 +42,11 @@ from src.skills_catalog import (
     normalize_user_tags,
     user_tags_input_count,
 )
-from src.public_feed import is_public_feed_source, public_feed_source_sql
+from src.public_feed import (
+    feed_visibility_where_sql,
+    is_public_feed_source,
+    public_feed_source_sql,
+)
 from src.jwt_auth import decode_access_token, issue_access_token
 from src.telegram_login import login_bot_token, verify_telegram_login
 from src.feed_social import display_views
@@ -64,6 +68,7 @@ from src.match_push import (
     merge_chat_id_on_login,
 )
 from src.reply_draft_strip import strip_reply_draft_price_deadline
+from src.tools_catalog import normalize_tools_required, vendor_lock_tools
 from src.owner_admin import (
     fetch_dashboard,
     is_owner_db_user,
@@ -84,9 +89,7 @@ _OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
 _ME_FEED_SCAN_LIMIT = 500
 _SKILLS_CATALOG_LIMIT = 50
 _SKILLS_CATALOG_DAYS = 30
-_FEED_RETENTION_DAYS = 7
 _FEED_DELAY_MINUTES = 15
-_BOT_FEED_WHERE = "is_visible = TRUE"
 _HOT_MAX_AGE_SEC = 300
 _DRAFT_RETRY_AFTER_SEC = 5
 
@@ -113,14 +116,12 @@ def _feed_base_where_sql(*, alias: str = "") -> tuple[str, list[Any]]:
 
 
 def _feed_where_sql(*, alias: str = "", apply_delay: bool = False) -> tuple[str, list[Any]]:
-    base, params = _feed_base_where_sql(alias=alias)
-    prefix = f"{alias}." if alias else ""
-    sql = base + f" AND {prefix}created_at >= NOW() - make_interval(days => %s)"
-    out_params: list[Any] = [*params, _FEED_RETENTION_DAYS]
-    if apply_delay:
-        sql += f" AND {prefix}created_at <= NOW() - make_interval(mins => %s)"
-        out_params.append(_FEED_DELAY_MINUTES)
-    return sql, out_params
+    delay = _FEED_DELAY_MINUTES if apply_delay else None
+    return feed_visibility_where_sql(
+        alias=alias,
+        apply_delay_minutes=delay,
+        delay_minutes=_FEED_DELAY_MINUTES,
+    )
 
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
@@ -169,7 +170,7 @@ def _row_to_item(
     category = resolve_lead_category(stored_category, title or "", body or "", tags)
     tools: list[str] = []
     if isinstance(tools_required, list):
-        tools = [str(t).strip() for t in tools_required if str(t).strip()]
+        tools = list(normalize_tools_required(tools_required))
     rd = strip_reply_draft_price_deadline((reply_draft or "").strip())
     return {
         "id": lead_id,
@@ -225,6 +226,12 @@ def _attach_personal_replies(cur: Any, user_id: str, items: list[dict[str, Any]]
         it["reply_draft"] = by_lead.get(lid, "")
 
 
+def _strip_tools_for_anon(items: list[dict[str, Any]]) -> None:
+    """O83: anon /v1/feed must not expose L2 tools_required."""
+    for it in items:
+        it["tools_required"] = []
+
+
 def _finalize_feed_items(
     cur: Any,
     items: list[dict[str, Any]],
@@ -234,6 +241,8 @@ def _finalize_feed_items(
     _strip_shared_reply_drafts(items)
     if user_id:
         _attach_personal_replies(cur, user_id, items)
+    else:
+        _strip_tools_for_anon(items)
 
 
 _SELECT_COLS = """

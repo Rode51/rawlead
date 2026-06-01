@@ -813,6 +813,59 @@ def drain_l1_backlog(
     return done
 
 
+def drain_tools_backlog(
+    cfg: Config,
+    pg: NeonLeadStorage,
+    *,
+    errors: list[str],
+    limit: int = 8,
+) -> int:
+    """Site: L2 tools-only для visible leads без tools_required."""
+    if not cfg.ai_active or not pg.enabled:
+        return 0
+    if cfg.radar_profile != "site":
+        return 0
+    rows = pg.fetch_leads_missing_tools(limit=limit, errors=errors)
+    if not rows:
+        return 0
+    from ai_analyze import AiLiteAnalysis, analyze_lead_tools
+
+    done = 0
+    for row in rows:
+        project = _listing_from_neon_row(row)
+        snippet = (project.listing_snippet or project.title or "").strip()
+        log_prefix = f"{row.source}:id={row.external_id} tools:"
+        lite = AiLiteAnalysis(
+            verdict="Брать",
+            task_summary=snippet[:400],
+            lead_tags=(),
+            ai_reasons=(),
+        )
+        tools = analyze_lead_tools(
+            cfg,
+            title=project.title,
+            budget_text=project.budget_text,
+            description=snippet,
+            lite=lite,
+            errors=errors,
+            log_prefix=log_prefix,
+        )
+        if not tools:
+            errors.append(f"{row.source}:id={row.external_id} skip:tools_failed")
+            continue
+        if pg.update_tools_required(
+            project.source,
+            str(project.project_id),
+            list(tools),
+            errors=errors,
+        ):
+            done += 1
+            errors.append(
+                f"{row.source}:id={row.external_id} tools:ok n={len(tools)}"
+            )
+    return done
+
+
 def process_legacy_neon_listing(
     project: ListingProject,
     storage: ProjectStorage,

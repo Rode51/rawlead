@@ -64,12 +64,14 @@ class TestFeedPrivacyO60(unittest.TestCase):
         cur = _FakeCursor({42: "MY REPLY"})
         _finalize_feed_items(cur, [item], user_id=None)
         self.assertEqual(item["reply_draft"], "")
+        self.assertEqual(item["tools_required"], [])
 
     def test_finalize_paid_personal_only(self) -> None:
         item = self._item_with_shared_draft()
         cur = _FakeCursor({42: "MY REPLY"})
         _finalize_feed_items(cur, [item], user_id="00000000-0000-0000-0000-000000000099")
         self.assertEqual(item["reply_draft"], "MY REPLY")
+        self.assertEqual(item["tools_required"], ["php"])
 
     def test_attach_personal_empty_when_no_row(self) -> None:
         item = {"id": 99, "reply_draft": ""}

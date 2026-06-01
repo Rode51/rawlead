@@ -4,8 +4,9 @@
   .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site
   .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --limit 150
 
-Фаза 2 (LLM judge, опционально):
-  .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --judge --judge-limit 30
+Фаза 2 (O72e LLM judge L1+L2, OPENROUTER_MODEL_JUDGE — только свежие лиды):
+  .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --judge --judge-limit 40 --judge-l1 --judge-l1-limit 35
+  .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --judge --judge-since 2026-06-01
   .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --lead-ids 7051,7019
 """
 
@@ -17,7 +18,7 @@ import re
 import sys
 import time
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,7 @@ from ai_analyze import (
     _openrouter_chat,
     _validate_reply_draft_maybe,
     _validate_reply_draft_take,
+    reply_draft_cliche_warn,
     reply_draft_sentence_warn,
 )
 from config import apply_profile_argv, load_config, load_radar_env
@@ -47,7 +49,7 @@ from lead_category import CATEGORIES
 from public_feed import public_feed_source_sql
 from rank import normalize_tags
 from skills_catalog import CANONICAL_TAGS, resolve_canonical_tag
-from tools_catalog import is_known_tool
+from tools_catalog import is_known_tool, normalize_tools_required, vendor_lock_tools
 
 _SELECT_COLS = """
     id, source, title, body, url, budget_text,
@@ -58,6 +60,10 @@ _SELECT_COLS = """
 _SKIP_VERDICTS = frozenset({"мимо", "пропустить", "skip"})
 _TAKE_VERDICTS = frozenset({"брать", "брат", "take"})
 _MAYBE_VERDICTS = frozenset({"сомнительно", "maybe"})
+_O72E_JUDGE_SINCE_DEFAULT = "2026-06-01"
+_JUDGE_L2_COMBINED_MIN = 4.0
+_JUDGE_L2_SEND_MIN = 0.5
+_JUDGE_L1_USABLE_MIN = 0.7
 
 _TOOL_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bfigma\b|\bфигма\b", re.I), "figma"),
@@ -71,17 +77,74 @@ _TOOL_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bкопирайт\b|\bcopywriting\b", re.I), "copywriting"),
 )
 
-_JUDGE_SYSTEM = """Ты — аудитор качества фриланс-откликов RawLead.
+_JUDGE_L2_SYSTEM = """Ты — аудитор качества универсальных фриланс-откликов RawLead (shared draft, O57).
 Оцени reply_draft относительно заказа (title, body, task_summary, tools_required).
 
 Верни один JSON-объект без markdown:
-relevance — 1–5 (релевантность отклика ТЗ)
-specificity — 1–5 (конкретность: шаги, не вода)
-tools_match — «да» | «нет» | «частично» (tools_required соответствуют задаче)
-send_as_is — true | false (готов отправить клиенту as-is)
+relevance — 1–5 (отклик про этот заказ, не шаблон)
+specificity — 1–5 (конкретные шаги/детали из ТЗ, не вода)
+universal_helpful — 1–5 (универсален для типового исполнителя, но полезен — не «готов всё»)
+tools_match — «да» | «нет» | «частично» (tools_required согласованы с текстом отклика и ТЗ)
+send_as_is — true | false (реальный фрилансер отправил бы as-is)
 reason — одно предложение на русском
-prompt_fix — если send_as_is=false: один абзац — что править в промпте (паттерн), иначе ""
+prompt_fix — если send_as_is=false: один абзац — паттерн для правки shared-draft / L2 промпта, иначе ""
 """
+
+_JUDGE_L1_SYSTEM = """Ты — аудитор L1-разбора заказа RawLead (карточка в ленте: task_summary, verdict, теги).
+Оцени, правильно ли ИИ понял заказ по title/body.
+
+Верни один JSON-объект без markdown:
+context_understanding — 1–5 (summary и теги отражают title/body)
+verdict_fair — 1–5 (Брать/Сомнительно/Мимо логичен для ТЗ)
+category_ok — true | false (dev/design/marketing/text не перепутаны)
+l1_usable — true | false (можно доверять карточке без перечитывания биржи)
+reason — одно предложение на русском
+l1_prompt_fix — если l1_usable=false: что править в L1 промпте (_LITE_SYSTEM), иначе ""
+"""
+
+
+def _parse_judge_since(raw: str) -> datetime:
+    text = (raw or "").strip() or _O72E_JUDGE_SINCE_DEFAULT
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(f"--judge-since: invalid date {text!r}, use YYYY-MM-DD") from exc
+    return datetime(parsed.year, parsed.month, parsed.day, tzinfo=timezone.utc)
+
+
+def _since_sql(since: datetime | None) -> tuple[str, list[Any]]:
+    if since is None:
+        return "", []
+    return " AND created_at >= %s", [since]
+
+
+def _lead_created_at(lead: dict[str, Any]) -> datetime | None:
+    raw = lead.get("created_at")
+    if raw is None:
+        return None
+    if isinstance(raw, datetime):
+        return raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _filter_fresh_for_judge(
+    leads: list[dict[str, Any]],
+    *,
+    since: datetime,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for lead in leads:
+        created = _lead_created_at(lead)
+        if created is not None and created >= since:
+            out.append(lead)
+    return out
 
 
 def _norm_verdict(raw: str) -> str:
@@ -95,7 +158,25 @@ def _norm_verdict(raw: str) -> str:
     return v
 
 
-def _parse_tools(raw: Any) -> list[str]:
+def _parse_string_list(raw: Any) -> list[str]:
+    if raw is None:
+        return []
+    items: list[str] = []
+    if isinstance(raw, list):
+        items = [str(t).strip() for t in raw if str(t).strip()]
+    elif isinstance(raw, str) and raw.strip():
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                items = [str(t).strip() for t in data if str(t).strip()]
+            else:
+                items = [raw.strip()]
+        except json.JSONDecodeError:
+            items = [raw.strip()]
+    return items
+
+
+def _parse_tools_raw(raw: Any) -> list[str]:
     if raw is None:
         return []
     items: list[str] = []
@@ -119,6 +200,10 @@ def _parse_tools(raw: Any) -> list[str]:
     return normalize_tags(expanded)[:8]
 
 
+def _parse_tools(raw: Any) -> list[str]:
+    return list(normalize_tools_required(_parse_tools_raw(raw)))
+
+
 def _hinted_tools(title: str, body: str) -> set[str]:
     hay = f"{title or ''}\n{body or ''}"
     out: set[str] = set()
@@ -126,6 +211,12 @@ def _hinted_tools(title: str, body: str) -> set[str]:
         if pat.search(hay):
             out.add(tag)
     return out
+
+
+def _json_datetime(raw: Any) -> str:
+    if isinstance(raw, datetime):
+        return raw.isoformat()
+    return str(raw or "")
 
 
 def _row_to_lead(row: tuple[Any, ...]) -> dict[str, Any]:
@@ -139,10 +230,14 @@ def _row_to_lead(row: tuple[Any, ...]) -> dict[str, Any]:
         "url": row[4] or "",
         "budget_text": row[5] or "",
         "ai_verdict": row[7] or "",
+        "lead_tags": normalize_tags(_parse_string_list(row[8]))[:6],
+        "ai_reasons": _parse_string_list(row[9])[:5],
         "category": category,
         "task_summary": (row[12] or "").strip(),
+        "tools_required_raw": _parse_tools_raw(row[13]),
         "tools_required": _parse_tools(row[13]),
         "reply_draft": (row[14] or "").strip(),
+        "created_at": _json_datetime(row[10]),
         "sample_bucket": "main",
     }
 
@@ -164,18 +259,28 @@ def _fetch_leads_by_ids(conn: psycopg.Connection, lead_ids: list[int]) -> list[d
     return out
 
 
-def _fetch_empty_l1(conn: psycopg.Connection, *, limit: int, src_sql: str, src_params: list[Any]) -> list[dict]:
+def _fetch_empty_l1(
+    conn: psycopg.Connection,
+    *,
+    limit: int,
+    src_sql: str,
+    src_params: list[Any],
+    since_sql: str = "",
+    since_params: list[Any] | None = None,
+) -> list[dict]:
+    since_params = since_params or []
     sql = f"""
         SELECT {_SELECT_COLS}
         FROM leads
         WHERE is_visible = TRUE
           {src_sql}
+          {since_sql}
           AND COALESCE(NULLIF(TRIM(task_summary), ''), '') = ''
         ORDER BY id DESC
         LIMIT %s
     """
     with conn.cursor() as cur:
-        cur.execute(sql, [*src_params, limit])
+        cur.execute(sql, [*src_params, *since_params, limit])
         rows = cur.fetchall()
     out = [_row_to_lead(r) for r in rows]
     for lead in out:
@@ -190,18 +295,22 @@ def _stratified_sample(
     src_sql: str,
     src_params: list[Any],
     pool_size: int = 2500,
+    since_sql: str = "",
+    since_params: list[Any] | None = None,
 ) -> list[dict]:
+    since_params = since_params or []
     sql = f"""
         SELECT {_SELECT_COLS}
         FROM leads
         WHERE is_visible = TRUE
           {src_sql}
+          {since_sql}
           AND COALESCE(NULLIF(TRIM(reply_draft), ''), '') <> ''
         ORDER BY id DESC
         LIMIT %s
     """
     with conn.cursor() as cur:
-        cur.execute(sql, [*src_params, pool_size])
+        cur.execute(sql, [*src_params, *since_params, pool_size])
         rows = cur.fetchall()
 
     pool = [_row_to_lead(r) for r in rows]
@@ -260,10 +369,17 @@ def audit_lead(lead: dict[str, Any]) -> dict[str, Any]:
             sw = reply_draft_sentence_warn(v_label, reply_draft)
             if sw:
                 warns.append(sw)
+            cw = reply_draft_cliche_warn(reply_draft)
+            if cw:
+                warns.append(cw)
     elif audit_l2 and verdict == "мимо" and reply_draft:
         warns.append("warn:reply_draft_nonempty_for_mimo")
 
     if audit_tools and tools:
+        locked = vendor_lock_tools(lead.get("tools_required_raw") or tools)
+        if locked:
+            fails.append(f"tools:vendor_lock:{','.join(locked[:5])}")
+
         if len(tools) < 2:
             fails.append("tools:min_2_required")
         elif len(tools) > 8:
@@ -414,12 +530,38 @@ def _build_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _run_judge(cfg, leads: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+def _judge_model(cfg) -> str:
+    return (cfg.ai_model_judge or "").strip() or "anthropic/claude-sonnet-4"
+
+
+def _l1_judge_targets(leads: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+    seen: set[int] = set()
+    out: list[dict[str, Any]] = []
+    for lead in leads:
+        if lead.get("sample_bucket") == "empty_l1" and lead["lead_id"] not in seen:
+            seen.add(lead["lead_id"])
+            out.append(lead)
+    for lead in leads:
+        if len(out) >= limit:
+            break
+        if (lead.get("task_summary") or "").strip() and lead["lead_id"] not in seen:
+            seen.add(lead["lead_id"])
+            out.append(lead)
+    for lead in leads:
+        if len(out) >= limit:
+            break
+        if lead["lead_id"] not in seen:
+            seen.add(lead["lead_id"])
+            out.append(lead)
+    return out[:limit]
+
+
+def _run_judge_l2(cfg, leads: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
     if not cfg.ai_active:
         return []
-    model = cfg.ai_model_shared_draft.strip() or cfg.ai_model_premium.strip()
+    model = _judge_model(cfg)
     judged: list[dict[str, Any]] = []
-    targets = [r for r in leads if r.get("reply_draft")][:limit]
+    targets = [r for r in leads if (r.get("reply_draft") or "").strip()][:limit]
     for lead in targets:
         user = (
             f"Заголовок: {lead['title']}\n"
@@ -433,7 +575,7 @@ def _run_judge(cfg, leads: list[dict[str, Any]], *, limit: int) -> list[dict[str
             raw = _openrouter_chat(
                 cfg,
                 model=model,
-                system=_JUDGE_SYSTEM,
+                system=_JUDGE_L2_SYSTEM,
                 user=user,
                 timeout_sec=60.0,
                 json_mode=True,
@@ -442,6 +584,7 @@ def _run_judge(cfg, leads: list[dict[str, Any]], *, limit: int) -> list[dict[str
             entry.update(
                 relevance=int(data.get("relevance", 0)),
                 specificity=int(data.get("specificity", 0)),
+                universal_helpful=int(data.get("universal_helpful", 0)),
                 tools_match=str(data.get("tools_match", "")),
                 send_as_is=bool(data.get("send_as_is")),
                 reason=str(data.get("reason", ""))[:300],
@@ -454,13 +597,78 @@ def _run_judge(cfg, leads: list[dict[str, Any]], *, limit: int) -> list[dict[str
     return judged
 
 
-def _judge_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
-    ok = [j for j in judged if "error" not in j and j.get("relevance")]
+def _run_judge_l1(cfg, leads: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+    if not cfg.ai_active:
+        return []
+    model = _judge_model(cfg)
+    judged: list[dict[str, Any]] = []
+    for lead in _l1_judge_targets(leads, limit=limit):
+        user = (
+            f"Заголовок: {lead['title']}\n"
+            f"Описание:\n{lead['body'][:3000]}\n\n"
+            f"category (DB): {lead['category']}\n"
+            f"verdict: {lead['ai_verdict']}\n"
+            f"task_summary: {lead['task_summary'] or '—'}\n"
+            f"lead_tags: {', '.join(lead.get('lead_tags') or []) or '—'}\n"
+            f"ai_reasons: {' | '.join(lead.get('ai_reasons') or []) or '—'}\n"
+        )
+        entry: dict[str, Any] = {"lead_id": lead["lead_id"], "model": model}
+        try:
+            raw = _openrouter_chat(
+                cfg,
+                model=model,
+                system=_JUDGE_L1_SYSTEM,
+                user=user,
+                timeout_sec=60.0,
+                json_mode=True,
+            )
+            data = _extract_json_object(raw or "")
+            entry.update(
+                context_understanding=int(data.get("context_understanding", 0)),
+                verdict_fair=int(data.get("verdict_fair", 0)),
+                category_ok=bool(data.get("category_ok")),
+                l1_usable=bool(data.get("l1_usable")),
+                reason=str(data.get("reason", ""))[:300],
+                l1_prompt_fix=str(data.get("l1_prompt_fix", ""))[:500],
+            )
+        except Exception as exc:  # noqa: BLE001 — audit script
+            entry["error"] = str(exc)[:200]
+        judged.append(entry)
+        time.sleep(0.5)
+    return judged
+
+
+def _judge_l2_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
+    ok = [
+        j
+        for j in judged
+        if "error" not in j and j.get("relevance") and j.get("universal_helpful")
+    ]
     if not ok:
-        return {"count": len(judged), "avg_relevance": 0, "avg_specificity": 0, "accept_3_5": False}
+        return {
+            "count": len(judged),
+            "scored": 0,
+            "avg_relevance": 0,
+            "avg_specificity": 0,
+            "avg_universal_helpful": 0,
+            "avg_combined_3": 0,
+            "send_as_is_pct": 0,
+            "accept_l2": False,
+            "top_worst": [],
+            "prompt_recommendations": [],
+        }
     rel = sum(j["relevance"] for j in ok) / len(ok)
     spec = sum(j["specificity"] for j in ok) / len(ok)
-    worst = sorted(ok, key=lambda x: (x["relevance"], x["specificity"]))[:10]
+    univ = sum(j["universal_helpful"] for j in ok) / len(ok)
+    combined = (rel + spec + univ) / 3
+    send_ok = sum(1 for j in ok if j.get("send_as_is")) / len(ok)
+    worst = sorted(
+        ok,
+        key=lambda x: (
+            x["relevance"] + x["specificity"] + x.get("universal_helpful", 0),
+            x["relevance"],
+        ),
+    )[:10]
     patterns: list[str] = []
     for j in worst:
         if j.get("prompt_fix"):
@@ -470,10 +678,150 @@ def _judge_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
         "scored": len(ok),
         "avg_relevance": round(rel, 2),
         "avg_specificity": round(spec, 2),
-        "accept_3_5": rel >= 3.5 and spec >= 3.5,
+        "avg_universal_helpful": round(univ, 2),
+        "avg_combined_3": round(combined, 2),
+        "send_as_is_pct": round(send_ok * 100, 1),
+        "accept_l2": combined >= _JUDGE_L2_COMBINED_MIN and send_ok >= _JUDGE_L2_SEND_MIN,
         "top_worst": worst,
         "prompt_recommendations": patterns[:10],
     }
+
+
+def _judge_l1_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
+    ok = [
+        j
+        for j in judged
+        if "error" not in j and j.get("context_understanding")
+    ]
+    if not ok:
+        return {
+            "count": len(judged),
+            "scored": 0,
+            "avg_context": 0,
+            "avg_verdict_fair": 0,
+            "l1_usable_pct": 0,
+            "category_ok_pct": 0,
+            "accept_l1": False,
+            "top_worst": [],
+            "l1_prompt_recommendations": [],
+        }
+    ctx = sum(j["context_understanding"] for j in ok) / len(ok)
+    vf = sum(j["verdict_fair"] for j in ok) / len(ok)
+    usable = sum(1 for j in ok if j.get("l1_usable")) / len(ok)
+    cat_ok = sum(1 for j in ok if j.get("category_ok")) / len(ok)
+    worst = sorted(ok, key=lambda x: (x["context_understanding"], x["verdict_fair"]))[:10]
+    patterns: list[str] = []
+    for j in worst:
+        if j.get("l1_prompt_fix"):
+            patterns.append(j["l1_prompt_fix"])
+    return {
+        "count": len(judged),
+        "scored": len(ok),
+        "avg_context": round(ctx, 2),
+        "avg_verdict_fair": round(vf, 2),
+        "l1_usable_pct": round(usable * 100, 1),
+        "category_ok_pct": round(cat_ok * 100, 1),
+        "accept_l1": usable >= _JUDGE_L1_USABLE_MIN,
+        "top_worst": worst,
+        "l1_prompt_recommendations": patterns[:10],
+    }
+
+
+def _render_judge_md(
+    report: dict[str, Any],
+    results: list[dict[str, Any]],
+    *,
+    judge_l2: list[dict[str, Any]] | None,
+    judge_l1: list[dict[str, Any]] | None,
+) -> str:
+    by_id = {r["lead_id"]: r for r in results}
+    lines = [
+        "# O72e — LLM judge (L1 + L2, свежие лиды)",
+        "",
+        f"- **Time:** {report['generated_at']}",
+        f"- **Profile:** {report.get('profile', 'site')}",
+        f"- **Judge model:** {report.get('judge_model', '—')}",
+        f"- **Judge since:** {report.get('judge_since', '—')}",
+        "",
+    ]
+
+    if judge_l2 is not None and report.get("judge_l2_summary"):
+        js = report["judge_l2_summary"]
+        lines.extend(
+            [
+                "## L2 — reply_draft (главный gate)",
+                "",
+                f"- Scored: **{js.get('scored', 0)}/{js.get('count', 0)}**",
+                f"- Avg relevance: **{js.get('avg_relevance', 0)}**/5",
+                f"- Avg specificity: **{js.get('avg_specificity', 0)}**/5",
+                f"- Avg universal_helpful: **{js.get('avg_universal_helpful', 0)}**/5",
+                f"- Avg combined (3 метрики): **{js.get('avg_combined_3', 0)}**/5 "
+                f"({'✅ ≥4.0' if js.get('avg_combined_3', 0) >= _JUDGE_L2_COMBINED_MIN else '❌ <4.0'})",
+                f"- send_as_is: **{js.get('send_as_is_pct', 0)}%** "
+                f"({'✅ ≥50%' if js.get('send_as_is_pct', 0) >= _JUDGE_L2_SEND_MIN * 100 else '❌ <50%'})",
+                f"- **Accept L2:** {'✅ PASS' if js.get('accept_l2') else '❌ FAIL'}",
+                "",
+                "### Top prompt-fix patterns (L2)",
+                "",
+            ]
+        )
+        for i, p in enumerate(js.get("prompt_recommendations", [])[:5], 1):
+            lines.append(f"{i}. {p}")
+        lines.extend(["", "### Top-10 worst L2 (цитаты)", ""])
+        for j in js.get("top_worst", [])[:10]:
+            lead = by_id.get(j["lead_id"], {})
+            title = (lead.get("title") or "")[:80]
+            draft = (lead.get("reply_draft") or "")[:400]
+            lines.append(f"- **#{j['lead_id']}** {title!r}")
+            lines.append(
+                f"  - scores: rel={j.get('relevance')} spec={j.get('specificity')} "
+                f"univ={j.get('universal_helpful')} send={j.get('send_as_is')}"
+            )
+            lines.append(f"  - reason: {j.get('reason', '')}")
+            if draft:
+                lines.append(f"  - draft: «{draft}…»" if len(draft) >= 400 else f"  - draft: «{draft}»")
+            if j.get("prompt_fix"):
+                lines.append(f"  - fix: {j['prompt_fix']}")
+
+    if judge_l1 is not None and report.get("judge_l1_summary"):
+        js1 = report["judge_l1_summary"]
+        lines.extend(
+            [
+                "",
+                "## L1 — task_summary / verdict / tags",
+                "",
+                f"- Scored: **{js1.get('scored', 0)}/{js1.get('count', 0)}**",
+                f"- Avg context_understanding: **{js1.get('avg_context', 0)}**/5",
+                f"- Avg verdict_fair: **{js1.get('avg_verdict_fair', 0)}**/5",
+                f"- l1_usable: **{js1.get('l1_usable_pct', 0)}%** "
+                f"({'✅ ≥70%' if js1.get('l1_usable_pct', 0) >= _JUDGE_L1_USABLE_MIN * 100 else '❌ <70%'})",
+                f"- category_ok: **{js1.get('category_ok_pct', 0)}%**",
+                f"- **Accept L1:** {'✅ PASS' if js1.get('accept_l1') else '❌ FAIL'}",
+                "",
+                "### Top prompt-fix patterns (L1)",
+                "",
+            ]
+        )
+        for i, p in enumerate(js1.get("l1_prompt_recommendations", [])[:5], 1):
+            lines.append(f"{i}. {p}")
+        lines.extend(["", "### Top-10 worst L1", ""])
+        for j in js1.get("top_worst", [])[:10]:
+            lead = by_id.get(j["lead_id"], {})
+            title = (lead.get("title") or "")[:80]
+            summary = (lead.get("task_summary") or "")[:300]
+            lines.append(f"- **#{j['lead_id']}** {title!r}")
+            lines.append(
+                f"  - ctx={j.get('context_understanding')} verdict_fair={j.get('verdict_fair')} "
+                f"usable={j.get('l1_usable')} cat_ok={j.get('category_ok')}"
+            )
+            lines.append(f"  - reason: {j.get('reason', '')}")
+            if summary:
+                lines.append(f"  - summary: «{summary}»")
+            if j.get("l1_prompt_fix"):
+                lines.append(f"  - fix: {j['l1_prompt_fix']}")
+
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _render_human_md(report: dict[str, Any]) -> str:
@@ -532,24 +880,20 @@ def _render_human_md(report: dict[str, Any]) -> str:
         )
         lines.append(f"  - fails: {', '.join(item['fails'])}")
 
-    if report.get("judge_summary"):
-        js = report["judge_summary"]
+    if report.get("judge_l2_summary"):
+        js = report["judge_l2_summary"]
         lines.extend(
             [
                 "",
-                "## LLM judge",
+                "## LLM judge (O72c)",
                 "",
-                f"- Scored: {js.get('scored', 0)}/{js.get('count', 0)}",
-                f"- Avg relevance: **{js.get('avg_relevance', 0)}**/5",
-                f"- Avg specificity: **{js.get('avg_specificity', 0)}**/5",
-                f"- Accept ≥3.5: {'✅' if js.get('accept_3_5') else '❌'}",
-                "",
-                "### Prompt fix patterns",
-                "",
+                f"- L2 scored: {js.get('scored', 0)}/{js.get('count', 0)} · "
+                f"combined **{js.get('avg_combined_3', 0)}**/5 · "
+                f"send_as_is **{js.get('send_as_is_pct', 0)}%** · "
+                f"{'✅' if js.get('accept_l2') else '❌'}",
+                f"- Подробно: `data/preprod_ai_prod_audit_judge.md`",
             ]
         )
-        for p in js.get("prompt_recommendations", [])[:5]:
-            lines.append(f"- {p}")
 
     if report.get("owner_lead_ids"):
         lines.extend(["", "## Owner lead_ids (root cause)", ""])
@@ -574,8 +918,15 @@ def main() -> int:
     parser.add_argument("--profile", default="site", choices=("site", "legacy"))
     parser.add_argument("--limit", type=int, default=150, help="main stratified sample size")
     parser.add_argument("--empty-l1-limit", type=int, default=25, help="extra empty task_summary rows")
-    parser.add_argument("--judge", action="store_true", help="phase 2: LLM judge")
-    parser.add_argument("--judge-limit", type=int, default=30)
+    parser.add_argument("--judge", action="store_true", help="O72c: L2 LLM judge")
+    parser.add_argument("--judge-limit", type=int, default=40)
+    parser.add_argument("--judge-l1", action="store_true", help="O72c: L1 LLM judge")
+    parser.add_argument("--judge-l1-limit", type=int, default=35)
+    parser.add_argument(
+        "--judge-since",
+        default="",
+        help=f"O72e: judge only leads with created_at on/after date (default {_O72E_JUDGE_SINCE_DEFAULT} when --judge)",
+    )
     parser.add_argument("--lead-ids", default="", help="comma lead_id for owner root-cause")
     parser.add_argument(
         "--json-out",
@@ -586,6 +937,11 @@ def main() -> int:
         "--md-out",
         type=Path,
         default=_ROOT / "data" / "preprod_ai_prod_audit_human.md",
+    )
+    parser.add_argument(
+        "--judge-md-out",
+        type=Path,
+        default=_ROOT / "data" / "preprod_ai_prod_audit_judge.md",
     )
     args = parser.parse_args()
     apply_profile_argv(["--profile", args.profile])
@@ -599,10 +955,35 @@ def main() -> int:
 
     owner_ids = [int(x.strip()) for x in args.lead_ids.split(",") if x.strip().isdigit()]
     src_sql, src_params = public_feed_source_sql()
+    need_judge = args.judge or args.judge_l1
+    judge_since: datetime | None = None
+    since_sql = ""
+    since_params: list[Any] = []
+    if need_judge:
+        try:
+            judge_since = _parse_judge_since(args.judge_since)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        since_sql, since_params = _since_sql(judge_since)
 
     with psycopg.connect(db_url) as conn:
-        main_sample = _stratified_sample(conn, n=args.limit, src_sql=src_sql, src_params=src_params)
-        empty_l1 = _fetch_empty_l1(conn, limit=args.empty_l1_limit, src_sql=src_sql, src_params=src_params)
+        main_sample = _stratified_sample(
+            conn,
+            n=args.limit,
+            src_sql=src_sql,
+            src_params=src_params,
+            since_sql=since_sql,
+            since_params=since_params,
+        )
+        empty_l1 = _fetch_empty_l1(
+            conn,
+            limit=args.empty_l1_limit,
+            src_sql=src_sql,
+            src_params=src_params,
+            since_sql=since_sql,
+            since_params=since_params,
+        )
         owner_leads = _fetch_leads_by_ids(conn, owner_ids)
 
     seen: set[int] = set()
@@ -622,18 +1003,33 @@ def main() -> int:
             if lid in by_id:
                 owner_root.append(by_id[lid])
 
-    judge_rows: list[dict] = []
-    judge_summary: dict[str, Any] | None = None
-    if args.judge:
+    judge_l2_rows: list[dict] = []
+    judge_l1_rows: list[dict] = []
+    judge_l2_summary: dict[str, Any] | None = None
+    judge_l1_summary: dict[str, Any] | None = None
+    if need_judge:
         if not cfg.ai_active:
             print("--judge: AI_ENABLED=0 или нет ключа OpenRouter", file=sys.stderr)
             return 2
-        judge_rows = _run_judge(cfg, results, limit=args.judge_limit)
-        judge_summary = _judge_summary(judge_rows)
+        assert judge_since is not None
+        fresh_results = _filter_fresh_for_judge(results, since=judge_since)
+        print(f"Judge model: {_judge_model(cfg)}")
+        print(
+            f"Judge since: {judge_since.date().isoformat()} "
+            f"({len(fresh_results)}/{len(results)} leads in sample)"
+        )
+        if args.judge:
+            judge_l2_rows = _run_judge_l2(cfg, fresh_results, limit=args.judge_limit)
+            judge_l2_summary = _judge_l2_summary(judge_l2_rows)
+        if args.judge_l1:
+            judge_l1_rows = _run_judge_l1(cfg, fresh_results, limit=args.judge_l1_limit)
+            judge_l1_summary = _judge_l1_summary(judge_l1_rows)
 
     report: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "profile": args.profile,
+        "judge_model": _judge_model(cfg) if need_judge else "",
+        "judge_since": judge_since.date().isoformat() if judge_since else "",
         "sample": {
             "main_limit": args.limit,
             "empty_l1_limit": args.empty_l1_limit,
@@ -644,13 +1040,27 @@ def main() -> int:
         "owner_lead_ids": owner_ids,
         "owner_root_cause": owner_root,
     }
-    if judge_summary is not None:
-        report["judge_summary"] = judge_summary
-        report["judge_results"] = judge_rows
+    if judge_l2_summary is not None:
+        report["judge_l2_summary"] = judge_l2_summary
+        report["judge_l2_results"] = judge_l2_rows
+    if judge_l1_summary is not None:
+        report["judge_l1_summary"] = judge_l1_summary
+        report["judge_l1_results"] = judge_l1_rows
 
     args.json_out.parent.mkdir(parents=True, exist_ok=True)
     args.json_out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     args.md_out.write_text(_render_human_md(report), encoding="utf-8")
+    if need_judge:
+        args.judge_md_out.write_text(
+            _render_judge_md(
+                report,
+                results,
+                judge_l2=judge_l2_rows or None,
+                judge_l1=judge_l1_rows or None,
+            ),
+            encoding="utf-8",
+        )
+        print(f"Judge md → {args.judge_md_out}")
 
     print(
         f"O72 audit: draft-only {summary['draft_only_pass']}/{summary['total']} "
@@ -667,15 +1077,25 @@ def main() -> int:
     else:
         print("Accept O72 combined: FAIL (<85% auto-pass)")
 
-    if judge_summary is not None:
+    if judge_l2_summary is not None:
         print(
-            f"Judge: rel={judge_summary['avg_relevance']} spec={judge_summary['avg_specificity']} "
-            f"({'PASS' if judge_summary['accept_3_5'] else 'FAIL'})"
+            f"Judge L2: combined={judge_l2_summary['avg_combined_3']} "
+            f"univ={judge_l2_summary['avg_universal_helpful']} "
+            f"send={judge_l2_summary['send_as_is_pct']}% "
+            f"({'PASS' if judge_l2_summary['accept_l2'] else 'FAIL'})"
+        )
+    if judge_l1_summary is not None:
+        print(
+            f"Judge L1: ctx={judge_l1_summary['avg_context']} "
+            f"usable={judge_l1_summary['l1_usable_pct']}% "
+            f"({'PASS' if judge_l1_summary['accept_l1'] else 'FAIL'})"
         )
 
     ok = summary["accept_draft_95pct"]
-    if judge_summary is not None:
-        ok = ok and judge_summary["accept_3_5"]
+    if judge_l2_summary is not None:
+        ok = ok and judge_l2_summary["accept_l2"]
+    if judge_l1_summary is not None:
+        ok = ok and judge_l1_summary["accept_l1"]
     return 0 if ok else 1
 
 

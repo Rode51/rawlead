@@ -184,15 +184,42 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 
 ## 3. Карточка лида — главный компонент
 
-### 3.1 Закрытое состояние (NEO · prod v1.10.9)
+### 3.1 Закрытое состояние (NEO · prod v1.10.9 · O82 match breakdown)
 
 **Сетка:** `.rl-feed-list` — 2 колонки desktop · 1 col mobile · `align-items: start` · collapsed `min-height: 240px`
+
+**Режим A — с навыками (skills_selected = true):**
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │ ● FL.ru          Верстка лендинга на WordPress  2ч   │
 │ Бюджет: 25 000 – 40 000 ₽                            │
-│ ▓▓▓▓▓▓▓▓▓▒  88%  Совпадение    [Брать ✓]            │
+│ ▓▓▓▓▓▓▓▓▓▒  88%  Совместимость    [Брать ✓]         │
+│ Качество заказа: 92 · Навыки: 82%                    │
+│ #wordpress  #верстка  #figma                         │
+└──────────────────────────────────────────────────────┘
+```
+
+**Режим B — без навыков (zero state, skills_selected = false):**
+
+```
+┌──────────────────────────────────────────────────────┐
+│ ● FL.ru          Верстка лендинга на WordPress  2ч   │
+│ Бюджет: 25 000 – 40 000 ₽                            │
+│ ▓▓▓▓▓▓▒  67%  Качество заказа    [Брать ✓]           │
+│ Добавь навыки, чтобы увидеть совместимость →         │
+│ #wordpress  #верстка  #figma                         │
+└──────────────────────────────────────────────────────┘
+```
+
+**100% match (режим A + keyword_match = 100 + ≥1 навык):**
+
+```
+┌──────────────────────────────────────────────────────┐
+│ ● FL.ru          Верстка лендинга на WordPress  2ч   │
+│ Бюджет: 25 000 – 40 000 ₽                            │
+│ ▓▓▓▓▓▓▓▓▓▓  100%  Совместимость  [ИДЕАЛЬНО ✦]       │
+│ Качество заказа: 95 · Навыки: 100%                   │
 │ #wordpress  #верстка  #figma                         │
 └──────────────────────────────────────────────────────┘
 ```
@@ -204,17 +231,26 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 | Время | Manrope 12px, `#525252`, справа |
 | Заголовок | Manrope 15px / 800, `#0A0A0A`, одна строка ellipsis; полный текст при expand |
 | Бюджет | Manrope 14px / 400, `#1A1A1A` |
-| Match-bar | height `4px`, track `#0A0A0A`, fill `#0A0A0A`; animate width 600ms при viewport |
+| **Match row** | `.rl-match-row` — flex, align-items center, gap 8px |
+| Match-bar | height `4px`, track `#D4D4D4`, fill `#0A0A0A`; animate width 600ms при viewport; **zero state:** fill `#525252` |
+| Match label | Manrope 13px / 700, `#0A0A0A`; **режим A:** «Совместимость»; **режим B:** «Качество заказа» |
 | Match % | Manrope 13px / 700, `#0A0A0A` |
-| **100% match** | `.rl-lead-card--perfect-match`: border `2px solid #FACC15`, shadow `4px 4px 0 #FACC15`, badge `.rl-badge--perfect` (жёлтый NEO) · pulse 700ms · только `keyword_match=100` + ≥1 навык (**O26**) |
+| AI-чип / ИДЕАЛЬНО | **Режим A < 100%:** «Брать» / «Сомнительно»; **100% match:** badge «ИДЕАЛЬНО ✦» заменяет AI-чип в match row |
+| **Breakdown row** | `.rl-match-breakdown` — Manrope 12px / 400, `#525252`; padding-top `2px` |
+| Breakdown A | `Качество заказа: {ai_score} · Навыки: {keyword_match}%` |
+| Breakdown B | `Добавь навыки, чтобы увидеть совместимость →` — ghost link → `[Навыки ▾]` |
+| Breakdown tooltip | desktop hover на «Совместимость»: «Качество × 60% + Навыки × 40%» (title attr) |
+| **100% match** | `.rl-lead-card--perfect-match`: border `2px solid #FACC15`, shadow `4px 4px 0 #FACC15` · pulse 700ms · только `keyword_match=100` + ≥1 навык (**O26**) |
 | **Просмотры** | иконка глаза + число · **O25b:** «только что» = 1–3 |
-| AI-чип | «Брать»: bg `#DCFCE7`, text `#16A34A`; «Сомнительно»: bg `#F5F5F0`, text `#6B7280` |
 | Теги | 11px/600, bg `#F5F5F0`, text `#525252`; max 4 + «+N» |
 | Cursor | pointer — вся карточка кликабельна |
 
 **Hover:** `box-shadow: 6px 6px 0 #0A0A0A` + `translate(-2px, -2px)` (150ms)
 
-**Mobile:** padding `16px 18px`; заголовок — 2 строки (не ellipsis, больше места)
+**Mobile (390px):**
+- padding `16px 18px`; заголовок — 2 строки (не ellipsis)
+- Breakdown row: Manrope 11px / 400, 1 строка, overflow ellipsis — не переносить
+- «ИДЕАЛЬНО ✦» при 100%: **в match row** (заменяет AI-чип), НЕ в meta-строке → нет конфликта с breakdown
 
 ### 3.2 Раскрытое состояние
 

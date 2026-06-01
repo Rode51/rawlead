@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.11.15');
+define('RAWLEAD_CHILD_VERSION', '1.11.18');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -149,6 +149,13 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restFeed' => esc_url_raw(rest_url('rawlead/v1/feed')),
             'lentaUrl' => esc_url_raw(rawlead_page_url('lenta')),
         ]);
+        wp_enqueue_script(
+            'rawlead-flow',
+            RAWLEAD_CHILD_URI . '/assets/js/rawlead-flow.js',
+            [],
+            RAWLEAD_CHILD_VERSION,
+            true
+        );
     }
 
     if (is_page('lenta')) {

@@ -147,7 +147,9 @@ final_rank    = round(ai_score * 0.6 + keyword_match * 0.4)
 | `f(...)` | **F2:** совпавшие теги лида / `len(lead_tags)` × 100, cap 100 · «ИДЕАЛЬНО ✦» только при ≥2 тегах у лида и km=100 · user_tags max **12** |
 | Веса 0.6 / 0.4 | в `settings` или env `RANK_WEIGHT_AI`, `RANK_WEIGHT_TAGS` |
 
-**Позже:** синонимы (`python` ↔ `питон`), эмбеддинги — отдельная задача.
+**→ O82 (2026-06-01):** w1 UI breakdown (§4 ниже) · w2 **F2+** (weighted/synonyms/granular `ai_score`) · w3 embeddings — см. [`CODER_PROMPT.md`](CODER_PROMPT.md) § **O82** · **O46 не отменяется** до приёмки w2.
+
+**Позже (w3):** эмбеддинги task_summary ↔ profile — отдельная задача.
 
 ---
 

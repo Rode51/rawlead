@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import json
+import logging
 from urllib.parse import urlparse
 
 import requests
 
 from config import Config
-from exchange_proxy import requests_proxies_for
+from exchange_proxy import exchange_fetch_begin, exchange_fetch_end, exchange_get, proxy_log_hint
 from lead_category import category_from_kwork_listing_url, category_from_kwork_want
 from listing import SOURCE_KWORK, ListingProject
+from radar_cycle_log import log_pipeline_line
+
+logger = logging.getLogger(__name__)
 
 
 class KworkListingError(RuntimeError):
@@ -144,15 +148,15 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
     """GET `cfg.kwork_projects_url`, первая страница (без пагинации в MVP)."""
     url = cfg.kwork_projects_url
     headers = {"User-Agent": cfg.http_user_agent}
+    exchange_fetch_begin("kwork")
+    log_pipeline_line(cfg.radar_log_path, f"fetch:kwork proxy={proxy_log_hint('kwork')}")
     try:
-        resp = requests.get(
-            url,
-            headers=headers,
-            timeout=timeout_sec,
-            proxies=requests_proxies_for("kwork"),
-        )
-    except requests.RequestException as exc:
-        raise KworkListingError(f"Сетевой сбой при запросе ленты: {exc}") from exc
+        try:
+            resp = exchange_get("kwork", url, headers=headers, timeout_sec=timeout_sec)
+        except requests.RequestException as exc:
+            raise KworkListingError(f"Сетевой сбой при запросе ленты: {exc}") from exc
+    finally:
+        exchange_fetch_end("kwork")
 
     if resp.status_code != 200:
         raise KworkListingError(f"HTTP {resp.status_code} для ленты Kwork.")
@@ -211,12 +215,7 @@ def check_project_page_gone(
         return None
     headers = {"User-Agent": cfg.http_user_agent}
     try:
-        resp = requests.get(
-            url,
-            headers=headers,
-            timeout=timeout_sec,
-            proxies=requests_proxies_for("kwork"),
-        )
+        resp = exchange_get("kwork", url, headers=headers, timeout_sec=timeout_sec)
     except requests.RequestException:
         return None
 

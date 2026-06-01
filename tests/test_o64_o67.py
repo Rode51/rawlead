@@ -95,6 +95,7 @@ def test_legacy_poll_interval_config() -> None:
         ai_model_summary="m",
         ai_model_premium="m",
         ai_model_shared_draft="m",
+        ai_model_judge="m",
         ai_provider="openrouter",
         min_budget_rub=0,
         ai_notify_skip=False,

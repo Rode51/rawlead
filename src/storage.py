@@ -325,6 +325,20 @@ class ProjectStorage:
 
             return row is not None
 
+    def max_project_id(self, source: str) -> int:
+        """MAX(project_id) для источника в SQLite (watermark для Пчёл)."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT MAX(project_id) FROM projects WHERE source = ?",
+                (source,),
+            ).fetchone()
+        if not row or row[0] is None:
+            return 0
+        try:
+            return int(row[0])
+        except (TypeError, ValueError):
+            return 0
+
     def list_project_ids(self, sources: list[str]) -> list[tuple[str, int]]:
         """Все (source, project_id) из SQLite для указанных источников."""
         if not sources:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import random
 import sys
 import time
@@ -28,17 +29,28 @@ from config import (
 )
 from filters import ListingWordFilter, default_listing_filter
 from fl_parser import FlListingError, fetch_listing_projects
+from freelance_ru_parser import (
+    FreelanceRuListingError,
+    fetch_listing_projects as fetch_freelance_ru_listing,
+)
+from freelancejob_parser import (
+    FreelancejobListingError,
+    fetch_listing_projects as fetch_freelancejob_listing,
+)
+from pchyol_parser import PchyolListingError, fetch_listing_projects as fetch_pchyol_listing, filter_new_pchyol_projects
 from habr_career_parser import (
     HabrCareerListingError,
     fetch_listing_projects as fetch_habr_career_listing,
 )
 from kwork_parser import KworkListingError, fetch_listing_projects as fetch_kwork_listing_projects
+from youdo_parser import YoudoListingError, fetch_listing_projects as fetch_youdo_listing
 from public_feed import public_feed_sources
 from vc_ru_parser import VcRuListingError, fetch_listing_projects as fetch_vc_ru_listing
 
 from l1_pool import L1Pool
 from delist_checker import run_delist_batch
-from lead_pipeline import drain_l1_backlog, process_new_listing, short_err
+from feed_retention import run_feed_retention_batch
+from lead_pipeline import drain_l1_backlog, drain_tools_backlog, process_new_listing, short_err
 from listing import ListingProject
 from pg_storage import NeonLeadStorage, pg_storage_from_config
 from radar_cycle_log import (
@@ -62,15 +74,24 @@ from telegram_control import send_control_panel
 _TG_POLL_INTERVAL_SEC = 2
 _DELIST_INTERVAL_SEC = 3600
 _DELIST_LAST_RUN_KEY = "delist_last_run_epoch"
+_FEED_RETENTION_LAST_RUN_KEY = "feed_retention_last_run_epoch"
 
 _LISTING_ERRORS = (
     FlListingError,
     KworkListingError,
     VcRuListingError,
     HabrCareerListingError,
+    YoudoListingError,
+    FreelanceRuListingError,
+    FreelancejobListingError,
+    PchyolListingError,
 )
 
 _P1_WEB_SOURCES: tuple[tuple[str, Callable[[Config], list[ListingProject]]], ...] = (
+    ("youdo", fetch_youdo_listing),
+    ("freelance_ru", fetch_freelance_ru_listing),
+    ("freelancejob", fetch_freelancejob_listing),
+    ("pchyol", fetch_pchyol_listing),
     ("vc_ru", fetch_vc_ru_listing),
     ("habr_career", fetch_habr_career_listing),
 )
@@ -365,6 +386,8 @@ def run_cycle(
         _tg_poll_if_due(cfg, storage, tg_poll_state)
         web_projects = _fetch_source(source_label, fetch_fn, cfg, errors, stats_web)
         if web_projects is not None:
+            if source_label == "pchyol":
+                web_projects = filter_new_pchyol_projects(web_projects, storage)
             stats_web.downloaded = len(web_projects)
             n, notify = _process_listings(
                 web_projects,
@@ -408,7 +431,23 @@ def run_cycle(
                 echo=True,
             )
 
+    tools_batch = int(os.getenv("TOOLS_BATCH_PER_CYCLE", "8") or "8")
+    if (
+        os.getenv("TOOLS_BACKLOG_DRAIN", "1").strip().lower() in ("1", "true", "yes")
+        and pg is not None
+        and cfg.ai_active
+        and cfg.radar_profile == "site"
+    ):
+        tools_n = drain_tools_backlog(cfg, pg, errors=errors, limit=tools_batch)
+        if tools_n > 0:
+            _append_log_line(
+                cfg.radar_log_path,
+                f"конвейер:tools={tools_n} (batch≤{tools_batch})",
+                echo=True,
+            )
+
     _maybe_run_delist_batch(cfg, pg, storage, errors)
+    _maybe_run_feed_retention_batch(cfg, pg, storage, errors)
 
     _collect_misc_errors(errors, summary)
     summary.sync_neon_from_globals()
@@ -483,6 +522,32 @@ def _maybe_run_delist_batch(
             cfg.radar_log_path,
             f"delist: checked={stats['checked']} delisted={stats['delisted']} "
             f"skipped={stats['skipped']}",
+            echo=True,
+        )
+
+
+def _maybe_run_feed_retention_batch(
+    cfg: Config,
+    pg: NeonLeadStorage | None,
+    storage: ProjectStorage,
+    errors: list[str],
+) -> None:
+    if cfg.radar_profile != "site" or pg is None or not pg.enabled:
+        return
+    now = time.time()
+    raw = storage.get_setting(_FEED_RETENTION_LAST_RUN_KEY, "0").strip()
+    try:
+        last = float(raw)
+    except ValueError:
+        last = 0.0
+    if now - last < _DELIST_INTERVAL_SEC:
+        return
+    stats = run_feed_retention_batch(pg, errors=errors)
+    storage.set_setting(_FEED_RETENTION_LAST_RUN_KEY, str(now))
+    if stats["hidden"]:
+        _append_log_line(
+            cfg.radar_log_path,
+            f"feed_retention: hidden={stats['hidden']}",
             echo=True,
         )
 

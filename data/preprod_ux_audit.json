@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-30T08:58:05.668564+00:00",
+  "generated_at": "2026-06-01T06:00:46.691177+00:00",
   "base_url": "https://rawlead.ru",
   "browser": "chromium+token",
   "has_auth": true,
@@ -7,17 +7,17 @@
     "desktop",
     "mobile"
   ],
-  "scenarios_total": 19,
-  "scenarios_pass": 18,
-  "critical_count": 1,
-  "pass": false,
+  "scenarios_total": 20,
+  "scenarios_pass": 20,
+  "critical_count": 0,
+  "pass": true,
   "results": [
     {
       "id": "U1",
       "title": "Header + footer links",
       "viewport": "desktop",
       "pass": true,
-      "ms": 3047,
+      "ms": 3003,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U1_desktop_before.png",
@@ -29,7 +29,7 @@
       "title": "Лента: категория + навыки",
       "viewport": "desktop",
       "pass": true,
-      "ms": 8044,
+      "ms": 8050,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U2_desktop_before.png",
@@ -41,7 +41,7 @@
       "title": "Сортировка + закрытие",
       "viewport": "desktop",
       "pass": true,
-      "ms": 6147,
+      "ms": 6173,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U3_desktop_before.png",
@@ -53,7 +53,7 @@
       "title": "Expand + tap outside",
       "viewport": "desktop",
       "pass": true,
-      "ms": 6238,
+      "ms": 6721,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U4_desktop_before.png",
@@ -61,12 +61,24 @@
       }
     },
     {
+      "id": "U10b",
+      "title": "Draft×5 tools audit",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 46648,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U10b_desktop_before.png",
+        "after": "data/preprod_ux_audit/U10b_desktop_after.png"
+      }
+    },
+    {
       "id": "U5",
       "title": "Draft + инструменты",
       "viewport": "desktop",
-      "pass": false,
-      "ms": 39166,
-      "error": "ИИ временно недоступен — повторите Повторить",
+      "pass": true,
+      "ms": 7433,
+      "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U5_desktop_before.png",
         "after": "data/preprod_ux_audit/U5_desktop_after.png"
@@ -77,7 +89,7 @@
       "title": "FAB support modal",
       "viewport": "desktop",
       "pass": true,
-      "ms": 5283,
+      "ms": 5215,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U6_desktop_before.png",
@@ -89,7 +101,7 @@
       "title": "ЛК: навыки + inbox",
       "viewport": "desktop",
       "pass": true,
-      "ms": 12132,
+      "ms": 12468,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U7_desktop_before.png",
@@ -101,7 +113,7 @@
       "title": "Marketing CTA",
       "viewport": "desktop",
       "pass": true,
-      "ms": 446,
+      "ms": 415,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U9_desktop_before.png",
@@ -113,7 +125,7 @@
       "title": "Console + network",
       "viewport": "desktop",
       "pass": true,
-      "ms": 67,
+      "ms": 64,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U10_desktop_before.png",
@@ -125,7 +137,7 @@
       "title": "Header + footer links",
       "viewport": "mobile",
       "pass": true,
-      "ms": 3026,
+      "ms": 2773,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U1_mobile_before.png",
@@ -137,7 +149,7 @@
       "title": "Лента: категория + навыки",
       "viewport": "mobile",
       "pass": true,
-      "ms": 8061,
+      "ms": 7992,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U2_mobile_before.png",
@@ -149,7 +161,7 @@
       "title": "Сортировка + закрытие",
       "viewport": "mobile",
       "pass": true,
-      "ms": 6654,
+      "ms": 6436,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U3_mobile_before.png",
@@ -161,7 +173,7 @@
       "title": "Expand + tap outside",
       "viewport": "mobile",
       "pass": true,
-      "ms": 5815,
+      "ms": 5941,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U4_mobile_before.png",
@@ -173,7 +185,7 @@
       "title": "Draft + инструменты",
       "viewport": "mobile",
       "pass": true,
-      "ms": 31898,
+      "ms": 7548,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U5_mobile_before.png",
@@ -185,7 +197,7 @@
       "title": "FAB support modal",
       "viewport": "mobile",
       "pass": true,
-      "ms": 5399,
+      "ms": 5223,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U6_mobile_before.png",
@@ -197,7 +209,7 @@
       "title": "ЛК: навыки + inbox",
       "viewport": "mobile",
       "pass": true,
-      "ms": 12102,
+      "ms": 11918,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U7_mobile_before.png",
@@ -209,7 +221,7 @@
       "title": "Mobile bottom sheet",
       "viewport": "mobile",
       "pass": true,
-      "ms": 7127,
+      "ms": 7162,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U8_mobile_before.png",
@@ -221,7 +233,7 @@
       "title": "Marketing CTA",
       "viewport": "mobile",
       "pass": true,
-      "ms": 388,
+      "ms": 370,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U9_mobile_before.png",
@@ -233,7 +245,7 @@
       "title": "Console + network",
       "viewport": "mobile",
       "pass": true,
-      "ms": 33,
+      "ms": 32,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U10_mobile_before.png",
@@ -241,12 +253,74 @@
       }
     }
   ],
-  "findings": [
+  "findings": [],
+  "draft_reviews": [
     {
-      "severity": "critical",
-      "scenario": "U5",
-      "viewport": "desktop",
-      "message": "Draft + инструменты: ИИ временно недоступен — повторите Повторить"
+      "lead_id": "8812",
+      "index": 1,
+      "tools": [
+        "telegram"
+      ],
+      "draft_preview": "Заинтересовал ваш заказ на организацию размещения у блогеров. Понимаю специфику работы с медийными личностями и готов взять на себя полный цикл — от подбора блогеров до согласования и контроля размещения. Могу предложить стратегию, учитывающую вашу активность на ТВ, для максимального охвата и эффективности.",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card1_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card1_draft.png"
+      }
+    },
+    {
+      "lead_id": "8794",
+      "index": 2,
+      "tools": [
+        "wordpress",
+        "elementor"
+      ],
+      "draft_preview": "Добрый день! Заинтересовал ваш проект по ускорению сайта на WordPress. Готов провести комплексную оптимизацию вашего лендинга с Elementor, уделяя внимание сжатию изображений, настройке кэширования и оптимизации кода для достижения максимальной скорости загрузки.",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card2_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card2_draft.png"
+      }
+    },
+    {
+      "lead_id": "8788",
+      "index": 3,
+      "tools": [
+        "html",
+        "php",
+        "netcat"
+      ],
+      "draft_preview": "Заинтересовал ваш проект по добавлению формы на сайт.\n\nСделаю форму с полями \"имя\" и \"телефон\" на HTML и обеспечу её корректную отправку в админку вашего сайта на Netcat с помощью PHP-обработчика.\n\nГотов приступить к работе.",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card3_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card3_draft.png"
+      }
+    },
+    {
+      "lead_id": "8784",
+      "index": 4,
+      "tools": [
+        "postgresql",
+        "python",
+        "telegram_bot"
+      ],
+      "draft_preview": "Заинтересовал ваш проект по созданию платформы для онлайн-тестирования. Готов разработать Telegram-бот на Python с использованием PostgreSQL для хранения вопросов, ответов и результатов учеников. Бот позволит преподавателям легко создавать билеты, а ученикам проходить тестирование и экзамены с автоматическим подсчетом баллов.",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card4_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card4_draft.png"
+      }
+    },
+    {
+      "lead_id": "8782",
+      "index": 5,
+      "tools": [
+        "robots_txt",
+        "sitemap_xml",
+        "seo"
+      ],
+      "draft_preview": "Заинтересовал ваш проект по SEO-оптимизации сайта доски объявлений. Готов провести полную настройку, включая корректное формирование title, description и H1-H3 для категорий и объявлений, а также оптимизацию robots.txt и sitemap.xml. Особое внимание уделю интеграции с Яндекс.Картами для правильного отображения адресов.",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card5_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card5_draft.png"
+      }
     }
   ],
   "artifacts_dir": "data/preprod_ux_audit",
@@ -255,6 +329,6 @@
     "path": "data/preprod_ux_audit_human.md",
     "model": "google/gemini-2.5-flash-lite",
     "mobile_screenshots": 12,
-    "llm_rating": 2
+    "llm_rating": null
   }
 }

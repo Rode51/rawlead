@@ -4,7 +4,9 @@
 
 | | |
 |--|--|
-| **→ Сейчас** | **WAVE-UX-MOBILE** → @coder · re-run O37c |
+| **→ Сейчас** | **→ @coder** § **O81-w1** + **O82-w1b** |
+| **D-O81** | **✅ Design 2026-06-01** (канвас v9 · спека § O81-w1) |
+| **D-O82b** | Match v2 breakdown — **⏸** (достаточно § O81-w1 card + OWNER_INTENT для Coder w1b) |
 | **D-O40** | **✅ Lead verify 2026-05-30** |
 | **Vision** | [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11** |
 
@@ -12,7 +14,408 @@
 
 ---
 
-## § D-O37c — Triage O37c findings (**→ после прогона**)
+## § D-O81 — Лендинг: «Один поток вместо десяти вкладок» (**✅ Design 2026-06-01 · → @coder § O81-w1**)
+
+**Владелец 2026-06-01:** посадочная **непонятна** · блок `flow.php` — сейчас **демо-карточка заказа**, не объясняет продукт.
+
+**Суть продукта (copy):** FL · Kwork · TG · **+ скоро** YouDo · Freelance.ru · FreelanceJob · Пчёл.нет — **один поток**, ИИ фильтр + отклик.
+
+| # | Задача Design | Статус |
+|---|---------------|--------|
+| d1 | **Заменить** demo `rl-lead-card` в секции flow — анимированная иллюстрация «N вкладок → 1 лента RawLead» | ✅ |
+| d2 | Chip-иконки источников (нейтрально, textual + dot) | ✅ |
+| d3 | Связка с hero: продукт понятен за 10 сек | ✅ |
+| d4 | REFERENCE §3.3 · NEO tokens · mobile 390px | ✅ |
+| d5 | Handoff `@coder` § **O81-w1** | ✅ |
+
+**Прототип:** `canvases/d081-flow-section.canvas.tsx` (v9 · принят владельцем 2026-06-01)
+
+**Handoff → Coder: § O81-w1 ниже**
+
+---
+
+## § O81-w1 — Coder: анимация flow-секции на лендинге
+
+**Основание:** § D-O81 Design принят · канвас v9 · владелец «принимаю»  
+**Приоритет:** P1  
+**Файлы для изменения:**
+
+```
+wordpress/rawlead-kadence-child/template-parts/rawlead/flow.php    ← заменить demo-карточку
+wordpress/rawlead-kadence-child/assets/css/rawlead.css              ← новые @keyframes + классы
+wordpress/rawlead-kadence-child/assets/js/rawlead-flow.js           ← новый файл (animation controller)
+wordpress/rawlead-kadence-child/functions.php                       ← enqueue rawlead-flow.js
+```
+
+### Визуальная концепция
+
+Биржи (5 chip) **поочерёдно** влетают в логотип с разных сторон → каждый удар **раздувает** логотип (+5% scale) → после всех ударов логотип **заряжается** (~630 мс: дрожит + жёлтое свечение) → **выстреливает 3 карточки** поочерёдно (stagger 380ms), на каждый выстрел — **отдача** (kick-back scale) + логотип постепенно сдувается обратно до 1.0 → **логотип остаётся**.
+
+**Анимация запускается один раз** — через IntersectionObserver при входе секции в viewport (threshold 0.35). Авто-повтор на сайте **не используется**.
+
+### HTML-структура секции
+
+```html
+<section class="rl-flow-anim" aria-label="Как работает RawLead">
+  <div class="rl-container rl-flow-anim__inner">
+
+    <!-- Левая часть: логотип — 3 слоя анимации -->
+    <div class="rl-flow-anim__logo-wrap" id="rl-flow-logo">
+      <!-- Слой 1: накопительный scale (JS управляет через style.transform) -->
+      <div class="rl-flow-logo__scale">
+        <!-- Слой 2: impact shake при поглощении чипа (JS добавляет/убирает is-impact) -->
+        <div class="rl-flow-logo__shake">
+          <!-- Слой 3: зарядка (.is-charging) или отдача (.is-recoil) -->
+          <div class="rl-flow-logo__reaction">
+            <a href="/" class="rl-logo rl-flow-anim__logo">
+              <span class="rl-logo__icon"><?php echo file_get_contents(RAWLEAD_CHILD_DIR.'/assets/images/wave2-mark-radar-v1.svg'); ?></span>
+              <span class="rl-logo__text-block">
+                <span class="rl-logo__name">RawLead</span>
+                <span class="rl-logo__by">by Rode51</span>
+              </span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Чипы источников (абсолютные, позиционируются JS) -->
+    <div class="rl-flow-anim__chips" aria-hidden="true">
+      <div class="rl-flow-chip" data-source="fl"           data-dx="-440" data-dy="5"    data-ms="0"  >
+        <span class="rl-flow-chip__dot" style="background:#00A65A"></span>FL.ru
+      </div>
+      <div class="rl-flow-chip" data-source="kwork"        data-dx="465"  data-dy="-55"  data-ms="200">
+        <span class="rl-flow-chip__dot" style="background:#EA580C"></span>Kwork
+      </div>
+      <div class="rl-flow-chip" data-source="tg"           data-dx="15"   data-dy="-292" data-ms="400">
+        <span class="rl-flow-chip__dot" style="background:#0088CC"></span>Telegram
+      </div>
+      <div class="rl-flow-chip" data-source="youdo"        data-dx="-385" data-dy="228"  data-ms="600">
+        <span class="rl-flow-chip__dot" style="background:#2563EB"></span>YouDo
+      </div>
+      <div class="rl-flow-chip" data-source="freelance_ru" data-dx="455"  data-dy="215"  data-ms="800">
+        <span class="rl-flow-chip__dot" style="background:#7C3AED"></span>Freelance.ru
+      </div>
+    </div>
+
+    <!-- Ripple-вспышки (по одной на чип, JS создаёт динамически) -->
+
+    <!-- Правая часть: выходные карточки -->
+    <div class="rl-flow-anim__cards" aria-hidden="true">
+      <!-- 3 карточки rl-lead-card — точно по спеке /lenta/ -->
+      <!-- см. структуру ниже -->
+    </div>
+
+  </div>
+</section>
+```
+
+### CSS-классы и анимации
+
+```css
+/* Idle: radar пульсирует до запуска */
+@keyframes rl-flow-idle {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.48; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ЛОГОТИП — 3 независимых слоя, каждый на своём div.
+
+   СЛОЙ 1 (data-layer="scale") — накапливает mass:
+     scale управляется JS через element.style.transform = scale(N).
+     Каждое изменение CSS transition 260ms cubic-bezier(0.17,0,0,1.30)
+     (slight overshoot → пружинный «хлопок» вверх при поглощении чипа,
+      и «недолёт» вниз при выстреле — ощущается как kick).
+
+   СЛОЙ 2 (data-layer="shake") — удар при попадании чипа:
+     JS добавляет/убирает класс .is-impact для каждого попадания.
+
+   СЛОЙ 3 (data-layer="reaction") — заряд или отдача:
+     .is-charging — до выстрела (вибрация + жёлтое свечение).
+     .is-recoil  — при каждом выстреле (gun kick).
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Слой 2: удар при поглощении чипа */
+@keyframes rl-flow-impact {
+  0%   { transform: translate(0,0) scale(1.00); }
+  16%  { transform: translate(-3px,-2px) scale(1.09); }
+  38%  { transform: translate(2px, 1px) scale(0.94); }
+  62%  { transform: translate(-1px, 2px) scale(1.03); }
+  85%  { transform: translate(1px,-1px) scale(0.99); }
+  100% { transform: translate(0,0) scale(1.00); }
+}
+.rl-flow-logo__shake.is-impact {
+  animation: rl-flow-impact 300ms cubic-bezier(0.36,0.07,0.19,0.97) forwards;
+}
+
+/* Слой 3A: зарядка (~630ms между последним чипом и первым выстрелом) */
+@keyframes rl-flow-charging {
+  0%   { transform: translate(0,0);       filter: drop-shadow(0 0 3px rgba(250,204,21,0.70)); }
+  25%  { transform: translate(-2px, 1px); filter: drop-shadow(0 0 8px rgba(250,204,21,1.00)); }
+  50%  { transform: translate(2px,-1px);  filter: drop-shadow(0 0 5px rgba(250,204,21,0.85)); }
+  75%  { transform: translate(-1px, 2px); filter: drop-shadow(0 0 10px rgba(250,204,21,1.00)); }
+  100% { transform: translate(0,0);       filter: drop-shadow(0 0 3px rgba(250,204,21,0.70)); }
+}
+.rl-flow-logo__reaction.is-charging {
+  animation: rl-flow-charging 140ms ease-in-out infinite;
+}
+
+/* Слой 3B: отдача при каждом выстреле карточкой */
+@keyframes rl-flow-recoil {
+  0%   { transform: translate(0,0) scale(1.00); }
+  14%  { transform: translate(5px, 2px) scale(0.88); }
+  32%  { transform: translate(-3px,-1px) scale(1.05); }
+  56%  { transform: translate(1px, 1px) scale(0.98); }
+  80%  { transform: translate(-1px, 0) scale(1.01); }
+  100% { transform: translate(0,0) scale(1.00); }
+}
+.rl-flow-logo__reaction.is-recoil {
+  animation: rl-flow-recoil 370ms cubic-bezier(0.36,0.07,0.19,0.97) forwards;
+}
+
+/* Ripple-вспышка на лого при поглощении чипа */
+@keyframes rl-flow-ripple {
+  0%   { transform: scale(0.12); opacity: 1.00; }
+  60%  { transform: scale(2.20); opacity: 0.45; }
+  100% { transform: scale(3.90); opacity: 0;    }
+}
+
+.rl-flow-anim__logo-wrap {
+  transform-origin: center center;
+}
+/* Слой 1: scale задаётся JS */
+.rl-flow-logo__scale {
+  transition: transform 260ms cubic-bezier(0.17,0,0,1.30);
+  transform-origin: center center;
+}
+.rl-flow-anim__logo-wrap .rl-logo__icon svg.is-idle {
+  animation: rl-flow-idle 2.8s ease-in-out infinite;
+}
+
+/* Чип */
+.rl-flow-chip {
+  position: absolute;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 13px;
+  background: #fff;
+  border: 2px solid #0A0A0A;
+  border-radius: 2px;
+  font-family: var(--rl-font); font-size: 13px; font-weight: 700;
+  white-space: nowrap;
+  /* box-shadow задаётся инлайн через JS (цвет источника) */
+  transform-origin: center center; /* JS repositions element so center = logo center */
+  /* Начальное состояние: translate(dx, dy) scale(1) — задаётся JS */
+}
+.rl-flow-chip__dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* Ripple */
+.rl-flow-ripple {
+  position: absolute;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  /* border-color задаётся JS; left/top = logo_cx-20, logo_cy-20 */
+}
+.rl-flow-ripple.is-running {
+  animation: rl-flow-ripple 450ms ease-out forwards;
+}
+
+/* Карточки */
+.rl-flow-anim__card {
+  /* стандартный rl-lead-card */
+  background: #fff;
+  border-radius: 4px;
+  border: none;
+  box-shadow: 4px 4px 0 #0A0A0A;
+  padding: 20px 24px;
+  /* Начало: translate(flyDx, flyDy) scale(0) */
+  /* В конце: translate(0,0) scale(1) · transition 520ms cubic-bezier(0.15,0,0,1.12) */
+}
+.rl-flow-anim__card--perfect {
+  border: 2px solid #FACC15;
+  box-shadow: 4px 4px 0 #FACC15;
+}
+```
+
+### JS: `rawlead-flow.js`
+
+**Ответственность:** IntersectionObserver → **однократный** запуск (unobserve после старта) · session guard · 3-слойная физика логотипа · prefersReducedMotion bypass
+
+```js
+// Псевдокод логики — полную реализацию Coder пишет сам по этой спеке
+
+var CHIPS = [
+  { id:'fl',           color:'#00A65A', dx:-440, dy:5,    ms:0,   rot:'5deg'  },
+  { id:'kwork',        color:'#EA580C', dx:465,  dy:-55,  ms:210, rot:'-8deg' },
+  { id:'tg',           color:'#0088CC', dx:15,   dy:-292, ms:420, rot:'3deg'  },
+  { id:'youdo',        color:'#2563EB', dx:-385, dy:228,  ms:630, rot:'-5deg' },
+  { id:'freelance_ru', color:'#7C3AED', dx:455,  dy:215,  ms:840, rot:'7deg'  },
+];
+
+var CARDS = [
+  { src:'FL.ru',  color:'#00A65A', title:'Telegram-бот для автоматизации заявок', budget:'Бюджет: 25 000 ₽', match:87, perfect:true,  flyDelay:0   },
+  { src:'Kwork',  color:'#EA580C', title:'Парсер маркетплейсов на Python',         budget:'Бюджет: 15 000 ₽', match:73, perfect:false, flyDelay:380 },
+  { src:'TG',     color:'#0088CC', title:'Лендинг для SaaS-продукта на WP',        budget:'Бюджет: 40 000 ₽', match:61, perfect:false, flyDelay:760 },
+];
+
+// Геометрия: LOGO_CX / LOGO_CY = getBoundingClientRect() логотипа (center)
+// Chip wrapper: position absolute; left = LOGO_CX-65; top = LOGO_CY-19; w=130; h=38
+// Chip начальный state: CSS custom props --dx, --dy, --rot, --ms → @keyframes rl-flow-chip-fly
+// Impact момент = 75% от 920ms полёта = 690ms после старта чипа → t = 100 + chip.ms + 690
+
+// === LOGO SCALE (слой 1) ===
+// logoScale = 1 + min(impactCount, 5) * 0.052  — растёт при поглощении
+//           - min(recoilCount,  3) * 0.088  — сдувается при выстреле
+// logoScaleEl.style.transform = `scale(${logoScale})`  ← transition 260ms обработает плавно
+
+// === Timeline (все t от старта IntersectionObserver callback) ===
+//   t=100:    фаза 1 — запустить чипы (@keyframes rl-flow-chip-fly с CSS vars)
+//
+//   t=790:    chip[0] impact → impactCount++ → logoScale → убрать/добавить is-impact на .shake
+//   t=1000:   chip[1] impact → то же
+//   t=1210:   chip[2] impact → то же
+//   t=1420:   chip[3] impact → то же
+//   t=1630:   chip[4] impact → то же (logoScale достиг 1.26)
+//
+//   t=1640:   CHARGING — добавить .is-charging на .reaction
+//             Лого вибрирует + жёлтое свечение (~630ms, до выстрела)
+//
+//   t=2270:   ВЫСТРЕЛ — убрать .is-charging
+//             фаза 2: card[0] fly-out
+//             recoilCount=1 → logoScale=1.173 → добавить .is-recoil (JS убирает после 370ms)
+//   t=2650:   card[1] fly-out
+//             recoilCount=2 → logoScale=1.085 → новый .is-recoil
+//   t=3030:   card[2] fly-out
+//             recoilCount=3 → logoScale≈1.000 → новый .is-recoil
+//
+//   t=3250:   фаза 3 — бары fill 0→N% (transition 640ms ease-out)
+//
+//   !! АВТОПОВТОР НА САЙТЕ НЕ ИСПОЛЬЗУЕТСЯ !!
+//   IntersectionObserver делает unobserve() после первого запуска.
+
+// === prefersReducedMotion ===
+// if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+//   показать финальное состояние сразу (no animation), logoScale=1, bars filled
+// }
+
+// === Запуск ===
+var io = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      io.unobserve(entry.target);  // однократно
+      startFlowAnimation();
+    }
+  });
+}, { threshold: 0.35 });
+io.observe(document.querySelector('.rl-flow-anim'));
+```
+
+### Карточка `/lenta/` — точная структура
+
+```html
+<article class="rl-lead-card rl-flow-anim__card [rl-flow-anim__card--perfect]">
+  <div class="rl-feed-card__head">
+    <div class="rl-feed-card__head-start">
+      <span class="rl-feed-card__source rl-feed-card__source--[fl|kwork|tg]">
+        FL.ru <!-- dot задаётся CSS ::before -->
+      </span>
+      <!-- только для perfect: -->
+      <span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>
+    </div>
+  </div>
+  <h3 class="rl-lead-card__title">Telegram-бот для автоматизации заявок</h3>
+  <p class="rl-lead-card__budget">Бюджет: 25 000 ₽</p>
+  <div class="rl-match">
+    <div class="rl-match__label"><span>Совместимость 87%</span></div>
+    <div class="rl-match__bar">
+      <span class="rl-match__fill" style="--match-value:0%"></span>
+      <!-- JS: --match-value: 0% → 87% при phase=3 (transition width 640ms ease-out) -->
+    </div>
+  </div>
+</article>
+```
+
+### Тайминги (итог)
+
+| Событие | Время от replay() |
+|---------|-------------------|
+| Idle-пульс SVG | немедленно (phase=0) |
+| Чип 1 (FL.ru) | 100ms |
+| Чип 2 (Kwork) | 300ms |
+| Чип 3 (Telegram) | 500ms |
+| Чип 4 (YouDo) | 700ms |
+| Чип 5 (Freelance.ru) | 900ms |
+| Последний чип поглощён | ~1600ms |
+| Лого пик взрыва | ~1750ms |
+| Карточка 1 (FL.ru) | 1700ms |
+| Карточка 2 (Kwork) | 2080ms |
+| Карточка 3 (TG) | 2460ms |
+| Бары заполняются | 2620ms |
+| Авто-повтор | 6620ms |
+
+### Acceptance checklist (Coder)
+
+- [ ] Секция запускается через IntersectionObserver (threshold 0.35)
+- [ ] `prefers-reduced-motion`: финальное состояние без анимации, немедленно
+- [ ] Mobile 390px: logo area height 152px · **карточки вылетают из логотипа** (fly-out, как desktop) · **не** просто fade/slide-up
+- [ ] Логотип остаётся видимым после взрыва (opacity:1 всегда)
+- [ ] Карточки: точная структура rl-lead-card как в `/lenta/` (source dot, budget, match bar)
+- [ ] Ripple-вспышки: цвет источника, 5 штук, синхронизированы с chip.ms+680
+- [ ] Session guard: повторный вход в viewport не стекует таймеры
+- [ ] Нет console.error в DevTools
+
+---
+
+## § D-O82 — Match breakdown на карточке (**✅ Lead Design 2026-06-01 · → @coder § O82-w1**)
+
+**Владелец 2026-06-01:** «Совместимость N%» **не moat** — нужна **прозрачность** как в [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §5.
+
+| # | Задача | Статус |
+|---|--------|--------|
+| d1 | Полоска + 1 строка breakdown (не три одинаковые полоски) | ✅ |
+| d2 | Zero state: нет навыков → «Качество заказа» + CTA «Добавь навыки →»; НЕ «0%» | ✅ |
+| d3 | Microcopy: tooltip «Качество × 60% + Навыки × 40%» | ✅ |
+| d4 | Mobile 390px: «ИДЕАЛЬНО ✦» в match row (заменяет AI-чип), не в meta-строке | ✅ |
+| d5 | Handoff `@coder` § **O82-w1** · `REFERENCE.md` §4 + `feed-cabinet-mvp.md` §3.1 | ✅ |
+
+**Спека:** [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) §3.1 · [`REFERENCE.md`](../../design/wp/REFERENCE.md) §4  
+**Handoff:** [`DESIGNER_PROMPT.md`](DESIGNER_PROMPT.md) § **O82-w1**  
+**Accept:** владелец 3 карточки — «понятно, не обман» · Coder acceptance checklist в § O82-w1.
+
+---
+
+## § D-O82b — Match карточка v2 (**⏸ после D-O81** · владелец 2026-06-01)
+
+**Gate:** Designer **сначала** закрывает **§ D-O81** · **не** начинать D-O82b, пока владелец не скажет «D-O81 готово» или Lead не снимет gate.
+
+**Кontекст:** O82-w1 Coder **не нравится владельцу** · ушли от идеи «Брать/Сомнительно» на карточке — у каждого свои навыки и своё видение.
+
+**Продукт (канон владельца):**
+
+| Было (w1) | Стало (w1b) |
+|-----------|-------------|
+| «Качество заказа» + `ai_score` на полоске | **Только «Совместимость»** = насколько **стек/навыки человека** подходят к заказу (`keyword_match`) |
+| Чип «Брать ✓» / «Сомнительно» в match row | **Убрать** с публичной карточки (verdict — внутренний L1, не UI ленты) |
+| «Добавь навыки…» при любых пустых навыках | **Только:** anon **и** навыки в фильтре **не выбраны** · если фильтр/навыки уже стоят — **не** показывать |
+| Breakdown «Качество: N · Навыки: M%» | Breakdown **про совпадение:** напр. «Совпало N из M навыков заказа» или список совпавших тегов (Design решает) |
+
+**Задачи Design:**
+
+| # | Задача |
+|---|--------|
+| b1 | Перерисовать match-row **без** AI-verdict chip · визуально проще (owner: «карточки не нравятся») |
+| b2 | Режим **anon, 0 навыков:** CTA «Добавь навыки…» → sheet «Навыки» · **без** % или нейтральная подсказка |
+| b3 | Режим **навыки выбраны** (guest или ЛК): **% совместимости** + breakdown совпадений · **без** «Качество заказа» |
+| b4 | `ai_score` / `final_rank` — **не** показывать пользователю на карточке (можно оставить sort=match на бэке) |
+| b5 | Handoff `@coder` § **O82-w1b** · правки `REFERENCE.md` §4 · `feed-cabinet-mvp.md` §3.1 |
+
+**Не в scope:** менять L1 verdict в боте · убирать `ai_score` из Neon.
+
+---
 
 **Вход:** `data/preprod_ux_audit_human.md` + JSON + скрины `data/preprod_ux_audit/`.
 
@@ -727,6 +1130,50 @@ Feed (с match %)
 | WP `/feed`: карточка, фильтры, sidebar, infinite scroll, состояния | Mobile app, отдельный сайт |
 | WP `/cabinet`: теги-чипы, match, AI-агент кнопка (disabled до 3f) | Coder-часть PHP (это CODER_PROMPT) |
 | Пульт: пульс лампы ok | Новый функционал пульта |
+| **P-PORTFOLIO** (личное на VPS) | **📋 после O76** — см. § D-P-PORTFOLIO |
+
+---
+
+## § D-P-PORTFOLIO — личное портфолио исполнителя (**📋 после O76**)
+
+**Владелец 2026-05-31:** тот же VPS · **интерактивно и стильно** — ссылка заказчикам и в FL · **параллельно** soft ads RawLead.
+
+**Не путать с RawLead DS:** отдельная визуальная система «я как разработчик», не копия `/lenta/`.
+
+| # | Deliverable |
+|---|-------------|
+| d1 | One-pager IA: hero · 4–5 кейсов · контакты/CTA · mobile-first |
+| d2 | Интерактив: scroll-reveal · карточки проектов · hover/expand · опц. мини-демо iframe |
+| d3 | Кейсы: RawLead · **Crystal Debt** (`crystal-debt-core`) · **Михалыч** (`Miha`) · чат-бот WIP — скрины от владельца |
+| d4 | Handoff `@designer` → assets + CSS brief → `@coder` § `CODER_PROMPT` **P-PORTFOLIO** |
+
+**Accept:** владелец готов вставить **одну URL** в FL без стыда.
+
+**Концепция v4 (владелец):** стиль + wow · брутализм `labs.rawlead.ru` · RE-motion · ИИ для **заказчика** = **шоу внедрения**, не форма с 3 буллетами. _(v1–v3 заменены)_
+
+**Запрет:** МИМО/БРАТЬ по тексту заказчика · скучный чат «обо мне» · стена текста.
+
+### ИИ-блок — выбрать 1 главный + 1 запасной (Design → владелец)
+
+| ID | Название | Опыт | LLM |
+|----|----------|------|-----|
+| **A ★** | **«До / После ИИ»** | Fullwidth **scrub-slider**: слева хаос заявок (brutalist inbox), справа — те же карточки с тегами, автоответом, алертом. Подпись: «Так встраивается слой ИИ». Без ввода текста. | Опц. только на CTA «Сгенерировать под вашу нишу» |
+| **B ★** | **«Выбери боль»** | Чипы-жёлтые: `Теряем заявки` `Долгий ответ` `Excel-ад` `Хаос в TG` → **explode** в изометрическую схему-«завод» (CSS): вход → блок **ИИ** → выходы (бот / CRM / отчёт). Клик по блоку — 1 строка + иконка. | После выбора 2+ чипов — 1 запрос «план внедрения» |
+| **C** | **«Собери модуль»** | Drag brutalist-плиток `Chat` `OCR` `Parser` `Push` на сетку 3×3 → анимация «деплой лог» в terminal · финал: fake blueprint PNG + «стек под ключ» | Финальный абзац по составу плиток |
+| **D** | **«Командная строка»** | Поле ввода стилизовано под CLI: гость печатает `магазин` / `клиника` → не оценка, а **посимвольный** brutalist-log «подключаю модуль…» → 3 строки **пользы для бизнеса** | Да, короткий промпт «integration advisor» |
+
+**Рекомендация Lead:** **A + B** на одной странице: A = мгновенный wow без LLM; B = интерактив + опциональный LLM. C/D — если владелец хочет «игру».
+
+| Слой | Содержание |
+|------|------------|
+| **База** | `labs.rawlead.ru`: фото, hero, marquee, RawLead **PRODUCTION** (кейс навыка, не ИИ-блок) |
+| **Motion** | RE: covers `01/04` · scroll-snap · pin ИИ-сцены · stagger · grid-bg |
+| **Кейсы** | RawLead live · CD fake journal · Михалыч character board |
+| **Техника** | Ключи server-only · rate limit · mobile: A = swipe вместо scrub |
+
+**Accept Design:** заказчик за 10 с **увидел движение/схему**, не прочитал резюме · владелец: «стильно слать в FL».
+
+Референсы: `labs.rawlead.ru` · [richardekwonye.com](https://www.richardekwonye.com/) · CD journal UI.
 
 ---
 
