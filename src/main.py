@@ -455,6 +455,24 @@ def run_cycle(
     if cfg.radar_profile == "site":
         commit_site_rollup_cycle(summary)
     record_cycle_summary(storage, summary)
+    storage.set_setting("status_main_last_cycle_at", summary.ts)
+    for src in sorted(enabled_sources):
+        st = summary.by_source.get(src)
+        ok = bool(st and not st.fetch_error)
+        storage.set_setting(f"status_fetch_ok_{src}", "1" if ok else "0")
+    if pg is not None and pg.enabled:
+        snap = pg.ingest_ops_snapshot(errors)
+        newest = ""
+        newest_gap = None
+        for src in ("fl", "kwork", "tg"):
+            row = snap.get(src) or {}
+            ts = str(row.get("last_insert_at", "")).strip()
+            gap = int(row.get("last_insert_gap_sec", 0) or 0)
+            if ts and (newest_gap is None or gap < newest_gap):
+                newest = ts
+                newest_gap = gap
+        if newest:
+            storage.set_setting("status_neon_last_insert_at", newest)
 
     _append_log_line(
         cfg.radar_log_path,

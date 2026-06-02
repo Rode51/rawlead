@@ -28,53 +28,45 @@
   var cfg = window.rawleadCabinet;
 
   var TOKEN_KEY = "rawlead_access_token";
+  var AUTH_COOKIE = "rl_access";
+  var AUTH_COOKIE_MAX_AGE = 7 * 24 * 3600;
+
+  function syncAuthCookie(token) {
+    if (!token) {
+      document.cookie = AUTH_COOKIE + "=; path=/; max-age=0; secure; samesite=lax";
+      return;
+    }
+    document.cookie =
+      AUTH_COOKIE +
+      "=" +
+      encodeURIComponent(token) +
+      "; path=/; max-age=" +
+      AUTH_COOKIE_MAX_AGE +
+      "; secure; samesite=lax";
+  }
   var SORT_KEY = "rawlead_cabinet_sort";
   var USER_META_KEY = "rawlead_user_meta";
   var GUEST_SKILLS_KEYS = ["rawlead_lenta_skills", "rawlead_guest_skills"];
   var MAX_USER_TAGS = 12;
-  var TIER_A_BY_NICHE = {
-    dev: [
-      "python",
-      "javascript",
-      "php",
-      "wordpress_dev",
-      "telegram_bot_dev",
-      "api_integration",
-    ],
-    design: [
-      "figma",
-      "ui_ux",
-      "web_design",
-      "logo_design",
-      "brand_identity",
-      "banner_design",
-    ],
-    marketing: [
-      "smm",
-      "target_ads",
-      "yandex_direct",
-      "google_ads",
-      "seo",
-      "email_marketing",
-    ],
-    text: [
-      "copywriting",
-      "seo_copywriting",
-      "article_writing",
-      "translation",
-      "technical_writing",
-      "editing_proofreading",
-    ],
+  var NICHE_ORDER = ["dev", "design", "marketing", "text"];
+  var NICHE_ROOT_LABELS = {
+    dev: "Разработка",
+    design: "Дизайн",
+    marketing: "Маркетинг",
+    text: "Тексты",
   };
+  var DEV_PICKER_SUBHEADS = [
+    { key: "use_case", label: "По задаче" },
+    { key: "technology", label: "По технологии" },
+  ];
 
   var loginEl = document.getElementById("rl-cabinet-login");
 
   var appEl = document.getElementById("rl-cabinet-app");
 
-  var loginHintEl = document.getElementById("rl-cabinet-login-hint");
+  var loginBtn = document.getElementById("rl-cabinet-login-btn");
+
   var loginStateEl = document.getElementById("rl-cabinet-login-state");
-  var fallbackEl = document.getElementById("rl-cabinet-login-fallback");
-  var fallbackLinkEl = document.getElementById("rl-cabinet-fallback-link");
   var widgetTimeoutMs = 3000;
   var popupTimeoutMs = 8000;
   var widgetLoadFailed = false;
@@ -91,34 +83,20 @@
       "rl-cabinet-login__state--error",
       "rl-cabinet-login__state--ok"
     );
-    loginStateEl.classList.add("rl-cabinet-login__state--" + (level || "info"));
-    loginStateEl.textContent = text || "";
+    var msg = text || "";
+    if (msg) {
+      loginStateEl.classList.add("rl-cabinet-login__state--" + (level || "info"));
+      loginStateEl.textContent = msg;
+      loginStateEl.hidden = false;
+      return;
+    }
+    loginStateEl.textContent = "";
+    loginStateEl.hidden = true;
   }
 
-  function showFallback(show, reasonText) {
-    if (fallbackEl) {
-      fallbackEl.hidden = !show;
-    }
-    if (!fallbackLinkEl) {
-      return;
-    }
-    if (cfg.tgBotId || cfg.tgLoginFallbackUrl) {
-      fallbackLinkEl.href = cfg.tgLoginFallbackUrl || "#";
-      fallbackLinkEl.classList.remove("is-disabled");
-      fallbackLinkEl.setAttribute("aria-disabled", "false");
-      if (show && reasonText) {
-        setLoginState("warn", reasonText);
-      }
-      return;
-    }
-    fallbackLinkEl.href = "#";
-    fallbackLinkEl.classList.add("is-disabled");
-    fallbackLinkEl.setAttribute("aria-disabled", "true");
-    if (show) {
-      setLoginState(
-        "error",
-        "Fallback URL не задан. Добавьте RAWLEAD_TG_LOGIN_FALLBACK_URL в wp-config.php."
-      );
+  function showFallback(_show, reasonText) {
+    if (reasonText) {
+      setLoginState("warn", reasonText);
     }
   }
 
@@ -191,70 +169,313 @@
     completeTelegramAuth(payload);
   });
 
-  function redirectTgLoginFallback() {
-    if (!cfg.tgLoginFallbackUrl) {
-      setLoginState(
-        "error",
-        "Fallback URL не задан. Добавьте RAWLEAD_TG_BOT_ID в wp-config.php."
-      );
-      return;
+  function apiEndpoint(path) {
+    var base = (cfg.apiBase || "").replace(/\/$/, "");
+    if (!base) {
+      return path;
     }
-    setLoginState("info", "Переходим в Telegram для входа...");
-    window.location.href = cfg.tgLoginFallbackUrl;
+    return base + path;
   }
 
-  if (fallbackLinkEl) {
-    fallbackLinkEl.addEventListener("click", function (e) {
-      if (!cfg.tgBotId && !cfg.tgLoginFallbackUrl) {
+  function isWideScreen() {
+    return window.innerWidth >= 768;
+  }
+
+  function qrImageUrl(deepLink) {
+    var base = cfg.restQrImage || "";
+    if (base) {
+      return (
+        base +
+        (base.indexOf("?") >= 0 ? "&" : "?") +
+        "data=" +
+        encodeURIComponent(deepLink || "")
+      );
+    }
+    return (
+      "https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=" +
+      encodeURIComponent(deepLink || "")
+    );
+  }
+
+  var qrPollTimer = null;
+
+  function stopQrPoll() {
+    if (qrPollTimer) {
+      clearTimeout(qrPollTimer);
+      qrPollTimer = null;
+    }
+  }
+
+  function hideQrPanel() {
+    stopQrPoll();
+    var qr = document.getElementById("rl-cabinet-login-qr");
+    if (qr) {
+      qr.classList.remove("rl-cabinet-login__qr--mobile");
+      qr.setAttribute("hidden", "hidden");
+    }
+    var img = document.getElementById("rl-cabinet-login-qr-img");
+    if (img) {
+      img.hidden = false;
+    }
+    if (loginBtn) {
+      loginBtn.hidden = false;
+      loginBtn.disabled = false;
+    }
+  }
+
+  function showQrPanel(deepLink, mobileMode) {
+    var qr = document.getElementById("rl-cabinet-login-qr");
+    var img = document.getElementById("rl-cabinet-login-qr-img");
+    var link = document.getElementById("rl-cabinet-login-qr-link");
+    if (!qr) {
+      return false;
+    }
+    if (mobileMode) {
+      qr.classList.add("rl-cabinet-login__qr--mobile");
+      if (img) {
+        img.removeAttribute("src");
+        img.hidden = true;
+      }
+    } else {
+      qr.classList.remove("rl-cabinet-login__qr--mobile");
+      if (img) {
+        img.hidden = false;
+        img.src = qrImageUrl(deepLink);
+      }
+    }
+    if (link) {
+      link.href = deepLink || "#";
+      link.textContent = mobileMode
+        ? "Открыть Telegram"
+        : "Открыть ссылку на телефоне";
+    }
+    qr.removeAttribute("hidden");
+    if (loginBtn) {
+      loginBtn.hidden = true;
+      loginBtn.disabled = false;
+    }
+    return true;
+  }
+
+  function pollBotComplete(authToken, expiresAt) {
+    stopQrPoll();
+    var completeBase = cfg.restBotComplete || "";
+    if (!completeBase || !authToken) {
+      return;
+    }
+    var deadline = Date.parse(expiresAt || "") || Date.now() + 5 * 60 * 1000;
+    var waitEl = document.getElementById("rl-cabinet-login-qr-wait");
+
+    function tick() {
+      if (Date.now() > deadline) {
+        hideQrPanel();
+        setLoginState("error", "Время вышло. Нажмите кнопку ещё раз.");
         return;
       }
-      e.preventDefault();
-      if (widgetLoadFailed || popupTimedOut || !cfg.tgBotId) {
-        redirectTgLoginFallback();
-        return;
-      }
-      if (window.Telegram && window.Telegram.Login) {
-        setLoginState("info", "Открываем Telegram Login popup...");
-        var popupDone = false;
-        var popupTimer = setTimeout(function () {
-          if (popupDone) {
+      var pollUrl =
+        completeBase +
+        (completeBase.indexOf("?") >= 0 ? "&" : "?") +
+        "auth=" +
+        encodeURIComponent(authToken);
+      fetch(pollUrl, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: { "X-WP-Nonce": cfg.nonce || "" },
+      })
+        .then(function (res) {
+          return res
+            .json()
+            .catch(function () {
+              return {};
+            })
+            .then(function (data) {
+              return { res: res, data: data };
+            });
+        })
+        .then(function (out) {
+          if (out.res.ok && out.data && out.data.access_token) {
+            hideQrPanel();
+            setToken(out.data.access_token);
+            saveUserMeta(out.data);
+            setLoginState("ok", "Вход выполнен. Загружаем кабинет...");
+            return mergeGuestSkillsAfterAuth().then(function () {
+              showApp();
+              bootCabinet();
+            });
+          }
+          if (out.res.status === 401) {
+            if (waitEl) {
+              waitEl.textContent = "Ждём подтверждение в Telegram…";
+            }
+            qrPollTimer = setTimeout(tick, 2000);
             return;
           }
-          popupTimedOut = true;
-          setLoginState(
-            "warn",
-            "Не удалось открыть Telegram. Из РФ включите VPN или нажмите кнопку снова для redirect."
-          );
-        }, popupTimeoutMs);
-        window.Telegram.Login.auth(
-          { bot_id: Number(cfg.tgBotId), request_access: "write" },
-          function (data) {
-            popupDone = true;
-            clearTimeout(popupTimer);
-            if (!data) {
-              setLoginState("error", "Telegram popup закрыт без авторизации.");
-              return;
-            }
-            var payload = data;
-            if (data.user && data.auth_date && data.hash) {
-              payload = Object.assign({}, data.user, {
-                auth_date: data.auth_date,
-                hash: data.hash,
-              });
-            }
-            payload = normalizeTelegramAuthPayload(payload);
-            if (!payload) {
-              setLoginState("error", "Telegram вернул неполные auth-данные.");
-              return;
-            }
-            setLoginState("info", "Получили auth из popup. Проверяем...");
-            completeTelegramAuth(payload);
+          var msg =
+            (out.data && out.data.detail) ||
+            (out.data && out.data.message) ||
+            "HTTP " + out.res.status;
+          throw new Error(String(msg));
+        })
+        .catch(function (err) {
+          if (String(err && err.message).indexOf("HTTP 401") >= 0) {
+            qrPollTimer = setTimeout(tick, 2000);
+            return;
           }
+          hideQrPanel();
+          setLoginState(
+            "error",
+            (err && err.message) || "Не удалось завершить вход. Попробуйте ещё раз."
+          );
+        });
+    }
+
+    tick();
+  }
+
+  function startBotLogin() {
+    var sessionUrl = cfg.restBotSession || "";
+    if (!sessionUrl) {
+      setLoginState("error", "Сервис временно недоступен. Попробуйте позже.");
+      return;
+    }
+    if (loginBtn) {
+      loginBtn.disabled = true;
+    }
+    setLoginState(
+      "info",
+      isWideScreen() ? "Готовим QR-код…" : "Откройте Telegram и нажмите Start."
+    );
+    fetch(sessionUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-WP-Nonce": cfg.nonce || "",
+      },
+      body: "{}",
+    })
+      .then(function (res) {
+        return res.json().catch(function () {
+          return {};
+        }).then(function (data) {
+          if (!res.ok) {
+            var msg =
+              (data && data.detail) ||
+              (data && data.message) ||
+              "HTTP " + res.status;
+            throw new Error(String(msg));
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        if (!data.deep_link || !data.auth_token) {
+          throw new Error("no deep_link");
+        }
+        var mobileMode = !isWideScreen();
+        if (!showQrPanel(data.deep_link, mobileMode)) {
+          throw new Error("qr panel missing");
+        }
+        if (mobileMode) {
+          setLoginState("info", "Откройте Telegram и нажмите Start.");
+        } else {
+          setLoginState("info", "Отсканируйте QR телефоном и нажмите Start в боте.");
+        }
+        pollBotComplete(data.auth_token, data.expires_at);
+      })
+      .catch(function (err) {
+        hideQrPanel();
+        if (loginBtn) {
+          loginBtn.disabled = false;
+        }
+        setLoginState(
+          "error",
+          "Не удалось открыть Telegram. Попробуйте через бота ниже."
         );
-        return;
-      }
-      redirectTgLoginFallback();
+      });
+  }
+
+  var qrCancelBtn = document.getElementById("rl-cabinet-login-qr-cancel");
+  if (qrCancelBtn) {
+    qrCancelBtn.addEventListener("click", function () {
+      hideQrPanel();
+      setLoginState("info", "");
     });
+  }
+
+  if (loginBtn) {
+    loginBtn.addEventListener("click", startBotLogin);
+  }
+
+  function completeBotAuth(authToken) {
+    if (!authToken) {
+      return Promise.reject(new Error("no auth token"));
+    }
+    setLoginState("info", "Завершаем вход...");
+    var completeUrl = cfg.restBotComplete || "";
+    if (!completeUrl) {
+      return Promise.reject(new Error("auth endpoint missing"));
+    }
+    return fetch(completeUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-WP-Nonce": cfg.nonce || "",
+      },
+      body: JSON.stringify({ auth_token: authToken }),
+    })
+      .then(function (res) {
+        return res.json().catch(function () {
+          return {};
+        }).then(function (data) {
+          if (!res.ok) {
+            var msg =
+              (data && data.detail) ||
+              (data && data.message) ||
+              "HTTP " + res.status;
+            throw new Error(String(msg));
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        if (!data.access_token) {
+          throw new Error("no token");
+        }
+        setToken(data.access_token);
+        saveUserMeta(data);
+        setLoginState("ok", "Вход выполнен. Загружаем кабинет...");
+        return mergeGuestSkillsAfterAuth().then(function () {
+          showApp();
+          bootCabinet();
+        });
+      });
+  }
+
+  function consumeBotAuthFromQuery() {
+    var params = new URLSearchParams(window.location.search || "");
+    var authToken = (params.get("auth") || "").trim();
+    if (!authToken) {
+      return false;
+    }
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    setLoginState("info", "Подтверждаем вход из Telegram...");
+    completeBotAuth(authToken).catch(function () {
+      setLoginState("error", "Не удалось завершить вход. Нажмите кнопку ещё раз.");
+    });
+    return true;
+  }
+
+  function redirectTgLoginFallback() {
+    if (!cfg.tgLoginFallbackUrl) {
+      setLoginState("error", "Не удалось открыть Telegram. Попробуйте ещё раз.");
+      return;
+    }
+    setLoginState("info", "Открываем Telegram…");
+    window.location.href = cfg.tgLoginFallbackUrl;
   }
 
   function getToken() {
@@ -268,10 +489,12 @@
     if (token) {
 
       localStorage.setItem(TOKEN_KEY, token);
+      syncAuthCookie(token);
 
     } else {
 
       localStorage.removeItem(TOKEN_KEY);
+      syncAuthCookie("");
 
     }
 
@@ -1044,46 +1267,27 @@
     }
 
     box.innerHTML = "";
-    showFallback(!!cfg.tgLoginFallbackUrl);
-    setLoginState("info", "Загружаем Telegram Widget...");
+    box.hidden = false;
+    showFallback(true);
+    setLoginState("info", "Загружаем Telegram Widget (fallback)...");
 
     if (!canMountTelegramWidget()) {
-
-      if (loginHintEl) {
-
-        loginHintEl.hidden = false;
-
-        if (cfgTruthy(cfg.tgLoginDev)) {
-          loginHintEl.textContent =
-            "Кнопка Telegram только на http://127.0.0.1:" +
+      if (cfgTruthy(cfg.tgLoginDev)) {
+        setLoginState(
+          "warn",
+          "Локальный вход — только через http://127.0.0.1:" +
             (cfg.localPort || "10007") +
-            "/cabinet/ — нажмите ссылку ниже.";
-        } else {
-          loginHintEl.textContent =
-            "Виджет Telegram на этом адресе недоступен. Используйте «Войти через Telegram» ниже.";
-        }
-
+            "/cabinet/"
+        );
+      } else {
+        setLoginState("warn", "Виджет недоступен. Используйте кнопку входа.");
       }
-
-      showFallback(true, "Widget недоступен на этом адресе. Используйте fallback-вход.");
       return;
-
     }
 
     if (!cfg.tgBotUsername) {
-
-      if (loginHintEl) {
-
-        loginHintEl.hidden = false;
-
-        loginHintEl.textContent =
-
-          "Добавьте в wp-config.php: define('RAWLEAD_TG_BOT_USERNAME', 'rawlead_bot');";
-
-      }
-
+      setLoginState("error", "Бот не настроен на сайте.");
       return;
-
     }
 
     var script = document.createElement("script");
@@ -1111,20 +1315,9 @@
 
       if (!hasWidget) {
         widgetLoadFailed = true;
-      }
-
-      if (!hasWidget && loginHintEl) {
-
-        loginHintEl.hidden = false;
-
-        loginHintEl.textContent =
-
-          "Виджет Telegram не загрузился. Из РФ нужен VPN (Telegram заблокирован). Обновите страницу (Ctrl+F5) или используйте кнопку входа ниже.";
-        showFallback(true, "Widget не загрузился. Нажмите «Войти через Telegram» — откроется redirect.");
+        setLoginState("warn", "Не удалось загрузить виджет. Нажмите кнопку входа.");
       } else {
-        setLoginState("ok", "Widget загружен. Подтвердите вход в Telegram.");
-        showFallback(true);
-
+        setLoginState("ok", "Подтвердите вход в Telegram.");
       }
 
     }, widgetTimeoutMs);
@@ -1190,22 +1383,15 @@
       })
 
       .catch(function (err) {
-
-        if (loginHintEl) {
-
-          loginHintEl.hidden = false;
-          var msg = err && err.message ? err.message : "Попробуйте снова.";
-          if (msg === "token save failed") {
-            loginHintEl.textContent = "Не удалось сохранить access_token. Проверьте режим приватности браузера.";
-            setLoginState("error", "Ошибка сохранения токена.");
-          } else {
-            loginHintEl.textContent = "Не удалось войти: " + msg;
-            setLoginState("error", "Ошибка проверки Telegram auth.");
-          }
-
+        var msg = err && err.message ? err.message : "Попробуйте снова.";
+        if (msg === "token save failed") {
+          setLoginState(
+            "error",
+            "Не удалось сохранить сессию. Проверьте настройки браузера."
+          );
+          return;
         }
-        showFallback(true, "Fallback доступен: откройте вход в новом окне.");
-
+        setLoginState("error", "Не удалось войти. " + msg);
       });
 
   }
@@ -1311,12 +1497,14 @@
   var skillsOverlayEl = document.getElementById("rl-cabinet-skills-modal-overlay");
   var skillsPanelEl =
     skillsModalEl && skillsModalEl.querySelector(".rl-cabinet-skills-modal__panel");
-  var skillsCatalogEl = document.getElementById("rl-cabinet-skills-catalog");
-  var skillsSearchEl = document.getElementById("rl-cabinet-skills-search");
+  var skillTreeRootsEl = document.getElementById("rl-cabinet-skill-tree-roots");
+  var skillTreeCounterEl = document.getElementById("rl-cabinet-skill-tree-counter");
+  var skillTreeHintEl = document.getElementById("rl-cabinet-skill-tree-hint");
+  var skillTreeLimitEl = document.getElementById("rl-cabinet-skill-tree-limit");
+  var skillTreeCloseBtn = document.getElementById("rl-cabinet-skill-tree-close");
+  var skillTreeResetBtn = document.getElementById("rl-cabinet-skill-tree-reset");
+  var skillTreeSaveErrEl = document.getElementById("rl-cabinet-skill-tree-save-error");
   var skillsApplyBtn = document.getElementById("rl-cabinet-skills-apply");
-  var skillsCancelBtn = document.getElementById("rl-cabinet-skills-cancel");
-  var skillsRareBtn = document.getElementById("rl-cabinet-skills-rare");
-  var skillsLimitEl = document.getElementById("rl-cabinet-skills-limit");
 
 
 
@@ -1330,13 +1518,17 @@
 
     pickerDraft: [],
 
-    pickerQuery: "",
+    expandedNiches: { dev: false, design: false, marketing: false, text: false },
 
-    pickerNiche: null,
+    expandedL1: {},
 
-    showRareSkills: false,
+    catalogByTag: {},
+
+    catalogByNiche: { dev: [], design: [], marketing: [], text: [] },
 
     catalogLoading: false,
+
+    tagsStripSkeleton: false,
 
     offset: 0,
 
@@ -1966,6 +2158,100 @@
 
 
 
+  function titleForTag(tag) {
+
+    var row = state.catalogByTag[tag];
+
+    return (row && row.title_ru) || tag;
+
+  }
+
+
+
+  function nicheForTag(tag) {
+
+    var row = state.catalogByTag[tag];
+
+    if (row && row.category) {
+
+      return row.category;
+
+    }
+
+    return catalogCategoryForTag(tag);
+
+  }
+
+
+
+  function orderedTagsForStrip(tags) {
+
+    var buckets = { dev: [], design: [], marketing: [], text: [], other: [] };
+
+    var i;
+
+    var n;
+
+    for (i = 0; i < tags.length; i++) {
+
+      n = nicheForTag(tags[i]) || "other";
+
+      if (!buckets[n]) {
+
+        buckets.other.push(tags[i]);
+
+      } else {
+
+        buckets[n].push(tags[i]);
+
+      }
+
+    }
+
+    return buckets.dev
+
+      .concat(buckets.design, buckets.marketing, buckets.text, buckets.other);
+
+  }
+
+
+
+  function flashTagsStrip() {
+
+    if (!tagsEl) {
+
+      return;
+
+    }
+
+    tagsEl.classList.add("is-saved-flash");
+
+    window.setTimeout(function () {
+
+      tagsEl.classList.remove("is-saved-flash");
+
+    }, 2000);
+
+  }
+
+
+
+  function tagsStripSkeletonHtml() {
+
+    return (
+
+      '<span class="rl-cabinet-tag rl-cabinet-tag--skel" aria-hidden="true"></span>' +
+
+      '<span class="rl-cabinet-tag rl-cabinet-tag--skel" aria-hidden="true"></span>' +
+
+      '<span class="rl-cabinet-tag rl-cabinet-tag--skel" aria-hidden="true"></span>'
+
+    );
+
+  }
+
+
+
   function renderTags() {
 
     if (!tagsEl) {
@@ -1974,41 +2260,103 @@
 
     }
 
-    var html = state.tags
+    if (state.tagsStripSkeleton) {
 
-      .map(function (tag) {
+      tagsEl.classList.add("is-skeleton");
 
-        return (
+      tagsEl.innerHTML = tagsStripSkeletonHtml();
 
-          '<span class="rl-cabinet-tag" role="listitem" data-tag="' +
+      if (tagsHint) {
 
-          escapeHtml(tag) +
+        tagsHint.hidden = true;
 
-          '">#' +
+      }
 
-          escapeHtml(tag) +
+      if (noTagsEl) {
 
-          '<button type="button" class="rl-cabinet-tag__remove" aria-label="Убрать навык">×</button></span>'
+        noTagsEl.hidden = true;
 
-        );
+      }
 
-      })
+      if (tagsClearBtn) {
 
-      .join("");
+        tagsClearBtn.hidden = true;
 
-    html +=
+      }
 
-      '<button type="button" class="rl-cabinet-tag rl-cabinet-tag--add" id="rl-cabinet-tag-add">+ Добавить навык</button>';
-
-    tagsEl.innerHTML = html;
-
-
-
-    if (tagsHint) {
-
-      tagsHint.hidden = state.tags.length > 0;
+      return;
 
     }
+
+    tagsEl.classList.remove("is-skeleton");
+
+    var html = "";
+
+    var ordered = orderedTagsForStrip(state.tags);
+
+    var mobile = !isWideScreen();
+
+    if (!ordered.length) {
+
+      html +=
+
+        '<button type="button" class="rl-cabinet-tag--empty-link" id="rl-cabinet-tag-add">+ Добавь навыки для совместимости →</button>';
+
+      if (tagsHint) {
+
+        tagsHint.hidden = false;
+
+        tagsHint.textContent = "Лента покажет совместимость";
+
+        tagsHint.classList.add("rl-cabinet-head__hint--compat");
+
+      }
+
+    } else {
+
+      html = ordered
+
+        .map(function (tag) {
+
+          var label = titleForTag(tag);
+
+          return (
+
+            '<span class="rl-cabinet-tag' +
+
+            (mobile ? " rl-cabinet-tag--open-sheet" : "") +
+
+            '" role="listitem" data-tag="' +
+
+            escapeHtml(tag) +
+
+            '">' +
+
+            escapeHtml(label) +
+
+            '<button type="button" class="rl-cabinet-tag__remove" aria-label="Убрать навык">×</button></span>'
+
+          );
+
+        })
+
+        .join("");
+
+      html +=
+
+        '<button type="button" class="rl-cabinet-tag rl-cabinet-tag--add" id="rl-cabinet-tag-add">+ Добавить</button>';
+
+      if (tagsHint) {
+
+        tagsHint.hidden = true;
+
+        tagsHint.classList.remove("rl-cabinet-head__hint--compat");
+
+      }
+
+    }
+
+    tagsEl.innerHTML = html;
 
     if (noTagsEl) {
 
@@ -2023,8 +2371,6 @@
       tagsClearBtn.disabled = state.tagsLoading;
 
     }
-
-
 
     tagsEl.querySelectorAll(".rl-cabinet-tag__remove").forEach(function (btn) {
 
@@ -2042,17 +2388,35 @@
 
         }
 
-        saveTags(state.tags.filter(function (t) {
+        saveTags(
 
-          return t !== tag;
+          state.tags.filter(function (t) {
 
-        }));
+            return t !== tag;
+
+          })
+
+        );
 
       });
 
     });
 
+    tagsEl.querySelectorAll(".rl-cabinet-tag--open-sheet").forEach(function (chip) {
 
+      chip.addEventListener("click", function (e) {
+
+        if (e.target.closest(".rl-cabinet-tag__remove")) {
+
+          return;
+
+        }
+
+        openSkillsPicker();
+
+      });
+
+    });
 
     var addBtn = document.getElementById("rl-cabinet-tag-add");
 
@@ -2066,42 +2430,98 @@
 
 
 
-  function skillChipHtml(row) {
+  function trackSkillTelemetry(eventName, payload) {
 
+    try {
+
+      document.dispatchEvent(
+
+        new CustomEvent("rawlead:telemetry", {
+
+          detail: Object.assign({ event: eventName }, payload || {}),
+
+        })
+
+      );
+
+
+    } catch (_err) {
+
+      /* AC-9: never block UX */
+
+    }
+
+  }
+
+
+
+  function skillTreeChipHtml(row, atLimit, opts) {
+    opts = opts || {};
     var tag = row.tag || "";
-
     var label = (row.title_ru || tag).trim() || tag;
-
-    var active = state.pickerDraft.indexOf(tag) >= 0;
-
-    var owned = state.tags.indexOf(tag) >= 0;
-
+    var selected = state.pickerDraft.indexOf(tag) >= 0;
+    var disabled = atLimit && !selected;
+    var level = row.picker_level || opts.level || "L1";
     return (
-
-      '<button type="button" class="rl-feed-chip rl-feed-skill' +
-
-      (active ? " is-active" : "") +
-
-      (owned ? " is-disabled" : "") +
-
+      '<button type="button" class="rl-skill-chip' +
+      (level === "L3" ? " rl-skill-chip--l3" : "") +
+      (selected ? " is-selected" : "") +
+      (disabled ? " is-disabled" : "") +
       '" data-tag="' +
-
       escapeHtml(tag) +
-
+      '" data-niche="' +
+      escapeHtml(row.category || opts.niche || "") +
       '"' +
-
-      (owned ? ' disabled aria-disabled="true"' : "") +
-
+      (disabled ? ' disabled aria-disabled="true"' : "") +
       ">" +
-
+      (selected ? "✓ " : "") +
       escapeHtml(label) +
-
-      (row.count ? ' <span class="rl-feed-skill__count">' + row.count + "</span>" : "") +
-
       "</button>"
-
     );
+  }
 
+  function renderL1ChipBlock(row, atLimit, niche) {
+    var tag = row.tag || "";
+    var selected = state.pickerDraft.indexOf(tag) >= 0;
+    var children = row.children || [];
+    var hasL3 = children.length > 0;
+    var l3Open = selected && hasL3;
+    var html =
+      '<div class="rl-l1-chip-wrap">' +
+      skillTreeChipHtml(row, atLimit, { niche: niche, level: "L1" }) +
+      "</div>";
+    if (hasL3) {
+      html +=
+        '<div class="rl-l3-row' +
+        (l3Open ? " is-visible" : "") +
+        '" data-l3-parent="' +
+        escapeHtml(tag) +
+        '">';
+      for (var ci = 0; ci < children.length; ci++) {
+        html += skillTreeChipHtml(
+          {
+            tag: children[ci].tag,
+            title_ru: children[ci].title_ru,
+            category: niche,
+            picker_level: "L3",
+          },
+          atLimit,
+          { niche: niche, level: "L3" }
+        );
+      }
+      html += "</div>";
+    }
+    return html;
+  }
+
+  function catalogGroupForNiche(niche) {
+    var g;
+    for (g = 0; g < state.catalogGroups.length; g++) {
+      if (state.catalogGroups[g].category === niche) {
+        return state.catalogGroups[g];
+      }
+    }
+    return null;
   }
 
 
@@ -2146,157 +2566,252 @@
 
 
 
-  function pickerRowVisible(row) {
+  function rebuildCatalogIndex() {
 
-    if (!row || !row.tag) {
+    var byTag = {};
 
-      return false;
+    var byNiche = { dev: [], design: [], marketing: [], text: [] };
 
-    }
+    var seen = {};
 
-    var tier = row.tier || "A";
 
-    var niche = state.pickerNiche;
 
-    if (niche) {
+    function ingest(row, category) {
 
-      var tierA = TIER_A_BY_NICHE[niche] || [];
+      if (!row || !row.tag || seen[row.tag]) {
 
-      if (tierA.indexOf(row.tag) >= 0) {
-
-        return true;
+        return;
 
       }
 
-      return !!(state.showRareSkills && tier === "B" && row.category === niche);
+      var cat = category || row.category || catalogCategoryForTag(row.tag);
 
-    }
+      if (!cat || !byNiche[cat]) {
 
-    return state.showRareSkills || tier === "A";
-
-  }
-
-
-
-  function updateRareSkillsUi() {
-
-    if (!skillsRareBtn) {
-
-      return;
-
-    }
-
-    skillsRareBtn.hidden = false;
-
-    skillsRareBtn.textContent = state.showRareSkills ? "Свернуть" : "Ещё навыки";
-
-    skillsRareBtn.setAttribute("aria-expanded", state.showRareSkills ? "true" : "false");
-
-  }
-
-
-
-  function renderPickerCatalog() {
-
-    if (!skillsCatalogEl) {
-
-      return;
-
-    }
-
-    updateRareSkillsUi();
-
-    var q = (state.pickerQuery || "").trim().toLowerCase();
-
-    var groups = state.catalogGroups.length ? state.catalogGroups : null;
-
-    if (!groups && !state.catalog.length) {
-
-      skillsCatalogEl.innerHTML =
-
-        '<p class="rl-feed-skills__empty">Пока нет навыков в ленте — дождитесь заказов из радара</p>';
-
-      return;
-
-    }
-
-    function rowMatches(row) {
-
-      if (!q) {
-
-        return true;
+        return;
 
       }
 
-      var tag = (row.tag || "").toLowerCase();
+      seen[row.tag] = true;
 
-      var label = (row.title_ru || row.tag || "").toLowerCase();
+      var item = {
 
-      return tag.indexOf(q) >= 0 || label.indexOf(q) >= 0;
+        tag: row.tag,
 
-    }
+        title_ru: row.title_ru || row.tag,
 
-    if (groups) {
+        category: cat,
 
-      skillsCatalogEl.innerHTML = groups
+        tier: row.tier || "A",
 
-        .map(function (group) {
+        picker_level: row.picker_level || "L1",
 
-          var skills = (group.skills || []).filter(rowMatches).filter(pickerRowVisible);
+        picker_group: row.picker_group || "",
 
-          if (!skills.length) {
+        children: row.children || [],
 
-            return "";
+        parent_id: row.parent_id || "",
 
-          }
+      };
 
-          return (
+      byTag[row.tag] = item;
 
-            '<div class="rl-feed-skills-group">' +
+      if (item.picker_level === "L3") {
 
-            '<p class="rl-feed-skills-group__title">' +
+        return;
 
-            escapeHtml(group.title || group.category || "") +
+      }
 
-            "</p>" +
+      byNiche[cat].push(item);
 
-            '<div class="rl-feed-skills-group__chips">' +
+      var ch;
 
-            skills.map(skillChipHtml).join("") +
+      for (ch = 0; ch < (row.children || []).length; ch++) {
 
-            "</div></div>"
+        ingest(row.children[ch], cat);
 
-          );
-
-        })
-
-        .join("");
-
-    } else {
-
-      var flat = state.catalog.filter(rowMatches).filter(pickerRowVisible);
-
-      skillsCatalogEl.innerHTML = flat.length
-
-        ? '<div class="rl-feed-skills-group__chips">' + flat.map(skillChipHtml).join("") + "</div>"
-
-        : '<p class="rl-feed-skills__empty">Ничего не найдено</p>';
+      }
 
     }
 
-    skillsCatalogEl.querySelectorAll(".rl-feed-skill:not(.is-disabled)").forEach(function (btn) {
 
-      btn.addEventListener("click", function () {
 
-        togglePickerTag(btn.getAttribute("data-tag"));
+    var g;
+
+    var s;
+
+    for (g = 0; g < state.catalogGroups.length; g++) {
+
+      var grp = state.catalogGroups[g];
+
+      for (s = 0; s < (grp.skills || []).length; s++) {
+
+        ingest(grp.skills[s], grp.category);
+
+      }
+
+    }
+
+    for (g = 0; g < state.catalog.length; g++) {
+
+      ingest(state.catalog[g]);
+
+    }
+
+
+
+    function tierRank(t) {
+
+      return t === "A" ? 0 : 1;
+
+    }
+
+
+
+    NICHE_ORDER.forEach(function (niche) {
+
+      byNiche[niche].sort(function (a, b) {
+
+        var ta = tierRank(a.tier);
+
+        var tb = tierRank(b.tier);
+
+        if (ta !== tb) {
+
+          return ta - tb;
+
+        }
+
+        return (a.title_ru || a.tag).localeCompare(b.title_ru || b.tag, "ru");
 
       });
 
     });
 
-    if (skillsApplyBtn) {
 
-      skillsApplyBtn.disabled = state.pickerDraft.length === 0;
+
+    state.catalogByTag = byTag;
+
+    state.catalogByNiche = byNiche;
+
+  }
+
+
+
+  function renderDevNicheBody(skills, atLimit, niche) {
+    var bodyHtml = "";
+    var grp = catalogGroupForNiche(niche);
+    var subheads = (grp && grp.picker_subheads) || DEV_PICKER_SUBHEADS;
+    var si;
+    var sh;
+    var l1skills;
+    for (si = 0; si < subheads.length; si++) {
+      sh = subheads[si];
+      l1skills = [];
+      for (var i = 0; i < skills.length; i++) {
+        if (
+          skills[i].picker_group === sh.key &&
+          (skills[i].picker_level || "L1") === "L1"
+        ) {
+          l1skills.push(skills[i]);
+        }
+      }
+      if (!l1skills.length) {
+        continue;
+      }
+      bodyHtml +=
+        '<p class="rl-niche-subhead">' + escapeHtml(String(sh.label).toUpperCase()) + "</p>";
+      bodyHtml += '<div class="rl-niche-root__chips">';
+      for (var lj = 0; lj < l1skills.length; lj++) {
+        bodyHtml += renderL1ChipBlock(l1skills[lj], atLimit, niche);
+      }
+      bodyHtml += "</div>";
+    }
+    return bodyHtml;
+  }
+
+  function renderFlatNicheBody(skills, atLimit, niche) {
+    if (!skills.length) {
+      return "";
+    }
+    return (
+      '<div class="rl-niche-root__chips">' +
+      skills
+        .map(function (row) {
+          return skillTreeChipHtml(row, atLimit, { niche: niche });
+        })
+        .join("") +
+      "</div>"
+    );
+  }
+
+
+
+  function nicheMixFromDraft() {
+
+    var mix = [];
+
+    var i;
+
+    var n;
+
+    for (i = 0; i < state.pickerDraft.length; i++) {
+
+      n = nicheForTag(state.pickerDraft[i]);
+
+      if (n && mix.indexOf(n) < 0) {
+
+        mix.push(n);
+
+      }
+
+    }
+
+    return mix;
+
+  }
+
+
+
+  function updateSkillTreeChrome() {
+
+    var n = state.pickerDraft.length;
+
+    var atLimit = n >= MAX_USER_TAGS;
+
+
+
+    if (skillTreeCounterEl) {
+
+      skillTreeCounterEl.textContent = "Выбрано " + n + " / " + MAX_USER_TAGS;
+
+      skillTreeCounterEl.classList.toggle("is-active", n > 0);
+
+    }
+
+    if (skillTreeHintEl) {
+
+      skillTreeHintEl.hidden = n < 7 || n >= MAX_USER_TAGS;
+
+    }
+
+    if (skillTreeLimitEl) {
+
+      skillTreeLimitEl.hidden = !atLimit;
+
+    }
+
+    if (skillTreeSaveErrEl) {
+
+      skillTreeSaveErrEl.hidden = true;
+
+    }
+
+    if (skillsApplyBtn && !skillsApplyBtn.classList.contains("is-loading")) {
+
+      skillsApplyBtn.disabled = n === 0;
+
+      skillsApplyBtn.classList.toggle("is-idle-disabled", n === 0);
 
     }
 
@@ -2304,9 +2819,216 @@
 
 
 
-  function togglePickerTag(tag) {
+  function setSkillTreeSaveState(mode) {
 
-    if (!tag || state.tags.indexOf(tag) >= 0) {
+    if (!skillsApplyBtn) {
+
+      return;
+
+    }
+
+    skillsApplyBtn.classList.remove("is-loading", "is-success", "is-idle-disabled");
+
+    if (mode === "loading") {
+
+      skillsApplyBtn.disabled = true;
+
+      skillsApplyBtn.classList.add("is-loading");
+
+      skillsApplyBtn.textContent = "Сохраняем…";
+
+      return;
+
+    }
+
+    if (mode === "success") {
+
+      skillsApplyBtn.disabled = true;
+
+      skillsApplyBtn.classList.add("is-success");
+
+      skillsApplyBtn.textContent = "Навыки сохранены ✓";
+
+      return;
+
+    }
+
+    if (mode === "error") {
+
+      skillsApplyBtn.disabled = state.pickerDraft.length === 0;
+
+      skillsApplyBtn.textContent = "Сохранить навыки →";
+
+      if (skillTreeSaveErrEl) {
+
+        skillTreeSaveErrEl.hidden = false;
+
+      }
+
+      return;
+
+    }
+
+    skillsApplyBtn.textContent = "Сохранить навыки →";
+
+    updateSkillTreeChrome();
+
+  }
+
+
+
+  function renderSkillTree() {
+
+    if (!skillTreeRootsEl) {
+
+      return;
+
+    }
+
+    updateSkillTreeChrome();
+
+    var atLimit = state.pickerDraft.length >= MAX_USER_TAGS;
+
+    var html = "";
+
+    var ni;
+
+
+
+    for (ni = 0; ni < NICHE_ORDER.length; ni++) {
+
+      var niche = NICHE_ORDER[ni];
+
+      var expanded = !!state.expandedNiches[niche];
+
+      var skills = state.catalogByNiche[niche] || [];
+
+      var bodyHtml = "";
+
+      var grpNiche = catalogGroupForNiche(niche);
+      if (grpNiche && grpNiche.picker_subheads) {
+        bodyHtml = renderDevNicheBody(skills, atLimit, niche);
+      } else {
+        bodyHtml = renderFlatNicheBody(skills, atLimit, niche);
+      }
+
+
+
+      if (!bodyHtml && !state.catalogLoading) {
+
+        bodyHtml = '<p class="rl-feed-skills__empty">Каталог загружается…</p>';
+
+      }
+
+
+
+      html +=
+
+        '<section class="rl-niche-root' +
+
+        (expanded ? " rl-niche-root--expanded" : "") +
+
+        '" data-niche="' +
+
+        escapeHtml(niche) +
+
+        '">' +
+
+        '<button type="button" class="rl-niche-root__header" data-niche-toggle="' +
+
+        escapeHtml(niche) +
+
+        '">' +
+
+        '<span class="rl-niche-root__chevron" aria-hidden="true">' +
+
+        (expanded ? "▾" : "▸") +
+
+        "</span>" +
+
+        "<span>" +
+
+        escapeHtml(NICHE_ROOT_LABELS[niche] || niche) +
+
+        "</span></button>" +
+
+        '<div class="rl-niche-root__body">' +
+
+        bodyHtml +
+
+        "</div></section>";
+
+    }
+
+
+
+    skillTreeRootsEl.innerHTML = html;
+
+
+
+    skillTreeRootsEl.querySelectorAll("[data-niche-toggle]").forEach(function (btn) {
+
+      btn.addEventListener("click", function () {
+
+        var nicheKey = btn.getAttribute("data-niche-toggle");
+
+        if (!nicheKey) {
+
+          return;
+
+        }
+
+        state.expandedNiches[nicheKey] = !state.expandedNiches[nicheKey];
+
+        renderSkillTree();
+
+      });
+
+    });
+
+
+
+    skillTreeRootsEl.querySelectorAll(".rl-skill-chip:not(.is-disabled)").forEach(function (btn) {
+
+      btn.addEventListener("click", function () {
+
+        toggleSkillTreeTag(btn.getAttribute("data-tag"), btn.getAttribute("data-niche"));
+
+      });
+
+    });
+
+    skillTreeRootsEl.querySelectorAll("[data-l1-expand]").forEach(function (btn) {
+
+      btn.addEventListener("click", function (e) {
+
+        e.preventDefault();
+
+        e.stopPropagation();
+
+        var parentTag = btn.getAttribute("data-l1-expand");
+
+        if (!parentTag) {
+
+          return;
+
+        }
+
+        state.expandedL1[parentTag] = !state.expandedL1[parentTag];
+
+        renderSkillTree();
+
+      });
+
+    });
+
+  }
+
+
+
+  function toggleSkillTreeTag(tag, nicheHint) {
+
+    if (!tag) {
 
       return;
 
@@ -2314,37 +3036,53 @@
 
     var idx = state.pickerDraft.indexOf(tag);
 
-    if (idx < 0 && state.tags.length + state.pickerDraft.length >= MAX_USER_TAGS) {
+    var niche = nicheHint || nicheForTag(tag) || "";
 
-      if (skillsLimitEl) {
 
-        skillsLimitEl.hidden = false;
+
+    if (idx >= 0) {
+
+      state.pickerDraft = state.pickerDraft.filter(function (t) {
+
+        return t !== tag;
+
+      });
+
+      if (state.expandedL1[tag]) {
+
+        delete state.expandedL1[tag];
 
       }
 
-      return;
+      trackSkillTelemetry("skill_unselect", { niche: niche, tag: tag });
+
+    } else {
+
+      if (state.pickerDraft.length >= MAX_USER_TAGS) {
+
+        updateSkillTreeChrome();
+
+        renderSkillTree();
+
+        return;
+
+      }
+
+      state.pickerDraft = state.pickerDraft.concat([tag]);
+
+      var catalogRow = state.catalogByTag[tag];
+
+      if (catalogRow && (catalogRow.children || []).length > 0) {
+
+        state.expandedL1[tag] = true;
+
+      }
+
+      trackSkillTelemetry("skill_select", { niche: niche, tag: tag });
 
     }
 
-    if (skillsLimitEl) {
-
-      skillsLimitEl.hidden = true;
-
-    }
-
-    state.pickerDraft =
-
-      idx >= 0
-
-        ? state.pickerDraft.filter(function (t) {
-
-            return t !== tag;
-
-          })
-
-        : state.pickerDraft.concat([tag]);
-
-    renderPickerCatalog();
+    renderSkillTree();
 
   }
 
@@ -2358,23 +3096,19 @@
 
     }
 
+    document.body.classList.remove("rl-skill-tree-open");
+
     state.pickerDraft = [];
 
-    state.pickerQuery = "";
+    state.expandedL1 = {};
 
-    state.showRareSkills = false;
+    NICHE_ORDER.forEach(function (n) {
 
-    if (skillsLimitEl) {
+      state.expandedNiches[n] = false;
 
-      skillsLimitEl.hidden = true;
+    });
 
-    }
-
-    if (skillsSearchEl) {
-
-      skillsSearchEl.value = "";
-
-    }
+    setSkillTreeSaveState("idle");
 
   }
 
@@ -2388,37 +3122,89 @@
 
     }
 
-    state.pickerDraft = [];
+    state.pickerDraft = state.tags.slice();
 
-    state.pickerQuery = "";
+    var ti;
 
-    state.showRareSkills = false;
+    var ttag;
 
-    state.pickerNiche = null;
+    for (ti = 0; ti < state.pickerDraft.length; ti++) {
 
-    if (skillsLimitEl) {
+      ttag = state.pickerDraft[ti];
 
-      skillsLimitEl.hidden = true;
+      var trow = state.catalogByTag[ttag];
+
+      if (trow && (trow.children || []).length > 0) {
+
+        state.expandedL1[ttag] = true;
+
+      }
 
     }
 
-    if (skillsSearchEl) {
+    NICHE_ORDER.forEach(function (n) {
 
-      skillsSearchEl.value = "";
+      var has = false;
+
+      var i;
+
+      for (i = 0; i < state.pickerDraft.length; i++) {
+
+        if (nicheForTag(state.pickerDraft[i]) === n) {
+
+          has = true;
+
+          break;
+
+        }
+
+      }
+
+      state.expandedNiches[n] = has;
+
+    });
+
+    if (skillTreeHintEl) {
+
+      skillTreeHintEl.hidden = true;
 
     }
+
+    if (skillTreeLimitEl) {
+
+      skillTreeLimitEl.hidden = state.pickerDraft.length < MAX_USER_TAGS;
+
+    }
+
+    if (skillTreeSaveErrEl) {
+
+      skillTreeSaveErrEl.hidden = true;
+
+    }
+
+    setSkillTreeSaveState("idle");
 
     skillsModalEl.hidden = false;
 
+    document.body.classList.add("rl-skill-tree-open");
+
+    function afterCatalog() {
+
+      rebuildCatalogIndex();
+
+      renderSkillTree();
+
+    }
+
     if (!state.catalog.length && !state.catalogGroups.length && !state.catalogLoading) {
 
-      loadCatalog().finally(renderPickerCatalog);
+      loadCatalog().finally(afterCatalog);
 
       return;
 
     }
 
-    renderPickerCatalog();
+    afterCatalog();
 
   }
 
@@ -2426,27 +3212,23 @@
 
   function applyPickerTags() {
 
-    if (!state.pickerDraft.length) {
+    if (!state.pickerDraft.length || state.tagsLoading) {
 
       return;
 
     }
 
-    var merged = state.tags.slice();
+    setSkillTreeSaveState("loading");
 
-    state.pickerDraft.forEach(function (tag) {
+    trackSkillTelemetry("skills_save", {
 
-      if (merged.indexOf(tag) < 0 && merged.length < MAX_USER_TAGS) {
+      selected_count: state.pickerDraft.length,
 
-        merged.push(tag);
-
-      }
+      niche_mix: nicheMixFromDraft(),
 
     });
 
-    closeSkillsPicker();
-
-    saveTags(merged);
+    saveTags(state.pickerDraft.slice(), { fromSheet: true });
 
   }
 
@@ -2464,12 +3246,6 @@
 
     var skillsUrl = cfg.restSkills + "?mode=full&limit=200";
 
-    if (state.pickerNiche) {
-
-      skillsUrl += "&category=" + encodeURIComponent(state.pickerNiche);
-
-    }
-
     return fetch(skillsUrl, { credentials: "same-origin" })
 
       .then(function (res) {
@@ -2484,6 +3260,8 @@
 
         state.catalog = data.skills || [];
 
+        rebuildCatalogIndex();
+
       })
 
       .catch(function () {
@@ -2491,6 +3269,8 @@
         state.catalogGroups = [];
 
         state.catalog = [];
+
+        rebuildCatalogIndex();
 
       })
 
@@ -2518,7 +3298,9 @@
 
 
 
-  function saveTags(tags) {
+  function saveTags(tags, opts) {
+
+    opts = opts || {};
 
     if (state.tagsLoading) {
 
@@ -2528,7 +3310,7 @@
 
     state.tagsLoading = true;
 
-    if (tagsEl) {
+    if (tagsEl && !opts.fromSheet) {
 
       tagsEl.classList.add("is-loading");
 
@@ -2570,13 +3352,31 @@
 
         renderTags();
 
+        if (opts.fromSheet) {
+
+          flashTagsStrip();
+
+          setSkillTreeSaveState("success");
+
+          window.setTimeout(closeSkillsPicker, 1500);
+
+        }
+
         resetAndLoad();
 
       })
 
       .catch(function () {
 
-        showError("Не удалось сохранить навыки.");
+        if (opts.fromSheet) {
+
+          setSkillTreeSaveState("error");
+
+        } else {
+
+          showError("Не удалось сохранить навыки.");
+
+        }
 
       })
 
@@ -2598,6 +3398,10 @@
 
   function loadTags() {
 
+    state.tagsStripSkeleton = true;
+
+    renderTags();
+
     return fetch(cfg.restTags, { credentials: "same-origin", headers: authHeaders() })
 
       .then(function (res) {
@@ -2616,7 +3420,19 @@
 
         state.tags = data.tags || [];
 
+        state.tagsStripSkeleton = false;
+
         renderTags();
+
+      })
+
+      .catch(function () {
+
+        state.tagsStripSkeleton = false;
+
+        renderTags();
+
+        throw new Error("tags load failed");
 
       });
 
@@ -3824,9 +4640,9 @@
 
   }
 
-  if (skillsCancelBtn) {
+  if (skillTreeCloseBtn) {
 
-    skillsCancelBtn.addEventListener("click", closeSkillsPicker);
+    skillTreeCloseBtn.addEventListener("click", closeSkillsPicker);
 
   }
 
@@ -3836,13 +4652,13 @@
 
   }
 
-  if (skillsRareBtn) {
+  if (skillTreeResetBtn) {
 
-    skillsRareBtn.addEventListener("click", function () {
+    skillTreeResetBtn.addEventListener("click", function () {
 
-      state.showRareSkills = !state.showRareSkills;
+      state.pickerDraft = [];
 
-      renderPickerCatalog();
+      renderSkillTree();
 
     });
 
@@ -3851,18 +4667,6 @@
   if (tagsClearBtn) {
 
     tagsClearBtn.addEventListener("click", clearAllTags);
-
-  }
-
-  if (skillsSearchEl) {
-
-    skillsSearchEl.addEventListener("input", function () {
-
-      state.pickerQuery = skillsSearchEl.value || "";
-
-      renderPickerCatalog();
-
-    });
 
   }
 
@@ -3972,6 +4776,10 @@
 
   function bootCabinet() {
 
+    state.tagsStripSkeleton = true;
+
+    renderTags();
+
     loadSubscription();
 
     loadCatalog()
@@ -4002,13 +4810,15 @@
 
     showLogin();
 
-    if (consumeDeepLinkAuth()) {
-      showFallback(true);
+    if (consumeBotAuthFromQuery()) {
       return;
     }
 
-    mountTelegramWidget();
+    if (consumeDeepLinkAuth()) {
+      return;
+    }
 
+    setLoginState("", "");
   }
 
   function startLoggedIn() {
@@ -4022,6 +4832,10 @@
   }
 
   ensureCabinetDelegation();
+
+  if (getToken()) {
+    syncAuthCookie(getToken());
+  }
 
   if (!getToken()) {
 

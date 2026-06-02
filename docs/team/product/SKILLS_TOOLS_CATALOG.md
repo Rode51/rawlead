@@ -1,9 +1,363 @@
 # SKILLS_TOOLS_CATALOG
 
-Статус: **v0.3** финал · 2026-05-28 · Product ✅ → Coder § **TAGS-V0.3**  
-Предыдущий: ~~v0.2~~ (66 тегов, перегружен) → merge-таблица ниже  
+Статус: **v0.5** deep research O94 · 2026-06-02 · **✅ approve владельца → @lead-architect → O94-code Coder**  
+Предыдущий: ~~v0.4~~ (O93 spike, 3 уровня) → ниже  
 Основа: `docs/team/product/SKILLS_TOOLS_RESEARCH_PROMPT.md`  
-Параметры refactor: **4 ниши · 2 уровня · Tier A max 6 на нишу · max 6 тегов на лид (L1) · 1 тег `llm_integration`**
+Параметры v0.5: **4 ниши · full stacks (Py/JS/PHP) · subheads Design/Marketing/Text · figma + ui_ux оба Tier A (убрать из expand) · paid_platform одна полка · typescript Tier B · 3 новых use_case · laravel L3**
+
+---
+
+## v0.5 — Deep research: расширенные стеки + subheads (O94 · 2026-06-02)
+
+> **Гарды:** L1 промпт / judge / Neon-схема — **не меняем**. Только picker-конфиг + EXPAND_MAP в коде.  
+> **Решения владельца 2026-06-02:** Q1=B · Q2=A · Q3=A · Q4=A · Q5=A — все приняты, отражены ниже.
+
+---
+
+### Dev — расширенные стеки
+
+#### «По задаче» (use_case)
+
+| picker_group | parent_id | label | tier | expand_to (L3) | v0.5 |
+|---|---|---|---|---|---|
+| use_case | `telegram_bot_dev` | Telegram-боты | **A** | aiogram, telethon | без изм. |
+| use_case | `wordpress_dev` | WordPress | **A** | php, html_css | без изм. |
+| use_case | `api_integration` | API интеграции | **A** | — | без изм. |
+| use_case | `llm_integration` | ИИ-интеграция | **A** | — | без изм. |
+| use_case | `web_scraping` | Парсинг сайтов | **A** | telethon, scrapy | + scrapy NEW |
+| use_case | `mobile_dev` | Мобильные приложения | **B** | react_native, flutter | **NEW** |
+| use_case | `data_analysis` | Анализ данных | **B** | pandas | **NEW** |
+| use_case | `ecommerce_dev` | Интернет-магазины | **B** | woocommerce, opencart | **NEW** |
+
+#### «По технологии» (technology)
+
+| picker_group | parent_id | label | tier | expand_to (L3) | v0.5 |
+|---|---|---|---|---|---|
+| technology | `python` | Python | **A** | django, fastapi, flask, scrapy | + flask, scrapy NEW |
+| technology | `javascript` | JavaScript | **A** | react, vue, nextjs, nodejs, typescript | + vue, nextjs, nodejs, typescript NEW |
+| technology | `php` | PHP | **B** | laravel, woocommerce | + laravel, woocommerce NEW |
+| technology | `typescript` | TypeScript | **B** | — | **NEW Tier B chip** (видим в «Ещё технологии»; лиды TS → also match js через expand) |
+
+> **typescript:** Tier B самостоятельный чип в «По технологии» + остаётся в javascript expand_to — TS-лиды автоматически матчатся JS-разработчикам.  
+> **scrapy:** cross-ref L3 — входит и в python, и в web_scraping.  
+> **laravel:** возвращён явным L3 под php (был synonym-only в v0.3, Q3=A).
+
+#### Полный EXPAND_MAP v0.5 (для Coder — заменить v0.4 целиком)
+
+```python
+EXPAND_MAP = {
+  # --- DEV use_case ---
+  "telegram_bot_dev": ["telegram_bot_dev", "aiogram", "telethon"],
+  "wordpress_dev":    ["wordpress_dev", "php", "html_css"],
+  "web_scraping":     ["web_scraping", "telethon", "scrapy"],
+  "api_integration":  ["api_integration"],
+  "llm_integration":  ["llm_integration"],
+  "mobile_dev":       ["mobile_dev", "react_native", "flutter"],      # NEW
+  "data_analysis":    ["data_analysis", "pandas"],                     # NEW
+  "ecommerce_dev":    ["ecommerce_dev", "woocommerce", "opencart"],    # NEW
+  # --- DEV technology ---
+  "python":           ["python", "django", "fastapi", "flask", "scrapy"],
+  "javascript":       ["javascript", "react", "vue", "nextjs", "nodejs", "typescript"],
+  "php":              ["php", "laravel", "woocommerce"],
+  "typescript":       ["typescript", "javascript"],   # Tier B: TS → also match js leads
+  # --- DESIGN ---
+  "ui_ux":            ["ui_ux", "web_design", "landing_page_design", "mobile_app_design"],
+  # figma — Tier A standalone, НЕ в expand ui_ux (Q1=B)
+  "figma":            ["figma"],
+  "logo_design":      ["logo_design", "brand_identity"],
+  "banner_design":    ["banner_design", "motion_design", "video_editing"],
+  "brand_identity":   ["brand_identity", "illustration"],
+  "video_editing":    ["video_editing", "motion_design"],
+  # --- MARKETING ---
+  "smm":              ["smm", "content_marketing"],
+  "seo":              ["seo", "web_analytics", "technical_seo"],       # technical_seo NEW L3
+  "email_marketing":  ["email_marketing", "crm_marketing"],
+  "target_ads":       ["target_ads"],   # vk_ads убран из expand (Q4=A standalone)
+  "yandex_direct":    ["yandex_direct"],
+  "google_ads":       ["google_ads"],
+  "vk_ads":           ["vk_ads"],       # standalone Tier B, НЕ дочерний target_ads
+  # --- TEXT ---
+  "copywriting":      ["copywriting", "sales_copywriting", "email_copywriting", "ux_writing"],
+  "article_writing":  ["article_writing", "seo_copywriting", "technical_writing"],
+  "translation":      ["translation"],
+}
+# Теги вне EXPAND_MAP: match по точному совпадению.
+```
+
+---
+
+### Design — subhead-группы
+
+**Решение figma / ui_ux (Q1=B, владелец 2026-06-02):**  
+`figma` **остаётся Tier A** самостоятельным чипом. `ui_ux` — отдельный Tier A чип. Оба видны в picker.  
+Убрать `figma` из `ui_ux` expand_to — нет скрытого дублирования в матче.
+
+| picker_group | parent_id | label | tier | expand_to (L3) | v0.5 |
+|---|---|---|---|---|---|
+| product_web | `ui_ux` | UI/UX дизайн | **A** | web_design, mobile_app_design | figma убрана из expand |
+| product_web | `figma` | Figma | **A** | — | Tier A standalone (Q1=B) |
+| brand_graphics | `logo_design` | Логотипы & Бренд | **A** | brand_identity, illustration | без изм. |
+| brand_graphics | `banner_design` | Баннеры & Реклама | **A** | motion_design, video_editing | без изм. |
+| brand_graphics | `presentation_design` | Презентации | **B** | — | без изм. |
+| video_motion | `video_editing` | Видеомонтаж | **B** | motion_design | **NEW subhead** |
+| video_motion | `motion_design` | Моушн-дизайн | **B** | — | **NEW subhead** |
+| video_motion | `threed_modeling` | 3D-моделирование | **B** | — | **NEW subhead** |
+
+**Итого Design subheads:**
+- **«Продукт & Web»** (`product_web`): ui_ux, figma · expand → web_design, mobile_app_design
+- **«Бренд & Графика»** (`brand_graphics`): logo_design, banner_design · Tier B: presentation_design
+- **«Видео & Моушн»** (`video_motion`): Tier B: video_editing, motion_design, threed_modeling
+
+---
+
+### Marketing — subhead-группы
+
+**Решение google_ads / target_ads + vk_ads (Q4=A, владелец 2026-06-02):**  
+Все три (`target_ads`, `yandex_direct`, `google_ads`) — Tier A на одной полке «По платформе».  
+`vk_ads` — Tier B standalone на той же полке ниже. Убрать `vk_ads` из expand `target_ads`.
+
+| picker_group | parent_id | label | tier | expand_to (L3) | v0.5 |
+|---|---|---|---|---|---|
+| organic | `smm` | SMM | **A** | content_marketing | **NEW subhead** |
+| organic | `seo` | SEO | **A** | web_analytics, technical_seo | technical_seo NEW L3 |
+| organic | `email_marketing` | Email-маркетинг | **A** | crm_marketing, chatbot_marketing | **NEW subhead** |
+| organic | `marketplace_promotion` | Маркетплейсы | **B** | — | **NEW subhead** |
+| paid_platform | `target_ads` | Таргет (Meta/IG) | **A** | — | vk_ads убран из expand |
+| paid_platform | `yandex_direct` | Яндекс Директ | **A** | — | standalone |
+| paid_platform | `google_ads` | Google Ads | **A** | — | standalone |
+| paid_platform | `vk_ads` | ВКонтакте Ads | **B** | — | standalone Tier B (Q4=A) |
+
+> `meta_ads` → синоним `target_ads` (Meta/Facebook/Instagram).  
+> `technical_seo` → L3 в expand `seo` (TBD из v0.4 закрыт).
+
+**Итого Marketing subheads:**
+- **«Органика»** (`organic`): smm, seo, email_marketing · Tier B: marketplace_promotion
+- **«По платформе»** (`paid_platform`): Tier A: target_ads, yandex_direct, google_ads · Tier B: vk_ads
+
+---
+
+### Text — subhead-группы
+
+| picker_group | parent_id | label | tier | expand_to (L3) | v0.5 |
+|---|---|---|---|---|---|
+| commercial | `copywriting` | Копирайтинг | **A** | sales_copywriting, email_copywriting, ux_writing | **NEW subhead** |
+| commercial | `seo_copywriting` | SEO-тексты | **A** | — | **NEW subhead** |
+| commercial | `sales_copywriting` | Продающие тексты | **B** | — | Tier B в commercial |
+| editorial | `article_writing` | Статьи & Блог | **A** | technical_writing | **NEW subhead** |
+| editorial | `technical_writing` | Техдокументация | **A** | — | **NEW subhead** |
+| editorial | `editing_proofreading` | Редактура | **A** | — | **NEW subhead** |
+| editorial | `script_writing` | Сценарии | **B** | — | Tier B в editorial |
+| language | `translation` | Перевод & Локализация | **A** | — | **NEW subhead** |
+| language | `ux_writing` | UX-тексты | **B** | — | Tier B в language |
+| language | `product_description` | Описания товаров | **B** | — | Tier B в language |
+
+> `subtitles` / `субтитры` → синоним `translation`.
+
+**Итого Text subheads:**
+- **«Коммерческий текст»** (`commercial`): copywriting, seo_copywriting · Tier B: sales_copywriting
+- **«Редактура & Публикации»** (`editorial`): article_writing, technical_writing, editing_proofreading · Tier B: script_writing
+- **«Перевод & Локализация»** (`language`): translation · Tier B: ux_writing, product_description
+
+---
+
+### Merge-таблица v0.4 → v0.5 ✅ (approve владельца 2026-06-02)
+
+#### Новые canonical_tags — все приняты
+
+| canonical_tag | категория | tier | expand-источник | решение |
+|---|---|---|---|---|
+| `flask` | dev | L3 | python | ✅ |
+| `scrapy` | dev | L3 | python + web_scraping | ✅ |
+| `pandas` | dev | L3 | data_analysis | ✅ |
+| `vue` | dev | L3 | javascript | ✅ (был synonym) |
+| `nextjs` | dev | L3 | javascript | ✅ |
+| `nodejs` | dev | L3 | javascript | ✅ (был synonym) |
+| `typescript` | dev | **Tier B** chip | в javascript expand | ✅ Q2=A: Tier B + в expand js |
+| `react_native` | dev | L3 | mobile_dev | ✅ |
+| `flutter` | dev | L3 | mobile_dev | ✅ |
+| `mobile_dev` | dev | B (use_case) | — | ✅ |
+| `data_analysis` | dev | B (use_case) | — | ✅ |
+| `ecommerce_dev` | dev | B (use_case) | — | ✅ Q5=A |
+| `woocommerce` | dev | L3 | php + ecommerce_dev | ✅ |
+| `opencart` | dev | L3 | ecommerce_dev | ✅ |
+| `laravel` | dev | L3 | php | ✅ Q3=A: явный L3 |
+| `technical_seo` | marketing | L3 | seo | ✅ |
+| `meta_ads` | marketing | alias | target_ads | ✅ |
+| `subtitles` | text | alias | translation | ✅ |
+
+#### Изменения существующих тегов
+
+| canonical_tag | было | стало | решение |
+|---|---|---|---|
+| `figma` | Tier A + в expand ui_ux | Tier A standalone; **убрана из expand ui_ux** | ✅ Q1=B |
+| `ui_ux` expand | figma, web_design, … | web_design, mobile_app_design (без figma) | ✅ Q1=B |
+| `target_ads` expand | google_ads, yandex_direct, vk_ads | **пусто** (все standalone) | ✅ Q4=A |
+| `vk_ads` | Tier B (в expand target_ads) | **Tier B standalone**, не в expand | ✅ Q4=A |
+| `typescript` | synonym javascript | **Tier B chip** + в expand javascript | ✅ Q2=A |
+
+#### Новые picker_group (subhead-метки для UI)
+
+| picker_group slug | ниша | лейбл в UI |
+|---|---|---|
+| `product_web` | design | «Продукт & Web» |
+| `brand_graphics` | design | «Бренд & Графика» |
+| `video_motion` | design | «Видео & Моушн» |
+| `organic` | marketing | «Органика» |
+| `paid_platform` | marketing | «По платформе» |
+| `commercial` | text | «Коммерческий текст» |
+| `editorial` | text | «Редактура & Публикации» |
+| `language` | text | «Перевод & Локализация» |
+
+> picker_group — только UI-конфиг; L1 / Neon-схема не меняются.
+
+---
+
+_Статус: **✅ v0.5 approved · 2026-06-02** · Handoff: `@lead-architect` → O94-code Coder_
+
+---
+
+## v0.4 — 3-уровневая иерархия (O93) [legacy]
+
+Статус: **v0.4** spike O93 · 2026-06-02 · Product ✅ → @lead-architect → Coder  
+Предыдущий: ~~v0.3~~ (51 тег, 2 уровня) → hierarchy ниже  
+Основа: `docs/team/product/SKILLS_TOOLS_RESEARCH_PROMPT.md`  
+Параметры v0.4: **4 ниши · 3 уровня · 2 UI-блока (use-case + technology) · parent match expand · L1/judge/Neon не меняем**
+
+### Lead triage + owner rev (2026-06-02)
+
+**Owner: вариант B (PM)** — **не** третий пункт «Гибрид минимальный»:
+- dev picker: **«По задаче»** + **«По технологии»** (два subhead)
+- **По технологии Tier A:** `python` (→ django, fastapi) **и** `javascript` (→ react)
+- use-case Tier A: telegram_bot_dev, wordpress_dev, web_scraping, api_integration, llm_integration
+- PM: «гибрид **выше**» в тексте B = два блока из «лучшего варианта», не option «Гибрид»
+
+**PM dedupe (остаётся):** design/marketing parent/child · EXPAND_MAP standalone parents · `technical_seo` TBD.
+
+---
+
+## v0.4 — 3-уровневая иерархия (O93)
+
+> **Legacy v0.3** (таблица ниже) — L1 canonical pool; **не** использовать для O93 picker layout.
+
+### Концепт
+
+| Уровень | Назначение | UI | Match |
+|---------|------------|----|-------|
+| **1 — Направление** | основной выбор пользователя | Tier A chips, всегда видно | выбор direction = match по всем expand_to |
+| **2 — Стек** | опциональное уточнение | раскрывается под direction | — |
+| **3 — Инструмент / либа** | узкая настройка, будущий отклик | только после выбора direction | — |
+
+**Guardrail:** Level 1 «virtual» nodes = только UI-конфиг + expand-таблица в коде. L1 пишет canonical_tag на уровне стека/инструмента — не меняется.
+
+---
+
+### UI dev — два блока (owner **вариант B**)
+
+| UI-блок | picker_group | Tier A parent_id | expand_to | L3 под parent |
+|---------|--------------|------------------|-----------|---------------|
+| **По задаче** | `use_case` | `telegram_bot_dev` | aiogram, telethon | aiogram, telethon |
+| | | `wordpress_dev` | php, html_css | — |
+| | | `web_scraping` | telethon | telethon |
+| | | `api_integration` | — | — |
+| | | `llm_integration` | — | — |
+| **По технологии** | `technology` | `python` | django, fastapi | django, fastapi |
+| | | `javascript` | react | react |
+
+**Tier A dev chips (7):** 5× use_case + `python` + `javascript`.
+
+**Не выбрано:** PM option «Гибрид» (python A, javascript Tier B only).
+
+---
+
+### Expand-таблица design
+
+| parent_id (Level 1, Tier A) | label | expand_to | L2 стек | L3 |
+|---|---|---|---|---|
+| `ui_ux` | UI/UX дизайн | web_design, landing_page_design, mobile_app_design, figma | — | — |
+| `logo_design` | Логотипы & Бренд | brand_identity | — | illustration, threed_modeling |
+| `banner_design` | Баннеры & Медиа | motion_design, video_editing | — | — |
+| `figma` | Figma | — | — | — |
+| `brand_identity` | Фирменный стиль | illustration | — | threed_modeling |
+| `presentation_design` | Презентации | — | — | — |
+
+**Tier A design (6 слотов, без изменений):** `figma`, `ui_ux`, `web_design`, `logo_design`, `brand_identity`, `banner_design`
+
+---
+
+### Expand-таблица marketing
+
+| parent_id (Level 1, Tier A) | label | expand_to | L3 |
+|---|---|---|---|
+| `target_ads` | Таргет & Реклама | google_ads, yandex_direct, vk_ads | — |
+| `seo` | SEO | web_analytics, content_marketing | — |
+| `email_marketing` | Email-маркетинг | crm_marketing | chatbot_marketing |
+| `smm` | SMM | content_marketing | chatbot_marketing |
+| `yandex_direct` | Яндекс Директ | — | — |
+| `google_ads` | Google Ads | — | — |
+
+**Tier A marketing (6 слотов, без изменений):** `smm`, `target_ads`, `yandex_direct`, `google_ads`, `seo`, `email_marketing`
+
+---
+
+### Expand-таблица text
+
+| parent_id (Level 1, Tier A) | label | expand_to | L3 |
+|---|---|---|---|
+| `copywriting` | Копирайтинг | sales_copywriting, email_copywriting, ux_writing | — |
+| `article_writing` | Статьи & Блог | seo_copywriting, technical_writing | — |
+| `translation` | Перевод | — | — |
+| `editing_proofreading` | Редактура | — | — |
+| `technical_writing` | Технические тексты | — | — |
+| `seo_copywriting` | SEO-тексты | — | — |
+
+**Tier A text (6 слотов, без изменений):** `copywriting`, `seo_copywriting`, `article_writing`, `translation`, `technical_writing`, `editing_proofreading`
+
+---
+
+### Правила match expand (для Coder)
+
+```
+EXPAND_MAP = {
+  # dev
+  "telegram_bot_dev": ["telegram_bot_dev", "aiogram", "telethon"],
+  "wordpress_dev":    ["wordpress_dev", "php", "html_css"],
+  "web_scraping":     ["web_scraping", "telethon"],
+  "api_integration":  ["api_integration"],
+  "llm_integration":  ["llm_integration"],
+  "python":           ["python", "django", "fastapi"],
+  "javascript":       ["javascript", "react"],
+  # design
+  "ui_ux":            ["ui_ux", "web_design", "landing_page_design", "mobile_app_design", "figma"],
+  "logo_design":      ["logo_design", "brand_identity"],
+  "banner_design":    ["banner_design", "motion_design", "video_editing"],
+  "brand_identity":   ["brand_identity", "illustration"],
+  # marketing
+  "target_ads":       ["target_ads", "google_ads", "yandex_direct", "vk_ads"],
+  "seo":              ["seo", "web_analytics", "content_marketing"],
+  "email_marketing":  ["email_marketing", "crm_marketing"],
+  "smm":              ["smm", "content_marketing"],
+  # text
+  "copywriting":      ["copywriting", "sales_copywriting", "email_copywriting", "ux_writing"],
+  "article_writing":  ["article_writing", "seo_copywriting", "technical_writing"],
+}
+# Теги вне EXPAND_MAP: match по точному совпадению (без expand).
+# parent всегда включён в свой expand_to.
+```
+
+---
+
+### Acceptance (O93 spike)
+
+- [x] 3-уровневая иерархия зафиксирована (dev — канон; design/marketing/text — dedupe parent/child)
+- [x] EXPAND_MAP draft для Coder — static config, не Neon
+- [x] Guardrail: L1 / judge / Neon schema не меняем
+- [x] Owner **вариант B (PM):** 2 UI-блока · python **и** javascript Tier A в «Пo технологии»
+- [x] @lead-architect review spike
+- [x] @lead-designer O93-w1 wireframes (`feed-cabinet-mvp` §4.6)
+- [x] Coder: keyword_match expand + tree UI /cabinet/ + /lenta/
+- [ ] Smoke + E2E (владелец)
+
+---
 
 ---
 

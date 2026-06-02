@@ -35,7 +35,8 @@ _tables_ready = False
 _table_lock = threading.Lock()
 _pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="draft-job")
 _jobs_lock = threading.Lock()
-_active_futures: dict[int, Future[None]] = {}
+_active_futures: dict[tuple[str, int], Future[None]] = {}
+_job_errors: dict[tuple[str, int], str] = {}
 
 DraftStatus = Literal["ready", "pending", "failed"]
 
@@ -225,6 +226,7 @@ def _poll_error_from_stored(stored: str) -> str:
 
 
 def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) -> None:
+    key = (user_id, lead_id)
     try:
         generate_and_store_lead_draft(
             cfg,
@@ -234,10 +236,8 @@ def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) ->
             max_retries=4,
             enforce_rate_limit=False,
         )
-        with psycopg.connect(cfg.database_url) as conn:
-            with conn.cursor() as cur:
-                _delete_lead_job(cur, lead_id)
-            conn.commit()
+        with _jobs_lock:
+            _job_errors.pop(key, None)
     except DraftError as exc:
         raw = exc.detail if exc.code == "ai_fail" else ""
         stored = raw or _user_facing_error(exc)
@@ -251,28 +251,25 @@ def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) ->
             exc.code,
             raw or exc.detail,
         )
-        with psycopg.connect(cfg.database_url) as conn:
-            with conn.cursor() as cur:
-                _set_lead_job_failed(cur, lead_id, stored)
-            conn.commit()
+        with _jobs_lock:
+            _job_errors[key] = stored
     except Exception as exc:
         logger.error("%serror %s", log_prefix, exc)
-        with psycopg.connect(cfg.database_url) as conn:
-            with conn.cursor() as cur:
-                _set_lead_job_failed(cur, lead_id, _DRAFT_USER_FAIL)
-            conn.commit()
+        with _jobs_lock:
+            _job_errors[key] = _DRAFT_USER_FAIL
     finally:
         with _jobs_lock:
-            _active_futures.pop(lead_id, None)
+            _active_futures.pop(key, None)
 
 
 def _start_worker(cfg: Config, user_id: str, lead_id: int, log_prefix: str) -> None:
+    key = (user_id, lead_id)
     with _jobs_lock:
-        fut = _active_futures.get(lead_id)
+        fut = _active_futures.get(key)
         if fut is not None and not fut.done():
             return
         fut = _pool.submit(_run_generation, cfg, user_id, lead_id, log_prefix)
-        _active_futures[lead_id] = fut
+        _active_futures[key] = fut
 
 
 def poll_draft(
@@ -285,7 +282,6 @@ def poll_draft(
     """GET / draft — current status without starting work."""
     if not cfg.database_url.strip():
         return DraftPollResponse(status="failed", lead_id=lead_id, error=_DRAFT_USER_FAIL)
-    _ensure_draft_tables(cfg.database_url)
     prefix = log_prefix or f"lenta:draft:{lead_id}:"
 
     with psycopg.connect(cfg.database_url) as conn:
@@ -295,33 +291,19 @@ def poll_draft(
                 return _draft_to_poll(saved, lead_id)
         conn.commit()
 
-    materialized = _try_materialize_shared(
-        cfg, user_id=user_id, lead_id=lead_id, log_prefix=prefix
-    )
-    if materialized:
-        with psycopg.connect(cfg.database_url) as conn:
-            with conn.cursor() as cur:
-                _delete_lead_job(cur, lead_id)
-            conn.commit()
-        return materialized
-
-    with psycopg.connect(cfg.database_url) as conn:
-        with conn.cursor() as cur:
-            _clear_stale_lead_pending(cur, lead_id)
-            job = _read_lead_job(cur, lead_id)
-        conn.commit()
-
-    if not job:
-        return DraftPollResponse(status="failed", lead_id=lead_id, error="Черновик ещё не запущен")
-
-    status, err = job
-    if status == "pending":
-        return DraftPollResponse(status="pending", lead_id=lead_id)
-    return DraftPollResponse(
-        status="failed",
-        lead_id=lead_id,
-        error=_poll_error_from_stored(err),
-    )
+    key = (user_id, lead_id)
+    with _jobs_lock:
+        fut = _active_futures.get(key)
+        if fut is not None and not fut.done():
+            return DraftPollResponse(status="pending", lead_id=lead_id)
+        err = _job_errors.get(key, "")
+    if err:
+        return DraftPollResponse(
+            status="failed",
+            lead_id=lead_id,
+            error=_poll_error_from_stored(err),
+        )
+    return DraftPollResponse(status="failed", lead_id=lead_id, error="Черновик ещё не запущен")
 
 
 def submit_draft(
@@ -338,7 +320,6 @@ def submit_draft(
     if not cfg.database_url.strip():
         raise DraftError("ai_unavailable")
 
-    _ensure_draft_tables(cfg.database_url)
     prefix = log_prefix or f"lenta:draft:{lead_id}:"
 
     with psycopg.connect(cfg.database_url) as conn:
@@ -350,34 +331,7 @@ def submit_draft(
                 return _draft_to_poll(saved, lead_id)
         conn.commit()
 
-    materialized = _try_materialize_shared(
-        cfg, user_id=user_id, lead_id=lead_id, log_prefix=prefix
-    )
-    if materialized:
-        with psycopg.connect(cfg.database_url) as conn:
-            with conn.cursor() as cur:
-                _delete_lead_job(cur, lead_id)
-            conn.commit()
-        return materialized
-
-    with psycopg.connect(cfg.database_url) as conn:
-        with conn.cursor() as cur:
-            _clear_stale_lead_pending(cur, lead_id)
-            job = _read_lead_job(cur, lead_id)
-            if job and job[0] == "failed":
-                _delete_lead_job(cur, lead_id)
-                job = None
-
-            if job and job[0] == "pending":
-                conn.commit()
-                _start_worker(cfg, user_id, lead_id, prefix)
-            else:
-                owned = _insert_lead_pending(cur, lead_id)
-                conn.commit()
-                if owned:
-                    _start_worker(cfg, user_id, lead_id, prefix)
-                else:
-                    _start_worker(cfg, user_id, lead_id, prefix)
+    _start_worker(cfg, user_id, lead_id, prefix)
 
     deadline = time.monotonic() + max(0.0, quick_wait_sec)
     while time.monotonic() < deadline:

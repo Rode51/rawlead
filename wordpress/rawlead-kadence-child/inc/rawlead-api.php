@@ -43,6 +43,10 @@ function rawlead_api_base_url(): string {
         return rtrim((string) RAWLEAD_API_URL, '/');
 
     }
+    $host = strtolower((string) wp_parse_url(home_url('/'), PHP_URL_HOST));
+    if (in_array($host, ['rawlead.ru', 'www.rawlead.ru'], true)) {
+        return 'https://api.rawlead.ru';
+    }
 
     return 'http://127.0.0.1:18766';
 
@@ -92,19 +96,71 @@ function rawlead_api_bearer_from_request(WP_REST_Request $request): string {
 
     $auth = $request->get_header('authorization');
 
-    if (!is_string($auth) || $auth === '') {
+    if (is_string($auth) && $auth !== '' && stripos($auth, 'Bearer ') === 0) {
 
-        return '';
+        $token = trim(substr($auth, 7));
+
+        if ($token !== '') {
+
+            return $token;
+
+        }
 
     }
 
-    if (stripos($auth, 'Bearer ') !== 0) {
+    $cookie = isset($_COOKIE['rl_access']) ? trim((string) $_COOKIE['rl_access']) : '';
 
-        return '';
+    return $cookie;
+
+}
+
+
+
+/**
+
+ * @return string|WP_Error PNG bytes
+
+ */
+
+function rawlead_fetch_qr_png(string $data) {
+
+    $data = trim($data);
+
+    if ($data === '' || strlen($data) > 2000) {
+
+        return new WP_Error('rawlead_invalid', 'invalid qr data', ['status' => 400]);
 
     }
 
-    return trim(substr($auth, 7));
+
+
+    $url = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&format=png&data=' . rawurlencode($data);
+
+    $response = wp_remote_get($url, ['timeout' => 12]);
+
+
+
+    if (is_wp_error($response)) {
+
+        return $response;
+
+    }
+
+
+
+    $code = (int) wp_remote_retrieve_response_code($response);
+
+    $body = wp_remote_retrieve_body($response);
+
+    if ($code < 200 || $code >= 300 || $body === '') {
+
+        return new WP_Error('rawlead_qr', 'qr fetch failed', ['status' => 502]);
+
+    }
+
+
+
+    return $body;
 
 }
 
@@ -400,6 +456,230 @@ add_action('rest_api_init', static function (): void {
 
         },
 
+    ]);
+
+    register_rest_route('rawlead/v1', '/auth/bot-session', [
+
+        'methods'             => 'POST',
+
+        'permission_callback' => '__return_true',
+
+        'callback'            => static function (): WP_REST_Response|WP_Error {
+
+            $data = rawlead_api_post('/v1/auth/bot-session', []);
+
+            if (is_wp_error($data)) {
+
+                return $data;
+
+            }
+
+            return new WP_REST_Response($data, 200);
+
+        },
+
+    ]);
+
+    register_rest_route('rawlead/v1', '/auth/qr-image', [
+
+        'methods'             => 'GET',
+
+        'permission_callback' => '__return_true',
+
+        'args'                => [
+
+            'data' => [
+
+                'type'              => 'string',
+
+                'required'          => true,
+
+                'sanitize_callback' => static function ($value): string {
+
+                    return is_string($value) ? trim($value) : '';
+
+                },
+
+            ],
+
+        ],
+
+        'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+
+            $png = rawlead_fetch_qr_png((string) $request->get_param('data'));
+
+            if (is_wp_error($png)) {
+
+                return $png;
+
+            }
+
+            $response = new WP_REST_Response($png, 200);
+
+            $response->header('Content-Type', 'image/png');
+
+            $response->header('Cache-Control', 'private, max-age=300');
+
+            return $response;
+
+        },
+
+    ]);
+
+    register_rest_route('rawlead/v1', '/auth/bot-complete', [
+
+        'methods'             => ['GET', 'POST'],
+
+        'permission_callback' => '__return_true',
+
+        'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+
+            if ($request->get_method() === 'GET') {
+
+                $auth = trim((string) $request->get_param('auth'));
+
+                if ($auth === '') {
+
+                    return new WP_Error('rawlead_invalid', 'auth required', ['status' => 400]);
+
+                }
+
+                $data = rawlead_api_get('/v1/auth/bot-complete', ['auth' => $auth]);
+
+                if (is_wp_error($data)) {
+
+                    return $data;
+
+                }
+
+                return new WP_REST_Response($data, 200);
+
+            }
+
+            $body = $request->get_json_params();
+
+            if (!is_array($body)) {
+
+                return new WP_Error('rawlead_invalid', 'Expected JSON body', ['status' => 400]);
+
+            }
+
+            $data = rawlead_api_post('/v1/auth/bot-complete', $body);
+
+            if (is_wp_error($data)) {
+
+                return $data;
+
+            }
+
+            return new WP_REST_Response($data, 200);
+
+        },
+
+    ]);
+
+    register_rest_route('rawlead/v1', '/admin/pageview', [
+
+        'methods'             => 'POST',
+
+        'permission_callback' => '__return_true',
+
+        'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+
+            $body = $request->get_json_params();
+
+            if (!is_array($body)) {
+
+                return new WP_Error('rawlead_invalid', 'Expected JSON body', ['status' => 400]);
+
+            }
+
+            $data = rawlead_api_post('/v1/admin/pageview', $body);
+
+            if (is_wp_error($data)) {
+
+                return $data;
+
+            }
+
+            return new WP_REST_Response(null, 204);
+
+        },
+
+    ]);
+
+    register_rest_route('rawlead/v1', '/ops/dashboard', [
+
+        'methods'             => 'GET',
+
+        'permission_callback' => '__return_true',
+
+        'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+
+            $data = rawlead_api_get('/v1/admin/dashboard', [], false, $request);
+
+            if (is_wp_error($data)) {
+
+                return $data;
+
+            }
+
+            return new WP_REST_Response($data, 200);
+
+        },
+
+    ]);
+
+    register_rest_route('rawlead/v1', '/ops/leads/(?P<id>\d+)/hide', [
+
+        'methods'             => 'POST',
+
+        'permission_callback' => '__return_true',
+
+        'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+
+            $id = (int) $request['id'];
+
+            if ($id <= 0) {
+
+                return new WP_Error('rawlead_invalid', 'invalid lead id', ['status' => 400]);
+
+            }
+
+            $bearer = rawlead_api_bearer_from_request($request);
+
+            $headers = $bearer !== '' ? ['Authorization' => 'Bearer ' . $bearer] : [];
+
+            $data = rawlead_api_post('/v1/admin/leads/' . $id . '/hide', [], $headers);
+
+            if (is_wp_error($data)) {
+
+                return $data;
+
+            }
+
+            return new WP_REST_Response($data, 200);
+
+        },
+
+    ]);
+
+    register_rest_route('rawlead/v1', '/ops/control', [
+        'methods'             => 'POST',
+        'permission_callback' => '__return_true',
+        'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+            $body = $request->get_json_params();
+            if (!is_array($body)) {
+                return new WP_Error('rawlead_invalid', 'Expected JSON body', ['status' => 400]);
+            }
+            $bearer = rawlead_api_bearer_from_request($request);
+            $headers = $bearer !== '' ? ['Authorization' => 'Bearer ' . $bearer] : [];
+            $data = rawlead_api_post('/v1/admin/control', $body, $headers);
+            if (is_wp_error($data)) {
+                return $data;
+            }
+            return new WP_REST_Response($data, 200);
+        },
     ]);
 
 
@@ -1271,3 +1551,50 @@ add_action('rest_api_init', static function (): void {
 
 });
 
+
+
+add_filter(
+
+    'rest_pre_serve_request',
+
+    static function ($served, $result, $request, $server) {
+
+        if (!($request instanceof WP_REST_Request) || $request->get_route() !== '/rawlead/v1/auth/qr-image') {
+
+            return $served;
+
+        }
+
+        if (!($result instanceof WP_REST_Response)) {
+
+            return $served;
+
+        }
+
+        $data = $result->get_data();
+
+        if (!is_string($data)) {
+
+            return $served;
+
+        }
+
+        status_header($result->get_status());
+
+        foreach ($result->get_headers() as $key => $value) {
+
+            header($key . ': ' . $value);
+
+        }
+
+        echo $data;
+
+        return true;
+
+    },
+
+    10,
+
+    4
+
+);

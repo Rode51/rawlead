@@ -120,6 +120,18 @@ RADAR_TG_ENABLED=1
 
 **45.152 не класть в `FL_PROXY_URLS`** — там же Bot API и acc1.
 
+### Страховка 2026-06-02 (O91)
+
+| Рекомендация | Деталь |
+|--------------|--------|
+| **Докупить** | **+3–4** IPv4 HTTP **только** для `FL_PROXY_URLS` / `KWORK_PROXY_URLS` |
+| **Страны** | RU ×2 · KZ или BY ×1 · DE/FI ×1 (fallback) |
+| **Итого pool** | **7–8** IP (4 старых + 3–4 новых) |
+| **Не нужно** | второй VPS-парсер · US-only pool |
+| **Опц.** | 1× residential RU при постоянном 403 на FL |
+
+После дописки env: `sudo systemctl restart rawlead-radar` · в логе `fetch:fl proxy=host:port` и (после O91) `exchange_proxy:alive=N/M`.
+
 Пример **`.env` на VPS** (логины/пароли — из вашего блокнота, **не в git**):
 
 ```env

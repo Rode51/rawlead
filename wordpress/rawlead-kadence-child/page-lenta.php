@@ -62,30 +62,14 @@ rawlead_get_part('header');
 				</label>
 			</fieldset>
 			<div class="rl-filter-bar__actions">
-				<details class="rl-feed-skills-dd">
-					<summary class="rl-filter-dropdown-btn rl-feed-skills-dd__trigger" id="rl-feed-skills-trigger">
-						<span class="rl-feed-skills-dd__label" id="rl-feed-skills-trigger-label"><?php esc_html_e('Навыки ▾', 'rawlead-kadence-child'); ?></span>
-						<span class="rl-feed-skills-dd__badge" id="rl-feed-skills-badge" hidden></span>
-					</summary>
-					<div class="rl-skills-panel rl-feed-skills-dd__panel" id="rl-feed-skills-panel">
-						<h3 class="rl-skills-panel__title"><?php esc_html_e('Навыки', 'rawlead-kadence-child'); ?></h3>
-						<div class="rl-skills-panel__body">
-							<p class="rl-feed-skills__section" id="rl-feed-skills-section" hidden></p>
-							<div class="rl-feed-skills" id="rl-feed-skills" aria-live="polite"></div>
-							<button type="button" class="rl-feed-skills-rare" id="rl-feed-skills-rare" hidden><?php esc_html_e('Ещё навыки', 'rawlead-kadence-child'); ?></button>
-							<p class="rl-feed-skills__hint" id="rl-feed-skills-hint" hidden><?php esc_html_e('Выберите навыки и нажмите Применить', 'rawlead-kadence-child'); ?></p>
-						</div>
-						<div class="rl-skills-panel__footer">
-							<button type="button" class="rl-btn rl-btn--primary rl-feed-skills-apply" id="rl-feed-skills-apply" title="<?php esc_attr_e('Порядок изменится. Заказы не исчезнут.', 'rawlead-kadence-child'); ?>"><?php esc_html_e('Применить', 'rawlead-kadence-child'); ?></button>
-							<button type="button" class="rl-btn rl-btn--ghost rl-feed-skills-my" id="rl-feed-skills-my"><?php esc_html_e('Мои навыки', 'rawlead-kadence-child'); ?></button>
-							<button type="button" class="rl-feed-skills-clear" id="rl-feed-skills-clear"><?php esc_html_e('Сбросить', 'rawlead-kadence-child'); ?></button>
-						</div>
-					</div>
-				</details>
+				<button type="button" class="rl-filter-dropdown-btn rl-feed-skills-dd__trigger" id="rl-feed-skills-trigger">
+					<span class="rl-feed-skills-dd__label" id="rl-feed-skills-trigger-label"><?php esc_html_e('Навыки', 'rawlead-kadence-child'); ?></span>
+					<span class="rl-feed-skills-dd__badge" id="rl-feed-skills-badge" hidden></span>
+				</button>
 				<details class="rl-filter-sort-dd">
-					<summary class="rl-filter-dropdown-btn" id="rl-feed-sort-trigger"><?php esc_html_e('Сортировка ▾', 'rawlead-kadence-child'); ?></summary>
+					<summary class="rl-filter-dropdown-btn" id="rl-feed-sort-trigger"><?php esc_html_e('Дата ▾', 'rawlead-kadence-child'); ?></summary>
 					<div class="rl-sort-panel">
-						<label class="rl-sort-option is-active"><input type="radio" name="sort" value="time" checked> <?php esc_html_e('Новые сначала', 'rawlead-kadence-child'); ?></label>
+						<label class="rl-sort-option is-active"><input type="radio" name="sort" value="time" checked> <?php esc_html_e('Дата', 'rawlead-kadence-child'); ?></label>
 						<label class="rl-sort-option"><input type="radio" name="sort" value="match"> <?php esc_html_e('По совместимости', 'rawlead-kadence-child'); ?></label>
 					</div>
 				</details>
@@ -97,7 +81,6 @@ rawlead_get_part('header');
 		</div>
 	</div>
 	<p class="rl-feed-delay-notice" id="rl-feed-delay-notice" hidden></p>
-	<p class="rl-sort-badge" id="rl-feed-sort-badge" hidden><?php esc_html_e('Сортировка по совместимости', 'rawlead-kadence-child'); ?></p>
 	<div class="rl-container rl-feed-main-wrap">
 		<header class="rl-feed-head">
 			<h1 class="rl-feed-head__title"><?php esc_html_e('Лента заказов', 'rawlead-kadence-child'); ?></h1>
@@ -116,6 +99,28 @@ rawlead_get_part('header');
 			</div>
 		</div>
 		<p class="rl-feed-end" id="rl-feed-end" hidden><?php esc_html_e('Все заказы показаны', 'rawlead-kadence-child'); ?></p>
+	</div>
+	<div class="rl-feed-skills-modal" id="rl-feed-skills-modal" hidden>
+		<div class="rl-feed-skills-modal__overlay" id="rl-feed-skills-modal-overlay" aria-hidden="true"></div>
+		<div class="rl-feed-skills-modal__panel rl-skill-tree" role="dialog" aria-modal="true" aria-labelledby="rl-feed-skills-title">
+			<div class="rl-skill-tree__handle" aria-hidden="true"></div>
+			<header class="rl-skill-tree__header">
+				<h3 class="rl-skill-tree__title" id="rl-feed-skills-title"><?php esc_html_e('Навыки', 'rawlead-kadence-child'); ?></h3>
+				<p class="rl-skill-tree__counter" id="rl-feed-skill-tree-counter" aria-live="polite"><?php esc_html_e('Выбрано 0 / 12', 'rawlead-kadence-child'); ?></p>
+				<button type="button" class="rl-skill-tree__close" id="rl-feed-skill-tree-close" aria-label="<?php esc_attr_e('Закрыть', 'rawlead-kadence-child'); ?>">✕</button>
+			</header>
+			<p class="rl-skill-tree__hint" id="rl-feed-skill-tree-hint" hidden><?php esc_html_e('Выберите навыки и нажмите Применить', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-skill-tree__limit-msg" id="rl-feed-skill-tree-limit" hidden><?php esc_html_e('Максимум 12 навыков — сними лишние, чтобы добавить новые', 'rawlead-kadence-child'); ?></p>
+			<div class="rl-skill-tree__body" id="rl-feed-skill-tree-body">
+				<div class="rl-skill-tree__roots" id="rl-feed-skill-tree-roots" aria-live="polite"></div>
+				<button type="button" class="rl-feed-skills-rare" id="rl-feed-skills-rare" hidden><?php esc_html_e('Ещё навыки', 'rawlead-kadence-child'); ?></button>
+			</div>
+			<footer class="rl-skill-tree__footer">
+				<button type="button" class="rl-btn rl-btn--primary rl-feed-skills-apply" id="rl-feed-skills-apply" title="<?php esc_attr_e('Порядок изменится. Заказы не исчезнут.', 'rawlead-kadence-child'); ?>"><?php esc_html_e('Применить', 'rawlead-kadence-child'); ?></button>
+				<button type="button" class="rl-btn rl-btn--ghost rl-feed-skills-my" id="rl-feed-skills-my"><?php esc_html_e('Мои навыки', 'rawlead-kadence-child'); ?></button>
+				<button type="button" class="rl-skill-tree__reset rl-feed-skills-clear" id="rl-feed-skills-clear"><?php esc_html_e('Сбросить', 'rawlead-kadence-child'); ?></button>
+			</footer>
+		</div>
 	</div>
 	<div class="rl-feed-sheet" id="rl-feed-sheet" hidden>
 		<div class="rl-feed-sheet__overlay" id="rl-feed-sheet-overlay"></div>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""O79 + O72e: proxy parsers + ai_analyze · restart API/radar."""
+"""O79 + O72e + O72e-9b: proxy parsers + L1 premium + ai_analyze · restart API/radar."""
 from __future__ import annotations
 
 import sys
@@ -15,7 +15,12 @@ _DEPLOY_FILES = (
     "src/kwork_parser.py",
     "src/main.py",
     "src/ai_analyze.py",
+    "src/pg_storage.py",
+    "src/skills_catalog.py",
+    "src/lead_category.py",
     "scripts/preprod_ai_prod_audit.py",
+    "scripts/qa_prompt_loop.py",
+    "scripts/l1_model_ab.py",
 )
 
 
@@ -31,7 +36,7 @@ def _upload_files() -> None:
 
 
 def main() -> int:
-    print("=== O79+O72e deploy: proxy parsers + ai_analyze ===")
+    print("=== O79+O72e+O72e-9b deploy: parsers + L1 premium + ai_analyze ===")
     _upload_files()
     ssh.run(
         "chown rawlead:rawlead "
@@ -40,7 +45,12 @@ def main() -> int:
         "/opt/rawlead/src/kwork_parser.py "
         "/opt/rawlead/src/main.py "
         "/opt/rawlead/src/ai_analyze.py "
-        "/opt/rawlead/scripts/preprod_ai_prod_audit.py"
+        "/opt/rawlead/src/pg_storage.py "
+        "/opt/rawlead/src/skills_catalog.py "
+        "/opt/rawlead/src/lead_category.py "
+        "/opt/rawlead/scripts/preprod_ai_prod_audit.py "
+        "/opt/rawlead/scripts/qa_prompt_loop.py "
+        "/opt/rawlead/scripts/l1_model_ab.py"
     )
     print("restart rawlead-api rawlead-radar...")
     _, out, _ = ssh.run(
@@ -56,7 +66,8 @@ def main() -> int:
     print(health or "")
     _, proxy_lines, _ = ssh.run(
         "wc -l /opt/rawlead/src/exchange_proxy.py; "
-        "grep -c 'fetch:fl proxy=' /opt/rawlead/src/fl_parser.py || true",
+        "grep -c 'fetch:fl proxy=' /opt/rawlead/src/fl_parser.py || true; "
+        "grep -c server_administration /opt/rawlead/src/skills_catalog.py || true",
         check=False,
     )
     print("verify:", proxy_lines.strip())

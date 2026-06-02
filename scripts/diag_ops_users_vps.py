@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import deploy_vps_ssh as ssh  # noqa: E402
+
+py = """
+import os, sys
+sys.path.insert(0,'/opt/rawlead/src')
+from dotenv import load_dotenv
+load_dotenv('/opt/rawlead/.env')
+import psycopg
+db=os.environ['DATABASE_URL']
+with psycopg.connect(db) as conn:
+    with conn.cursor() as cur:
+        cur.execute(\"SELECT u.id, u.tg_user_id, u.tg_username, s.plan FROM users u LEFT JOIN subscriptions s ON s.user_id=u.id ORDER BY u.created_at DESC LIMIT 5\")
+        for r in cur.fetchall():
+            print(r)
+        cur.execute(\"SELECT COUNT(*) FROM users u INNER JOIN subscriptions s ON s.user_id=u.id WHERE s.plan='owner'\")
+        print('owner_plans', cur.fetchone()[0])
+print('TELEGRAM_CHAT_ID set', bool(os.environ.get('TELEGRAM_CHAT_ID','').strip()))
+"""
+
+remote = "/tmp/_vps_ops_users.py"
+ssh.upload(Path(__file__).resolve().parents[1] / "scripts/_vps_ops_users_check.py", remote)
+_, out, _ = ssh.run(f"cd /opt/rawlead && sudo -u rawlead .venv/bin/python {remote}", check=False)
+print(out)

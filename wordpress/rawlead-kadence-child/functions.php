@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.11.18');
+define('RAWLEAD_CHILD_VERSION', '1.14.0');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -193,6 +193,10 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restTags'             => esc_url_raw(rest_url('rawlead/v1/me/tags')),
             'restSkills'           => esc_url_raw(rest_url('rawlead/v1/skills/catalog')),
             'restAuth'             => esc_url_raw(rest_url('rawlead/v1/auth/telegram')),
+            'restBotSession'       => esc_url_raw(rest_url('rawlead/v1/auth/bot-session')),
+            'restBotComplete'      => esc_url_raw(rest_url('rawlead/v1/auth/bot-complete')),
+            'restQrImage'          => esc_url_raw(rest_url('rawlead/v1/auth/qr-image')),
+            'botLoginUrl'          => esc_url_raw('https://t.me/' . rawlead_tg_login_bot_username() . '?start=login'),
             'restSubscription'          => esc_url_raw(rest_url('rawlead/v1/me/subscription')),
             'restNotificationSettings'  => esc_url_raw(rest_url('rawlead/v1/me/notification-settings')),
             'lentaUrl'                  => esc_url_raw(rawlead_page_url('lenta')),
@@ -221,6 +225,21 @@ add_action('wp_enqueue_scripts', static function (): void {
         wp_localize_script('rawlead-support', 'rawleadSupport', [
             'restSupport' => esc_url_raw(rest_url('rawlead/v1/support')),
         ]);
+    }
+
+    if (is_page(['lenta', 'cabinet']) || is_front_page()) {
+        $pv_slug = is_front_page() ? '' : (string) get_post_field('post_name', get_queried_object_id());
+        $pv_path = $pv_slug === '' ? '/' : '/' . $pv_slug;
+        wp_register_script('rawlead-pageview', false, [], RAWLEAD_CHILD_VERSION, true);
+        wp_enqueue_script('rawlead-pageview');
+        wp_add_inline_script(
+            'rawlead-pageview',
+            sprintf(
+                '(function(){var u=%1$s,p=%2$s,k="rawlead_vid_v1",v="";try{v=localStorage.getItem(k)||"";if(!v){v=(Date.now().toString(36)+Math.random().toString(36).slice(2,10));localStorage.setItem(k,v);}}catch(e){}fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path:p,visitor_id:v}),keepalive:true}).catch(function(){});})();',
+                wp_json_encode(esc_url_raw(rest_url('rawlead/v1/admin/pageview'))),
+                wp_json_encode($pv_path)
+            )
+        );
     }
 }, 20);
 

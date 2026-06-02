@@ -13,14 +13,16 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
 import psycopg
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict
@@ -62,6 +64,16 @@ from src.ai_analyze import draft_stats_24h, ai_last_error, draft_fail_per_hour
 from src.stars_billing import stars_available
 from src.draft_async import draft_response_body, poll_draft, submit_draft
 from src.draft_limits import draft_rate_limit_detail
+from src.bot_auth import (
+    BOT_AUTH_PREFIX,
+    BOT_SESSION_TTL_SEC,
+    authorize_bot_auth_session,
+    cabinet_return_url as _cabinet_return_url,
+    create_bot_session,
+    hash_bot_auth_token as _hash_bot_auth_token,
+    merge_chat_id_on_login_standalone,
+    mint_bot_first_login_url,
+)
 from src.match_push import (
     DraftError,
     draft_rate_limit_retry_after,
@@ -71,9 +83,11 @@ from src.reply_draft_strip import strip_reply_draft_price_deadline
 from src.tools_catalog import normalize_tools_required, vendor_lock_tools
 from src.owner_admin import (
     fetch_dashboard,
+    hide_lead,
     is_owner_db_user,
     ops_html,
     record_pageview,
+    run_ops_control,
 )
 
 # /cabinet/ login and /v1/me/* are site-product endpoints.
@@ -132,6 +146,11 @@ def _db_url() -> str:
     if not url:
         raise RuntimeError("DATABASE_URL not set")
     return url
+
+
+def _bot_login_username() -> str:
+    raw = os.environ.get("TELEGRAM_BOT_USERNAME", "rawlead_bot").strip().lstrip("@")
+    return raw or "rawlead_bot"
 
 
 def _api_key() -> str:
@@ -578,6 +597,23 @@ def _grant_owner_beta_if_match(cur: Any, user_id: str, tg_user_id: int) -> None:
     )
 
 
+def _resolve_bearer_user_id(
+    authorization: str = Header(default="", alias="Authorization"),
+) -> str:
+    """Только Bearer JWT — без fallback на MVP owner header."""
+    auth = (authorization or "").strip()
+    if not auth.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    token = auth[7:].strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        data = decode_access_token(token)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Unauthorized") from exc
+    return str(data["sub"])
+
+
 def _resolve_user_id(
     authorization: str = Header(default="", alias="Authorization"),
     x_rawlead_user_id: str = Header(default="", alias="X-RawLead-User-Id"),
@@ -712,6 +748,119 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
         "first_name": first_name,
         "photo_url": photo_url,
     }
+
+
+@app.post("/v1/auth/bot-session")
+def auth_bot_session() -> dict[str, Any]:
+    """Deep-link login step 1: mint one-time token (TTL 5 min)."""
+    try:
+        plain, deep_link, expires = create_bot_session()
+    except Exception as exc:
+        logger.error("auth_bot_session: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+    return {
+        "auth_token": plain,
+        "deep_link": deep_link,
+        "expires_at": expires.isoformat(),
+    }
+
+
+class BotCompletePayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    auth_token: str = ""
+
+
+def _complete_bot_auth(auth_token: str) -> dict[str, Any]:
+    token = (auth_token or "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="auth_token required")
+    token_hash = _hash_bot_auth_token(token)
+    now = datetime.now(timezone.utc)
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT expires_at, tg_user_id, tg_username, tg_first_name,
+                           tg_photo_url, authorized_at, consumed_at
+                    FROM auth_bot_sessions
+                    WHERE token_hash = %s
+                    FOR UPDATE
+                    """,
+                    (token_hash,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="session not found")
+                (
+                    expires_at,
+                    tg_user_id,
+                    tg_username,
+                    tg_first_name,
+                    tg_photo_url,
+                    authorized_at,
+                    consumed_at,
+                ) = row
+                if consumed_at is not None:
+                    raise HTTPException(status_code=410, detail="session consumed")
+                exp = expires_at
+                if exp.tzinfo is None:
+                    exp = exp.replace(tzinfo=timezone.utc)
+                if exp <= now:
+                    raise HTTPException(status_code=410, detail="session expired")
+                if tg_user_id is None or authorized_at is None:
+                    raise HTTPException(status_code=401, detail="awaiting bot authorization")
+
+                user_id = _upsert_telegram_user(
+                    cur,
+                    tg_user_id=int(tg_user_id),
+                    username=(tg_username or "").strip() or None,
+                    first_name=(tg_first_name or "").strip() or None,
+                    photo_url=(tg_photo_url or "").strip() or None,
+                )
+                _grant_owner_beta_if_match(cur, user_id, int(tg_user_id))
+                merge_chat_id_on_login(cur, tg_user_id=int(tg_user_id))
+                cur.execute(
+                    """
+                    UPDATE auth_bot_sessions
+                    SET consumed_at = %s
+                    WHERE token_hash = %s
+                    """,
+                    (now, token_hash),
+                )
+            conn.commit()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("auth_bot_complete: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+    access = issue_access_token(user_id, tg_user_id=int(tg_user_id))
+    username = (tg_username or "").strip() or None
+    first_name = (tg_first_name or "").strip() or None
+    photo_url = (tg_photo_url or "").strip() or None
+    return {
+        "access_token": access,
+        "token_type": "bearer",
+        "user_id": user_id,
+        "tg_user_id": int(tg_user_id),
+        "username": username,
+        "first_name": first_name,
+        "photo_url": photo_url,
+    }
+
+
+@app.post("/v1/auth/bot-complete")
+def auth_bot_complete(payload: BotCompletePayload) -> dict[str, Any]:
+    """Deep-link login step 2: exchange authorized token → JWT (one-time)."""
+    return _complete_bot_auth(payload.auth_token)
+
+
+@app.get("/v1/auth/bot-complete")
+def auth_bot_complete_get(auth: str = Query(default="")) -> dict[str, Any]:
+    """Same as POST — for return URL `?auth=` on /cabinet/."""
+    return _complete_bot_auth(auth)
 
 
 # 3c1 ─────────────────────────────────────────────────────────────────────────
@@ -1479,7 +1628,7 @@ def me_notification_settings_patch(
 
 
 def _require_owner_user(
-    user_id: str = Depends(_resolve_user_id),
+    user_id: str = Depends(_resolve_bearer_user_id),
 ) -> str:
     try:
         with psycopg.connect(_db_url()) as conn:
@@ -1494,11 +1643,61 @@ def _require_owner_user(
     return user_id
 
 
+def _ops_access_granted(request: Request, key: str = "") -> bool:
+    gate = os.getenv("RAWLEAD_OPS_KEY", "").strip()
+    if not gate:
+        return True
+    supplied = (key or request.cookies.get("rl_ops_key", "")).strip()
+    return bool(supplied) and secrets.compare_digest(supplied, gate)
+
+
+def _ops_jwt_from_request(request: Request) -> str:
+    auth = (request.headers.get("authorization") or "").strip()
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+        if token:
+            return token
+    return (request.cookies.get("rl_access") or "").strip()
+
+
+def _owner_dashboard_data(jwt: str) -> dict[str, Any] | None:
+    if not jwt:
+        return None
+    try:
+        user_id = str(decode_access_token(jwt)["sub"])
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                if not is_owner_db_user(cur, user_id):
+                    return None
+        return fetch_dashboard(_db_url())
+    except Exception as exc:
+        logger.warning("ops SSR dashboard: %s", exc)
+        return None
+
+
 @app.get("/ops/", response_class=HTMLResponse)
-def ops_dashboard_page() -> HTMLResponse:
-    """O45: owner admin UI (JWT из /cabinet/ localStorage)."""
-    api_base = os.getenv("RAWLEAD_PUBLIC_API_URL", "").strip()
-    return HTMLResponse(ops_html(api_base=api_base))
+def ops_dashboard_page(
+    request: Request,
+    key: str = Query(default=""),
+) -> HTMLResponse:
+    """O45/O78: owner admin — SSR при cookie rl_access, иначе инструкция + JS fallback."""
+    if not _ops_access_granted(request, key):
+        raise HTTPException(status_code=404, detail="Not found")
+    jwt = _ops_jwt_from_request(request)
+    data = _owner_dashboard_data(jwt)
+    api_base = os.getenv("RAWLEAD_OPS_API_BASE", "/wp-json/rawlead/v1").strip()
+    resp = HTMLResponse(ops_html(api_base=api_base, data=data))
+    gate = os.getenv("RAWLEAD_OPS_KEY", "").strip()
+    if gate and key == gate:
+        resp.set_cookie(
+            "rl_ops_key",
+            gate,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=86400 * 30,
+        )
+    return resp
 
 
 @app.get("/v1/admin/dashboard")
@@ -1507,19 +1706,57 @@ def admin_dashboard(_owner: str = Depends(_require_owner_user)) -> dict[str, Any
     return fetch_dashboard(_db_url())
 
 
+@app.post("/v1/admin/leads/{lead_id}/hide")
+def admin_hide_lead(
+    lead_id: int,
+    _owner: str = Depends(_require_owner_user),
+) -> dict[str, Any]:
+    del _owner
+    if lead_id <= 0:
+        raise HTTPException(status_code=400, detail="invalid lead id")
+    if not hide_lead(_db_url(), lead_id):
+        raise HTTPException(status_code=404, detail="lead not found or already hidden")
+    return {"ok": True, "lead_id": lead_id}
+
+
 class PageviewPayload(BaseModel):
     path: str = "/"
+    visitor_id: str = ""
 
 
 @app.post("/v1/admin/pageview", status_code=204)
-def admin_pageview_beacon(payload: PageviewPayload) -> Response:
+def admin_pageview_beacon(payload: PageviewPayload, request: Request) -> Response:
     """O45: публичный beacon — только path, агрегат по дням."""
     allowed_prefixes = ("/", "/lenta", "/cabinet", "/pricing", "/how", "/contact")
     path = (payload.path or "/").strip()[:200] or "/"
     if not any(path == p or path.startswith(p + "/") for p in allowed_prefixes):
         raise HTTPException(status_code=400, detail="path not allowed")
-    record_pageview(_db_url(), path=path)
+    visitor = (payload.visitor_id or "").strip()[:64]
+    if not visitor:
+        # Fallback when frontend has not yet sent local visitor id.
+        host = (request.client.host if request.client else "") or "0.0.0.0"
+        ua = (request.headers.get("user-agent") or "")[:200]
+        seed = f"{host}|{ua}|{datetime.now(timezone.utc).date().isoformat()}"
+        visitor = hashlib.sha1(seed.encode("utf-8", "ignore")).hexdigest()[:40]
+    record_pageview(_db_url(), path=path, visitor_id=visitor)
     return Response(status_code=204)
+
+
+class OpsControlPayload(BaseModel):
+    target: str
+    action: str
+
+
+@app.post("/v1/admin/control")
+def admin_control(
+    payload: OpsControlPayload,
+    _owner: str = Depends(_require_owner_user),
+) -> dict[str, Any]:
+    del _owner
+    result = run_ops_control(target=payload.target, action=payload.action)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("message", "control failed"))
+    return result
 
 
 # 3c4 ─────────────────────────────────────────────────────────────────────────

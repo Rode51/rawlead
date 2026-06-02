@@ -836,7 +836,7 @@ def drain_tools_backlog(
         snippet = (project.listing_snippet or project.title or "").strip()
         log_prefix = f"{row.source}:id={row.external_id} tools:"
         lite = AiLiteAnalysis(
-            verdict="Брать",
+            feed_visible=True,
             task_summary=snippet[:400],
             lead_tags=(),
             ai_reasons=(),

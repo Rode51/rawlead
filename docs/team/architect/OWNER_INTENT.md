@@ -62,10 +62,238 @@
 | **O51** | **ЛК grid 2 col** как лента | § **PRE-STRESS-WAVE-2** |
 | **O62** | **Draft без порога km:** 0% — можно откликнуться · km только информативен | § **O61** · paid draft на любом lead |
 | **O63** | **Новые парсеры:** YouDo · Freelance.ru · FreelanceJob · Пчёл.нет · **cross-source dedup** | § **O63** · **→ волна 2026-06-01** |
-| **O72e** | **Judge gate жёсткий:** L1+L2 **combined ≥4.0/5** · **QA regen 50→judge** после смены промпта · prod-gate также на **свежих** лидах | § **O72e** · § **O72e-3** |
+| **O72e** | **Judge gate:** L2 ≥4/send ≥50% · L1 ≥70% · **O72e-9** hierarchical L1 + A/B | § **O72e-9** |
 | **O79** | **FL+Kwork 1 мин/цикл на VPS** → **ротация прокси** (`FL_PROXY_URLS`, `KWORK_PROXY_URLS`) · **отдельный пул**, не `TELETHON_PROXY_*` | § **O79** · `.env` на VPS — владелец |
 | **O82** | **Match moat:** **совместимость стека** (не «качество заказа») · без чипов «Брать/Сомнительно» на карточке · CTA «Добавь навыки» **только anon без навыков** | § **O82-w1b** · F2+ w2 |
-| **O83** | **«Инструменты» в ленте — только auth** (anon не видит L2 tools) | § **O83** · с **O82-w1** |
+| **O83** | **«Инструменты» в ленте — только auth** (anon не видит L2 tools) | § **O83** · s **O82-w1** |
+| **O89** | **Уникальный отклик:** shared pro + flash-lite rephrase per user | § **O89** · после O90+O91 |
+| **O90** | **Ingest lag:** `source_published_at` · отчёт биржа→Neon→L1 · `/ops/` | § **O90** |
+| **O91** | **Ночной watchdog:** пульс цикла · алерт TG · автоперезапуск · health прокси | § **O91** · **не** второй парсер |
+| **O92** | **Skill Tree в ЛК:** 4 ниши → ветки tags (RPG-style) | § **O92** · **✅ v1 deploy 1.11.30** |
+
+---
+
+## § O90 — Ingest lag (биржа → Neon → лента)
+
+**Решение владельца 2026-06-02:** нужна статистика «когда на бирже» vs «когда у нас» и почему бывают провалы/пачки.
+
+| Метрика | Формула |
+|---------|---------|
+| **ingest_lag** | `created_at - source_published_at` |
+| **l1_lag** | `l1_completed_at - created_at` |
+| **feed_lag** | `l1_completed_at - source_published_at` (полный путь) |
+
+**Колонки Neon:** `sql/016_leads_ingest_timestamps.sql` · парсеры пишут `source_published_at` · L1 — `l1_completed_at`.
+
+**Отчёт:** `scripts/ingest_lag_report.py` · p50/p95 по `fl`/`kwork`/`tg` · карточка `/ops/`.
+
+**Не путать** с O11 (15 мин задержка anon ленты) — это product delay, не lag парсера.
+
+---
+
+## § O91 — Uptime: пока владелец спит
+
+**Решение владельца 2026-06-02:** подстраховка от «радар молчал 3 ч → пачка → отписки».
+
+| Слой | Решение | Зачем |
+|------|---------|--------|
+| **Пульс** | SQLite `status_main_last_cycle_at` + Neon `MAX(created_at)` | видеть «живой fetch», не только `systemctl active` |
+| **Watchdog** | `rawlead-ingest-watchdog.timer` **каждые 5 мин** → TG владельцу | gap цикла >15 мин · 0 вставок >20 мин · L1 backlog >120 |
+| **Авторестарт** | `systemctl restart rawlead-radar` если gap >25 мин и **не** пауза | hung process не ловит `Restart=on-failure` |
+| **Прокси** | TCP probe pool (как Telethon) + skip мёртвых в `exchange_proxy` | все 4 упали → алерт, не тихий 0 |
+| **Внешний** | UptimeRobot → `GET /health` API (опц.) | VPS жив, API отвечает |
+
+**❌ Не делаем сейчас:** второй полный парсер на том же VPS (те же прокси/IP — не даёт отказоустойчивости). **Опц. v2:** cold standby VPS в другом DC — после GTM.
+
+**❌ Не делаем:** постоянная Sonnet/ИИ «как админ» — дорого; правила + дешёвый watchdog.
+
+**Прокси-страховка (владелец):** см. § **O91-proxy** в `CODER_PROMPT.md` · `DEPLOY_VPS.md`.
+
+---
+
+## § O89 — Reply uniquify (anti-ban + маржа)
+
+**Решение владельца 2026-06-01:** оставить **один тяжёлый** запрос при парсинге (`leads.reply_draft`, Gemini pro, O57/O72e). При клике платного юзера **«Написать отkлик»** — не отдавать тот же текст всем: прогон через **самую дёшевую** сетку (OpenRouter: `gemini-2.5-flash-lite` или аналог ~4o-mini) с жёстким промптом **rephrase-only**.
+
+**Промпт-ядро (черновик для Coder):**
+
+> Ты — рандомизатор откликов. Возьми готовый экспертный текст и перепиши: другая структура предложений, синонимы, другое приветствие (но «Здравствуйте!» допустимо). **Полностью сохрани** техническую суть, стек из ТЗ, ключевые вопросы заказчику. **Запрещено:** цена, срок, бюджет, «от X ₽». На выходе — уникальная формулировка, живой язык.
+
+**Архитектура (целевая):**
+
+| Слой | Когда | Модель | Куда |
+|------|-------|--------|------|
+| **Base** | ingest / regen shared | Gemini **pro** | `leads.reply_draft` (один на lead) |
+| **Uniquify** | **каждый** paid, **1-й** клик на lead | **flash-lite** / mini | `user_lead_replies.reply_draft` (**per user**) |
+
+**❌ Неверная модель:** «первый юзер = base, остальные = rephrase».  
+**✅ Верная:** base **не отдаётся** юзеру как финал (кроме fallback при fail mini). Юзер A и B **оба** получают **свой** rephrase от **одного** `leads.reply_draft`.
+
+**Concurrency (не задваивать):**
+
+| Сценарий | Поведение |
+|----------|-----------|
+| **Два разных юзера**, один lead, одновременно | Два flash-lite → две строки `user_lead_replies` (PK `user_id+lead_id`) · тексты разные |
+| **Один юзер**, двойной клик / два таба | Lock или job `ON CONFLICT DO NOTHING` на `(user_id, lead_id)` · второй ждёт poll · **один** rephrase |
+| **Shared base ещё пуст** | `lead_draft_jobs` — один pro на lead · затем uniquify per user |
+| **Повторный клик** | Cache из `user_lead_replies` — **без** LLM |
+
+**Variation seed:** `user_id` (+ `lead_id`) в промпт mini.
+
+**Код сейчас:** `materialize_shared_draft_for_user` — **копия** shared без LLM → риск одинаковых откликов на бирже.
+
+**Guardrails (обязательно):** те же validators O72e (Здравствуйте, ban price/deadline, cliche) · retry 1× при fail · fallback = shared (лучше копия, чем мусор).
+
+**Copy / UX (Product + Design):** везде акцент **«уникальный отклик»** — `/lenta/` кнопка/tooltip · `/pricing/` · `/how/` · post-login · не пугать «все получают одно и то же». Формулировка честная: *«AI адаптирует формулировку под вас»*, не «пишет с нуля по вашему резюме» (profile rephrase — опционально v2).
+
+**Экономика:** ~$0.001–0.003 за клик vs ~$0.05–0.15 full L2 · маржа сохраняется.
+
+**Gate:** не ломать O72e — judge меряет **base** shared; uniquify — отдельный smoke (5 пар base→rewrite, Sonnet «send не хуже»).
+
+**Handoff:** § **O89** в `CODER_PROMPT.md` · copy → `@lead-product` · UI → `@lead-designer`.
+
+---
+
+## § O92 — Skill Tree профиля (UX-first, без риска для L1)
+
+**Решение владельца 2026-06-02:** в `/cabinet/` заменить плоский список навыков на дерево:
+- 4 корня: dev / design / marketing / text
+- внутри — подветки и canonical-tag чекбоксы
+- payload в API остаётся массивом slug (`["yandex_direct","smm"]`)
+
+**Критично (guardrail v1):**
+- **не менять** L1 prompt / sanitize / judge / модели
+- **не менять** схему Neon
+- это только UI-подача + UX выбор навыков
+
+**Почему не «магия»:** дерево повышает качество ввода юзера, но «идеальный» match достигается только с контролем шума и метриками.
+
+**Статус O92 v1 (2026-06-02):** deploy `1.11.30` — **interim**, не финальный UX. Не переносить в `/lenta/` до O93.
+
+**План по шагам (legacy O92):**
+1. ~~UI-tree~~ interim принят
+2. ~~Ограничения max 12~~ ✅
+3. ~~Telemetry~~ ✅
+4. A/B — **отложено** до O93
+5. Веса/auto-priorities — после O93
+
+---
+
+## § O93 — Настоящее Skill Tree (направление → стек → инструменты)
+
+**Решение владельца 2026-06-02 (финал):** текущий O92 — «каша» (направления, языки и библиотеки на одном уровне). Пример: выбрал «Telegram-боты» — **не должен** отдельно тыкать `aiogram`/`Telethon` для match.
+
+**Целевая модель (3 уровня):**
+
+| Уровень | Примеры | Роль в match | UI |
+|---------|---------|--------------|-----|
+| **1. Направление** | WordPress разработка, Telegram-боты, Парсинг, Техническое SEO | **основной выбор** — достаточно для match | всегда видно |
+| **2. Стек** | Python, JavaScript, PHP, Django, FastAPI | опциональное уточнение | раскрывается под направлением |
+| **3. Инструменты/библиотеки** | aiogram, Telethon, Figma (tool) | **не обязательны** для match; для узкой настройки / будущего отклика | только после выбора направления |
+
+**Правила match (обязательно в O93):**
+- Выбор **направления** автоматически покрывает дочерние canonical-теги в `keyword_match` (parent → children expand на бэке).
+- Дочерние теги **не показываются** на верхнем уровне picker (L3 под раскрытием parent).
+- L1 / judge / Neon schema **не меняем** на первом этапе O93 — меняем **каталог-метаданные + match + UI**.
+
+**Решение владельца 2026-06-02 (rev · PM вариант B):**
+
+Picker dev — **два блока**. PM: «B — две группы (по задаче + по технологии, **гибрид выше**)» = лучший вариант из спора, **не** третий пункт «Гибрид минимальный».
+
+| Блок UI | Содержимое | Зачем |
+|---------|------------|-------|
+| **По задаче** | Telegram-боты, WordPress, Парсинг, API, ИИ… | «я делаю ботов / сайты» |
+| **По технологии** | **Python** + **JavaScript** Tier A | «просто Python/JS-разработчик» |
+
+- Python → django, fastapi · JavaScript → react (expand на бэке)
+- **Не выбрано:** «Гибрид» (только python Tier A, javascript Tier B)
+
+**Стоп-лист до O93:**
+- ❌ O92 parity в `/lenta/`
+- ❌ O92b rollout новых тегов в UI-tree
+- ❌ GTM / soft ads
+
+**Порядок:** PM+Design spike (каталог v0.4 hierarchy) → Coder (match expand + tree UI cabinet+feed) → smoke → E2E.
+
+**Статус O93 (2026-06-02):** deploy `1.12.0` — dev tree в `/cabinet/` + `/lenta/`; match expand на бэке; design/marketing/text — **плоский picker** (expand-таблицы в коде есть, UI нет).
+
+---
+
+## § O93.1 — UX: авто-раскрытие L3
+
+**Запрос владельца 2026-06-02:** при клике на L1 (Python, Telegram-боты…) **сразу** показывать дочерние чипы — **не** отдельная стрелка ▾.
+
+**Решение Lead:** принять. O93-w1 изначально требовал второй клик — это лишний шаг; меняем только UX (CSS/JS), match expand не трогаем.
+
+**→ Coder** (hotfix после E2E smoke или параллельно, ~1 PR).
+
+---
+
+## § O94 — Каталог v0.5: research + все 4 ниши в tree
+
+**Запрос владельца 2026-06-02:**
+1. Почему двухблочный tree только в **Разработке** — нужно **связать** каталог, match и UI для design / marketing / text.
+2. **Deep research** — нормально заполнить таблицу (не 2 фреймворка под Python «на глаз»).
+3. Стеки людей разные — расширить L2/L3 из рынка + `pending_tags`, не ломая UX (лимит чипов, parent dedupe).
+
+**Почему O93 был только dev:** сознательный pilot на самой «кашистой» нише; expand для design/marketing уже в `EXPAND_MAP`, но без PM dedupe (parent/child overlap в v0.4) и без wireframes — риск повторить O92.
+
+**Решение Lead:**
+| Шаг | Кто | Что |
+|-----|-----|-----|
+| 1 | **PM + research** | `SKILLS_TOOLS_RESEARCH_PROMPT.md` → **каталог v0.5**: L1/L2/L3 по 4 нишам; Python/JS стеки (Flask, Vue, Node→JS, pandas…); dedupe design/marketing; что Tier A vs L3-only |
+| 2 | **Owner gate** | approve таблицу v0.5 (не auto в Neon) |
+| 3 | **Design** | wireframes subheads для design/marketing/text (где 2 блока уместны — «по задаче» / «по инструменту») |
+| 4 | **Coder** | `EXPAND_MAP` + `L3_BY_PARENT` + picker API + UI все ниши; O92b только **approved** теги |
+| 5 | **O93.1** | авто-раскрытие L3 (можно раньше v0.5) |
+
+**Стоп до v0.5 approve:** массовое добавление L3 в UI без research (иначе снова «каша» и шум в match).
+
+**Связка (единая цепочка):** research → `SKILLS_TOOLS_CATALOG.md` → `skills_catalog.py` (entries + expand + L3) → `rank.py` expand → picker cabinet+feed → L1 judge aliases.
+
+**Статус v0.5 (2026-06-02):** **✅ approve владельца** → **O94-code** (@coder) → **O94-L1** (промпт + targeted bench, не full O72e).
+
+---
+
+## § E2E-UX-WALK — прогон «обычный пользователь» (Playwright MCP)
+
+**Запрос владельца 2026-06-02:** агент открывает браузер, «щупает» UI как фрилансер — не только tree, но **скорость, поиск кнопок, выбор навыков**.
+
+**Когда:** после **O93-w2b deploy** (modal на prod); повтор после **O94-code**.
+
+**Инструмент:** MCP `user-playwright` (`browser_navigate`, `browser_click`, `browser_snapshot`, `browser_network_requests`).
+
+**Сценарий (390×844 + desktop 1280):**
+
+| # | Шаг | Метрика / вопрос |
+|---|-----|------------------|
+| 1 | `/lenta/` cold load | TTFB, первый paint, «20 заказов» видно ≤3 с |
+| 2 | Найти «Навыки» без подсказки | ≤2 с, ≤2 взгляда (filter bar) |
+| 3 | Открыть modal | full sheet, counter 0/12, scroll niches |
+| 4 | Разработка → Python | L3 **сразу** без ▾ |
+| 5 | Применить 3 навыка | badge на триггере, match % на карточках |
+| 6 | Сортировка | «Дата ▾» → «По совместимости ▾», порядок меняется |
+| 7 | `/cabinet/` login flow (guest → login) | навыки modal parity с лентой |
+| 8 | Mobile sheet «Фильтр» | навыки **не** только внутри sheet — отдельный modal |
+
+**Deliverable:** `docs/problems/` или секция в `STATUS` — таблица find/blocker/P0–P2. **Не** правки кода в том же чате — triage → Coder.
+
+**Lead 2026-06-02 (prod до deploy):** dropdown 420px · «Сортировка ▾» · «Навыки ▾ ▾» — подтверждено Playwright.
+
+---
+
+## § O92b — Auto-learning только с human gate
+
+**Проверка 2026-06-02 (Neon):** есть рабочий baseline `public.pending_tags` (`tag`, `category`, `first_seen_at`, `seen_count`) — это уже контур сбора кандидатов из L1 unknown tags.
+
+**Решение владельца/Lead:** не делать full-auto запись в canonical каталог. Держим premium-качество через semi-auto pipeline:
+1. Сбор кандидатов (`pending_tags`) и ранжирование
+2. Очистка/нормализация (`alias_to_existing`, typo, шум)
+3. Ручной approve owner/lead
+4. Только approved идут в каталог и в Skill Tree
+5. После rollout — smoke/judge check
+
+**Зачем:** избежать шумовых/ложных тегов и деградации matching.
 
 ---
 
@@ -293,7 +521,26 @@
 | 2026-06-01 | **Match UI v2** | Не «Качество заказа» / не «Брать✓» на карточке — **% совместимости стека** · «Добавь навыки» **только anon без выбранных навыков** | § **O82-w1b** |
 | 2026-06-01 | **L2 промпт владельца** | «Senior Freelance Acquisition Agent» — **канон духа** shared draft · **без** срока/цены в reply_draft | § **O72e-3** |
 | 2026-06-01 | **L1 модель — A/B** | Менять **можно**, но **после** промпта p4 · только дешёвые (`flash-lite`→`flash`→`deepseek`) · Sonnet на L1 **нет** · gate = `l1_usable ≥70%` / $ per lead | § **O72e-3** p10–p12 |
-| 2026-06-01 | **QA-автомат O72e-4** | После O72e-3 deploy: **`qa_prompt_loop.py --apply`** · LLM патчит промпт · owner **следит** · max 5 итераций · gate ≥50%/≥70%/≥4.0 | § **O72e-4** |
+| 2026-06-01 | **QA-автомат O72e-4** | **`qa_prompt_loop.py` ✅ код** · **`--apply` ⏸** (бюджет ~$8) | § **O72e-4** |
+| 2026-06-01 | **O72e-5 full** | owner `--full`: combined **4.06** · send **39%** · L1 **36%** FAIL · regen 28/28 · bug `_render_md` | § **O72e-5** · **O72e-6** follow-up |
+| 2026-06-01 | **O85 login fix** | JS → WP REST proxy (не 127.0.0.1) · bot `/login` · theme **v1.11.20** | § **O85** · retest TG |
+| 2026-06-01 | **O86 bot silence** | Подписчикам **только** match-лиды + вход; ошибки/auth — **mute**, log owner | § **O86** · P0 |
+| 2026-06-01 | **O78 admin** | Web-пульт простыми словами: визиты, радар, здоровье · база `/ops/` O45 | § **O78** |
+| 2026-06-01 | **O72e-6 тон отклика** | «Здравствуйте!» + **глагол выполнения** (Сделаю/Настрою/Адаптирую…) · **❌** «Заинтересовал…» · **❌** «беру в работу» | § **O72e-6** · решение владельца |
+| 2026-06-01 | **O88 mobile login** | Вход в **Safari/Chrome**, не TG WebView · poll на странице | § **O88** · P0 |
+| 2026-06-01 | **O72e-8 L1 v2** | Убрать Брать/МИМО из L1 → `feed_visible` · replay L1 в `--full` · A/B flash-lite / gemini-2.0-flash / 4o-mini · gate на **свежих** `--judge-since 2026-06-02` | § **O72e-8** · **@coder 2026-06-02** |
+| 2026-06-01 | **O72e full** | L2 PASS (4.15/67%) · L1 FAIL (47%) | log `161825Z` |
+| 2026-06-02 | **O90 ingest lag** | `source_published_at` + отчёт + `/ops/` | § **O90** · после O72e-9 |
+| 2026-06-02 | **O91 watchdog** | timer 5 мин · TG алерт · автоперезапуск · proxy probe | § **O91** · после O72e-9 |
+| 2026-06-02 | **O72e-8 gate owner** | Full **FAIL** L1 **33%** · L2 **3.94**/61% · log `063753Z` · L1=deepseek | § **O72e-9** |
+| 2026-06-02 | **O72e-9 L1 premium** | PDF research: **4 тега** · **primary_category** · few-shot RU · fix sanitize · A/B Qwen/Mistral/flash-lite | § **O72e-9** · **@coder P0** |
+| 2026-06-02 | **O72e-9 gate PASS** | Full `075032Z`: combined **4.10** · send **61.9%** · L1 usable **87.0%** · category_ok **91.3%** | **следом O90+O91 → O89** |
+| 2026-06-02 | **Прокси +3–4 IP** | только `FL_PROXY_URLS`/`KWORK_*` · RU/KZ/DE · не трогать `TG_PROXY` | `DEPLOY_VPS.md` |
+| 2026-06-02 | **O92 Skill Tree** | ЛК: 4 ниши + ветки тегов; **v1 UI-only**, API payload прежний, **L1 без изменений** | interim deploy 1.11.30 |
+| 2026-06-02 | **O93-w2** | авто-L3 · лента = modal как ЛК | **→ @coder** |
+| 2026-06-02 | **O94-v0.5** | research каталог 4 ниши + стеки | **→ @lead-product** |
+| 2026-06-02 | **O93 picker вариант B** | 2 блока; python **и** javascript Tier A в «По технологии»; не option «Гибрид» | **✅ deploy 1.12.0** |
+| 2026-06-01 | **O81-w1c flow cards** | Fly-out ✅ · owner **принял** | **✅** |
 | 2026-05-31 | **Crystal Debt хостинг** | Сервер лежит · платить не хочет · доделает **потом** | P-PORTFOLIO: **только скрины**, подпись MVP/paused · не врать «live demo» |
 | 2026-05-31 | **P-PORTFOLIO v2** | Дизайн: **labs.rawlead.ru** брутализм + wow как [richardekwonye.com](https://www.richardekwonye.com/) | `LEAD_DESIGN_PROMPT` § D-P-PORTFOLIO |
 | 2026-05-31 | **P-PORTFOLIO ИИ v3** | **Не** МИМО/БРАТЬ по ТЗ заказчика — обидит. **Да:** «куда встроить ИИ в ваш бизнес» + демо на **пресете** | FOR_YOU · CODER § p5 |

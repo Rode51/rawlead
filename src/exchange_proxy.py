@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -15,8 +16,10 @@ logger = logging.getLogger(__name__)
 
 _indexes: dict[str, int] = {}
 _sessions: dict[str, "ExchangeFetchSession"] = {}
+_dead_until: dict[str, float] = {}
 
 _FAILOVER_HTTP = frozenset({403, 429})
+_DEAD_TTL_SEC = 600.0
 
 
 def _parse_proxy_list(env_plural: str, env_single: str) -> list[str]:
@@ -76,6 +79,24 @@ def _proxies_dict(url: str | None) -> dict[str, str | None]:
     return {"http": url, "https": url}
 
 
+def _is_alive_proxy(url: str) -> bool:
+    return time.time() >= _dead_until.get(url, 0.0)
+
+
+def _mark_proxy_dead(url: str) -> None:
+    if not url:
+        return
+    _dead_until[url] = time.time() + _DEAD_TTL_SEC
+
+
+def exchange_pool_health(source: str) -> tuple[int, int]:
+    _key, urls = _urls_for_source(source)
+    if not urls:
+        return (0, 0)
+    alive = sum(1 for u in urls if _is_alive_proxy(u))
+    return (alive, len(urls))
+
+
 @dataclass
 class ExchangeFetchSession:
     source: str
@@ -85,9 +106,12 @@ class ExchangeFetchSession:
 
     @property
     def current_url(self) -> str | None:
-        if not self.urls:
+        urls = [u for u in self.urls if _is_alive_proxy(u)]
+        if not urls:
+            urls = self.urls
+        if not urls:
             return None
-        return self.urls[(self.start_idx + self.try_offset) % len(self.urls)]
+        return urls[(self.start_idx + self.try_offset) % len(urls)]
 
     def current_proxies(self) -> dict[str, str | None]:
         return _proxies_dict(self.current_url)
@@ -96,20 +120,26 @@ class ExchangeFetchSession:
         return _hint_from_url(self.current_url)
 
     def advance_failover(self) -> bool:
-        if not self.urls:
+        urls = [u for u in self.urls if _is_alive_proxy(u)]
+        if not urls:
+            urls = self.urls
+        if not urls:
             return False
         self.try_offset += 1
-        return self.try_offset < len(self.urls)
+        return self.try_offset < len(urls)
 
 
 def exchange_fetch_begin(source: str) -> ExchangeFetchSession:
     """Round-robin pick one proxy for the whole listing fetch."""
     key, urls = _urls_for_source(source)
     start = 0
-    if urls:
-        start = _indexes.get(key, 0) % len(urls)
+    alive_urls = [u for u in urls if _is_alive_proxy(u)] or urls
+    if alive_urls:
+        start = _indexes.get(key, 0) % len(alive_urls)
         _indexes[key] = start + 1
-    session = ExchangeFetchSession(source=source, urls=urls, start_idx=start)
+    session = ExchangeFetchSession(source=source, urls=alive_urls, start_idx=start)
+    alive, total = exchange_pool_health(source)
+    logger.info("fetch:%s proxy_pool alive=%s/%s", source, alive, total)
     _sessions[source] = session
     return session
 
@@ -155,12 +185,14 @@ def proxy_log_hint(source: str) -> str:
     """Хост:порт для лога (без пароля)."""
     session = _active_session(source)
     if session:
-        return session.log_hint()
+        alive, total = exchange_pool_health(source)
+        return f"{session.log_hint()} alive={alive}/{total}"
     proxies = requests_proxies_for(source)
     url = proxies.get("https") or proxies.get("http") or ""
     if not url or url == DIRECT_REQUESTS_PROXIES.get("https"):
         return "direct"
-    return _hint_from_url(url)
+    alive, total = exchange_pool_health(source)
+    return f"{_hint_from_url(url)} alive={alive}/{total}"
 
 
 def exchange_get(
@@ -186,6 +218,7 @@ def exchange_get(
                     proxies=session.current_proxies(),
                 )
             except requests.RequestException as exc:
+                _mark_proxy_dead(session.current_url or "")
                 if session.advance_failover():
                     logger.warning(
                         "fetch:%s proxy=%s failover after timeout: %s",
@@ -196,6 +229,7 @@ def exchange_get(
                     continue
                 raise
             if resp.status_code in _FAILOVER_HTTP and session.advance_failover():
+                _mark_proxy_dead(session.current_url or "")
                 logger.warning(
                     "fetch:%s proxy=%s failover after HTTP %s",
                     source,

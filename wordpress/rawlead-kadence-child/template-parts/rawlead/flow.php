@@ -1,6 +1,6 @@
 <?php
 /**
- * Flow block — O81-w1 animated illustration (REFERENCE §3.3).
+ * Flow block — O81-w1 animated illustration (Design § O81-w1).
  *
  * @package RawLead_Kadence_Child
  */
@@ -41,16 +41,16 @@ $home     = home_url('/');
 					<div class="rl-flow-chip" data-source="fl" data-dx="-440" data-dy="5" data-ms="0" data-color="#00A65A" data-rot="5deg">
 						<span class="rl-flow-chip__dot" style="background:#00A65A"></span>FL.ru
 					</div>
-					<div class="rl-flow-chip" data-source="kwork" data-dx="465" data-dy="-55" data-ms="200" data-color="#EA580C" data-rot="-8deg">
+					<div class="rl-flow-chip" data-source="kwork" data-dx="465" data-dy="-55" data-ms="210" data-color="#EA580C" data-rot="-8deg">
 						<span class="rl-flow-chip__dot" style="background:#EA580C"></span>Kwork
 					</div>
-					<div class="rl-flow-chip" data-source="tg" data-dx="15" data-dy="-292" data-ms="400" data-color="#0088CC" data-rot="3deg">
+					<div class="rl-flow-chip" data-source="tg" data-dx="15" data-dy="-292" data-ms="420" data-color="#0088CC" data-rot="3deg">
 						<span class="rl-flow-chip__dot" style="background:#0088CC"></span>Telegram
 					</div>
-					<div class="rl-flow-chip" data-source="youdo" data-dx="-385" data-dy="228" data-ms="600" data-color="#2563EB" data-rot="-5deg">
+					<div class="rl-flow-chip" data-source="youdo" data-dx="-385" data-dy="228" data-ms="630" data-color="#2563EB" data-rot="-5deg">
 						<span class="rl-flow-chip__dot" style="background:#2563EB"></span>YouDo
 					</div>
-					<div class="rl-flow-chip" data-source="freelance_ru" data-dx="455" data-dy="215" data-ms="800" data-color="#7C3AED" data-rot="7deg">
+					<div class="rl-flow-chip" data-source="freelance_ru" data-dx="455" data-dy="215" data-ms="840" data-color="#7C3AED" data-rot="7deg">
 						<span class="rl-flow-chip__dot" style="background:#7C3AED"></span>Freelance.ru
 					</div>
 				</div>
@@ -69,14 +69,9 @@ $home     = home_url('/');
 					<h3 class="rl-lead-card__title"><?php esc_html_e('Telegram-бот для автоматизации заявок', 'rawlead-kadence-child'); ?></h3>
 					<p class="rl-lead-card__budget"><?php esc_html_e('Бюджет: 25 000 ₽', 'rawlead-kadence-child'); ?></p>
 					<div class="rl-match">
-						<div class="rl-match-row">
-							<div class="rl-match__bar" role="progressbar" aria-valuenow="87" aria-valuemin="0" aria-valuemax="100">
-								<span class="rl-match__fill" style="--match-value:0%"></span>
-							</div>
-							<div class="rl-match__label">
-								<span class="rl-match__pct">87%</span>
-								<span class="rl-match__name"><?php esc_html_e('Совместимость', 'rawlead-kadence-child'); ?></span>
-							</div>
+						<div class="rl-match__label"><span><?php esc_html_e('Совместимость 87%', 'rawlead-kadence-child'); ?></span></div>
+						<div class="rl-match__bar" role="progressbar" aria-valuenow="87" aria-valuemin="0" aria-valuemax="100">
+							<span class="rl-match__fill" style="--match-value:0%"></span>
 						</div>
 					</div>
 				</article>
@@ -90,14 +85,9 @@ $home     = home_url('/');
 					<h3 class="rl-lead-card__title"><?php esc_html_e('Парсер маркетплейсов на Python', 'rawlead-kadence-child'); ?></h3>
 					<p class="rl-lead-card__budget"><?php esc_html_e('Бюджет: 15 000 ₽', 'rawlead-kadence-child'); ?></p>
 					<div class="rl-match">
-						<div class="rl-match-row">
-							<div class="rl-match__bar" role="progressbar" aria-valuenow="73" aria-valuemin="0" aria-valuemax="100">
-								<span class="rl-match__fill" style="--match-value:0%"></span>
-							</div>
-							<div class="rl-match__label">
-								<span class="rl-match__pct">73%</span>
-								<span class="rl-match__name"><?php esc_html_e('Совместимость', 'rawlead-kadence-child'); ?></span>
-							</div>
+						<div class="rl-match__label"><span><?php esc_html_e('Совместимость 73%', 'rawlead-kadence-child'); ?></span></div>
+						<div class="rl-match__bar" role="progressbar" aria-valuenow="73" aria-valuemin="0" aria-valuemax="100">
+							<span class="rl-match__fill" style="--match-value:0%"></span>
 						</div>
 					</div>
 				</article>
@@ -111,14 +101,9 @@ $home     = home_url('/');
 					<h3 class="rl-lead-card__title"><?php esc_html_e('Лендинг для SaaS-продукта на WP', 'rawlead-kadence-child'); ?></h3>
 					<p class="rl-lead-card__budget"><?php esc_html_e('Бюджет: 40 000 ₽', 'rawlead-kadence-child'); ?></p>
 					<div class="rl-match">
-						<div class="rl-match-row">
-							<div class="rl-match__bar" role="progressbar" aria-valuenow="61" aria-valuemin="0" aria-valuemax="100">
-								<span class="rl-match__fill" style="--match-value:0%"></span>
-							</div>
-							<div class="rl-match__label">
-								<span class="rl-match__pct">61%</span>
-								<span class="rl-match__name"><?php esc_html_e('Совместимость', 'rawlead-kadence-child'); ?></span>
-							</div>
+						<div class="rl-match__label"><span><?php esc_html_e('Совместимость 61%', 'rawlead-kadence-child'); ?></span></div>
+						<div class="rl-match__bar" role="progressbar" aria-valuenow="61" aria-valuemin="0" aria-valuemax="100">
+							<span class="rl-match__fill" style="--match-value:0%"></span>
 						</div>
 					</div>
 				</article>

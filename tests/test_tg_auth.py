@@ -35,6 +35,11 @@ class TestTelegramAuth(unittest.TestCase):
         self.assertEqual(resp.status_code, 401)
         self.assertIn("invalid telegram hash", resp.json()["detail"])
 
+    def test_bot_complete_missing_token_returns_400(self) -> None:
+        client = TestClient(app)
+        resp = client.post("/v1/auth/bot-complete", json={"auth_token": ""})
+        self.assertEqual(resp.status_code, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

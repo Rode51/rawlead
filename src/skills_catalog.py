@@ -1,4 +1,4 @@
-"""Canonical skills pool (SKILLS_TOOLS_CATALOG v0.3) — L1 tags, catalog API, pending queue."""
+"""Canonical skills pool (SKILLS_TOOLS_CATALOG v0.5) — L1 tags, catalog API, pending queue."""
 
 from __future__ import annotations
 
@@ -17,14 +17,43 @@ _CATALOG_ROWS: tuple[tuple[str, str, str, str, bool, tuple[str, ...]], ...] = (
         "A",
         "JavaScript",
         True,
-        ("js", "node.js", "nodejs", "node", "нода", "vue", "vue.js", "джаваскрипт"),
+        ("js", "node", "нода", "джаваскрипт"),
     ),
-    ("php", "dev", "A", "PHP", True, ("пхп", "laravel", "ларавел")),
+    ("php", "dev", "B", "PHP", True, ("пхп",)),
+    ("typescript", "dev", "B", "TypeScript", True, ("ts", "тайпскрипт")),
+    ("laravel", "dev", "B", "Laravel", False, ("ларавел",)),
+    ("flask", "dev", "B", "Flask", False, ("фласк",)),
+    ("scrapy", "dev", "B", "Scrapy", False, ("скрапи", "веб-скрейпинг")),
+    ("pandas", "dev", "B", "Pandas", False, ()),
+    ("vue", "dev", "B", "Vue.js", False, ("vue.js",)),
+    ("nextjs", "dev", "B", "Next.js", False, ("next.js", "некст")),
+    ("nodejs", "dev", "B", "Node.js", False, ("node.js",)),
+    ("react_native", "dev", "B", "React Native", False, ("react native",)),
+    ("flutter", "dev", "B", "Flutter", False, ()),
+    (
+        "mobile_dev",
+        "dev",
+        "B",
+        "Мобильные приложения",
+        True,
+        ("mobile app", "мобильная разработка", "ios android"),
+    ),
+    ("data_analysis", "dev", "B", "Анализ данных", True, ("data science", "аналитика данных")),
+    (
+        "ecommerce_dev",
+        "dev",
+        "B",
+        "Интернет-магазины",
+        True,
+        ("e-commerce", "интернет магазин", "ecommerce"),
+    ),
+    ("woocommerce", "dev", "B", "WooCommerce", False, ("woo commerce",)),
+    ("opencart", "dev", "B", "OpenCart", False, ("open cart",)),
     (
         "wordpress_dev",
         "dev",
         "A",
-        "WordPress разработка",
+        "WordPress",
         True,
         ("wp dev", "вордпресс разработка", "плагин wp", "wordpress"),
     ),
@@ -118,7 +147,7 @@ _CATALOG_ROWS: tuple[tuple[str, str, str, str, bool, tuple[str, ...]], ...] = (
         "target_ads",
         "marketing",
         "A",
-        "Таргетированная реклама",
+        "Таргет (Meta/IG)",
         True,
         ("таргет", "paid social", "таргетолог", "реклама инстаграм"),
     ),
@@ -178,14 +207,81 @@ _CATALOG_ROWS: tuple[tuple[str, str, str, str, bool, tuple[str, ...]], ...] = (
     ("product_description", "text", "B", "Описания товаров", False, ("ecom карточки", "карточки товаров", "marketplace text")),
     ("email_copywriting", "text", "B", "Тексты для email", False, ("email sequence", "письмо-воронка")),
     ("ux_writing", "text", "B", "UX-райтинг", False, ("microcopy", "тексты интерфейсов")),
+    (
+        "server_administration",
+        "dev",
+        "B",
+        "Администрирование серверов",
+        False,
+        (
+            "3x-ui",
+            "3x ui",
+            "vps",
+            "ssh",
+            "linux server",
+            "настройка сервера",
+            "установка по",
+            "сервер macos",
+            "серверная",
+        ),
+    ),
+    (
+        "technical_seo",
+        "marketing",
+        "B",
+        "Техническое SEO",
+        False,
+        (
+            "robots.txt",
+            "sitemap",
+            "search console",
+            "вебмастер",
+            "индексац",
+            "gsc",
+            "google search console",
+            "техническ seo",
+            "техническое seo",
+        ),
+    ),
+    (
+        "infographic_design",
+        "design",
+        "B",
+        "Инфографика",
+        False,
+        (
+            "инфографик",
+            "wildberries",
+            "ozon",
+            "маркетплейс",
+            "wb ",
+            "карточк товар",
+            "маркетплейса",
+        ),
+    ),
+    (
+        "transcription",
+        "text",
+        "B",
+        "Транскрибация",
+        False,
+        (
+            "транскриб",
+            "расшифров",
+            "audio transcription",
+            "видео в текст",
+            "расшифровк",
+        ),
+    ),
 )
 
 # v0.2 → v0.3 merge (t3-5 partial — для resolve старых тегов в БД/L1)
 _V02_MERGE_ALIASES: dict[str, str] = {
     "ai_integration": "llm_integration",
-    "node_js": "javascript",
-    "laravel": "php",
-    "vue_js": "javascript",
+    "node_js": "nodejs",
+    "vue_js": "vue",
+    "meta_ads": "target_ads",
+    "subtitles": "translation",
     "sql": "api_integration",
     "email_automation": "email_marketing",
     "ppc": "yandex_direct",
@@ -198,45 +294,136 @@ _V02_MERGE_ALIASES: dict[str, str] = {
     "conversion_rate_optimization": "seo",
     "typography": "brand_identity",
     "naming": "brand_identity",
-    "transcription": "editing_proofreading",
     "resume_cv_writing": "technical_writing",
 }
 
 _USER_MAX_TAGS = 12
 
-# Tier A default per niche (picker)
-TIER_A_BY_NICHE: dict[str, tuple[str, ...]] = {
+# O94 v0.5 — 4-niche tree picker (SKILLS_TOOLS_CATALOG v0.5)
+DEV_USE_CASE_L1: tuple[str, ...] = (
+    "telegram_bot_dev",
+    "wordpress_dev",
+    "web_scraping",
+    "api_integration",
+    "llm_integration",
+    "mobile_dev",
+    "data_analysis",
+    "ecommerce_dev",
+)
+DEV_TECHNOLOGY_L1: tuple[str, ...] = ("python", "javascript", "php", "typescript")
+DEV_PICKER_L1: tuple[str, ...] = DEV_USE_CASE_L1 + DEV_TECHNOLOGY_L1
+
+PICKER_GROUP_LABELS: dict[str, str] = {
+    "use_case": "По задаче",
+    "technology": "По технологии",
+    "product_web": "Продукт & Web",
+    "brand_graphics": "Бренд & Графика",
+    "video_motion": "Видео & Моушн",
+    "organic": "Органика",
+    "paid_platform": "По платформе",
+    "commercial": "Коммерческий текст",
+    "editorial": "Редактура & Публикации",
+    "language": "Перевод & Локализация",
+}
+
+# picker_group key, UI label, L1 parent tags (order preserved)
+_NICHE_SUBHEAD_L1: dict[str, tuple[tuple[str, str, tuple[str, ...]], ...]] = {
     "dev": (
-        "python",
-        "javascript",
-        "php",
-        "wordpress_dev",
-        "telegram_bot_dev",
-        "api_integration",
+        ("use_case", "По задаче", DEV_USE_CASE_L1),
+        ("technology", "По технологии", DEV_TECHNOLOGY_L1),
     ),
     "design": (
-        "figma",
-        "ui_ux",
-        "web_design",
-        "logo_design",
-        "brand_identity",
-        "banner_design",
+        ("product_web", "Продукт & Web", ("ui_ux", "figma")),
+        ("brand_graphics", "Бренд & Графика", ("logo_design", "banner_design", "presentation_design")),
+        ("video_motion", "Видео & Моушн", ("video_editing", "motion_design", "threed_modeling")),
     ),
     "marketing": (
-        "smm",
-        "target_ads",
-        "yandex_direct",
-        "google_ads",
-        "seo",
-        "email_marketing",
+        ("organic", "Органика", ("smm", "seo", "email_marketing", "marketplace_promotion")),
+        ("paid_platform", "По платформе", ("target_ads", "yandex_direct", "google_ads", "vk_ads")),
     ),
+    "text": (
+        ("commercial", "Коммерческий текст", ("copywriting", "seo_copywriting", "sales_copywriting")),
+        (
+            "editorial",
+            "Редактура & Публикации",
+            ("article_writing", "technical_writing", "editing_proofreading", "script_writing"),
+        ),
+        ("language", "Перевод & Локализация", ("translation", "ux_writing", "product_description")),
+    ),
+}
+
+# parent → expanded tags for keyword_match (includes parent) — v0.5 full map
+EXPAND_MAP: dict[str, tuple[str, ...]] = {
+    "telegram_bot_dev": ("telegram_bot_dev", "aiogram", "telethon"),
+    "wordpress_dev": ("wordpress_dev", "php", "html_css"),
+    "web_scraping": ("web_scraping", "telethon", "scrapy"),
+    "api_integration": ("api_integration",),
+    "llm_integration": ("llm_integration",),
+    "mobile_dev": ("mobile_dev", "react_native", "flutter"),
+    "data_analysis": ("data_analysis", "pandas"),
+    "ecommerce_dev": ("ecommerce_dev", "woocommerce", "opencart"),
+    "python": ("python", "django", "fastapi", "flask", "scrapy"),
+    "javascript": ("javascript", "react", "vue", "nextjs", "nodejs", "typescript"),
+    "php": ("php", "laravel", "woocommerce"),
+    "typescript": ("typescript", "javascript"),
+    "ui_ux": ("ui_ux", "web_design", "landing_page_design", "mobile_app_design"),
+    "figma": ("figma",),
+    "logo_design": ("logo_design", "brand_identity"),
+    "banner_design": ("banner_design", "motion_design", "video_editing"),
+    "brand_identity": ("brand_identity", "illustration"),
+    "video_editing": ("video_editing", "motion_design"),
+    "smm": ("smm", "content_marketing"),
+    "seo": ("seo", "web_analytics", "technical_seo"),
+    "email_marketing": ("email_marketing", "crm_marketing", "chatbot_marketing"),
+    "target_ads": ("target_ads",),
+    "yandex_direct": ("yandex_direct",),
+    "google_ads": ("google_ads",),
+    "vk_ads": ("vk_ads",),
+    "copywriting": ("copywriting", "sales_copywriting", "email_copywriting", "ux_writing"),
+    "article_writing": ("article_writing", "seo_copywriting", "technical_writing"),
+    "translation": ("translation",),
+}
+
+L3_BY_PARENT: dict[str, tuple[str, ...]] = {
+    "telegram_bot_dev": ("aiogram", "telethon"),
+    "wordpress_dev": ("php", "html_css"),
+    "web_scraping": ("telethon", "scrapy"),
+    "mobile_dev": ("react_native", "flutter"),
+    "data_analysis": ("pandas",),
+    "ecommerce_dev": ("woocommerce", "opencart"),
+    "python": ("django", "fastapi", "flask", "scrapy"),
+    "javascript": ("react", "vue", "nextjs", "nodejs", "typescript"),
+    "php": ("laravel", "woocommerce"),
+    "ui_ux": ("web_design", "mobile_app_design"),
+    "logo_design": ("brand_identity", "illustration"),
+    "banner_design": ("motion_design", "video_editing"),
+    "video_editing": ("motion_design",),
+    "seo": ("web_analytics", "technical_seo"),
+    "smm": ("content_marketing",),
+    "email_marketing": ("crm_marketing", "chatbot_marketing"),
+    "copywriting": ("sales_copywriting", "email_copywriting", "ux_writing"),
+    "article_writing": ("technical_writing",),
+}
+
+TIER_A_BY_NICHE: dict[str, tuple[str, ...]] = {
+    "dev": (
+        "telegram_bot_dev",
+        "wordpress_dev",
+        "web_scraping",
+        "api_integration",
+        "llm_integration",
+        "python",
+        "javascript",
+    ),
+    "design": ("ui_ux", "figma", "logo_design", "banner_design"),
+    "marketing": ("smm", "seo", "email_marketing", "target_ads", "yandex_direct", "google_ads"),
     "text": (
         "copywriting",
         "seo_copywriting",
         "article_writing",
-        "translation",
         "technical_writing",
         "editing_proofreading",
+        "translation",
     ),
 }
 
@@ -381,16 +568,34 @@ def sanitize_l1_cms_tags(
     return tuple(tags[:_L1_MAX_TAGS])
 
 
+def l1_gate_anti_rules_block() -> str:
+    """O72e-9: анти-правила из gate 063753Z (категория + теги)."""
+    return """
+Анти-ошибки category/lead_tags (перед JSON):
+- 3X-UI / VPS / SSH / установка ПО на сервер → primary_category **dev**, теги server_administration (не api_integration/javascript «наугад»)
+- инфографика WB/Ozon/маркетплейс → **design**, infographic_design (не dev)
+- Tilda + GSC/индексация/robots/sitemap/Search Console → **dev**, technical_seo (не design; tilda_dev только если правки сайта, не «дизайн»)
+- привлечение трафика в TG-бот / реферал / Sora / Kling / партнёрка → **marketing** (не design)
+- спрайты / иллюстрация без кода → **design**, illustration (не dev)
+- Google Sheets + SMTP-скрипт / Apps Script автоматизация → **dev** (javascript), не marketing
+- транскрибация / расшифровка аудио+перевод → **text**, transcription + translation
+- UX/UI аудит экрана приложения → **design**, ui_ux (не dev)
+- оформление группы ВК (обложка, виджеты, описание) → **design** (ui_ux, banner_design), не smm/vk_ads если нет рекламы
+- api_integration — только при явном API/скрипте/интеграции в ТЗ, не от слов «api»/«лендинг» без dev-контекста
+"""
+
+
 def allowed_tags_prompt_block() -> str:
     """Блок для L1 system: разрешённые canonical_tag по нишам."""
     lines = [
         "",
         "lead_tags — только canonical_tag из списка ниже (EN slug, без #, без русских слов).",
-        f"Максимум {_L1_MAX_TAGS} тегов. Навык не в списке — не добавляй.",
+        f"Максимум {_L1_MAX_TAGS} тегов. Каждый тег должен быть из словаря **primary_category**.",
         "Синонимы из заказа → canonical (яндекс.директ → yandex_direct; gpt/openai → llm_integration).",
         "ЗАПРЕЩЕНО как теги: ai, automation, #ai — только canonical из пула.",
+        l1_gate_anti_rules_block().strip(),
         "",
-        f"Разрешённые canonical_tag (v0.3, {len(CANONICAL_TAGS)}):",
+        f"Разрешённые canonical_tag (v0.5, {len(CANONICAL_TAGS)}):",
     ]
     for cat in CATEGORIES:
         tags = sorted(e.tag for e in _SKILLS_BY_TAG.values() if e.category == cat)
@@ -404,6 +609,63 @@ def title_for_tag(tag: str) -> str:
     if entry:
         return entry.title_ru
     return str(tag).replace("_", " ")
+
+
+def expand_user_tags_for_match(user_tags: set[str]) -> set[str]:
+    """Parent L1 → children for keyword_match (O93 EXPAND_MAP)."""
+    expanded: set[str] = set()
+    for tag in user_tags:
+        children = EXPAND_MAP.get(tag)
+        if children:
+            expanded.update(children)
+        else:
+            expanded.add(tag)
+    return expanded
+
+
+def _l3_children(parent_tag: str) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for l3 in L3_BY_PARENT.get(parent_tag, ()):
+        entry = _SKILLS_BY_TAG.get(l3)
+        if not entry:
+            continue
+        out.append(
+            {
+                "tag": l3,
+                "title_ru": entry.title_ru,
+                "tier": entry.tier,
+                "picker_level": "L3",
+                "parent_id": parent_tag,
+            }
+        )
+    return out
+
+
+def _tree_picker_skills(category: str) -> list[dict[str, Any]]:
+    skills: list[dict[str, Any]] = []
+    for group_key, _label, l1_tags in _NICHE_SUBHEAD_L1.get(category, ()):
+        for tag in l1_tags:
+            entry = _SKILLS_BY_TAG.get(tag)
+            if not entry:
+                continue
+            skills.append(
+                {
+                    "tag": tag,
+                    "title_ru": entry.title_ru,
+                    "tier": entry.tier,
+                    "picker_level": "L1",
+                    "picker_group": group_key,
+                    "children": _l3_children(tag),
+                }
+            )
+    return skills
+
+
+def _picker_subheads_for(category: str) -> list[dict[str, str]]:
+    return [
+        {"key": group_key, "label": PICKER_GROUP_LABELS.get(group_key, label)}
+        for group_key, label, _tags in _NICHE_SUBHEAD_L1.get(category, ())
+    ]
 
 
 def build_dynamic_catalog_groups(
@@ -435,37 +697,69 @@ def build_catalog_groups(
     categories: list[str] | None = None,
     ui_only: bool = True,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Статический каталог (fallback / dev)."""
+    """Статический каталог (fallback / full mode). O93 tree for dev."""
     cat_filter = set(categories) if categories else None
     buckets: dict[str, list[dict[str, Any]]] = {c: [] for c in CATEGORIES}
     flat: list[dict[str, Any]] = []
-    for entry in sorted(_SKILLS_BY_TAG.values(), key=lambda e: (e.category, e.tier, e.tag)):
-        if cat_filter is not None and entry.category not in cat_filter:
-            continue
-        if ui_only and not entry.shows_in_ui:
-            continue
-        item = {
-            "tag": entry.tag,
-            "title_ru": entry.title_ru,
-            "category": entry.category,
-            "tier": entry.tier,
-        }
-        flat.append(item)
-        buckets[entry.category].append(
-            {
-                "tag": entry.tag,
-                "title_ru": entry.title_ru,
-                "tier": entry.tier,
-            }
-        )
+    flat_seen: set[str] = set()
+
+    def append_flat(item: dict[str, Any], category: str) -> None:
+        tag = item.get("tag")
+        if not tag or tag in flat_seen:
+            return
+        flat_seen.add(tag)
+        flat.append({**item, "category": category})
+
+    tree_cats = [c for c in CATEGORIES if c in _NICHE_SUBHEAD_L1]
+    if cat_filter is not None:
+        tree_cats = [c for c in tree_cats if c in cat_filter]
+
+    picker_l1_all: set[str] = set()
+    for _cat, subheads in _NICHE_SUBHEAD_L1.items():
+        for _gk, _lbl, tags in subheads:
+            picker_l1_all.update(tags)
+
+    for cat in tree_cats:
+        tree_skills = _tree_picker_skills(cat)
+        buckets[cat] = tree_skills
+        for skill in tree_skills:
+            append_flat(skill, cat)
+            for child in skill.get("children") or []:
+                append_flat(child, cat)
+        if not ui_only:
+            for entry in sorted(_SKILLS_BY_TAG.values(), key=lambda e: e.tag):
+                if entry.category != cat:
+                    continue
+                if entry.tag in flat_seen or entry.tag in picker_l1_all:
+                    continue
+                append_flat(
+                    {
+                        "tag": entry.tag,
+                        "title_ru": entry.title_ru,
+                        "tier": entry.tier,
+                        "picker_level": "L3" if entry.tag in _all_l3_tags() else "L1",
+                    },
+                    cat,
+                )
+
     group_cats = [c for c in CATEGORIES if cat_filter is None or c in cat_filter]
-    groups = [
-        {
+    groups: list[dict[str, Any]] = []
+    for cat in group_cats:
+        if not buckets[cat]:
+            continue
+        group: dict[str, Any] = {
             "category": cat,
             "title": CATEGORY_TITLES[cat],
             "skills": buckets[cat],
         }
-        for cat in group_cats
-        if buckets[cat]
-    ]
+        if cat in _NICHE_SUBHEAD_L1:
+            group["picker_subheads"] = _picker_subheads_for(cat)
+        groups.append(group)
     return groups, flat
+
+
+def _all_l3_tags() -> frozenset[str]:
+    tags: set[str] = set()
+    for children in L3_BY_PARENT.values():
+        tags.update(children)
+    return frozenset(tags)

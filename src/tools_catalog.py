@@ -44,6 +44,14 @@ KNOWN_TOOLS: frozenset[str] = frozenset(
         "style_guide",
         "windows_api",
         "premiere_pro",
+        "google_apps_script",
+        "rhino",
+        "fontlab",
+        "elementor",
+        "wp_rocket",
+        "javascript",
+        "html_css",
+        "lcp",
     }
 )
 

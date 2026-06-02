@@ -1,0 +1,14 @@
+[Unit]
+Description=RawLead ingest watchdog (cycle gap + proxy probe + optional restart)
+After=network-online.target rawlead-radar.service
+
+[Service]
+Type=oneshot
+User=rawlead
+Group=rawlead
+WorkingDirectory=/opt/rawlead
+EnvironmentFile=/opt/rawlead/.env
+EnvironmentFile=-/opt/rawlead/.env.site
+Environment=PYTHONPATH=/opt/rawlead/src
+ExecStart=/opt/rawlead/.venv/bin/python -u scripts/ingest_watchdog.py
+Nice=10

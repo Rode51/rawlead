@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import psycopg
 from contextlib import contextmanager
 
-from ai_analyze import AiLiteAnalysis
+from ai_analyze import AiLiteAnalysis, resolve_l1_primary_category, sanitize_l1_category
 from config import Config
 from lead_category import category_for_listing
 from listing import ListingProject
@@ -48,6 +48,16 @@ def _short_pg_err(exc: BaseException, *, max_len: int = 200) -> str:
     return s
 
 
+def _ingest_category(project: ListingProject, snippet: str) -> str:
+    raw = category_for_listing(
+        project.source,
+        listing_category=project.listing_category,
+        title=project.title,
+        snippet=snippet,
+    )
+    return sanitize_l1_category(raw, title=project.title, snippet=snippet)
+
+
 def _ai_score_stub(analysis: AiAnalysis | None) -> int | None:
     if analysis is None:
         return None
@@ -57,7 +67,16 @@ def _ai_score_stub(analysis: AiAnalysis | None) -> int | None:
 def _ai_score_lite(lite: AiLiteAnalysis | None) -> int | None:
     if lite is None:
         return None
-    return _VERDICT_SCORE.get(lite.verdict.strip().casefold(), 50)
+    if not lite.feed_visible:
+        return _VERDICT_SCORE["мимо"]
+    return _VERDICT_SCORE["брать"]
+
+
+def neon_ai_verdict(lite: AiLiteAnalysis | None) -> str | None:
+    """O72e-8: feed_visible → Neon ai_verdict (OK / МИМО)."""
+    if lite is None:
+        return None
+    return "OK" if lite.feed_visible else "МИМО"
 
 
 def _lite_tags_json(lite: AiLiteAnalysis | None) -> str:
@@ -75,16 +94,7 @@ def _lite_reasons_json(lite: AiLiteAnalysis | None) -> str | None:
 def _is_visible_lite(lite: AiLiteAnalysis | None, category: str = "") -> bool:
     if lite is None:
         return True
-    if lite.verdict.strip().casefold() in ("мимо", "пропустить"):
-        return False
-    score = _ai_score_lite(lite)
-    cat = category.strip().casefold()
-    threshold = (
-        _MIN_AI_SCORE_VISIBLE_NONTECH
-        if cat in ("design", "marketing", "text")
-        else _MIN_AI_SCORE_VISIBLE
-    )
-    return score is not None and score >= threshold
+    return lite.feed_visible
 
 
 def _is_visible_stub(analysis: AiAnalysis | None) -> bool:
@@ -152,13 +162,17 @@ def _ensure_leads_columns(database_url: str) -> None:
     with _leads_columns_lock:
         if _leads_columns_ready:
             return
-        sql_path = _SQL_DIR / "014_leads_delist_legacy.sql"
-        ddl = sql_path.read_text(encoding="utf-8") if sql_path.is_file() else ""
-        if ddl.strip():
-            with psycopg.connect(database_url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(ddl)
-                conn.commit()
+        sql_files = (
+            _SQL_DIR / "014_leads_delist_legacy.sql",
+            _SQL_DIR / "016_leads_ingest_timestamps.sql",
+        )
+        with psycopg.connect(database_url) as conn:
+            with conn.cursor() as cur:
+                for sql_path in sql_files:
+                    ddl = sql_path.read_text(encoding="utf-8") if sql_path.is_file() else ""
+                    if ddl.strip():
+                        cur.execute(ddl)
+            conn.commit()
         _leads_columns_ready = True
 
 
@@ -167,6 +181,31 @@ def _source_bucket(source: str) -> str:
     if s.startswith("tg"):
         return "tg"
     return s.split(":")[0] or s
+
+
+def _parse_source_published_at(raw: str) -> datetime | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    normalized = text.replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except ValueError:
+        pass
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%d.%m.%Y %H:%M",
+        "%d.%m.%Y %H:%M:%S",
+    ):
+        try:
+            return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
 
 
 class NeonLeadStorage:
@@ -202,13 +241,9 @@ class NeonLeadStorage:
             return True
         h = (content_hash or "").strip() or None
         body_text = (body or project.listing_snippet or project.title or "").strip()
-        category = category_for_listing(
-            project.source,
-            listing_category=project.listing_category,
-            title=project.title,
-            snippet=body_text,
-        )
-        params = (
+        category = _ingest_category(project, body_text)
+        source_published_at = _parse_source_published_at(project.published_at)
+        base_params = (
             project.source,
             str(project.project_id),
             project.title,
@@ -218,35 +253,44 @@ class NeonLeadStorage:
             json.dumps([], ensure_ascii=False),
             False,
             category,
+            source_published_at,
         )
         try:
             with self.connection() as conn:
                 with conn.cursor() as cur:
                     if h:
+                        params_with_hash = (
+                            *base_params[:8],
+                            h,
+                            base_params[8],
+                            base_params[9],
+                        )
                         cur.execute(
                             """
                             INSERT INTO leads (
                                 source, external_id, title, body, url, budget_text,
-                                lead_tags, is_visible, content_hash, category
+                                lead_tags, is_visible, content_hash, category,
+                                source_published_at, last_fetch_ok_at
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, NOW())
                             ON CONFLICT (content_hash) DO NOTHING
                             RETURNING id
                             """,
-                            (*params, h),
+                            params_with_hash,
                         )
                     else:
                         cur.execute(
                             """
                             INSERT INTO leads (
                                 source, external_id, title, body, url, budget_text,
-                                lead_tags, is_visible, content_hash, category
+                                lead_tags, is_visible, content_hash, category,
+                                source_published_at, last_fetch_ok_at
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, NULL, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, NULL, %s, %s, NOW())
                             ON CONFLICT (source, external_id) DO NOTHING
                             RETURNING id
                             """,
-                            params,
+                            base_params,
                         )
                     inserted = cur.fetchone() is not None
                     if not inserted and h:
@@ -403,17 +447,20 @@ class NeonLeadStorage:
         if not self.enabled:
             return
         snippet = (body_snippet or project.listing_snippet or project.title or "").strip()
-        ai_verdict = lite.verdict if lite is not None else None
+        ai_verdict = neon_ai_verdict(lite)
         ai_score = _ai_score_lite(lite)
         task_summary = lite.task_summary.strip() if lite is not None else None
         lead_tags = _lite_tags_json(lite)
         reasons = _lite_reasons_json(lite)
-        category = category_for_listing(
-            project.source,
-            listing_category=project.listing_category,
-            title=project.title,
-            snippet=snippet,
-        )
+        if lite is not None:
+            category = resolve_l1_primary_category(
+                lite.primary_category,
+                lite.lead_tags,
+                title=project.title,
+                snippet=snippet,
+            )
+        else:
+            category = _ingest_category(project, snippet)
         is_visible = _is_visible_lite(lite, category) and is_public_feed_source(project.source)
         if lite is not None and lite.pending_tags:
             self.record_pending_tags(list(lite.pending_tags), category=category)
@@ -430,7 +477,8 @@ class NeonLeadStorage:
                             ai_reasons = %s::jsonb,
                             task_summary = COALESCE(%s, task_summary),
                             is_visible = %s,
-                            category = COALESCE(NULLIF(category, ''), %s)
+                            category = %s,
+                            l1_completed_at = NOW()
                         WHERE source = %s AND external_id = %s
                         """,
                         (
@@ -498,12 +546,7 @@ class NeonLeadStorage:
         if not self.enabled:
             return
         snippet = (body_snippet or project.listing_snippet or project.title or "").strip()
-        category = category_for_listing(
-            project.source,
-            listing_category=project.listing_category,
-            title=project.title,
-            snippet=snippet,
-        )
+        category = _ingest_category(project, snippet)
         try:
             with self.connection() as conn:
                 with conn.cursor() as cur:
@@ -1096,6 +1139,128 @@ class NeonLeadStorage:
             logger.warning("%s", msg)
             err.append(msg)
             return 0
+
+    def ingest_lag_report(
+        self,
+        *,
+        lookback_hours: int = 24,
+        errors: list[str] | None = None,
+    ) -> dict[str, dict[str, float | int]]:
+        """O90: p50/p95 ingest/l1/feed lag по источникам."""
+        out: dict[str, dict[str, float | int]] = {}
+        if not self.enabled:
+            return out
+        err = errors if errors is not None else []
+        lookback = max(1, min(int(lookback_hours), 24 * 30))
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        WITH lag_rows AS (
+                          SELECT
+                            CASE
+                              WHEN source LIKE 'tg:%%' THEN 'tg'
+                              ELSE split_part(source, ':', 1)
+                            END AS source_bucket,
+                            EXTRACT(EPOCH FROM (created_at - source_published_at)) AS ingest_lag_sec,
+                            EXTRACT(EPOCH FROM (l1_completed_at - created_at)) AS l1_lag_sec,
+                            EXTRACT(
+                              EPOCH FROM (
+                                COALESCE(l1_completed_at, created_at) - source_published_at
+                              )
+                            ) AS feed_lag_sec
+                          FROM leads
+                          WHERE created_at >= NOW() - make_interval(hours => %s)
+                            AND source_published_at IS NOT NULL
+                        )
+                        SELECT
+                          source_bucket,
+                          COUNT(*)::int,
+                          percentile_cont(0.5) WITHIN GROUP (ORDER BY ingest_lag_sec),
+                          percentile_cont(0.95) WITHIN GROUP (ORDER BY ingest_lag_sec),
+                          percentile_cont(0.5) WITHIN GROUP (ORDER BY l1_lag_sec)
+                            FILTER (WHERE l1_lag_sec IS NOT NULL),
+                          percentile_cont(0.95) WITHIN GROUP (ORDER BY l1_lag_sec)
+                            FILTER (WHERE l1_lag_sec IS NOT NULL),
+                          percentile_cont(0.5) WITHIN GROUP (ORDER BY feed_lag_sec),
+                          percentile_cont(0.95) WITHIN GROUP (ORDER BY feed_lag_sec)
+                        FROM lag_rows
+                        GROUP BY source_bucket
+                        ORDER BY source_bucket
+                        """,
+                        (lookback,),
+                    )
+                    for row in cur.fetchall():
+                        bucket = str(row[0] or "")
+                        if not bucket:
+                            continue
+                        out[bucket] = {
+                            "count": int(row[1] or 0),
+                            "ingest_p50_sec": float(row[2] or 0.0),
+                            "ingest_p95_sec": float(row[3] or 0.0),
+                            "l1_p50_sec": float(row[4] or 0.0),
+                            "l1_p95_sec": float(row[5] or 0.0),
+                            "feed_p50_sec": float(row[6] or 0.0),
+                            "feed_p95_sec": float(row[7] or 0.0),
+                        }
+            return out
+        except Exception as exc:
+            msg = f"pg:ingest_lag_report:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return out
+
+    def ingest_ops_snapshot(self, errors: list[str] | None = None) -> dict[str, dict[str, int | str]]:
+        """O90: данные для /ops/ — lag/last insert/backlog по источникам."""
+        out: dict[str, dict[str, int | str]] = {}
+        if not self.enabled:
+            return out
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        WITH base AS (
+                          SELECT
+                            CASE
+                              WHEN source LIKE 'tg:%%' THEN 'tg'
+                              ELSE split_part(source, ':', 1)
+                            END AS source_bucket,
+                            created_at,
+                            l1_completed_at
+                          FROM leads
+                          WHERE source IS NOT NULL
+                        )
+                        SELECT
+                          source_bucket,
+                          EXTRACT(EPOCH FROM (NOW() - MAX(created_at)))::int AS last_insert_gap_sec,
+                          TO_CHAR(MAX(created_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS "UTC"') AS last_insert_at,
+                          COUNT(*) FILTER (
+                            WHERE l1_completed_at IS NULL
+                              AND created_at >= NOW() - INTERVAL '48 hours'
+                          )::int AS backlog
+                        FROM base
+                        GROUP BY source_bucket
+                        ORDER BY source_bucket
+                        """
+                    )
+                    for row in cur.fetchall():
+                        bucket = str(row[0] or "")
+                        if not bucket:
+                            continue
+                        out[bucket] = {
+                            "last_insert_gap_sec": int(row[1] or 0),
+                            "last_insert_at": str(row[2] or ""),
+                            "backlog": int(row[3] or 0),
+                        }
+            return out
+        except Exception as exc:
+            msg = f"pg:ingest_ops_snapshot:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return out
 
     def last_visible_created_at(self, errors: list[str] | None = None) -> str | None:
         """MAX(created_at) для is_visible=true — свежесть ленты."""

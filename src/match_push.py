@@ -19,6 +19,7 @@ import requests
 from ai_analyze import (
     AiLiteAnalysis,
     analyze_premium,
+    rephrase_reply_draft_per_user,
     analyze_shared_reply_draft,
     note_draft_request,
 )
@@ -236,8 +237,10 @@ def _persist_lead_tools_required(cur: Any, lead_id: int, tools: list[str]) -> No
 
 def _lite_from_lead_row(row: tuple[Any, ...]) -> AiLiteAnalysis:
     tags = _canonical_lead_tags(row[8])
+    v = (row[7] or "OK").strip().casefold()
+    hidden = v in ("мимо", "пропустить", "skip")
     return AiLiteAnalysis(
-        verdict=(row[7] or "Сомнительно").strip(),
+        feed_visible=not hidden,
         task_summary=(row[12] or "").strip() or (row[3] or "")[:400],
         lead_tags=tuple(tags),
         ai_reasons=tuple(_parse_ai_reasons(row[9])),
@@ -429,6 +432,30 @@ def _insert_user_draft(cur: Any, user_id: str, lead_id: int, reply: str) -> None
     )
 
 
+def _build_personalized_reply(
+    cfg: Config,
+    *,
+    user_id: str,
+    lead_id: int,
+    shared_reply: str,
+    ai_errors: list[str],
+    log_prefix: str,
+) -> tuple[str, bool]:
+    """O89: per-user uniquify; fallback to shared only on emergency."""
+    base = strip_reply_draft_price_deadline(shared_reply)
+    personalized = rephrase_reply_draft_per_user(
+        cfg,
+        base_reply_draft=base,
+        user_id=user_id,
+        lead_id=lead_id,
+        errors=ai_errors,
+        log_prefix=log_prefix,
+    )
+    if personalized:
+        return personalized, False
+    return base, True
+
+
 def _draft_result_from_row(
     cur: Any,
     user_id: str,
@@ -449,7 +476,7 @@ def materialize_shared_draft_for_user(
     lead_id: int,
     log_prefix: str = "",
 ) -> DraftResult | None:
-    """O57 s1: leads.reply_draft → user_lead_replies без L2."""
+    """O89: leads.reply_draft (shared) -> per-user uniquified cache."""
     if not cfg.database_url.strip():
         return None
     prefix = log_prefix or f"draft:{lead_id}:"
@@ -480,13 +507,21 @@ def materialize_shared_draft_for_user(
             if not shared:
                 return None
 
-            reply = strip_reply_draft_price_deadline(shared)
+            reply, fallback_shared = _build_personalized_reply(
+                cfg,
+                user_id=user_id,
+                lead_id=lead_id,
+                shared_reply=shared,
+                ai_errors=ai_errors,
+                log_prefix=prefix,
+            )
             tools = _backfill_lead_tools_if_empty(
                 cur, cfg, row, ai_errors=ai_errors, log_prefix=prefix
             )
             _insert_user_draft(cur, user_id, lead_id, reply)
             conn.commit()
-            logger.info("%scache_hit lead=%s user=%s", prefix, lead_id, user_id[:8])
+            mode = "fallback_shared" if fallback_shared else "personalized"
+            logger.info("%s%s lead=%s user=%s", prefix, mode, lead_id, user_id[:8])
             if tools:
                 row = _fetch_lead_row(cur, lead_id) or row
             return _draft_result_from_row(cur, user_id, row, reply)
@@ -556,13 +591,21 @@ def generate_and_store_lead_draft(
 
             shared = (row[14] or "").strip()
             if shared:
-                reply = strip_reply_draft_price_deadline(shared)
+                reply, fallback_shared = _build_personalized_reply(
+                    cfg,
+                    user_id=user_id,
+                    lead_id=lead_id,
+                    shared_reply=shared,
+                    ai_errors=ai_errors,
+                    log_prefix=prefix,
+                )
                 tools = _backfill_lead_tools_if_empty(
                     cur, cfg, row, ai_errors=ai_errors, log_prefix=prefix
                 )
                 _insert_user_draft(cur, user_id, lead_id, reply)
                 conn.commit()
-                logger.info("%scache_hit lead=%s user=%s", prefix, lead_id, user_id[:8])
+                mode = "fallback_shared" if fallback_shared else "personalized"
+                logger.info("%s%s lead=%s user=%s", prefix, mode, lead_id, user_id[:8])
                 note_draft_request(True)
                 if tools:
                     row = _fetch_lead_row(cur, lead_id) or row
@@ -627,11 +670,22 @@ def generate_and_store_lead_draft(
                     (reply, lead_id),
                 )
                 tools = tools_existing
-            _insert_user_draft(cur, user_id, lead_id, reply)
+            # Shared L2 remains in leads.reply_draft; each user gets unique cached variant.
+            reply_personal, fallback_shared = _build_personalized_reply(
+                cfg,
+                user_id=user_id,
+                lead_id=lead_id,
+                shared_reply=reply,
+                ai_errors=ai_errors,
+                log_prefix=prefix,
+            )
+            _insert_user_draft(cur, user_id, lead_id, reply_personal)
             conn.commit()
 
     note_draft_request(True)
-    return DraftResult(reply_draft=reply, tools_required=tools, keyword_match=km)
+    if fallback_shared:
+        logger.warning("%sfallback_shared lead=%s user=%s", prefix, lead_id, user_id[:8])
+    return DraftResult(reply_draft=reply_personal, tools_required=tools, keyword_match=km)
 
 
 def _send_tg_draft_result(
@@ -686,7 +740,7 @@ def handle_tg_draft_callback(
     _answer_callback_query(cfg, str(callback_id), "Генерирую отклик…", errors)
 
     if not cfg.database_url.strip():
-        _send_draft_reply(cfg, int(chat_id), "Сервис временно недоступен.", errors)
+        _log_draft_mute(errors, chat_id=int(chat_id), code="no_db")
         return True
 
     try:
@@ -698,11 +752,10 @@ def handle_tg_draft_callback(
                 )
                 row = cur.fetchone()
                 if not row:
-                    _send_draft_reply(
-                        cfg,
-                        int(chat_id),
-                        "Сначала войдите: " + _CABINET_URL,
+                    _log_draft_mute(
                         errors,
+                        chat_id=int(chat_id),
+                        code="no_user",
                     )
                     return True
                 user_id = str(row[0])
@@ -731,60 +784,54 @@ def handle_tg_draft_callback(
                     )
                     return
                 if polled.status == "failed":
-                    _send_draft_reply(
-                        cfg,
-                        int(chat_id),
-                        polled.error or "ИИ временно недоступен — повторите",
+                    _log_draft_mute(
                         errors,
+                        chat_id=int(chat_id),
+                        code="poll_fail",
+                        detail=polled.error or "",
                     )
                     errors.append(f"tg:draft:fail lead={lead_id}")
                     return
                 time.sleep(2)
-            _send_draft_reply(
-                cfg,
-                int(chat_id),
-                "ИИ временно недоступен — повторите",
-                errors,
-            )
+            _log_draft_mute(errors, chat_id=int(chat_id), code="poll_timeout")
 
         threading.Thread(target=_poll_and_send, daemon=True).start()
         return True
     except DraftError as exc:
-        if exc.code == "rate_limit":
-            _send_draft_reply(
-                cfg,
-                int(chat_id),
-                "Лимит черновиков: 10 в час. Попробуйте позже.",
-                errors,
-            )
-        elif exc.code == "forbidden":
-            _send_draft_reply(
-                cfg,
-                int(chat_id),
-                "Нужна активная подписка: " + _CABINET_URL,
-                errors,
-            )
-        elif exc.code == "ai_fail":
-            _send_draft_reply(
-                cfg,
-                int(chat_id),
-                "ИИ временно недоступен — повторите",
-                errors,
-            )
-        else:
-            _send_draft_reply(
-                cfg,
-                int(chat_id),
-                "Заказ не найден или недоступен.",
-                errors,
-            )
+        _log_draft_mute(
+            errors,
+            chat_id=int(chat_id),
+            code=exc.code,
+            detail=exc.detail,
+        )
         errors.append(f"tg:draft:fail lead={lead_id} {exc.code}")
     except Exception as exc:
         logger.warning("tg:draft callback lead=%s: %s", lead_id, exc)
-        _send_draft_reply(cfg, int(chat_id), "Ошибка сервера. Попробуйте позже.", errors)
+        _log_draft_mute(
+            errors,
+            chat_id=int(chat_id),
+            code="err",
+            detail=type(exc).__name__,
+        )
         errors.append(f"tg:draft:err lead={lead_id}")
 
     return True
+
+
+def _log_draft_mute(
+    errors: list[str] | None,
+    *,
+    chat_id: int,
+    code: str,
+    detail: str = "",
+) -> None:
+    """O86: ошибки draft — только radar.log, без sendMessage подписчику."""
+    err = errors if errors is not None else []
+    msg = f"tg:draft:mute chat={chat_id} {code}"
+    if detail:
+        msg += f" {detail[:120]}"
+    err.append(msg)
+    logger.info(msg)
 
 
 def _answer_callback_query(

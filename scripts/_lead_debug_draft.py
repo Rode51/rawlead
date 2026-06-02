@@ -33,7 +33,7 @@ if not row:
 title, body, budget, url, verdict, summary, tags, reasons = row
 tags = normalize_tags(list(tags or []))
 lite = AiLiteAnalysis(
-    verdict=(verdict or "Сомнительно").strip(),
+    feed_visible=(verdict or "OK").strip().casefold() not in ("мимо", "пропустить"),
     task_summary=(summary or body or "")[:400],
     lead_tags=tuple(tags),
     ai_reasons=tuple(reasons or []),

@@ -1,15 +1,18 @@
 /**
- * O81-w1 — flow section animation (chips → logo → cards).
+ * O81-w1 — flow section animation (chips → logo → cards). Design § O81-w1.
  */
 (function () {
   "use strict";
 
-  var CHIP_FLY_MS = 920;
-  var IMPACT_AT_MS = 690;
-  var CARD_STAGGER_MS = 380;
-  var CHARGE_AT_MS = 1640;
-  var SHOOT_AT_MS = 2270;
-  var BARS_AT_MS = 2620;
+  var CHIP_FLY_MS = 820;
+  var IMPACT_AT_MS = 540;
+  var CARD_STAGGER_MS = 300;
+  var CHARGE_AT_MS = 1280;
+  var SHOOT_AT_MS = 1730;
+  var BARS_AT_MS = 2320;
+
+  var REF_STAGE_W = 640;
+  var REF_STAGE_H = 320;
 
   var started = false;
 
@@ -38,16 +41,23 @@
     });
   }
 
+  function resetCardFlyStyles(section) {
+    $$(".rl-flow-anim__card", section).forEach(function (card) {
+      card.style.transform = "";
+      card.style.opacity = "";
+      card.style.transition = "";
+    });
+  }
+
   function showFinalState(section) {
     section.classList.add("is-complete");
+    resetCardFlyStyles(section);
     $$(".rl-flow-chip", section).forEach(function (chip) {
       chip.style.opacity = "0";
       chip.style.visibility = "hidden";
     });
     $$(".rl-flow-anim__card", section).forEach(function (card) {
       card.classList.add("is-visible");
-      card.style.transform = "none";
-      card.style.opacity = "1";
     });
     var svg = $(".rl-flow-anim__logo .rl-logo__icon svg", section);
     if (svg) {
@@ -56,11 +66,8 @@
     fillBars(section);
   }
 
-  var REF_STAGE_W = 640;
-  var REF_STAGE_H = 320;
-
-  function layoutChips(section, logoWrap, chipsWrap) {
-    if (!logoWrap || !chipsWrap) {
+  function layoutChips(section, logoWrap) {
+    if (!logoWrap) {
       return;
     }
     var stage = $(".rl-flow-anim__stage", section);
@@ -81,8 +88,6 @@
       var color = chip.getAttribute("data-color") || "#0A0A0A";
       var chipW = chip.offsetWidth || 130;
       var chipH = chip.offsetHeight || 38;
-      chip.dataset.hitX = String(chipW / 2);
-      chip.dataset.hitY = String(chipH / 2);
       chip.style.left = cx - chipW / 2 + "px";
       chip.style.top = cy - chipH / 2 + "px";
       chip.style.boxShadow = "3px 3px 0 " + color;
@@ -91,21 +96,57 @@
     });
   }
 
-  function layoutCardFly(section, logoWrap) {
-    if (!logoWrap) {
-      return;
-    }
+  /** Measure slot in normal grid, return vector from logo center to slot center. */
+  function flyVectorForCard(logoWrap, card) {
     var logoRect = logoWrap.getBoundingClientRect();
     var lx = logoRect.left + logoRect.width / 2;
     var ly = logoRect.top + logoRect.height / 2;
+    var savedTransform = card.style.transform;
+    var savedOpacity = card.style.opacity;
+    var savedTransition = card.style.transition;
 
+    card.style.transition = "none";
+    card.style.transform = "none";
+    card.style.opacity = "0";
+    void card.offsetWidth;
+
+    var rect = card.getBoundingClientRect();
+    var tx = lx - (rect.left + rect.width / 2);
+    var ty = ly - (rect.top + rect.height / 2);
+
+    card.style.transform = savedTransform;
+    card.style.opacity = savedOpacity;
+    card.style.transition = savedTransition;
+
+    return { tx: tx, ty: ty };
+  }
+
+  function armCardAtLogo(logoWrap, card) {
+    var vec = flyVectorForCard(logoWrap, card);
+    card.style.transition = "none";
+    card.style.setProperty("--fly-dx", vec.tx + "px");
+    card.style.setProperty("--fly-dy", vec.ty + "px");
+    card.style.transform =
+      "translate(" + vec.tx + "px, " + vec.ty + "px) scale(0.15)";
+    card.style.opacity = "0";
+    return vec;
+  }
+
+  function armHiddenCards(section, logoWrap) {
     $$(".rl-flow-anim__card", section).forEach(function (card) {
-      var cardRect = card.getBoundingClientRect();
-      var tx = lx - (cardRect.left + cardRect.width / 2);
-      var ty = ly - (cardRect.top + cardRect.height / 2);
-      card.style.setProperty("--fly-dx", tx + "px");
-      card.style.setProperty("--fly-dy", ty + "px");
+      if (!card.classList.contains("is-visible")) {
+        armCardAtLogo(logoWrap, card);
+      }
     });
+  }
+
+  function revealCard(logoWrap, card) {
+    var vec = armCardAtLogo(logoWrap, card);
+    void card.offsetWidth;
+    card.style.transition = "";
+    card.classList.add("is-visible");
+    card.style.transform = "translate(0, 0) scale(1)";
+    card.style.opacity = "1";
   }
 
   function createRipple(section, color) {
@@ -150,7 +191,6 @@
     var shakeEl = $(".rl-flow-logo__shake", section);
     var reactionEl = $(".rl-flow-logo__reaction", section);
     var logoWrap = $(".rl-flow-anim__logo-wrap", section);
-    var chipsWrap = $(".rl-flow-anim__chips", section);
     var cards = $$(".rl-flow-anim__card", section);
     var svg = $(".rl-flow-anim__logo .rl-logo__icon svg", section);
 
@@ -158,10 +198,7 @@
       svg.classList.add("is-idle");
     }
 
-    layoutChips(section, logoWrap, chipsWrap);
-    window.requestAnimationFrame(function () {
-      layoutCardFly(section, logoWrap);
-    });
+    layoutChips(section, logoWrap);
 
     var impactCount = 0;
     var recoilCount = 0;
@@ -190,6 +227,14 @@
       window.setTimeout(function () {
         shakeEl.classList.remove("is-impact");
       }, 300);
+      if (logoWrap) {
+        logoWrap.classList.remove("is-hit");
+        void logoWrap.offsetWidth;
+        logoWrap.classList.add("is-hit");
+        window.setTimeout(function () {
+          logoWrap.classList.remove("is-hit");
+        }, 240);
+      }
     }
 
     function triggerRecoil() {
@@ -206,16 +251,27 @@
       }, 370);
     }
 
+    function triggerCardImpact() {
+      if (!logoWrap) {
+        return;
+      }
+      logoWrap.classList.remove("is-card-hit");
+      void logoWrap.offsetWidth;
+      logoWrap.classList.add("is-card-hit");
+      window.setTimeout(function () {
+        logoWrap.classList.remove("is-card-hit");
+      }, 340);
+    }
+
     $$(".rl-flow-chip", section).forEach(function (chip) {
       var ms = parseInt(chip.getAttribute("data-ms") || "0", 10);
       var color = chip.getAttribute("data-color") || "#0A0A0A";
       window.setTimeout(function () {
-        var hitX = chip.dataset.hitX || "65";
-        var hitY = chip.dataset.hitY || "19";
         chip.style.transition =
-          "transform " + CHIP_FLY_MS + "ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease";
-        chip.style.transform =
-          "translate(" + hitX + "px, " + hitY + "px) scale(0.15) rotate(0deg)";
+          "transform " +
+          CHIP_FLY_MS +
+          "ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease";
+        chip.style.transform = "translate(0, 0) scale(0.15) rotate(0deg)";
         window.setTimeout(function () {
           chip.style.opacity = "0";
           triggerImpact(color);
@@ -229,6 +285,11 @@
       }
     }, CHARGE_AT_MS);
 
+    window.setTimeout(function () {
+      layoutChips(section, logoWrap);
+      armHiddenCards(section, logoWrap);
+    }, SHOOT_AT_MS - 50);
+
     cards.forEach(function (card, index) {
       window.setTimeout(
         function () {
@@ -236,7 +297,8 @@
             reactionEl.classList.remove("is-charging");
           }
           triggerRecoil();
-          card.classList.add("is-visible");
+          triggerCardImpact();
+          revealCard(logoWrap, card);
         },
         SHOOT_AT_MS + index * CARD_STAGGER_MS
       );
@@ -248,17 +310,18 @@
       }
       fillBars(section);
       section.classList.add("is-complete");
+      resetCardFlyStyles(section);
     }, BARS_AT_MS);
 
     var resizeTimer;
     window.addEventListener("resize", function () {
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(function () {
-        layoutChips(section, logoWrap, chipsWrap);
+        layoutChips(section, logoWrap);
         if (section.classList.contains("is-complete")) {
           return;
         }
-        layoutCardFly(section, logoWrap);
+        armHiddenCards(section, logoWrap);
       }, 120);
     });
   }

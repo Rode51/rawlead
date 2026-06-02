@@ -6,7 +6,7 @@
 
 > **v0.9:** поле **`contour`** (`owner`/`saas`) — **отменено**. Вместо него **`is_visible`** после ИИ-модерации — см. [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) §0c.
 
-**Миграции:** `sql/001` … `sql/013` · apply через Neon SQL Editor или auto DDL в `draft_async._ensure_draft_tables`.
+**Миграции:** `sql/001` … `sql/015` · apply через Neon SQL Editor или auto DDL в `draft_async._ensure_draft_tables`.
 
 Черновик SQL: [`../../sql/001_neon_schema.sql`](../../sql/001_neon_schema.sql) + последующие `sql/00*.sql`.
 
@@ -41,7 +41,10 @@
 | `is_visible` | BOOLEAN | `true` — в `/feed` и match; `false` — только dogfood-бот владельца |
 | `content_hash` | TEXT | SHA-256 нормализованного текста (`listing_dedup`); NULL — дедуп только по `source`+`external_id` |
 | `notified_at` | TIMESTAMPTZ | legacy / owner |
-| `created_at` | TIMESTAMPTZ | |
+| `created_at` | TIMESTAMPTZ | момент **INSERT в Neon** (≠ дата на бирже) |
+| `source_published_at` | TIMESTAMPTZ | когда опубликовано на бирже/TG (`sql/016`, O90) |
+| `l1_completed_at` | TIMESTAMPTZ | когда L1 выставил score/visible (`sql/016`, O90) |
+| `last_fetch_ok_at` | TIMESTAMPTZ | последний успешный fetch карточки (delist, O90) |
 | `category` | TEXT | `dev` / `design` / … (`sql/002`) |
 | `task_summary` | TEXT | L1 краткое описание (`sql/004`) |
 | `tools_required` | JSONB | стек заказа L2 (`sql/005`) |
@@ -130,6 +133,21 @@ Dedupe TG push: **PK** `(user_id, lead_id)`.
 ### `admin_pageviews` (O45 · `sql/011`)
 
 **PK** `(path, day)` · счётчик просмотров для `/ops/`.
+
+### `auth_bot_sessions` (O84 · `sql/015`)
+
+One-time deep-link login: `/cabinet/` → `@rawlead_bot?start=auth_<token>` → JWT.
+
+| Колонка | Тип | Смысл |
+|---------|-----|--------|
+| `id` | UUID PK | |
+| `token_hash` | TEXT UNIQUE | SHA-256 plain token (не хранить token) |
+| `expires_at` | TIMESTAMPTZ | TTL **5 мин** |
+| `tg_user_id` | BIGINT | после `/start auth_*` в боте |
+| `tg_username` / `tg_first_name` / `tg_photo_url` | TEXT | из TG message |
+| `authorized_at` | TIMESTAMPTZ | бот подтвердил |
+| `consumed_at` | TIMESTAMPTZ | JWT выдан (`/v1/auth/bot-complete`) |
+| `created_at` | TIMESTAMPTZ | |
 
 ---
 

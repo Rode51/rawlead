@@ -57,19 +57,28 @@ def _canonical_user_keys(user_tags: dict[str, float]) -> set[str]:
     return keys
 
 
+def _expanded_user_keys(user_tags: dict[str, float]) -> set[str]:
+    from skills_catalog import expand_user_tags_for_match
+
+    return expand_user_tags_for_match(_canonical_user_keys(user_tags))
+
+
 def keyword_match(lead_tags: list[str], user_tags: dict[str, float]) -> int:
-    """F2+: hybrid coverage (lead + user), synonyms → canonical_tag."""
+    """F2+: hybrid coverage (lead + user), synonyms → canonical_tag, O93 parent expand."""
+    from skills_catalog import expand_user_tags_for_match
+
     lead_set = _canonical_tag_list(lead_tags)
     if not lead_set or not user_tags:
         return 0
-    user_keys = _canonical_user_keys(user_tags)
-    if not user_keys:
+    user_base = _canonical_user_keys(user_tags)
+    if not user_base:
         return 0
-    matched = sum(1 for tag in lead_set if tag in user_keys)
+    user_expanded = expand_user_tags_for_match(user_base)
+    matched = sum(1 for tag in lead_set if tag in user_expanded)
     if matched <= 0:
         return 0
     coverage_lead = matched / len(lead_set)
-    cap = max(1, min(len(user_keys), max(1, _USER_TAG_CAP)))
+    cap = max(1, min(len(user_base), max(1, _USER_TAG_CAP)))
     coverage_user = matched / cap
     w_lead = max(0.0, _RANK_MATCH_LEAD_WEIGHT)
     w_user = max(0.0, _RANK_MATCH_USER_WEIGHT)
@@ -82,11 +91,14 @@ def keyword_match(lead_tags: list[str], user_tags: dict[str, float]) -> int:
 
 def keyword_match_breakdown(lead_tags: list[str], user_tags: dict[str, float]) -> dict[str, int]:
     """Для UI/API: matched/total lead tags + percent."""
+    from skills_catalog import expand_user_tags_for_match
+
     lead_set = _canonical_tag_list(lead_tags)
     if not lead_set or not user_tags:
         return {"matched": 0, "total": len(lead_set), "percent": 0}
-    user_keys = _canonical_user_keys(user_tags)
-    matched = sum(1 for tag in lead_set if tag in user_keys)
+    user_base = _canonical_user_keys(user_tags)
+    user_expanded = expand_user_tags_for_match(user_base)
+    matched = sum(1 for tag in lead_set if tag in user_expanded)
     return {
         "matched": matched,
         "total": len(lead_set),

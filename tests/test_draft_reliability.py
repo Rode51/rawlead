@@ -79,7 +79,7 @@ class TestAnalyzePremiumRetries(unittest.TestCase):
         cfg.ai_provider = "openrouter"
         cfg.ai_model_premium = "test-model"
         lite = AiLiteAnalysis(
-            verdict="Брать",
+            feed_visible=True,
             task_summary="test task",
             lead_tags=("php",),
         )

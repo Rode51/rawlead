@@ -55,12 +55,13 @@ from preprod_ai_prod_audit import (  # noqa: E402
 )
 
 _SKIP_VERDICTS = frozenset({"мимо", "пропустить", "skip"})
-_REGEN_VERDICTS = frozenset({"брать", "брат", "take", "сомнительно", "maybe"})
+_REGEN_VERDICTS = frozenset({"брать", "брат", "take", "сомнительно", "maybe", "ok"})
 
 
 def _lite_from_lead(lead: dict[str, Any]) -> AiLiteAnalysis:
+    v_norm = _norm_verdict(lead.get("ai_verdict") or "")
     return AiLiteAnalysis(
-        verdict=(lead.get("ai_verdict") or "Сомнительно").strip(),
+        feed_visible=v_norm not in _SKIP_VERDICTS,
         task_summary=(lead.get("task_summary") or "").strip(),
         lead_tags=tuple(lead.get("lead_tags") or ()),
         ai_reasons=tuple(lead.get("ai_reasons") or ()),
@@ -172,10 +173,22 @@ def fetch_regen_candidates(
     limit: int,
     src_sql: str,
     src_params: list[Any],
+    since: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Stratified visible leads with L1+verdict suitable for shared L2 regen."""
+    since_sql, since_params = "", []
+    if since is not None:
+        from preprod_ai_prod_audit import _since_sql
+
+        since_sql, since_params = _since_sql(since)
     pool = _stratified_sample(
-        conn, n=limit, src_sql=src_sql, src_params=src_params, pool_size=3000
+        conn,
+        n=limit,
+        src_sql=src_sql,
+        src_params=src_params,
+        pool_size=3000,
+        since_sql=since_sql,
+        since_params=since_params,
     )
     out: list[dict[str, Any]] = []
     for lead in pool:

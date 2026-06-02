@@ -18,51 +18,36 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 	<section class="rl-cabinet-login" id="rl-cabinet-login">
 		<div class="rl-cabinet-login__card">
 			<h1 class="rl-cabinet-login__title"><?php esc_html_e('Кабинет', 'rawlead-kadence-child'); ?></h1>
-			<p class="rl-cabinet-login__lead"><?php esc_html_e('Вход через Telegram = твой аккаунт. Навыки в профиле, отклики — в inbox.', 'rawlead-kadence-child'); ?></p>
-			<div id="rl-telegram-login-widget" class="rl-cabinet-login__widget"></div>
-			<p class="rl-cabinet-login__state rl-cabinet-login__state--info" id="rl-cabinet-login-state" aria-live="polite"></p>
-			<p class="rl-cabinet-login__hint" id="rl-cabinet-login-hint" hidden></p>
-			<?php if ($rawlead_cabinet_is_local) : ?>
-			<p class="rl-cabinet-login__hint">
-				<?php esc_html_e('Если видите серый/битый блок вместо кнопки Telegram — браузер не открывает telegram.org. Откройте кабинет на 127.0.0.1 и включите VPN/прокси или отключите блокировщик для telegram.org.', 'rawlead-kadence-child'); ?>
-			</p>
-			<?php else : ?>
-			<p class="rl-cabinet-login__hint">
-				<?php esc_html_e('Из РФ для входа нужен VPN (Telegram заблокирован). Если кнопка не загрузилась — используйте «Войти через Telegram» ниже.', 'rawlead-kadence-child'); ?>
-			</p>
-			<?php endif; ?>
-			<div class="rl-cabinet-login__fallback" id="rl-cabinet-login-fallback" hidden>
-				<p class="rl-cabinet-login__hint"><?php esc_html_e('Вход без iframe: нажмите кнопку — откроется Telegram OAuth и вернёт в /cabinet/.', 'rawlead-kadence-child'); ?></p>
-				<p class="rl-cabinet-login__direct">
-					<a class="rl-btn rl-btn--primary" id="rl-cabinet-fallback-link" href="#">
-						<?php esc_html_e('Войти через Telegram (fallback)', 'rawlead-kadence-child'); ?>
-					</a>
+			<p class="rl-cabinet-login__lead"><?php esc_html_e('Войди через Telegram — навыки, отклики и уведомления в одном месте.', 'rawlead-kadence-child'); ?></p>
+			<button type="button" class="rl-btn rl-btn--primary rl-cabinet-login__btn" id="rl-cabinet-login-btn">
+				<svg class="rl-cabinet-login__icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+					<path fill="currentColor" d="M9.04 15.314l-.376 5.302c.538 0 .77-.231 1.049-.508l2.518-2.418 5.217 3.823c.957.527 1.637.251 1.898-.885l3.438-16.08.001-.001c.305-1.423-.514-1.98-1.447-1.634L1.12 9.775c-1.392.541-1.369 1.317-.236 1.667l4.913 1.533L18.9 5.48c.595-.394 1.136-.176.691.218"/>
+				</svg>
+				<?php esc_html_e('Войти через Telegram', 'rawlead-kadence-child'); ?>
+			</button>
+			<div class="rl-cabinet-login__qr" id="rl-cabinet-login-qr" hidden>
+				<p class="rl-cabinet-login__qr-lead rl-cabinet-login__qr-lead--desktop"><?php esc_html_e('Отсканируйте камерой телефона — откроется бот, нажмите Start.', 'rawlead-kadence-child'); ?></p>
+				<p class="rl-cabinet-login__qr-lead rl-cabinet-login__qr-lead--mobile"><?php esc_html_e('Откройте Telegram и нажмите Start. Эта страница останется открытой — кабинет войдёт сам.', 'rawlead-kadence-child'); ?></p>
+				<img class="rl-cabinet-login__qr-img" id="rl-cabinet-login-qr-img" width="260" height="260" alt="<?php esc_attr_e('QR-код для входа через Telegram', 'rawlead-kadence-child'); ?>">
+				<p class="rl-cabinet-login__qr-wait" id="rl-cabinet-login-qr-wait"><?php esc_html_e('Ждём подтверждение в Telegram…', 'rawlead-kadence-child'); ?></p>
+				<p class="rl-cabinet-login__qr-link">
+					<a class="rl-btn rl-btn--ghost" id="rl-cabinet-login-qr-link" href="#" target="_blank" rel="noopener"><?php esc_html_e('Открыть Telegram', 'rawlead-kadence-child'); ?></a>
 				</p>
+				<button type="button" class="rl-btn rl-btn--ghost rl-cabinet-login__qr-cancel" id="rl-cabinet-login-qr-cancel"><?php esc_html_e('Отмена', 'rawlead-kadence-child'); ?></button>
 			</div>
+			<p class="rl-cabinet-login__state" id="rl-cabinet-login-state" aria-live="polite" hidden></p>
+			<p class="rl-cabinet-login__alt">
+				<a class="rl-link-arrow" href="<?php echo esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=login'); ?>" target="_blank" rel="noopener">
+					<?php esc_html_e('Или войти через @rawlead_bot →', 'rawlead-kadence-child'); ?>
+				</a>
+			</p>
 			<?php if ($rawlead_cabinet_is_local) : ?>
-			<p class="rl-cabinet-login__direct">
-				<a class="rl-btn rl-btn--ghost" href="<?php echo esc_url($rawlead_cabinet_login_url); ?>">
-					<?php esc_html_e('Открыть по адресу для Telegram (127.0.0.1)', 'rawlead-kadence-child'); ?>
+			<p class="rl-cabinet-login__dev">
+				<a class="rl-link-arrow" href="<?php echo esc_url($rawlead_cabinet_login_url); ?>">
+					<?php esc_html_e('Локальный вход (127.0.0.1)', 'rawlead-kadence-child'); ?>
 				</a>
 			</p>
 			<?php endif; ?>
-			<p class="rl-cabinet-login__bot-hint">
-				<?php
-				printf(
-					/* translators: %s: Telegram bot username */
-					esc_html__('Чтобы получать match-лиды в Telegram — %1$s/start%2$s в боте @rawlead_bot. Отклики пишите на %3$sленте%4$s.', 'rawlead-kadence-child'),
-					'<code>',
-					'</code>',
-					'<a href="' . esc_url(rawlead_page_url('lenta')) . '">',
-					'</a>'
-				);
-				?>
-			</p>
-			<p class="rl-cabinet-login__direct">
-				<a class="rl-btn rl-btn--ghost" href="https://t.me/rawlead_bot" target="_blank" rel="noopener">
-					<?php esc_html_e('Открыть @rawlead_bot', 'rawlead-kadence-child'); ?>
-				</a>
-			</p>
 		</div>
 	</section>
 	<div class="rl-container rl-app__layout rl-cabinet-app" id="rl-cabinet-app" hidden>
@@ -171,22 +156,24 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 		</div>
 	</div>
 	<div class="rl-cabinet-skills-modal" id="rl-cabinet-skills-modal" hidden>
-		<div class="rl-cabinet-skills-modal__overlay" id="rl-cabinet-skills-modal-overlay"></div>
-		<div class="rl-cabinet-skills-modal__panel" role="dialog" aria-modal="true" aria-labelledby="rl-cabinet-skills-title">
-			<h3 class="rl-skills-panel__title" id="rl-cabinet-skills-title"><?php esc_html_e('Выбрать специализацию', 'rawlead-kadence-child'); ?></h3>
-			<label class="rl-cabinet-skills-search-wrap">
-				<span class="screen-reader-text"><?php esc_html_e('Поиск навыка', 'rawlead-kadence-child'); ?></span>
-				<input type="search" class="rl-cabinet-skills-search" id="rl-cabinet-skills-search" placeholder="<?php esc_attr_e('Поиск навыка…', 'rawlead-kadence-child'); ?>" autocomplete="off">
-			</label>
-			<div class="rl-skills-panel__body">
-				<div class="rl-feed-skills" id="rl-cabinet-skills-catalog" aria-live="polite"></div>
-				<button type="button" class="rl-feed-skills-rare" id="rl-cabinet-skills-rare" hidden><?php esc_html_e('Ещё навыки', 'rawlead-kadence-child'); ?></button>
-				<p class="rl-feed-skills__hint" id="rl-cabinet-skills-limit" hidden><?php esc_html_e('Максимум 12 навыков', 'rawlead-kadence-child'); ?></p>
+		<div class="rl-cabinet-skills-modal__overlay" id="rl-cabinet-skills-modal-overlay" aria-hidden="true"></div>
+		<div class="rl-cabinet-skills-modal__panel rl-skill-tree" role="dialog" aria-modal="true" aria-labelledby="rl-cabinet-skills-title">
+			<div class="rl-skill-tree__handle" aria-hidden="true"></div>
+			<header class="rl-skill-tree__header">
+				<h3 class="rl-skill-tree__title" id="rl-cabinet-skills-title"><?php esc_html_e('Навыки', 'rawlead-kadence-child'); ?></h3>
+				<p class="rl-skill-tree__counter" id="rl-cabinet-skill-tree-counter" aria-live="polite"><?php esc_html_e('Выбрано 0 / 12', 'rawlead-kadence-child'); ?></p>
+				<button type="button" class="rl-skill-tree__close" id="rl-cabinet-skill-tree-close" aria-label="<?php esc_attr_e('Закрыть', 'rawlead-kadence-child'); ?>">✕</button>
+			</header>
+			<p class="rl-skill-tree__hint" id="rl-cabinet-skill-tree-hint" hidden><?php esc_html_e('⚡ Рекомендуем 6–8 ключевых — так совместимость точнее', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-skill-tree__limit-msg" id="rl-cabinet-skill-tree-limit" hidden><?php esc_html_e('Максимум 12 навыков — сними лишние, чтобы добавить новые', 'rawlead-kadence-child'); ?></p>
+			<div class="rl-skill-tree__body" id="rl-cabinet-skill-tree-body">
+				<div class="rl-skill-tree__roots" id="rl-cabinet-skill-tree-roots" aria-live="polite"></div>
 			</div>
-			<div class="rl-skills-panel__footer">
-				<button type="button" class="rl-btn rl-btn--primary rl-feed-skills-apply" id="rl-cabinet-skills-apply"><?php esc_html_e('Добавить', 'rawlead-kadence-child'); ?></button>
-				<button type="button" class="rl-btn rl-btn--ghost" id="rl-cabinet-skills-cancel"><?php esc_html_e('Отмена', 'rawlead-kadence-child'); ?></button>
-			</div>
+			<footer class="rl-skill-tree__footer">
+				<button type="button" class="rl-btn rl-skill-tree__save" id="rl-cabinet-skills-apply" disabled><?php esc_html_e('Сохранить навыки →', 'rawlead-kadence-child'); ?></button>
+				<p class="rl-skill-tree__save-error" id="rl-cabinet-skill-tree-save-error" role="alert" hidden><?php esc_html_e('Ошибка — попробуй снова', 'rawlead-kadence-child'); ?></p>
+				<button type="button" class="rl-skill-tree__reset" id="rl-cabinet-skill-tree-reset"><?php esc_html_e('Сбросить всё', 'rawlead-kadence-child'); ?></button>
+			</footer>
 		</div>
 	</div>
 </main>

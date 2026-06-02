@@ -45,20 +45,10 @@ _ACTION_RESUME = "resume"
 _ACTION_STATUS = "status"
 _ACTION_STOP_HARD = "stop_hard"
 
-_WELCOME_SUBSCRIBER = (
-    "RawLead — лента заказов для фрилансеров.\n"
-    "Сайт: https://rawlead.ru/lenta/\n"
-    "Match-уведомления включены после /start."
-)
+_WELCOME_SUBSCRIBER = "RawLead — лента заказов: https://rawlead.ru/lenta/"
 _WELCOME_LOGIN = (
-    "RawLead — войдите в кабинет на сайте:\n"
-    "https://rawlead.ru/cabinet/"
+    "RawLead — откройте ссылку ниже, чтобы войти в кабинет на сайте."
 )
-_STARS_HINT = (
-    "Оплата подписки — Telegram Stars.\n"
-    "Нажмите /pay или кнопку «Оплатить Stars» в кабинете."
-)
-_NO_ACCESS = "Нет доступа."
 
 
 class TelegramControlError(RuntimeError):
@@ -113,6 +103,11 @@ def _reply_keyboard_markup() -> str:
 
 def _remove_keyboard_markup() -> str:
     return json.dumps({"remove_keyboard": True}, separators=(",", ":"))
+
+
+def _inline_url_markup(url: str, label: str) -> str:
+    markup = {"inline_keyboard": [[{"text": label, "url": url}]]}
+    return json.dumps(markup, ensure_ascii=False, separators=(",", ":"))
 
 
 def _normalize_command(text: str) -> str:
@@ -292,6 +287,7 @@ def _send_to_chat(
     *,
     with_admin_keyboard: bool = False,
     remove_keyboard: bool = False,
+    reply_markup: str | None = None,
     timeout_sec: float = 20.0,
 ) -> None:
     proxies = telegram_requests_proxies(cfg)
@@ -300,7 +296,9 @@ def _send_to_chat(
         "chat_id": str(chat_id).strip(),
         "text": text,
     }
-    if with_admin_keyboard:
+    if reply_markup is not None:
+        data["reply_markup"] = reply_markup
+    elif with_admin_keyboard:
         data["reply_markup"] = _reply_keyboard_markup()
     elif remove_keyboard:
         data["reply_markup"] = _remove_keyboard_markup()
@@ -495,11 +493,108 @@ def _handle_action(
         _send_message(cfg, body)
 
 
-def _start_payload(text: str) -> str:
+def _start_raw_payload(text: str) -> str:
     parts = (text or "").strip().split(maxsplit=1)
     if len(parts) < 2:
         return ""
-    return parts[1].strip().casefold()
+    return parts[1].strip()
+
+
+def _start_payload(text: str) -> str:
+    return _start_raw_payload(text).casefold()
+
+
+def _handle_bot_login_link(
+    cfg: Config,
+    message: dict,
+    *,
+    chat_id: int,
+    user_id: int,
+    errors: list[str],
+) -> bool:
+    from_user = message.get("from") if isinstance(message.get("from"), dict) else {}
+    username = str(from_user.get("username") or "").strip() or None
+    first_name = str(from_user.get("first_name") or "").strip() or None
+    try:
+        from bot_auth import mint_bot_first_login_url
+
+        return_url = mint_bot_first_login_url(
+            tg_user_id=int(user_id),
+            tg_chat_id=int(chat_id),
+            username=username,
+            first_name=first_name,
+            photo_url=None,
+        )
+        upsert_subscriber_chat_id(
+            cfg.database_url,
+            tg_user_id=int(user_id),
+            tg_chat_id=int(chat_id),
+        )
+    except Exception as exc:
+        errors.append(f"bot_login:err {type(exc).__name__}:{str(exc)[:80]}")
+        return True
+
+    errors.append("bot_login:ok")
+    try:
+        _send_to_chat(
+            cfg,
+            chat_id,
+            _WELCOME_LOGIN,
+            reply_markup=_inline_url_markup(return_url, "Открыть кабинет"),
+        )
+    except TelegramControlError:
+        pass
+    return True
+
+
+def _handle_bot_auth_start(
+    cfg: Config,
+    message: dict,
+    *,
+    auth_token: str,
+    chat_id: int,
+    user_id: int,
+    errors: list[str],
+) -> bool:
+    from_user = message.get("from") if isinstance(message.get("from"), dict) else {}
+    username = str(from_user.get("username") or "").strip() or None
+    first_name = str(from_user.get("first_name") or "").strip() or None
+    photo_url = None
+    try:
+        from bot_auth import authorize_bot_auth_session
+
+        ok, return_url, err = authorize_bot_auth_session(
+            auth_token=auth_token,
+            tg_user_id=int(user_id),
+            tg_chat_id=int(chat_id),
+            username=username,
+            first_name=first_name,
+            photo_url=photo_url,
+        )
+    except Exception as exc:
+        errors.append(f"bot_auth:err {type(exc).__name__}:{str(exc)[:80]}")
+        return True
+
+    if not ok:
+        errors.append(f"bot_auth:fail {err[:80]}")
+        return True
+
+    upsert_subscriber_chat_id(
+        cfg.database_url,
+        tg_user_id=int(user_id),
+        tg_chat_id=int(chat_id),
+    )
+    errors.append("bot_auth:ok")
+    try:
+        _send_to_chat(
+            cfg,
+            chat_id,
+            "✓ Вход подтверждён. Нажмите кнопку ниже, чтобы вернуться в кабинет.",
+            reply_markup=_inline_url_markup(return_url, "Вернуться на сайт"),
+        )
+    except TelegramControlError:
+        pass
+    return True
 
 
 def _send_stars_invoice_reply(
@@ -536,7 +631,28 @@ def _handle_subscriber_message(
         return True
 
     cmd = _normalize_command(text)
+    if cmd in ("/login", "/cabinet"):
+        return _handle_bot_login_link(
+            cfg,
+            message,
+            chat_id=int(chat_id),
+            user_id=int(user_id),
+            errors=errors,
+        )
+
     if cmd == _START_CMD:
+        raw_payload = _start_raw_payload(text)
+        if raw_payload.lower().startswith("auth_"):
+            token = raw_payload[5:]
+            if token:
+                return _handle_bot_auth_start(
+                    cfg,
+                    message,
+                    auth_token=token,
+                    chat_id=int(chat_id),
+                    user_id=int(user_id),
+                    errors=errors,
+                )
         upsert_subscriber_chat_id(
             cfg.database_url,
             tg_user_id=int(user_id),
@@ -545,14 +661,17 @@ def _handle_subscriber_message(
         payload = _start_payload(text)
         try:
             if payload == "login":
-                _send_to_chat(cfg, chat_id, _WELCOME_LOGIN, remove_keyboard=True)
+                return _handle_bot_login_link(
+                    cfg,
+                    message,
+                    chat_id=int(chat_id),
+                    user_id=int(user_id),
+                    errors=errors,
+                )
             elif payload in ("pay", "stars"):
                 _send_stars_invoice_reply(cfg, chat_id, int(user_id), errors)
             else:
-                msg = _WELCOME_SUBSCRIBER
-                if stars_available(cfg):
-                    msg += "\n\n" + _STARS_HINT
-                _send_to_chat(cfg, chat_id, msg, remove_keyboard=True)
+                _send_to_chat(cfg, chat_id, _WELCOME_SUBSCRIBER, remove_keyboard=True)
         except TelegramControlError:
             pass
         return True
@@ -582,10 +701,6 @@ def _handle_subscriber_message(
         return True
 
     if not is_admin and _resolve_action(text) is not None:
-        try:
-            _send_to_chat(cfg, chat_id, _NO_ACCESS, remove_keyboard=True)
-        except TelegramControlError:
-            pass
         return True
 
     return False

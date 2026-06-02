@@ -1,6 +1,6 @@
 # TASKS (активное)
 
-Снимок: [`STATUS.md`](STATUS.md)
+**Снимок:** [`STATUS.md`](STATUS.md)
 
 ---
 
@@ -8,26 +8,19 @@
 
 | # | Задача | Статус |
 |---|--------|--------|
-| **D-O81** | лендинг flow | **✅ Design** · **→ @coder O81-w1** |
-| **O81-w1** | flow-анимация + mobile fly-out | **✅** |
-| **O82-w1b** | match совместимость | **✅** |
-| **O82-w1** | Match breakdown (старое w1) | **⚠️ заменить w1b** |
-| **D-O82b** | Match breakdown copy | **⏸** (w1b по OWNER_INTENT) |
-| **O82-w2** | F2+ + synonyms + tools backfill | **✅** deploy VPS |
-| **O72e-3** | Промпты L1+L2 · deploy VPS · gate частично | **✅ код** · **→ O72e-4** |
-| **O72e-4** | QA-автомат regen→judge→LLM-патч (owner смотрит) | **→ @coder** после O72e-3 |
-| **O82-w2** (granular ai_score) | backlog | после O72e-3 |
-| **O63-w2** | FreelanceJob + Пчёл.нет | **✅** |
-| **UX audit** | U11 + U12 на prod | **→ @coder** (перегнать audit) |
-| **Реклама** | soft launch | **⏸ после O82-w2 + O63 env** |
-| **O77** / **O78** | views / admin | backlog |
-
-## После гейтов
-
-| # | Трек | Кто |
-|---|------|-----|
-| **GTM-A/B/C** | soft launch · portfolio · FL | владелец + leads |
+| **O94-L1** | AI.md + targeted L1 bench | **→ @coder** |
+| **E2E UX** | Playwright walk «обычный юзер» | **→ Lead / agent** |
+| **O92b** | pending_tags | **⏸** после E2E |
+| **Реклама** | soft launch | **⏸** |
 
 ---
 
-_Lead · 2026-06-01_
+## Закрыто 2026-06-02
+
+**O94-code** v0.5 catalog + UI 4 ниши · deploy VPS  
+**O93-w2/w2b** modal лента · auto-L3 · sort UX · **1.14.0**  
+**O94-v0.5** PM research · **O93** · O72e-9
+
+---
+
+_Lead · 2026-06-02_

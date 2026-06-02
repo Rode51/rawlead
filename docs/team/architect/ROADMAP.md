@@ -1,104 +1,110 @@
 # Дорожная карта
 
-**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11** · [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § MARKET-INTEL-B
+**Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.11**
 
-**Снимок / очередь:** [`STATUS.md`](../common/STATUS.md) · [`TASKS.md`](../common/TASKS.md) · **реклама:** [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md)
-
----
-
-## Сейчас (2026-06-01)
-
-| # | Что | Кто | Статус |
-|---|-----|-----|--------|
-| **O63-w1** | YouDo + Freelance.ru | @coder | **→** |
-| **O82** | Match UX v2 (moat до ads) | @coder + @lead-designer | **📋 после w1** |
-| **O72e** | Judge ≥4 на свежих | @coder | **цикл** |
-| **O73** | Heatmap | владелец/coder | **📋** |
-| **Реклама** | soft-launch | владелец | **⏸ после O63+O82** |
-
-**Порядок:** **O63-w1** → **O63-w2** → **O82-w1→w2** → soft ads.
+**Снимок:** [`STATUS.md`](../common/STATUS.md) · **очередь:** [`TASKS.md`](../common/TASKS.md) · **реклама:** [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md)
 
 ---
 
-## O72 — AI draft quality audit
+## Сейчас (2026-06-01 → 02)
 
-**Цель:** на реальных лидах из Neon понять качество **reply_draft** и **tools_required** (не только fixtures 12/12).
+| # | Что | Статус |
+|---|-----|--------|
+| **O72e L2** | send/combined on full | **✅** |
+| **O72e L1** | category/tags | **✅ O72e-9 PASS** (02.06, `075032Z`) |
+| **O90+O91** | ingest lag + watchdog | **✅ done** |
+| **O89** | uniquify | **✅ done** |
+| **O92** | Skill Tree interim в ЛК | **deploy** `1.11.30` · **не финал** |
+| **O93** | Skill Tree PM вариант B + match expand | **✅ deploy** `1.12.0` |
+| **O93-w2** | авто-L3 + лента modal | **✅ код** · deploy **w2b** |
+| **O94-v0.5** | PM research | **✅ approve** |
+| **O94-code** | v0.5 в код + UI 4 ниши | **✅ deploy 1.14.0** |
+| **O94-L1** | AI.md + targeted bench | **→ @coder** |
+| **E2E UX** | Playwright + владелец | **после w2b** |
+| **O92b** | pending_tags review | **⏸** |
+| **Реклама** | soft-launch | **⏸** |
 
-| Фаза | Суть |
+**Порядок:** **w2b deploy → O94-code → O94-L1 bench → E2E → O92b → GTM**.
+
+---
+
+## O72e — prompt quality gate (активно)
+
+| Слой | Gate |
 |------|------|
-| **1** | auto-metrics: validators + tools vs catalog + эвристики |
-| **2** | LLM judge 20–30 samples (релевантность, tools match) |
+| **L2** | combined ≥4.0 · send ≥50% |
+| **L1** | usable ≥70% |
+| **Инструменты** | `$0` bench 5/5 · full на свежих лидах |
 
-**Accept:** ≥85% auto-pass · judge avg ≥3.5/5 · top fail cases для промпта.
+Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § O90/O91 · Owner: [`FOR_YOU.md`](../../FOR_YOU.md) § «Твои шаги».
 
-Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § **O72**
-
----
-
-## O63 — новые парсеры (решение владельца 2026-05-30)
-
-**Gate:** не блокирует pre-launch · parallel backlog.
-
-| source_id | Биржа | URL (старт) | Приоритет |
-|-----------|-------|-------------|-----------|
-| `youdo` | YouDo | https://youdo.com/ | P1 |
-| `freelance_ru` | Freelance.ru | https://freelance.ru/project/ | P1 |
-| `freelancejob` | FreelanceJob | https://www.freelancejob.ru/projects/ |
-| `pchyol` | Пчёл.нет | https://pchel.net/jobs/ |
-
-**Dedup:** `content_hash` + усилить нормализацию · fuzzy — O63b.
-
-**Coder:** [`CODER_PROMPT.md`](CODER_PROMPT.md) § **O63**
+_(O72 auto-metrics — ✅ архив, см. STATUS_ARCHIVE.)_
 
 ---
 
-## O82 — Match UX v2 (moat · владелец 2026-06-01)
+## O89 — reply uniquify (следом)
 
-**Проблема:** F2 даёт мало градаций (33/50/67/100) · `ai_score` — 3 корзины · UI без breakdown — пользователь не верит «совместимости».
+**Решение владельца:** один **pro**-каркас при ingest · **flash-lite** rephrase **per user** на «Написать отклик» · copy «уникальный отклик».
 
-**Цель:** прозрачная персональная оценка (vision §5) + более «живой» rank — **дифференциатор** vs агрегаторы «просто лента».
-
-| Волна | Суть |
-|-------|------|
-| **w1** | Breakdown на карточке · zero-state без навыков · copy «не оценка качества» |
-| **w2** | Synonyms · granular ai_score · F2+ формула · tests на разброс % |
-| **w3** | Embeddings · веса навыков — backlog |
-
-**Gate:** **до soft ads** · после **O63-w1**.
-
-Coder: [`CODER_PROMPT.md`](CODER_PROMPT.md) § **O82** · Design: **D-O82**
+Детали: [`OWNER_INTENT.md`](OWNER_INTENT.md) § O89.
 
 ---
 
-## Фазы (сводка vision §4)
+## O92 — Skill Tree в профиле (после O89)
 
-| Фаза | Статус | Суть |
-|------|--------|------|
-| **0** Радар ПК | ✅ | FL, Kwork, TG, пульт, legacy/site |
-| **0b** Биржи v2 | **📋 O63** | YouDo · Freelance.ru · … |
-| **3b–3d** Neon + API + WP | ✅ | `/lenta/`, `/cabinet/` |
-| **E0–E5** PRE-LAUNCH-UX | ✅ | фильтры, каталог, REVOLUTION UI |
-| **3x** «Горячий» | ✅ | badge &lt; 5 мин |
-| **P5 E2** VPS радары | **✅** | 24/7 Site + Legacy |
-| **3f** ИИ-агент | **→** | draft + tools · **O72 метрики** |
-| **3g–3h** Auth + биллинг | → | один тариф |
-| **4** Аналитика поведения | **→ O73** | Metrika/Clarity |
-| **5** **P-PORTFOLIO** (личное на VPS) | **после O72d+O76** | интерактив · FL · параллельно soft ads |
-| **5b** RawLead GTM | **после гейтов** | `PRE_LAUNCH_MARKETING` |
+**Идея владельца:** вместо плоского списка навыков в ЛК — 4 корневые ниши (dev/design/marketing/text) с раскрывающимися ветками и чекбоксами canonical-tag.
+
+**V1 guardrail:** UI/UX-only. Payload в API тот же (`["tag_a","tag_b"]`), **L1/LLM/prompts/Neon schema не меняем**.
+
+**Цель:** повысить полноту и точность заполнения профиля без регресса качества matching.
+
+## O92b — Semi-auto рост каталога навыков (после O92)
+
+**Факт:** в Neon уже есть `public.pending_tags` (candidate queue от L1 unknown tags, `seen_count` + `first_seen_at`).
+
+**Принцип:** только semi-auto. Автоматически собирать кандидатов можно, автоматически писать в canonical-tag каталог — нельзя.
+
+**Поток:** `pending_tags` → ranking/cleanup → owner review → ручное approve в каталог → rollout + smoke.
+
+---
+
+## O63 — парсеры
+
+| source | Статус |
+|--------|--------|
+| FL · Kwork · TG | ✅ prod |
+| YouDo · Freelance.ru | ✅ w1 |
+| FreelanceJob · Пчёл | ✅ w2 |
+
+---
+
+## O82 — Match UX v2
+
+| Волна | Статус |
+|-------|--------|
+| w1 · w2 | **✅** deploy VPS |
+| w3 embeddings | backlog |
+
+---
+
+## Фазы (vision §4)
+
+| Фаза | Статус |
+|------|--------|
+| 0 · 0b · 3b–3d · E0–E5 · P5 E2 | ✅ |
+| **3f** ИИ draft + tools | **→ O72e gate** |
+| 3g–3h Auth + Stars | ✅ база · polish по мере GTM |
+| 4 O73 analytics | backlog |
+| 5 P-PORTFOLIO · 5b GTM | после gate |
 
 Coder ТЗ: [`CODER_PROMPT.md`](CODER_PROMPT.md) · решения: [`OWNER_INTENT.md`](OWNER_INTENT.md).
 
 ---
 
-## Отменено / не приоритет
+## Отменено
 
-| Было | Решение |
-|------|---------|
-| Ставка A «только портфолио» | Plan B (2026-05-24) |
-| Цена «от 300 ₽» | **590–990 ₽** (2026-05-28) |
-| Freelancehunt | снят (O3) |
-| 25 источников сразу | волнами после MVP |
+Freelancehunt · ставка A «только портфолио» · цена «от 300 ₽» · 25 источников сразу.
 
 ---
 
-_Lead Architect · O72/O73 pre-launch · 2026-05-30_
+_Lead Architect · 2026-06-02_

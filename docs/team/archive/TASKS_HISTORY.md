@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-06-01 — O72e gate wave + site UX close
+
+**Закрыто:** O81-w1c · O88 · O85/O86/O78 · O72e-6 · O72e-7 r4 · O82-w2 · O63-w2.
+
+**O72e:** 3× quick-test (send 20→40→60%) · **PASS** на 5 якорях (`152154Z`: 4.07/60%/80%) · full judge ⏳ владелец.
+
+**Следом:** O89 uniquify (OWNER_INTENT § O89) · GTM после full PASS.
+
+**Docs:** STATUS/TASKS/ROADMAP/FOR_YOU — один снимок, без дублей закрытых треков.
+
+---
+
 ## 2026-05-30 — Cursor Team Kit v1.0 + DESIGNER slim
 
 **Kit:** `docs/team/templates/cursor-team-kit/` — rules + docs-skeleton + `bootstrap.ps1` для других repo.

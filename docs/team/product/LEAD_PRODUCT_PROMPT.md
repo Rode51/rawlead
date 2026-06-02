@@ -2,10 +2,29 @@
 
 **Дата:** 2026-05-24 · с владельцем  
 **Принято Lead Architect:** 2026-05-24 — `ROADMAP.md`, `LEAD_DESIGN_PROMPT.md`, ревизия `TASKS`/`STATUS`/`CODER_PROMPT`  
-**→ @lead-product:** **✅** copy c1–c4 + TWO-SPEEDS сдано 2026-05-29 · **→ E5** @coder
+**→ @lead-product:** **§ O94-v0.5** research каталог 4 ниши · **✅** copy c1–c4 + TWO-SPEEDS сдано 2026-05-29 · **✅ O94-v0.5 approved 2026-06-02 → @lead-architect**
 
 **Ставка:** **B — Открытая площадка + ИИ-агент по подписке** (согласовано в чате `@lead-product` 2026-05-24, замена ставки A)  
 **Vision:** [`PRODUCT_VISION.md`](PRODUCT_VISION.md) **v0.11** (MARKET-INTEL Plan B · 2026-05-28)
+
+---
+
+## § O94-v0.5 — Каталог навыков: research все 4 ниши (**✅ 2026-06-02**)
+
+**Результат:** [SKILLS_TOOLS_CATALOG.md](SKILLS_TOOLS_CATALOG.md) **v0.5** · approve владельца 2026-06-02 · Q1=B · Q2=A · Q3=A · Q4=A · Q5=A.
+
+| # | Deliverable | Статус |
+|---|-------------|--------|
+| 1 | 4 ниши: use-case + technology + L3 expand без parent/child каши | ✅ |
+| 2 | Dev stacks: flask, scrapy, vue, nextjs, nodejs, typescript Tier B, react_native, flutter, laravel | ✅ |
+| 3 | Design/Marketing/Text: subhead-группы (product_web, brand_graphics, video_motion, organic, paid_platform, commercial, editorial, language) | ✅ |
+| 4 | Dedupe: figma + ui_ux оба Tier A (figma убрана из expand ui_ux); paid_platform — одна полка | ✅ |
+| 5 | Merge-таблица approved | ✅ |
+
+**Handoff: @lead-architect → O94-code Coder** (EXPAND_MAP v0.5 + picker_group subheads Design/Marketing/Text).  
+**Параллельно:** Coder делает **O93-w2** (авто-L3 + лента modal) **без** новых тегов.
+
+**Статус:** **✅ v0.5 сдан + approve владельца 2026-06-02** → handoff **O94-code** + **O94-L1** (см. `CODER_PROMPT`).
 
 ---
 

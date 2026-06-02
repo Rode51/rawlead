@@ -1,4 +1,4 @@
-# WP /lenta/ и /cabinet/ — дизайн-спека v4
+# WP /lenta/ и /cabinet/ — дизайн-спека v5
 
 **Статус:** NEO-BRUTALIST · **принято владельцем 2026-05-29** (prod as-is, theme **v1.10.9**)  
 **Канон UI:** `wordpress/.../assets/css/rawlead.css` · токены — [`REFERENCE.md`](REFERENCE.md) §2  
@@ -319,7 +319,12 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 └──────────────────────────────────────────────────────┘
 ```
 
-**TG Login кнопка:** `.rl-tg-login-btn` — кастомная, full-width, deep link в TG. **Без** iframe Telegram-Widget.
+**TG Login кнопка:** `.rl-tg-login-btn` — кастомная, full-width. **Без** iframe Telegram-Widget.
+
+**Flow (O85/O88):**
+- **Desktop (≥768px):** QR на странице + poll — JWT остаётся в этом браузере.
+- **Mobile (<768px, O88):** страница **не уходит** в `t.me` · ссылка «Открыть Telegram» (`target=_blank`) + **poll** на `/cabinet/` · JWT в Safari/Chrome.
+- **Fallback:** бот `/login` или «Вернуться на сайт» — вторичный путь, не primary на mobile.
 
 #### STATE 2 — Free (TG login, подписка не активна)
 
@@ -432,6 +437,189 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 | Paid, inbox пуст | «Пока нет откликов — напиши первый на ленте →» + ghost link `/lenta/` |
 | Free, inbox locked | «Доступно с подпиской [590 ₽/мес]» + CTA |
 | Загрузка | 2 skeleton-карточки |
+
+---
+
+### 4.5 O92 — Skill Tree (v1): acceptance
+
+**Guardrail v1:** только UI/UX. API payload (массив slug), L1, Neon schema — **не трогать**.  
+**Каталог тегов:** [`SKILLS_TOOLS_CATALOG.md`](../../team/product/SKILLS_TOOLS_CATALOG.md) v0.3 · 51 тег · 4 ниши.
+
+#### Пользовательский сценарий (happy path)
+
+1. Авторизованный пользователь (STATE 2 или STATE 3) открывает `/cabinet/`
+2. Видит collapsed skills-строку с текущими навыками и кнопкой `[+ Добавить]`
+3. Нажимает `[+ Добавить]` (или tap на строке на mobile) → открывается Skill Tree sheet
+4. Видит **4 корневых блока**: Разработка · Дизайн · Маркетинг · Тексты
+5. Нажимает на нишу → раскрываются sub-категории с чекбоксами canonical-tag
+6. Отмечает нужные теги; при ≥7 выбранных появляется hint «Рекомендуем 6–8 ключевых»
+7. При попытке выбрать 13-й тег — действие блокируется, видит «Максимум 12 навыков»
+8. Нажимает `[Сохранить]` → sheet закрывается, collapsed-строка обновляется сразу
+9. Matching на `/lenta/` пересчитывается — L1/LLM не задействованы
+
+#### Acceptance-критерии (продуктовые)
+
+| # | Критерий | Блокирует сдачу |
+|---|----------|-----------------|
+| AC-1 | В sheet видны **4 корневые ниши** (Разработка / Дизайн / Маркетинг / Тексты) — всегда, независимо от ранее выбранных тегов | Да |
+| AC-2 | Клик/tap по корню → раскрываются **sub-category заголовки** + canonical-tag чекбоксы этой ниши | Да |
+| AC-3 | Можно раскрыть **≥1 ниши одновременно** (не accordion с взаимным закрытием) | Да |
+| AC-4 | Жёсткий лимит **max 12**: 13-й чекбокс не выбирается, отображается inline-блокировка | Да |
+| AC-5 | При ≥7 выбранных — видимый **hint «Рекомендуем 6–8 ключевых навыков»** (не ошибка, не блок) | Да |
+| AC-6 | `[Сохранить]` отправляет **массив slug** (тот же контракт API); новых полей нет | Да |
+| AC-7 | После save collapsed skills-строка немедленно показывает выбранные теги с `[×]` | Да |
+| AC-8 | **Mobile (< 768px):** sheet открывается на `95vh`, scroll внутри, sticky `[Сохранить →]` 52px снизу | Да |
+| AC-9 | **Telemetry:** `skill_select` / `skill_unselect` (поля: niche, tag) и `skills_save` (selected_count, niche_mix) — без блокировки UX при ошибке трекинга | Нет (нужно, но не блокирует UI) |
+| AC-10 | Стиль: NEO-BRUTALIST (токены `DESIGN_SYSTEM` · `REFERENCE §2`); активный чекбокс-chip — bg `#FACC15`, border `2px solid #0A0A0A` | Да |
+| AC-11 | L1-промпт, judge, модель, Neon schema — **не изменены** на всём этапе v1 | Да |
+| AC-12 | Matching на `/lenta/` после смены навыков: результат меняется только через `keyword_match` (без регресса `ai_score`) | Да |
+
+#### Визуальная спека — O92 Skill Tree
+
+**Полный coder-handoff:** [`DESIGNER_PROMPT.md`](../../team/design/DESIGNER_PROMPT.md) § **O92-w1**  
+Здесь — компактный канон для сверки.
+
+##### Триггеры открытия
+
+- `[+ Добавить]` в collapsed skills-row → открывает sheet/panel
+- Tap на любой chip `[xxx ×]` в collapsed row на mobile → тот же sheet
+
+##### Wireframe (схема, оба breakpoint)
+
+**Desktop (≥768px)** — выпадающая панель `max-width: 480px`, `border: 2px solid #0A0A0A`, `shadow: 6px 6px 0 #0A0A0A`:
+
+```
+┌─ Навыки ───────────────────── [Выбрано 3 / 12] [✕] ─┐
+│                                                      │
+│  [▸ Разработка]  ← collapsed niche root, 44px       │
+│  [▾ Дизайн]      ← expanded niche root              │
+│    [✓ Figma] [✓ UI/UX дизайн] [Веб-дизайн]          │
+│    [Лендинг] [Мобайл] [Баннеры] [Фирм. стиль]       │
+│  [▸ Маркетинг]                                       │
+│  [▸ Тексты]                                          │
+│                                                      │
+│  [Сохранить навыки →]           Сбросить всё         │
+└──────────────────────────────────────────────────────┘
+```
+
+**Mobile (<768px)** — bottom sheet `95vh`, scroll внутри, sticky footer `52px`:
+
+```
+      ────────  ← handle 40px×4px
+┌────────────────────────────────────────┐
+│  Навыки                     [✕]        │
+│  Выбрано 3 / 12                        │
+├────────────────────────────────────────┤
+│  [▸ Разработка]                        │  ← scroll
+│  [▾ Дизайн]                            │
+│    [✓ Figma] [✓ UI/UX]  [Веб-дизайн]  │
+│    [Лендинг] [Мобайл] [Баннеры]        │
+│  [▸ Маркетинг]                         │
+│  [▸ Тексты]                            │
+├────────────────────────────────────────┤ sticky
+│  [Сохранить навыки →]  full-width 52px │
+└────────────────────────────────────────┘
+overlay rgba(0,0,0,0.5)  →  tap = закрыть
+```
+
+##### Состояния chip навыка
+
+| Состояние | Стиль |
+|-----------|-------|
+| Unchecked | bg `#F5F5F0`, border `1.5px solid #D4D4D4`, text `#525252`, 14px/400 |
+| **Checked** | bg `#FACC15`, border `2px solid #0A0A0A`, text `#0A0A0A`, 14px/700, shadow `2px 2px 0 #0A0A0A` |
+| Disabled (13-й+) | opacity `0.55`, cursor `not-allowed` |
+
+`min-height: 36px` · `padding: 6px 12px` · `border-radius: 2px`
+
+##### Счётчик / hint / лимит
+
+| N выбрано | UI |
+|-----------|-----|
+| 0–6 | «Выбрано N / 12» в шапке, `#0A0A0A 13px/600` |
+| **7–11** | + hint: `⚡ Рекомендуем 6–8 ключевых` · bg `#FEF9C3`, border-left `3px solid #FACC15`, 13px/400 · **не блок** |
+| **12** | + limit: `Максимум 12 навыков — сними лишние` · bg `#FEE2E2`, border-left `3px solid #DC2626` · все незвыбранные → disabled |
+
+##### Кнопка «Сохранить»
+
+| Состояние | Вид |
+|-----------|-----|
+| N=0 | ghost, `#A3A3A3`, `not-allowed` |
+| N≥1 | NEO primary: bg `#0A0A0A`, text `#FACC15` |
+| Loading | spinner + «Сохраняем…», disabled |
+| **Success** | bg `#16A34A`, «Навыки сохранены ✓» → sheet закрывается 1.5с → strip обновляется **немедленно** |
+| Error | кнопка активна; inline `#DC2626` «Ошибка — попробуй снова»; sheet не закрывается |
+
+##### Collapsed skills-strip (after save)
+
+- Чипы с `[×]` — сразу после `200 OK` (без reload)
+- Порядок нише: Dev → Design → Marketing → Text
+- **Empty (0):** `[+ Добавь навыки для совместимости →]` ghost link, `min-height: 44px`
+- **Saved flash:** outline `2px solid #16A34A` на row на 2с
+- **Skeleton (load):** 3 placeholder-chip `60–100px × 30px`, bg `#F5F5F0`, pulse
+
+#### Out of scope (v1)
+
+- A/B-тест Skill Tree vs flat список → O92b+
+- Авто-приоритеты / веса по нишам → после данных telemetry
+- Добавление новых тегов в каталог → только через O92b review/approve pipeline (без auto-write)
+
+---
+
+### 4.6 O93 — 3-level Skill Tree (PM вариант B · 2026-06-02)
+
+**Wireframes + chip specs:** [`DESIGNER_PROMPT.md`](../../team/design/DESIGNER_PROMPT.md) § **O93-w1**  
+**Каталог тегов:** [`SKILLS_TOOLS_CATALOG.md`](../../team/product/SKILLS_TOOLS_CATALOG.md) v0.4  
+**Guardrail:** L1-промпт / judge / Neon schema — **не меняем** в O93.
+
+#### Что нового vs O92
+
+| Было (O92) | Стало (O93) |
+|------------|-------------|
+| «Разработка» — flat chips (всё в одну полку) | «Разработка» — два subhead: **«По задаче»** + **«По технологии»** |
+| Python без JavaScript (только backend) | **Python И JavaScript** оба Tier A в «По технологии» |
+| L3 не существовал | L3 chips под раскрытым L1 (aiogram/Telethon, Django/FastAPI, React) |
+| Skill Tree только /cabinet/ | **Один паттерн** для /cabinet/ и /lenta/ |
+
+#### Содержимое ниши «Разработка»
+
+| Subhead | L1 chips | L3 под chip (только при expanded) |
+|---------|----------|-----------------------------------|
+| **По задаче** | Telegram-боты, WordPress, Парсинг, API, ИИ | Telegram-боты → aiogram, Telethon |
+| **По технологии** | **Python**, **JavaScript** | Python → Django, FastAPI · JavaScript → React |
+
+Остальные ниши (Дизайн, Маркетинг, Тексты) — flat, без subheads (O92 без изменений).
+
+#### Acceptance-критерии O93
+
+| # | Критерий | Блокирует сдачу |
+|---|----------|-----------------|
+| AC-O93-1 | Нишa «Разработка» содержит два заголовка-subhead: «ПО ЗАДАЧЕ» и «ПО ТЕХНОЛОГИИ» | Да |
+| AC-O93-2 | «По задаче»: 5 L1 chips — Telegram-боты, WordPress, Парсинг, API, ИИ | Да |
+| AC-O93-3 | «По технологии»: **два** L1 chip — Python **и** JavaScript (оба Tier A, не option «Гибрид») | Да |
+| AC-O93-4 | L3 chips скрыты до выбора L1; при **выборе** L1 — **сразу** под ним (без отдельного ▾) · **rev O93-w2** | → w2 |
+| AC-O93-7 | Один и тот же **modal** Skill Tree на /cabinet/ и /lenta/ (не dropdown 420px) · **rev O93-w2** | → w2 |
+| AC-O93-5 | L3 для Telegram-боты: aiogram, Telethon; для Python: Django, FastAPI; для JavaScript: React | Да |
+| AC-O93-6 | Снятие L1 — L3 row скрывается; повторный выбор L1 — L3 row возвращается | Да |
+| AC-O93-8 | Ниши Дизайн/Маркетинг/Тексты — flat без subheads (O92 без изменений) | Да |
+| AC-O93-9 | Лимит max 12 суммарно L1+L3; disabled-правило из O92 AC-4 применяется ко всем уровням | Да |
+| AC-O93-10 | L3 теги включаются в `tags[]` payload если выбраны; контракт API не меняется | Да |
+| AC-O93-11 | L1-промпт / judge / Neon schema — **не тронуты** | Да |
+
+#### CSS-классы (новые для O93)
+
+```css
+.rl-niche-subhead          /* «ПО ЗАДАЧЕ» / «ПО ТЕХНОЛОГИИ» — 11px/600 #525252 uppercase */
+.rl-skill-chip--l3         /* L3 chip — 12px, меньше padding, indent */
+.rl-l3-row                 /* flex-wrap контейнер L3 chips; hidden по умолч. */
+.rl-l3-row.is-visible      /* раскрыт (L1 selected · O93-w2: без ▾) */
+```
+
+#### Out of scope O93
+
+- Бэкенд expand (parent → children в `keyword_match`) — отдельный Coder-тикет
+- Subheads в нишах Дизайн / Маркетинг / Тексты — после телеметрии O93
+- Новые теги в каталоге — только через O92b semi-auto pipeline
 
 ---
 
@@ -685,4 +873,4 @@ Coder: `CODER_PROMPT.md` § PRE-LAUNCH-UX + § CABINET-INBOX-O23 — после 
 
 ---
 
-_Lead Designer · NEO-BRUTALIST + O23 + C1 · 2026-05-29_
+_Lead Designer · NEO-BRUTALIST + O23 + C1 · 2026-05-29_ · _Lead Product · O92 Skill Tree AC · 2026-06-02_

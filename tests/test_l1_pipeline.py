@@ -82,7 +82,7 @@ class L1PoolTest(TestCase):
             delays.append(time.monotonic())
             time.sleep(0.05)
             return AiLiteAnalysis(
-                verdict="Брать",
+                feed_visible=True,
                 task_summary="test",
                 lead_tags=("python",),
                 ai_reasons=(),

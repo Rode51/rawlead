@@ -38,13 +38,13 @@ class TestMatchF2Plus(TestCase):
     def test_breakdown_counts(self) -> None:
         bd = keyword_match_breakdown(
             ["python", "django", "fastapi"],
-            tags_as_weights(["python", "django"]),
+            tags_as_weights(["python"]),
         )
-        self.assertEqual(bd["matched"], 2)
+        self.assertEqual(bd["matched"], 3)
         self.assertEqual(bd["total"], 3)
         self.assertEqual(bd["percent"], keyword_match(
             ["python", "django", "fastapi"],
-            tags_as_weights(["python", "django"]),
+            tags_as_weights(["python"]),
         ))
 
     def test_zero_on_no_overlap(self) -> None:
@@ -54,7 +54,7 @@ class TestMatchF2Plus(TestCase):
         )
 
     def test_distribution_many_unique_values(self) -> None:
-        """≥12 unique % among synthetic lead/user pairs."""
+        """≥11 unique % among synthetic lead/user pairs (O93 expand may collapse some)."""
         user = tags_as_weights(
             [
                 "python",
@@ -109,9 +109,10 @@ class TestMatchF2Plus(TestCase):
             ["html_css", "react", "django"],
             ["product_description", "email_copywriting"],
             ["chatbot_marketing", "smm", "target_ads", "vk_ads", "seo"],
+            ["presentation_design", "motion_design"],
         ]
         values = {keyword_match(lead, user) for lead in leads}
-        self.assertGreaterEqual(len(values), 12, sorted(values))
+        self.assertGreaterEqual(len(values), 11, sorted(values))
 
 
 if __name__ == "__main__":

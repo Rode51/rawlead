@@ -58,7 +58,7 @@ _SELECT_COLS = """
 """
 
 _SKIP_VERDICTS = frozenset({"мимо", "пропустить", "skip"})
-_TAKE_VERDICTS = frozenset({"брать", "брат", "take"})
+_TAKE_VERDICTS = frozenset({"брать", "брат", "take", "ok"})
 _MAYBE_VERDICTS = frozenset({"сомнительно", "maybe"})
 _O72E_JUDGE_SINCE_DEFAULT = "2026-06-01"
 _JUDGE_L2_COMBINED_MIN = 4.0
@@ -90,13 +90,12 @@ reason — одно предложение на русском
 prompt_fix — если send_as_is=false: один абзац — паттерн для правки shared-draft / L2 промпта, иначе ""
 """
 
-_JUDGE_L1_SYSTEM = """Ты — аудитор L1-разбора заказа RawLead (карточка в ленте: task_summary, verdict, теги).
+_JUDGE_L1_SYSTEM = """Ты — аудитор L1-разбора заказа RawLead (карточка в ленте: task_summary, feed_visible, теги).
 Оцени, правильно ли ИИ понял заказ по title/body.
 
 Верни один JSON-объект без markdown:
 context_understanding — 1–5 (summary и теги отражают title/body)
-verdict_fair — 1–5 (Брать/Сомнительно/Мимо логичен для ТЗ)
-category_ok — true | false (dev/design/marketing/text не перепутаны)
+category_ok — true | false (dev/design/marketing/text не перепутаны; поле category в карточке = primary_category L1)
 l1_usable — true | false (можно доверять карточке без перечитывания биржи)
 reason — одно предложение на русском
 l1_prompt_fix — если l1_usable=false: что править в L1 промпте (_LITE_SYSTEM), иначе ""
@@ -285,6 +284,36 @@ def _fetch_empty_l1(
     out = [_row_to_lead(r) for r in rows]
     for lead in out:
         lead["sample_bucket"] = "empty_l1"
+    return out
+
+
+def fetch_fresh_l1_gate_leads(
+    conn: psycopg.Connection,
+    *,
+    limit: int,
+    src_sql: str,
+    src_params: list[Any],
+    since: datetime,
+) -> list[dict[str, Any]]:
+    """Visible fresh leads with L1 (task_summary), без требования reply_draft — для O72e full gate."""
+    since_sql, since_params = _since_sql(since)
+    sql = f"""
+        SELECT {_SELECT_COLS}
+        FROM leads
+        WHERE is_visible = TRUE
+          {src_sql}
+          {since_sql}
+          AND COALESCE(NULLIF(TRIM(task_summary), ''), '') <> ''
+          AND LOWER(TRIM(COALESCE(ai_verdict, ''))) NOT IN ('мимо', 'пропустить', 'skip', '')
+        ORDER BY id DESC
+        LIMIT %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, [*src_params, *since_params, limit])
+        rows = cur.fetchall()
+    out = [_row_to_lead(r) for r in rows]
+    for lead in out:
+        lead["sample_bucket"] = "fresh_l1_gate"
     return out
 
 
@@ -606,8 +635,8 @@ def _run_judge_l1(cfg, leads: list[dict[str, Any]], *, limit: int) -> list[dict[
         user = (
             f"Заголовок: {lead['title']}\n"
             f"Описание:\n{lead['body'][:3000]}\n\n"
-            f"category (DB): {lead['category']}\n"
-            f"verdict: {lead['ai_verdict']}\n"
+            f"primary_category (L1/DB): {lead['category']}\n"
+            f"feed_visible: {'true' if _norm_verdict(lead['ai_verdict']) != 'мимо' else 'false'}\n"
             f"task_summary: {lead['task_summary'] or '—'}\n"
             f"lead_tags: {', '.join(lead.get('lead_tags') or []) or '—'}\n"
             f"ai_reasons: {' | '.join(lead.get('ai_reasons') or []) or '—'}\n"
@@ -625,7 +654,6 @@ def _run_judge_l1(cfg, leads: list[dict[str, Any]], *, limit: int) -> list[dict[
             data = _extract_json_object(raw or "")
             entry.update(
                 context_understanding=int(data.get("context_understanding", 0)),
-                verdict_fair=int(data.get("verdict_fair", 0)),
                 category_ok=bool(data.get("category_ok")),
                 l1_usable=bool(data.get("l1_usable")),
                 reason=str(data.get("reason", ""))[:300],
@@ -698,7 +726,6 @@ def _judge_l1_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
             "count": len(judged),
             "scored": 0,
             "avg_context": 0,
-            "avg_verdict_fair": 0,
             "l1_usable_pct": 0,
             "category_ok_pct": 0,
             "accept_l1": False,
@@ -706,10 +733,9 @@ def _judge_l1_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
             "l1_prompt_recommendations": [],
         }
     ctx = sum(j["context_understanding"] for j in ok) / len(ok)
-    vf = sum(j["verdict_fair"] for j in ok) / len(ok)
     usable = sum(1 for j in ok if j.get("l1_usable")) / len(ok)
     cat_ok = sum(1 for j in ok if j.get("category_ok")) / len(ok)
-    worst = sorted(ok, key=lambda x: (x["context_understanding"], x["verdict_fair"]))[:10]
+    worst = sorted(ok, key=lambda x: (x["context_understanding"], x.get("category_ok", False)))[:10]
     patterns: list[str] = []
     for j in worst:
         if j.get("l1_prompt_fix"):
@@ -718,7 +744,6 @@ def _judge_l1_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
         "count": len(judged),
         "scored": len(ok),
         "avg_context": round(ctx, 2),
-        "avg_verdict_fair": round(vf, 2),
         "l1_usable_pct": round(usable * 100, 1),
         "category_ok_pct": round(cat_ok * 100, 1),
         "accept_l1": usable >= _JUDGE_L1_USABLE_MIN,
@@ -788,11 +813,10 @@ def _render_judge_md(
         lines.extend(
             [
                 "",
-                "## L1 — task_summary / verdict / tags",
+                "## L1 — task_summary / feed_visible / tags",
                 "",
                 f"- Scored: **{js1.get('scored', 0)}/{js1.get('count', 0)}**",
                 f"- Avg context_understanding: **{js1.get('avg_context', 0)}**/5",
-                f"- Avg verdict_fair: **{js1.get('avg_verdict_fair', 0)}**/5",
                 f"- l1_usable: **{js1.get('l1_usable_pct', 0)}%** "
                 f"({'✅ ≥70%' if js1.get('l1_usable_pct', 0) >= _JUDGE_L1_USABLE_MIN * 100 else '❌ <70%'})",
                 f"- category_ok: **{js1.get('category_ok_pct', 0)}%**",
@@ -811,7 +835,7 @@ def _render_judge_md(
             summary = (lead.get("task_summary") or "")[:300]
             lines.append(f"- **#{j['lead_id']}** {title!r}")
             lines.append(
-                f"  - ctx={j.get('context_understanding')} verdict_fair={j.get('verdict_fair')} "
+                f"  - ctx={j.get('context_understanding')} "
                 f"usable={j.get('l1_usable')} cat_ok={j.get('category_ok')}"
             )
             lines.append(f"  - reason: {j.get('reason', '')}")
