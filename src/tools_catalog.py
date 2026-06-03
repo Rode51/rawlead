@@ -7,14 +7,28 @@ from typing import Any
 
 from skills_catalog import CANONICAL_TAGS, resolve_canonical_tag
 
-# Top prod fail names (~30) — audit whitelist only; does not expand CANONICAL_TAGS (51).
+# Audit whitelist + display names (does not expand CANONICAL_TAGS picker set).
 KNOWN_TOOLS: frozenset[str] = frozenset(
     {
         "photoshop",
-        "canva",
         "illustrator",
+        "canva",
+        "figma",
+        "sketch",
+        "after_effects",
+        "premiere_pro",
+        "cinema_4d",
+        "blender",
+        "powerpoint",
+        "word_processor",
+        "excel",
         "google_analytics",
         "yandex_metrika",
+        "google_sheets_api",
+        "google_apps_script",
+        "google_docs",
+        "google_drive",
+        "google_calendar",
         "instagram",
         "crm",
         "consulting",
@@ -30,7 +44,6 @@ KNOWN_TOOLS: frozenset[str] = frozenset(
         "chart_js",
         "make_com",
         "telegram_api",
-        "google_sheets_api",
         "git",
         "adb",
         "postgresql",
@@ -39,21 +52,77 @@ KNOWN_TOOLS: frozenset[str] = frozenset(
         "telegram_bot",
         "python",
         "php",
-        "gemini_deep_research",
-        "word_processor",
-        "style_guide",
-        "windows_api",
-        "premiere_pro",
-        "google_apps_script",
-        "rhino",
-        "fontlab",
-        "elementor",
-        "wp_rocket",
         "javascript",
         "html_css",
+        "wordpress",
+        "elementor",
+        "wp_rocket",
+        "woocommerce",
+        "tilda",
+        "rhino",
+        "fontlab",
         "lcp",
+        "mailwizz",
+        "selenium",
+        "netcat",
+        "1c",
+        "ton",
+        "nft",
+        "blockchain",
+        "hex_editor",
+        "vpn",
+        "ide",
+        "llm_api",
+        "style_guide",
+        "windows_api",
     }
 )
+
+# L2 часто отдаёт синонимы — приводим к KNOWN_TOOLS или canonical_tag.
+_TOOL_ALIAS_MAP: dict[str, str] = {
+    "adobe_photoshop": "photoshop",
+    "adobe_illustrator": "illustrator",
+    "google_sheets": "google_sheets_api",
+    "google_sheet": "google_sheets_api",
+    "google_таблиц": "google_sheets_api",
+    "google_tables": "google_sheets_api",
+    "apps_script": "google_apps_script",
+    "gsuite": "google_apps_script",
+    "wp": "wordpress_dev",
+    "wordpress": "wordpress_dev",
+    "word_press": "wordpress_dev",
+    "вордпресс": "wordpress_dev",
+    "tg": "telegram_bot_dev",
+    "telegram_bot": "telegram_bot_dev",
+    "telethon": "telegram",
+    "aiogram": "telegram",
+    "pyrogram": "telegram",
+    "js": "javascript",
+    "react": "javascript",
+    "vue": "javascript",
+    "node": "javascript",
+    "nodejs": "javascript",
+    "ae": "after_effects",
+    "c4d": "cinema_4d",
+    "ppt": "powerpoint",
+    "ms_powerpoint": "powerpoint",
+    "keynote": "powerpoint",
+    "ps": "photoshop",
+    "ai": "illustrator",
+    "фотошоп": "photoshop",
+    "фигма": "figma",
+    "motion_design_software": "after_effects",
+    "video_editing_software": "premiere_pro",
+    "3x_ui": "vpn",
+    "3x-ui": "vpn",
+    "google_metrika": "yandex_metrika",
+    "яндекс_метрика": "yandex_metrika",
+    "metrika": "yandex_metrika",
+    "search_console": "seo_tools",
+    "gsc": "seo_tools",
+    "wildberries": "consulting",
+    "ozon": "consulting",
+}
 
 # O72e-2: vendor-specific libs → generic stack names for display + L2 ingest.
 _VENDOR_TOOL_MAP: dict[str, str] = {
@@ -73,9 +142,10 @@ _VENDOR_TOOL_MAP: dict[str, str] = {
     "cursor": "ide",
     "cursor_agent": "ide",
     "openrouter": "llm_api",
+    "gemini_deep_research": "llm_api",
+    "gemini": "llm_api",
 }
 
-# RawLead / executor stack — fail audit if leaked into tools_required (O72e-2, O80).
 VENDOR_LOCK_TOOLS: frozenset[str] = frozenset(
     {
         "neon",
@@ -87,29 +157,83 @@ VENDOR_LOCK_TOOLS: frozenset[str] = frozenset(
         "cursor_agent",
         "openrouter",
         "gemini_deep_research",
+        "gemini",
+        "rawlead",
     }
+)
+
+# Regex → slug (canonical_tag предпочтительнее KNOWN_TOOLS для audit pass).
+_TZ_TOOL_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\bfigma\b|\bфигма\b", re.I), "figma"),
+    (re.compile(r"\bphotoshop\b|\bфотошоп\b|\bpsd\b", re.I), "photoshop"),
+    (re.compile(r"\billustrator\b|\bиллюстратор\b", re.I), "illustrator"),
+    (re.compile(r"\bafter\s*effects\b|\baftereffects\b", re.I), "after_effects"),
+    (re.compile(r"\bpremiere\b", re.I), "premiere_pro"),
+    (re.compile(r"\bcinema\s*4d\b", re.I), "cinema_4d"),
+    (re.compile(r"\bpython\b|\bпитон\b|\bpy\b(?!\w)", re.I), "python"),
+    (re.compile(r"\bphp\b|\blaravel\b", re.I), "php"),
+    (re.compile(r"\bwordpress\b|\bwp\b|\bвордпресс\b|\belementor\b|\bwoocommerce\b", re.I), "wordpress_dev"),
+    (re.compile(r"\bjavascript\b|\breact\b|\bvue\b|\bnode\.?js\b", re.I), "javascript"),
+    (re.compile(r"\bgoogle\s+apps\s+script\b|\bapps\s+script\b", re.I), "google_apps_script"),
+    (re.compile(r"\brhino\b|\bрино\b", re.I), "rhino"),
+    (re.compile(r"\bgoogle\s+sheet", re.I), "google_sheets_api"),
+    (re.compile(r"\btelegram\b|\bтелеграм\b|\btg\b|\baiogram\b|\btelethon\b", re.I), "telegram_bot_dev"),
+    (re.compile(r"\bпарсинг\b|\bscraping\b|\bscraper\b|\bпарсер\b", re.I), "web_scraping"),
+    (re.compile(r"\bseo\b|\bсео\b|\bsearch\s+console\b|\btilda\b|\bтильда\b", re.I), "seo"),
+    (re.compile(r"\bsmm\b|\bсмм\b", re.I), "smm"),
+    (re.compile(r"\bmailwizz\b|\bspf\b|\bdkim\b|\bdmarc\b", re.I), "email_marketing"),
+    (re.compile(r"\bmysql\b|\bpostgresql\b|\bpostgres\b", re.I), "mysql"),
+    (re.compile(r"\bpowerpoint\b|\bppt\b|\bпрезентац", re.I), "powerpoint"),
+    (re.compile(r"\bexcel\b|\bcsv\b", re.I), "excel"),
+    (re.compile(r"\bblender\b", re.I), "blender"),
+    (re.compile(r"\bselenium\b", re.I), "selenium"),
+    (re.compile(r"\bton\b|\bnft\b|\bblockchain\b", re.I), "blockchain"),
 )
 
 
 def normalize_tool_key(raw: str) -> str:
-    """Lowercase slug for KNOWN_TOOLS lookup (spaces/dots/dashes → _)."""
+    """Lowercase slug for lookup (spaces/dots/dashes → _)."""
     t = str(raw).strip().lower().lstrip("#")
     t = t.replace(".", "_")
     t = re.sub(r"[\s-]+", "_", t)
     return t
 
 
-def map_tool_to_generic(key: str) -> str:
-    """Map vendor slug to generic tool name; unknown keys pass through."""
+def _resolve_tool_slug(key: str) -> str:
+    """Alias → vendor map → canonical_tag → passthrough."""
     k = normalize_tool_key(key)
     if not k:
         return ""
-    return _VENDOR_TOOL_MAP.get(k, k)
+    if k in _TOOL_ALIAS_MAP:
+        k = _TOOL_ALIAS_MAP[k]
+    k = _VENDOR_TOOL_MAP.get(k, k)
+    canon = resolve_canonical_tag(k)
+    if canon and canon in CANONICAL_TAGS:
+        return canon
+    if k in KNOWN_TOOLS:
+        return k
+    return k
+
+
+def map_tool_to_generic(key: str) -> str:
+    return _resolve_tool_slug(key)
+
+
+def tools_from_tz_text(*chunks: str) -> list[str]:
+    """Инструменты/теги из текста ТЗ (fallback если L2 пустой или мусор)."""
+    hay = "\n".join(c for c in chunks if c)
+    out: list[str] = []
+    seen: set[str] = set()
+    for pat, slug in _TZ_TOOL_HINTS:
+        if pat.search(hay) and slug not in seen:
+            seen.add(slug)
+            out.append(slug)
+    return out
 
 
 def normalize_tools_required(raw: Any, *, limit: int = 8) -> tuple[str, ...]:
-    """Lowercase, vendor→generic, dedupe, cap — for L2 ingest and feed display."""
-    if isinstance(raw, list):
+    """Lowercase, alias, vendor→generic, dedupe, cap — for L2 ingest and feed display."""
+    if isinstance(raw, (list, tuple)):
         items = [str(t) for t in raw if str(t).strip()]
     elif isinstance(raw, str) and raw.strip():
         items = [raw.strip()]
@@ -118,8 +242,8 @@ def normalize_tools_required(raw: Any, *, limit: int = 8) -> tuple[str, ...]:
     out: list[str] = []
     seen: set[str] = set()
     for item in items:
-        mapped = map_tool_to_generic(item)
-        if mapped and mapped not in seen:
+        mapped = _resolve_tool_slug(item)
+        if mapped and mapped not in seen and is_known_tool(mapped):
             seen.add(mapped)
             out.append(mapped)
         if len(out) >= limit:
@@ -127,8 +251,29 @@ def normalize_tools_required(raw: Any, *, limit: int = 8) -> tuple[str, ...]:
     return tuple(out)
 
 
+def finalize_tools_for_lead(
+    tools: tuple[str, ...] | list[str],
+    *,
+    title: str = "",
+    snippet: str = "",
+    task_summary: str = "",
+    limit: int = 8,
+) -> tuple[str, ...]:
+    """O98: нормализация + только known + добор из ТЗ до min 2."""
+    out = list(normalize_tools_required(tools, limit=limit))
+    if len(out) < 2:
+        for hint in tools_from_tz_text(title, snippet, task_summary):
+            if hint not in out:
+                extra = normalize_tools_required([hint], limit=1)
+                if extra:
+                    out.append(extra[0])
+            if len(out) >= limit:
+                break
+    return normalize_tools_required(out, limit=limit)
+
+
 def vendor_lock_tools(raw_tools: list[str] | tuple[str, ...]) -> list[str]:
-    """Tools still flagged as internal/vendor lock before generic map."""
+    """Tools still flagged as internal/vendor lock (raw keys before resolve)."""
     locked: list[str] = []
     for t in raw_tools:
         key = normalize_tool_key(t)
@@ -138,12 +283,10 @@ def vendor_lock_tools(raw_tools: list[str] | tuple[str, ...]) -> list[str]:
 
 
 def is_known_tool(raw: str) -> bool:
-    """Audit: canonical skill alias OR KNOWN_TOOLS free-form name."""
-    canonical = resolve_canonical_tag(raw)
-    if canonical and canonical in CANONICAL_TAGS:
+    """Audit: canonical skill alias OR KNOWN_TOOLS slug."""
+    slug = _resolve_tool_slug(raw)
+    if not slug:
+        return False
+    if slug in CANONICAL_TAGS:
         return True
-    key = normalize_tool_key(raw)
-    if key in KNOWN_TOOLS:
-        return True
-    generic = map_tool_to_generic(key)
-    return generic in KNOWN_TOOLS
+    return slug in KNOWN_TOOLS

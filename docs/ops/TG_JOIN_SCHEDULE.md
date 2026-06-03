@@ -62,6 +62,8 @@
 python scripts/tg_join_queue.py --account acc2
 
 # Join в фоне — внутри tg_main (TG_JOIN_IN_TG_MAIN=1), не отдельный процесс
+# acc2 без chat_ids: join-bootstrap в tg_monitor (очередь TG_JOIN_QUEUE_v2.csv)
+# Нельзя: TG_JOIN_IN_TG_MAIN=1 + tg_join_queue.py параллельно с radar (database locked)
 
 # Windows — полный радар (2 окна: биржи + TG)
 scripts\start-radar-full.bat

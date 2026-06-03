@@ -123,6 +123,9 @@ def regen_one_lead(
             timeout_sec=90.0,
         )
         if not raw:
+            if not ai_errors:
+                ai_errors.append(f"attempt {attempt + 1}: analyze_shared returned empty")
+            time.sleep(min(2 ** attempt, 8))
             continue
         draft = strip_reply_draft_price_deadline(raw.strip())
         try:

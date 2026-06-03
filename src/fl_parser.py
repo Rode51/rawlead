@@ -11,7 +11,9 @@ import requests
 from bs4 import BeautifulSoup
 
 from config import Config
+from exchange_browser_fetch import fetch_listing_html_browser, listing_browser_enabled
 from exchange_proxy import exchange_fetch_begin, exchange_fetch_end, exchange_get, proxy_log_hint
+from html_fetch import HtmlFetchError
 from lead_category import category_from_fl_listing_url
 from listing import SOURCE_FL, ListingProject
 from radar_cycle_log import log_pipeline_line
@@ -122,7 +124,7 @@ def parse_listing_html(html: str, page_url: str) -> list[ListingProject]:
     return projects
 
 
-def _fetch_listing_html(
+def _fetch_listing_html_requests(
     url: str,
     cfg: Config,
     *,
@@ -149,6 +151,33 @@ def _fetch_listing_html(
 
     encoding = resp.encoding or "utf-8"
     return resp.content.decode(encoding, errors="replace")
+
+
+def _fetch_listing_html(
+    url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float,
+    page: int,
+) -> str | None:
+    hint = proxy_log_hint("fl")
+    if listing_browser_enabled():
+        try:
+            return fetch_listing_html_browser(
+                "fl",
+                url,
+                user_agent=cfg.http_user_agent,
+                timeout_sec=timeout_sec,
+            )
+        except HtmlFetchError as exc:
+            logger.warning(
+                "fl_listing: Playwright failed (%s) — httpx fallback (%s)",
+                exc,
+                hint,
+            )
+    return _fetch_listing_html_requests(
+        url, cfg, timeout_sec=timeout_sec, page=page
+    )
 
 
 def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[ListingProject]:

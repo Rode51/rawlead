@@ -1,10 +1,178 @@
-# Designer — **→ Сейчас:** D-O82b ⏸ · O93-w1 **✅ принято** (§4.6)
+# Designer — **→ Сейчас:** — (idle) · **Queued:** CSS-детали после Lead, если нужно
 
-**Канон WP:** [`REFERENCE.md`](../../design/wp/REFERENCE.md) v5 · PM spike: [`SKILLS_TOOLS_CATALOG.md`](../../team/product/SKILLS_TOOLS_CATALOG.md) § v0.4 · решение: [`OWNER_INTENT.md`](../../team/architect/OWNER_INTENT.md) § O93
+**O96-D закрыт у Lead Designer** → **`@coder` § O96-code** · см. [`LEAD_DESIGN_PROMPT.md`](LEAD_DESIGN_PROMPT.md) § O96-D.
+
+**Канон WP:** [`REFERENCE.md`](../../design/wp/REFERENCE.md) v5 · [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md)
 
 ---
 
-## § O93-w1 — 3-level Skill Tree: @coder handoff (P0 · 2026-06-02)
+## § O98-w — Skill Tree / фильтр навыков: UX с нуля (**queued · после O96-D ф1**)
+
+**Запрос владельца 2026-06-02:** окно выбора навыков (⚙ лента + modal ЛК) **«жутко неудобно»** — решения пока **нет**, нужен **Design-исследование** (2–3 варианта), не CSS-hotfix.
+
+**Контекст prod 1.16.1:** O94-w4 tray + O95-fix (dedupe, scroll) — **технически OK**, владелец **не принимает** UX.
+
+### Симптомы (зафиксировать «было» + скрины prod)
+
+| # | Симптом |
+|---|---------|
+| 1 | Много выбранных L1 → tray «Уточнение» **раздувается**, теряется обзор |
+| 2 | 4 ниши × subheads × 12 лимит — **когнитивная перегрузка** |
+| 3 | Непонятно «достаточно L1» vs «надо L3» · save vs отмена |
+| 4 | Лента ⚙ и ЛК — один sheet, но **паттерн** всё ещё «форму на 12 полей» |
+
+### Задача Design (solution unknown — **исследование**)
+
+| # | Deliverable |
+|---|-------------|
+| d1 | **2–3 концепта** (wireframe desktop + mobile 390px): альтернативы tray / wizard / collapsed-by-default / «сначала ниши, потом детали» / … |
+| d2 | Сравнительная таблица: скорость выбора · понятность tier · scroll · 12 лимит |
+| d3 | **Рекомендация Lead+владелец** — один вариант или гибрид |
+| d4 | Спека § **4.8** в `feed-cabinet-mvp.md` → handoff `@coder` |
+
+**Не в scope:** anon bar (O95) · API tags · новые теги каталога · O97 badge сложности (отдельно § O97-w2).
+
+**Порядок:** **после** § **O97-w2** (badge) · **до** E2E / vault · Coder **не раньше** approve макета.
+
+**Gate:** владелец не знает «как правильно» — Design **обязан** предложить, не уточнять у владельца готовый макет.
+
+---
+
+## § O94-w4 — Skill Tree: L3 без потери взгляда (P0 · 2026-06-02 · ✅ сдано)
+
+**Запрос владельца:** окно навыков неудобно — клик по L1 → «всё съезжает», под ним **такие же** чипы → непонятно tier 2 vs tier 3.
+
+**Scope:** L3 tray + визуальная иерархия · **единый Skill Tree sheet** — `/cabinet/` modal **и** `/lenta/` «Изменить навыки» (logged-in) · mobile 390px.
+
+**Anon `/lenta/`:** sheet **нет** (§ **O95**) — Design рисует entry logged-in + cabinet.
+
+**Не в scope:** O95 anon shell, API, новые теги.
+
+### Проблемы (зафиксировать в wireframe «было»)
+
+| # | Симптом |
+|---|---------|
+| 1 | L3 = те же `.rl-skill-chip` (border, fill) — не читается «подуровень» |
+| 2 | Рост колонки L1 сдвигает соседей при wrap / длинных subhead-рядах |
+| 3 | Нет copy «это уточнение, необязательно» |
+| 4 | Несколько L1 с L3 — хаос при 2+ выбранных |
+
+### Deliverables Design
+
+| # | Артефакт | Статус |
+|---|----------|--------|
+| d1 | **2–3 варианта** L3 UX (wireframe desktop + mobile) | ✅ 2026-06-02 |
+| d2 | **Выбор владельца** — **A+B** | ✅ 2026-06-02 |
+| d3 | Спека [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) § **4.7** | ✅ 2026-06-02 |
+| d4 | Handoff `@coder` § **O94-w4-code** ниже | ✅ 2026-06-02 |
+
+### d1 — Wireframes (2026-06-02)
+
+#### «До» (O94-w3) — фиксируем проблему
+
+```
+ПО ЗАДАЧЕ:   [✓ Telegram-боты ▾] [WordPress] [Парсинг] [API] [ИИ]
+               └ [aiogram] [Telethon]  ← те же рамки/fill ← #1; L1-строка выросла ← #2
+ПО ТЕХНОЛОГИИ: [✓ Python ▾] [✓ JavaScript ▾]
+               └ [Django] [FastAPI]    └ [React]  ← хаос 2 раскрытых ← #4
+```
+
+#### Вариант A — Sub-tray (L1-строка FIXED)
+
+```
+ПО ЗАДАЧЕ:   [✓ Telegram-боты ▾] [WordPress] [Парсинг] [API] [ИИ]  ← не растёт
+             ┌─ Уточнение (необязательно) ──────────────────────┐
+             │  [aiogram] [Telethon]                            │  ← L3 в tray
+             └──────────────────────────────────────────────────┘
+ПО ТЕХНОЛОГИИ: [✓ Python ▾] [JavaScript]
+             ┌─ Уточнение (необязательно) ──────────────────────┐
+             │  [Django] [FastAPI]                              │
+             └──────────────────────────────────────────────────┘
+```
+Mobile: tray full-width внутри `.rl-niche-root__body` · grid shift = 0
+
+#### Вариант B — Ghost L3 + label (indent, другой стиль)
+
+```
+ПО ЗАДАЧЕ:   [✓ Telegram-боты ▾] [WordPress] [Парсинг] [API] [ИИ]
+  Уточнение:  [○ aiogram] [○ Telethon]   ← ghost: bg #F0F0EC, 1px #D4D4D4, 12px/400
+ПО ТЕХНОЛОГИИ: [✓ Python ▾] [✓ JavaScript ▾]
+  Уточнение:  [○ Django] [● FastAPI] [○ React]  ← ● selected: bg #FEF9C3, 12px/600
+```
+Grid shift остаётся (−) · tier читается (✓) · mobile indent 12px
+
+#### Вариант A+B — рекомендован Lead ⭐
+
+```
+ПО ЗАДАЧЕ:   [✓ Telegram-боты ▾] [WordPress] [Парсинг] [API] [ИИ]  ← FIXED
+             ┌─ Уточнение (необязательно) ──────────────────────┐
+             │  [○ aiogram] [○ Telethon]  ← ghost в tray        │
+             └──────────────────────────────────────────────────┘
+ПО ТЕХНОЛОГИИ: [✓ Python ▾] [JavaScript]
+             ┌─ Уточнение (необязательно) ──────────────────────┐
+             │  [○ Django] [● FastAPI]    ← selected L3         │
+             └──────────────────────────────────────────────────┘
+```
+Mobile: tray full-width · cabinet = lenta (один компонент) · AC-D1–D4 ✓
+
+---
+
+### Варианты — сводка
+
+| ID | Идея | Решает #1 | Решает #2 | Решает #3 | Решает #4 |
+|----|------|:---------:|:---------:|:---------:|:---------:|
+| **A** | Sub-tray full-width | — | ✓ | ✓ (label) | ✓ (C-паттерн) |
+| **B** | Ghost chips + label | ✓ | — | ✓ | — |
+| **A+B** ⭐ | Tray + ghost | ✓ | ✓ | ✓ | ✓ |
+
+**d2 ✅ Владелец 2026-06-02: A+B** — tray + ghost chips
+
+### Acceptance Design (AC-D-w4)
+
+- AC-D1: wireframe «до/после» с JS+Python на одной строке — ✅ выше
+- AC-D2: явное отличие L1 vs L3 (не только font-size −2px) — ✅ ghost vs filled
+- AC-D3: copy optional refinement (1 строка) — ✅ «Уточнение (необязательно)»
+- AC-D4: **единый sheet** cabinet + lenta «Изменить навыки» (anon lenta — без sheet)
+
+**Gate:** §4.7 ✅ → **O94-w4-code** ниже · shell anon/logged-in → **O95**
+
+---
+
+## § O94-w4-code → @coder (P0 · Design ✅ · 2026-06-02)
+
+**Основание:** Design A+B принят · спека [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) § **4.7**
+
+### Файлы
+
+```
+wordpress/rawlead-kadence-child/assets/css/rawlead.css        ← .rl-l3-tray + .rl-skill-chip--l3
+wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js  ← tray logic cabinet
+wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js     ← tray logic lenta
+```
+
+### Что сделать
+
+| # | Задача |
+|---|--------|
+| 1 | **CSS** `.rl-l3-tray` / `.rl-l3-tray__label` / `.rl-l3-tray__group` — по §4.7 токенам |
+| 2 | **CSS** `.rl-skill-chip--l3` обновить: 28px / 12px / ghost `#F0F0EC` / checked `#FEF9C3` |
+| 3 | **JS** L1 `.is-selected` → tray `is-visible` под subhead-блоком; L1 deselected → hidden (L3 state persist) |
+| 4 | **JS** 2+ L1 в subhead → один tray, chips с мини-лейблами («Python:» / «JavaScript:») |
+| 5 | Один переиспользуемый tray-модуль: cabinet + lenta |
+
+### Acceptance (из §4.7)
+
+- AC-O94-1: L1-строка не растёт ← **главный фикс**
+- AC-O94-2: L3 ghost 28px vs L1 filled 36px
+- AC-O94-3: copy «Уточнение (необязательно)»
+- AC-O94-4: один компонент cabinet = lenta
+- AC-O94-5: 2 L1 → один tray, мини-лейблы
+- AC-O94-6: `tags[]` payload без изменений
+- AC-O94-7: mobile full-width tray
+
+---
+
+## § O93-w1 — 3-level Skill Tree (архив handoff)
 
 **Owner: PM вариант B** — «По задаче» + «По технологии»; **Python и JavaScript** Tier A (не option «Гибрид»).
 

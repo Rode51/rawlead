@@ -36,7 +36,7 @@ $geo_svg = RAWLEAD_CHILD_DIR . '/assets/images/wave2-hero-geo-corner-v1.svg';
 	<div class="rl-hero__inner">
 		<h1 id="rl-hero-title" class="rl-hero__title"><?php esc_html_e('Заказы под твой стек. Без мусора.', 'rawlead-kadence-child'); ?></h1>
 		<p class="rl-hero__sub">
-			<?php esc_html_e('Умный радар фриланса. ИИ находит идеальные совпадения по твоим навыкам и готовит черновик отклика.', 'rawlead-kadence-child'); ?>
+			<?php esc_html_e('ИИ находит заказы под твой стек и пишет черновик отклика — свой у каждого. Не шаблон с полки, не копипаст. Отправляешь ты — своими словами.', 'rawlead-kadence-child'); ?>
 		</p>
 		<div class="rl-hero__cta-group">
 			<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($lenta); ?>"><?php esc_html_e('Смотреть ленту →', 'rawlead-kadence-child'); ?></a>

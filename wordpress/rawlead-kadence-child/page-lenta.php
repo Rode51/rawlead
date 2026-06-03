@@ -66,13 +66,6 @@ rawlead_get_part('header');
 					<span class="rl-feed-skills-dd__label" id="rl-feed-skills-trigger-label"><?php esc_html_e('Навыки', 'rawlead-kadence-child'); ?></span>
 					<span class="rl-feed-skills-dd__badge" id="rl-feed-skills-badge" hidden></span>
 				</button>
-				<details class="rl-filter-sort-dd">
-					<summary class="rl-filter-dropdown-btn" id="rl-feed-sort-trigger"><?php esc_html_e('Дата ▾', 'rawlead-kadence-child'); ?></summary>
-					<div class="rl-sort-panel">
-						<label class="rl-sort-option is-active"><input type="radio" name="sort" value="time" checked> <?php esc_html_e('Дата', 'rawlead-kadence-child'); ?></label>
-						<label class="rl-sort-option"><input type="radio" name="sort" value="match"> <?php esc_html_e('По совместимости', 'rawlead-kadence-child'); ?></label>
-					</div>
-				</details>
 				<button type="button" class="rl-filter-dropdown-btn rl-filter-mobile-trigger" id="rl-feed-filters-open" aria-expanded="false" aria-controls="rl-feed-sheet">
 					<?php esc_html_e('Фильтр', 'rawlead-kadence-child'); ?>
 				</button>
@@ -81,16 +74,26 @@ rawlead_get_part('header');
 		</div>
 	</div>
 	<p class="rl-feed-delay-notice" id="rl-feed-delay-notice" hidden></p>
+	<div class="rl-feed-anon-strip" id="rl-feed-anon-strip" hidden>
+		<span class="rl-feed-anon-strip__text"><?php esc_html_e('⏱ Лента с задержкой 15 мин ·', 'rawlead-kadence-child'); ?></span>
+		<a class="rl-feed-anon-strip__cta" href="<?php echo esc_url(rawlead_page_url('pricing')); ?>"><?php esc_html_e('Premium — сразу, от 790 ₽ →', 'rawlead-kadence-child'); ?></a>
+	</div>
 	<div class="rl-container rl-feed-main-wrap">
 		<header class="rl-feed-head">
 			<h1 class="rl-feed-head__title"><?php esc_html_e('Лента заказов', 'rawlead-kadence-child'); ?></h1>
-			<p class="rl-feed-head__count" id="rl-feed-count" aria-live="polite"></p>
+			<div class="rl-feed-head__meta">
+				<p class="rl-feed-head__count" id="rl-feed-count" aria-live="polite"></p>
+				<button type="button" class="rl-feed-tags-edit" id="rl-feed-tags-edit" hidden>
+					<span aria-hidden="true">⚙</span>
+					<span class="rl-feed-tags-edit__label"><?php esc_html_e('Изменить навыки', 'rawlead-kadence-child'); ?></span>
+				</button>
+			</div>
 		</header>
 		<div class="rl-feed-banner" id="rl-feed-error" role="alert" hidden></div>
 		<div class="rl-feed-list" id="rl-feed-list" aria-live="polite"></div>
 		<div class="rl-feed-pagination" id="rl-feed-pagination">
 			<button type="button" class="rl-btn rl-btn--primary rl-btn--load-more" id="rl-feed-load-more">
-				<?php esc_html_e('Ещё лиды', 'rawlead-kadence-child'); ?> <span class="rl-btn__arrow" aria-hidden="true">→</span>
+				<?php esc_html_e('Показать ещё', 'rawlead-kadence-child'); ?> <span class="rl-btn__arrow" aria-hidden="true">→</span>
 			</button>
 			<span class="rl-feed-pagination__count" id="rl-feed-pagination-count"><?php esc_html_e('Показано', 'rawlead-kadence-child'); ?> <span id="rl-feed-shown">0</span> <?php esc_html_e('из', 'rawlead-kadence-child'); ?> <span id="rl-feed-total">0</span></span>
 			<div class="rl-feed-loading" id="rl-feed-loading" role="status" aria-live="polite" hidden>
@@ -109,16 +112,14 @@ rawlead_get_part('header');
 				<p class="rl-skill-tree__counter" id="rl-feed-skill-tree-counter" aria-live="polite"><?php esc_html_e('Выбрано 0 / 12', 'rawlead-kadence-child'); ?></p>
 				<button type="button" class="rl-skill-tree__close" id="rl-feed-skill-tree-close" aria-label="<?php esc_attr_e('Закрыть', 'rawlead-kadence-child'); ?>">✕</button>
 			</header>
-			<p class="rl-skill-tree__hint" id="rl-feed-skill-tree-hint" hidden><?php esc_html_e('Выберите навыки и нажмите Применить', 'rawlead-kadence-child'); ?></p>
-			<p class="rl-skill-tree__limit-msg" id="rl-feed-skill-tree-limit" hidden><?php esc_html_e('Максимум 12 навыков — сними лишние, чтобы добавить новые', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-skill-tree__hint" id="rl-feed-skill-tree-hint" hidden><?php esc_html_e('Слишком широко — match упадёт. Оставь 6–8 ключевых.', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-skill-tree__limit-msg" id="rl-feed-skill-tree-limit" hidden><?php esc_html_e('Максимум 12 — сними лишние.', 'rawlead-kadence-child'); ?></p>
 			<div class="rl-skill-tree__body" id="rl-feed-skill-tree-body">
 				<div class="rl-skill-tree__roots" id="rl-feed-skill-tree-roots" aria-live="polite"></div>
-				<button type="button" class="rl-feed-skills-rare" id="rl-feed-skills-rare" hidden><?php esc_html_e('Ещё навыки', 'rawlead-kadence-child'); ?></button>
 			</div>
 			<footer class="rl-skill-tree__footer">
-				<button type="button" class="rl-btn rl-btn--primary rl-feed-skills-apply" id="rl-feed-skills-apply" title="<?php esc_attr_e('Порядок изменится. Заказы не исчезнут.', 'rawlead-kadence-child'); ?>"><?php esc_html_e('Применить', 'rawlead-kadence-child'); ?></button>
-				<button type="button" class="rl-btn rl-btn--ghost rl-feed-skills-my" id="rl-feed-skills-my"><?php esc_html_e('Мои навыки', 'rawlead-kadence-child'); ?></button>
-				<button type="button" class="rl-skill-tree__reset rl-feed-skills-clear" id="rl-feed-skills-clear"><?php esc_html_e('Сбросить', 'rawlead-kadence-child'); ?></button>
+				<button type="button" class="rl-btn rl-btn--primary rl-feed-skills-apply" id="rl-feed-skills-apply" title="<?php esc_attr_e('Порядок изменится. Заказы не исчезнут.', 'rawlead-kadence-child'); ?>"><?php esc_html_e('Сохранить навыки →', 'rawlead-kadence-child'); ?></button>
+				<button type="button" class="rl-skill-tree__reset rl-feed-skills-clear" id="rl-feed-skills-clear"><?php esc_html_e('Сбросить всё', 'rawlead-kadence-child'); ?></button>
 			</footer>
 		</div>
 	</div>

@@ -37,7 +37,7 @@
 | `ai_score` | SMALLINT 0–100 | базовая оценка ИИ («насколько заказ годный») |
 | `ai_verdict` | TEXT | Брать / Сомнительно / Нет |
 | `lead_tags` | JSONB | теги из ИИ: `["python","fastapi","parser"]` |
-| `ai_reasons` | JSONB | 2–3 строки «почему score» (для UI) |
+| `ai_reasons` | JSONB | 2–3 строки «почему score» (для UI); **O97:** опц. ключ `complexity` 1–5 **без DDL** |
 | `is_visible` | BOOLEAN | `true` — в `/feed` и match; `false` — только dogfood-бот владельца |
 | `content_hash` | TEXT | SHA-256 нормализованного текста (`listing_dedup`); NULL — дедуп только по `source`+`external_id` |
 | `notified_at` | TIMESTAMPTZ | legacy / owner |

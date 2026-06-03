@@ -1,58 +1,93 @@
 # Для тебя
 
-## Что сейчас важно (2 минуты)
+## Сейчас — E2E → vault (ingest O99 ✅ на VPS)
 
-| # | Действие |
-|---|----------|
-| 1 | **O72e закрыт:** PASS `075032Z` (`combined 4.10`, `send 61.9%`, `L1 87.0%`) |
-| 2 | **Закрыто:** `O90+O91` (lag + watchdog + proxy health) |
-| 3 | **Закрыто:** `O89` (уникальный отклик per-user) |
-| 4 | **Interim:** O92 в `/cabinet/` (deploy `1.11.30`) — **не финал**, в ленту не тащим |
-| 5 | **✅ O93** deploy `1.12.0` — проверь `/cabinet/` + `/lenta/` (Разработка → 2 блока) |
-| 6 | **Сейчас:** E2E UX прогон → потом O92b / ads |
+| Шаг | Что |
+|-----|-----|
+| 1 | **O97 + O99 ingest** ✅ — API/radar на VPS, browser FL/Kwork, hot L1 |
+| 2 | **E2E** — Playwright + твой smoke на rawlead.ru |
+| 3 | **Отклики (L2)** — отдельный чат: regen/judge, **не трогай** пока идёт `regen_shared_reply_drafts.py` |
 
----
+**Прокси v2 + O99 browser** — на VPS. При `pool_exhausted` — `scripts/clear-vps-proxy-bans.py`, не путать с regen откликов.
 
-## Быстрые ссылки
-
-| Вопрос | Где смотреть |
-|--------|--------------|
-| Текущий статус | [`team/common/STATUS.md`](team/common/STATUS.md) |
-| Активные задачи | [`team/common/TASKS.md`](team/common/TASKS.md) |
-| ТЗ для Coder | [`team/architect/CODER_PROMPT.md`](team/architect/CODER_PROMPT.md) |
-| Решения владельца | [`team/architect/OWNER_INTENT.md`](team/architect/OWNER_INTENT.md) |
-| Запуск/ops | [`ops/RUN.md`](ops/RUN.md), [`ops/DEPLOY_VPS.md`](ops/DEPLOY_VPS.md) |
+**Runbook 2026-06-03** (L1 хвост · TG acc2 · YouDo): [`problems/2026-06-03-ingest-l1-tg-youdo.md`](problems/2026-06-03-ingest-l1-tg-youdo.md).
 
 ---
 
-## Прокси (кратко)
+## L1 и очередь без разбора
 
-- Для бирж: только `FL_PROXY_URLS` / `KWORK_PROXY_URLS`
-- Не смешивать с `TG_PROXY_URL` / `TELETHON_PROXY_*`
-- Цель пула: `7-8` IP (текущие + `+3..4` новых)
-
----
-
-## Если ИИ «недоступен»
-
-- L1 обычно продолжает работать
-- L2 может временно падать из-за OpenRouter
-- Действие: повторить через 1-2 мин и проверить баланс OpenRouter в `.env.site`
+| Что | Действие |
+|-----|----------|
+| Свежие без L1 (48 ч) | На VPS: `L1_BACKLOG_DRAIN=1` в `.env.site` — пачка L1 каждый цикл |
+| Старый хвост (лишний OpenRouter) | `scripts/clear_l1_backlog.py --profile site --by-age --days-old 2 --apply` (сначала `--dry-run`) |
+| Проверка | `/status` → «Без L1 (48 ч)»; лог `конвейер:L1=` |
 
 ---
 
-## Безопасность и Git
+## TG acc2 и join
 
-- Не коммитить: `.env*`, `*.session`, `*credentials*`, `mcp.pool.json`
-- Перед коммитом: `git status`
+- **Слушает** только чаты из `data/telethon_chat_ids_acc2.txt` (после join).
+- **Волна v2:** 6 чатов в [`docs/ops/TG_JOIN_QUEUE_v2.csv`](docs/ops/TG_JOIN_QUEUE_v2.csv) — join ~15 мин между чатами.
+- **`TG_JOIN_IN_TG_MAIN=1`** обязателен на VPS (иначе join не крутится в radar).
+- Старые ~25 чатов из `TG_JOIN_QUEUE.csv` — отдельно: `tg_sync_chat_ids.py --account acc2`.
 
 ---
 
-## История и подробные инструкции
+## YouDo / O63 secondary (2026-06-03)
 
-Длинная история, старые runbook и разборы перенесены в рабочие документы:
+| source | Статус |
+|--------|--------|
+| **Freelance.ru** | ✅ **25 новых** на VPS после O63-FIX deploy — идут в L1 |
+| **FreelanceJob** | ✅ 40 скачано · filter 6 — ожидаемо, см. `FILTERS_SITE.md` |
+| **YouDo** | ✅ **node-proxy RU** (3 слота) · smoke **50 задач** · radar 24/7 · фикс: Chrome UA + antibot `noscript` + ephemeral browser |
+| **Пчёл** | парсер ок · на листинге часто 0 новых (floor/dup) |
 
-- [`team/archive/STATUS_ARCHIVE.md`](team/archive/STATUS_ARCHIVE.md)
-- [`team/archive/CODER_PROMPT_ARCHIVE.md`](team/archive/CODER_PROMPT_ARCHIVE.md)
-- [`ops/DESKTOP_LAUNCH.md`](ops/DESKTOP_LAUNCH.md)
-- [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md)
+Deploy: `scripts/deploy-youdo-browser-vps.py` · диагностика: `scripts/_diag_secondary_logs_vps.py` → `data/_diag_secondary_logs.txt`.
+
+---
+
+## Gate (простыми словами)
+
+- **Complexity L1:** 1 вечер · 2 проект · 3 система · **4 без норм ТЗ**
+- **Judge:** насколько L1 угадал — **≥70% ok** или avg **≥3** из 4
+- **L1 usable:** как O72e — **≥70%**
+
+---
+
+---
+
+## Два бота (не путать)
+
+| Бот | Зачем | Что приходит в ЛС |
+|-----|--------|-------------------|
+| **@FLPARSINGBOT** | Админ / dogfood | Карточки бирж под твои фильтры; **прокси** (бан, переключение, «осталось N/M»); `/status` с биржами и Neon consumer |
+| **@rawlead_bot** | Продукт | Match подписчикам; **не** служебные алерты парсера |
+
+**Прокси:** пуши только в чат **@FLPARSINGBOT** (не @rawlead_bot). Если видишь «FLPARSING · прокси» в чате RawLead — на VPS в `.env.legacy` был чужой токен; код теперь проверяет getMe. Проверка: `python scripts/verify-vps-bot-identity.py` → legacy=@FLPARSINGBOT, site=@rawlead_bot.
+
+**Проверка:** `/status` в @FLPARSINGBOT → блоки FL (primary) и secondary.
+
+## Биржи: датчики O104 ✅ на VPS
+
+| Куда | Что |
+|------|-----|
+| **@FLPARSINGBOT** `/status` | 🟢🟡🔴 по каждой бирже + причина |
+| **@FLPARSINGBOT** push | `🔴 YouDo · …` — max раз в 30 мин |
+| **`/ops/`** | «Биржи и скорость» · lag минуты |
+| **`radar_site.log`** | `health:youdo status=ok` |
+
+**Regen/judge в консоли не ломает:** O104 на VPS (SQLite + log); regen/judge — Neon `reply_draft`, отдельный процесс.
+
+## O99 ingest — **включено на VPS** (2026-06-03)
+
+1. **FL/Kwork** — браузерный fetch + fallback httpx (`EXCHANGE_LISTING_BROWSER=1`).
+2. **Лента** — только после L1; hot drain после FL/Kwork, до secondary.
+3. **Secondary** — каждый 2-й цикл; свои прокси, не банят primary.
+4. **L1:** 4 воркера, два OpenRouter-ключа (см. `.env.site`).
+5. **Отдельно:** regen **текстов отклика** (`regen_shared_reply_drafts.py`) — **не** ingest; идёт в другом чате.
+
+Канон: [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) · [`STATUS.md`](team/common/STATUS.md).
+
+---
+
+_Lead · 2026-06-03_

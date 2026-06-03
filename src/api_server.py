@@ -181,7 +181,11 @@ def _row_to_item(
         tools_required,
         reply_draft,
     ) = row
+    from ai_reasons import difficulty_from_ai_reasons, parse_ai_reasons_raw
+
     tags, tag_labels = lead_tags_for_feed(lead_tags)
+    reasons_list, _ = parse_ai_reasons_raw(ai_reasons)
+    difficulty = difficulty_from_ai_reasons(ai_reasons)
     km = keyword_match_val
     fr = final_rank_val
     if fr is None:
@@ -203,7 +207,8 @@ def _row_to_item(
         "ai_verdict": ai_verdict,
         "lead_tags": tags,
         "lead_tag_labels": tag_labels,
-        "ai_reasons": ai_reasons if ai_reasons is not None else [],
+        "ai_reasons": reasons_list,
+        "difficulty": difficulty,
         "final_rank": fr,
         "keyword_match": km,
         "category": category,
@@ -378,6 +383,36 @@ def _rank_feed_rows(
     return ranked
 
 
+def _feed_today_count(
+    cur: Any,
+    *,
+    skills: list[str],
+    categories: list[str],
+    apply_delay: bool = False,
+) -> int:
+    """Leads created today (Europe/Moscow) with same visibility/category/skills/delay as feed."""
+    feed_where, feed_params = _feed_where_sql(apply_delay=apply_delay)
+    cat_sql, cat_params = _category_sql(categories)
+    skills_sql, skills_params = _skills_sql(skills)
+    today_sql = (
+        " AND (created_at AT TIME ZONE 'Europe/Moscow')::date"
+        " = (NOW() AT TIME ZONE 'Europe/Moscow')::date"
+    )
+    cur.execute(
+        f"""
+        SELECT COUNT(*)::int
+        FROM leads
+        WHERE {feed_where}
+          {cat_sql}
+          {skills_sql}
+          {today_sql}
+        """,
+        (*feed_params, *cat_params, *skills_params),
+    )
+    row = cur.fetchone()
+    return int(row[0] or 0) if row else 0
+
+
 def _feed_page_time(
     cur: Any,
     *,
@@ -479,6 +514,9 @@ def _personal_feed_page(
     sort: str,
 ) -> tuple[list[dict[str, Any]], int]:
     user_tags = _load_user_tags(cur, user_id)
+    has_profile = bool(user_tags)
+    if not has_profile:
+        sort = "time"
     extra, extra_params = _skills_sql(skills)
     cat_sql, cat_params = _category_sql(categories)
     feed_where, feed_params = _feed_where_sql()
@@ -498,9 +536,12 @@ def _personal_feed_page(
         ranked: list[dict[str, Any]] = []
         for row in rows:
             tags = _canonical_lead_tags(row[8])
-            km = keyword_match(tags, user_tags)
-            if not _passes_min_match(km, min_match):
-                continue
+            if has_profile:
+                km = keyword_match(tags, user_tags)
+                if not _passes_min_match(km, min_match):
+                    continue
+            else:
+                km = 0
             fr = final_rank(row[6], km)
             ranked.append(
                 _row_to_item(row, keyword_match_val=km, final_rank_val=fr, feed_delayed=False)
@@ -1005,6 +1046,12 @@ def feed(
                         apply_delay=apply_delay,
                         user_id=feed_user_id,
                     )
+                today_count = _feed_today_count(
+                    cur,
+                    skills=skill_list,
+                    categories=category_list,
+                    apply_delay=apply_delay,
+                )
     except Exception as exc:
         logger.error("feed: %s", exc)
         raise HTTPException(status_code=500, detail="db error")
@@ -1013,6 +1060,7 @@ def feed(
         "limit": limit,
         "offset": offset,
         "count": count,
+        "today_count": today_count,
         "sort": sort,
         "skills": skill_list,
         "category": category_list,
@@ -1148,11 +1196,10 @@ def _fetch_visible_lead(cur: Any, lead_id: int) -> tuple[Any, ...] | None:
 
 
 def _parse_ai_reasons(raw: Any) -> list[str]:
-    if raw is None:
-        return []
-    if isinstance(raw, list):
-        return [str(x).strip() for x in raw if str(x).strip()]
-    return []
+    from ai_reasons import parse_ai_reasons_raw
+
+    reasons, _ = parse_ai_reasons_raw(raw)
+    return reasons
 
 
 def _draft_http_error(exc: DraftError, *, lead_id: int) -> HTTPException:

@@ -83,7 +83,18 @@
 2. FOR_YOU ≤ 1 экран; детали → README или KAK_ETO.
 3. **STATUS ≤ ~80** · **CODER_PROMPT ≤ ~120** · **DESIGNER_PROMPT ≤ ~80** — hot-only; закрытое → `team/archive/*_ARCHIVE.md`.
 4. Новый `.md` — только с согласия владельца + строка в § Канон.
-5. **Coder/Designer/Mechanic** — не создают файлы вне своей зоны (см. PROJECT_MAP § «Агентам»).
+5. **Зоны ролей (не путать):**
+
+| Файл | Кто пишет | Lead Architect |
+|------|-----------|----------------|
+| `OWNER_INTENT.md` | Lead + журнал решений | ✅ решения владельца |
+| `LEAD_PRODUCT_PROMPT.md` | **@lead-product** | ❌ только read · handoff в TASKS |
+| `LEAD_DESIGN_PROMPT.md` | **@lead-designer** | ❌ только read |
+| `CODER_PROMPT.md` hot | Lead | ✅ · DoD закрытый → archive |
+| `PRODUCT_VISION.md` | PM + owner | ❌ Lead read-only |
+| `docs/problems/` | Mechanic | triage → Mechanic |
+
+6. **DRAFT:** идея/copy из чата владельца → сначала `OWNER_INTENT` §; **не** черновить product-copy в Architect-чате (ошибка 2026-06-03, § O105).
 
 ---
 

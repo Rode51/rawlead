@@ -33,12 +33,49 @@
 | **Зачем** | Продукт: Neon + `/lenta/` + TG в ленту | Dogfood: карточки **тебе** в @FLPARSINGBOT |
 | **Процессы** | `main.py` (биржи) + `tg_main` (чаты) | `neon_legacy_consumer.py` (без парсера бирж) |
 | **Биржи** | Парсит FL/Kwork → Neon | **Читает** Neon (то, что уже спарсил Site) |
-| **TG** | Слушает 21 чат (acc1+acc3), L1 сразу | **Не** слушает чаты |
-| **Уведомления тебе** | По умолчанию **нет** (`SITE_NOTIFY_OWNER=0`) | Да — FL/Kwork (+ TG если попадёт в consumer) |
+| **TG** | acc1+acc3 listen; acc2 — v2 join + bootstrap | acc2 догоняет чаты из `TG_JOIN_QUEUE_v2` |
+| **Уведомления тебе** | Match/подписка — @rawlead_bot; **прокси/ингest-алерты** — только @FLPARSINGBOT | Карточки dogfood FL/Kwork (+ TG в consumer) |
 | **Фильтры** | `FILTERS_SITE.md` | `FILTERS_LEGACY.md` |
 | **Env** | `.env.site` **главнее** `.env` для Site | `.env.legacy` |
 
-Подробно: [`FOR_YOU.md`](FOR_YOU.md) § «Два радара».
+Подробно: [`FOR_YOU.md`](FOR_YOU.md) § «Два бота».
+
+### Прокси бирж (каскад v2, 2026-06-03)
+
+- **Primary** (`EXCHANGE_PROXY_URLS`): FL + Kwork — sticky, бан **per-source** (`fl:host` / `kwork:host`).
+- **Secondary** (`EXCHANGE_PROXY_URLS_SECONDARY` или primary + `TELETHON_PROXY_ACC2/3`): YouDo, Пчёл, freelance.* — бан **не** убивает FL/Kwork.
+- 403/429 → бан после **2** HTTP-ударов на слот (`EXCHANGE_PROXY_HTTP_STRIKES=2`); connect — 3 подряд.
+- SQLite: `exchange_proxy_bans_v2` · сброс: `scripts/clear-vps-proxy-bans.py`.
+- **Пуш:** только **@FLPARSINGBOT** (`.env.legacy` без merge `.env` — не @rawlead_bot).
+- `/status`: блоки FL (primary) и secondary.
+- **L1:** `L1_MAX_WORKERS=4` · `OPENROUTER_API_KEY_L1_B` — воркеры 2/4 на второй ключ (те же запросы, два RPM-лимита).
+
+### Почему банит и куда идём (O99 — решение Lead 2026-06-03)
+
+**Симптом:** HTTP 403, пул «сгорает», ощущение что премиум-скорость убили прокси-рулетка.
+
+**Корень:** биржи видят **datacenter HTTP GET** раз в минуту с одного IP на много сайтов — это не «плохие прокси», это **палевный робот**. Каскад v2 (per-source баны, два пула) — **страховка**, не стратегия роста.
+
+**Цель:** **FL/Kwork ≤1–2 мин** биржа→лента стабильно; YouDo/Пчёл — без убийства primary.
+
+| Волна | Что | Зачем |
+|-------|-----|--------|
+| **A (сейчас)** | v2 каскад + FLPARSING-алерты + не трогать `TG_PROXY`/acc1 | FL/Kwork не падают из‑за Пчёла |
+| **B (O99) ✅** | Browser fetch FL/Kwork (`exchange_browser_fetch.py`, `EXCHANGE_LISTING_BROWSER=1`) | VPS 2026-06-03 |
+| **C (O99) ✅** | Hot L1 после FL/Kwork; secondary каждый 2-й цикл; лента только `feed_visible` | VPS 2026-06-03 |
+| **D (инфра)** | +2–4 IP **только** под FL/Kwork; secondary — отдельные IP или реже опрос | Запас без «все 4 в бане» |
+| **E (опц.)** | 1× residential RU под FL | Если B+D не хватает |
+| **F (YouDo)** | browser-first в коде ✅ · **ingest ⏳ O63-FIX** (VPS: 403/bans, Neon 0) · `YOUDO_PROXY_URLS` — отдельный IP | § O63-FIX |
+
+**Не делаем:** крутить IP каждую минуту (ускоряет бан); лить YouDo 403 в общий котёл (исправлено v2).
+
+**L1 backlog (Site):** `L1_BACKLOG_DRAIN=1` — `drain_l1_backlog` в конце цикла (свежие id первые). Старый хвост без OpenRouter: `scripts/clear_l1_backlog.py --by-age --days-old 2`. Runbook: [`problems/2026-06-03-ingest-l1-tg-youdo.md`](problems/2026-06-03-ingest-l1-tg-youdo.md).
+
+**TG acc2:** при `pending` в v2 и пустом listen-файле — `join-bootstrap` в `tg_monitor.py` (join внутри `tg_main` при `TG_JOIN_IN_TG_MAIN=1`).
+
+**Метрика успеха:** `scripts/ingest_lag_report.py` — p95 **feed_lag** по `fl`/`kwork` &lt; 3 мин при живом пуле; алерты только FLPARSING.
+
+Детали владельца: [`OWNER_INTENT.md`](team/architect/OWNER_INTENT.md) § **O99**.
 
 ---
 

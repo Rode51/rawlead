@@ -4,6 +4,205 @@
 
 Перенесено **2026-05-30** (~4300 строк). Grep по O71, O37c, WAVE-2 и т.д.
 
+
+---
+
+# Перенесено из hot **2026-06-03** (Lead slim CODER_PROMPT)
+
+## § O104 — Биржи (архив DoD)
+
+**Решение владельца 2026-06-03:** «Как узнать, если YouDo/биржа снова отъебёт?» — **понятная админка + бот FLPARSING** с причинами и таймингами. Язык — **простой**, как у хороших SaaS, без ops-жаргона.
+
+**Контекст:** YouDo починили node-proxy + код; без датчиков снова узнаем только по «0 в Neon». Часть инфра **уже есть** — собрать в одно:
+
+| Уже в коде | Файл |
+|------------|------|
+| `/ops/` SSR | `owner_admin.py` · `api_server.py` |
+| `ingest_ops_snapshot` | `pg_storage.py` |
+| `source_published_at` | `sql/016_*` · insert в `pg_storage` |
+| `/status` биржи (кратко) | `radar_status.py` |
+| Watchdog FL/Kwork | `scripts/ingest_watchdog.py` |
+| Алерты **только FLPARSING** | `health_check.send_flparsing_admin_text` |
+| Прокси-алерты FLPARSING | `exchange_proxy.py` |
+
+**Не дублировать:** второй парсер · алерты в @rawlead_bot · regen/judge.
+
+### DoD (приёмка Lead)
+
+| # | Критерий |
+|---|----------|
+| 1 | **Каждая биржа** (fl, kwork, youdo, freelance_ru, freelancejob, pchyol, tg) — статус 🟢/🟡/🔴 + **причина простым языком** |
+| 2 | **`/status` в @FLPARSINGBOT** — блок «Биржи» со всеми источниками, последний OK, «тишина N мин», текст ошибки (≤80 симв.) |
+| 3 | **Push в @FLPARSINGBOT** при 🔴 (источник молчит или fetch_error) · cooldown **≥30 мин** на источник (не спам) |
+| 4 | **`https://…/ops/`** — секция **«Биржи и скорость»**: таблица + карточки; подписи **по-русски** (см. ниже) |
+| 5 | **Тайминги** (где есть `source_published_at`): med/p95 **«На бирже → к нам»**, **«К нам → в ленту»** (ingest_lag / feed_lag) |
+| 6 | **`pytest`** — запись health + формат статуса + cooldown алерта (mock TG) |
+
+### w1 — Реестр здоровья (`exchange_health.py` новый)
+
+После каждого fetch в `main.py` / `run_cycle`:
+
+```text
+exchange_health:{source} → JSON в SQLite settings:
+  last_fetch_at, last_ok_at, last_error_at,
+  last_error_kind (ok|antibot|403|browser|parse|proxy|timeout|unknown),
+  last_error_short, last_downloaded, last_new_ids
+```
+
+**kind → текст для владельца (канон):**
+
+| kind | Показываем |
+|------|------------|
+| ok | «Работает» |
+| antibot | «Антибот / блок IP» |
+| 403 | «403 запрещено» |
+| browser | «Браузер не открыл страницу» |
+| parse | «Страница открылась, разбор не смог» |
+| proxy | «Прокси кончились / в бане» |
+| timeout | «Таймаут» |
+
+🟢 last_ok &lt; 15 мин · 🟡 15–45 мин · 🔴 &gt;45 мин или last fetch = error.
+
+### w2 — @FLPARSINGBOT (`radar_status.py` + `ingest_watchdog.py`)
+
+- Расширить `_format_exchange_line` / site block — **все** `PUBLIC_FEED_SOURCES`, не только FL/Kwork.
+- Watchdog: те же пороги для **youdo + secondary** (`WATCHDOG_YOUDO_GAP_MIN=45` env, default 45).
+- Алерт шаблон: `🔴 YouDo · тишина 52 мин · Антибот / блок IP · последний OK 17:04 UTC`
+- **Только** `send_flparsing_admin_text` · verify getMe @FLPARSINGBOT (уже есть).
+
+### w3 — `/ops/` (`owner_admin.py`)
+
+Новый блок **«Биржи и скорость»** (SSR в `ops_html`):
+
+| Колонка (RU) | Данные |
+|--------------|--------|
+| Биржа | FL.ru, Kwork, YouDo, … |
+| Сейчас | 🟢 Работает / 🟡 Давно не видели / 🔴 Сломалось |
+| Последний заказ к нам | `last_insert_at` + «N мин назад» |
+| На бирже → к нам | p50 ingest_lag (мин) |
+| К нам → в ленту | p50 feed_lag (мин) |
+| Что случилось | `last_error_short` или «—» |
+
+Стиль: как текущие карточки `/ops/` — крупно, без таблиц на 20 колонок.
+
+### w4 — Логи (`radar_site.log`)
+
+Одна строка на источник за цикл (если ещё нет явной):  
+`health:youdo status=ok downloaded=50 new=3 lag_p50=2m` или `health:youdo status=fail kind=antibot`.
+
+### Файлы
+
+`src/exchange_health.py` (новый) · `src/main.py` · `src/radar_status.py` · `src/owner_admin.py` · `scripts/ingest_watchdog.py` · `tests/test_exchange_health.py` · `docs/ops/RADAR_LOG.md` (1 абзац health:*)
+
+**STOP:** WP theme · L2/L3 · парсеры (кроме 1 строки record в main) · @rawlead_bot.
+
+**Проверка Coder:** VPS или local mock · `/status` скрин · `/ops/?key=…` · симуляция `fetch_error` → один алерт FLPARSING.
+
+Канон: [`OWNER_INTENT.md`](OWNER_INTENT.md) § O104 · [`FOR_YOU.md`](../../FOR_YOU.md) § два бота.
+
+---
+
+## § O72e-10 — ✅ принято Lead (2026-06-03)
+
+Judge — **владелец** (команды в [`archive/CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) или problem-doc O98).
+
+---
+
+## Два чата — граница файлов
+
+| Чат | § | Можно | STOP |
+|-----|---|-------|------|
+| **O104 ops/health** | **O104** | `exchange_health.py` · `radar_status` · `owner_admin` · `ingest_watchdog` · tests | WP · L2/L3 · regen |
+
+---
+
+## § O72e-10 — L1/L2/L3 premium (архив DoD)
+
+**Решение владельца 2026-06-03:** L3 uniquify = **`google/gemini-2.5-flash`** · gate send **≥50%** · judge **Sonnet-4** (не менять).
+
+**Вход судьи (обязательно Read):** [`data/preprod_ai_prod_audit_judge.md`](../../data/preprod_ai_prod_audit_judge.md) · сводка [`docs/problems/2026-06-03-o98-reply-humanize-bench.md`](../../problems/2026-06-03-o98-reply-humanize-bench.md)
+
+**Baseline r3 (71 лид):** L1 PASS · L2 send **43.7%** FAIL · L3 send **48%** uniq **2.64** FAIL. Humanize **не** катить regen до этой сдачи.
+
+### DoD (приёмка Lead)
+
+| Слой | Метрика | Порог |
+|------|---------|-------|
+| L1 | complexity_ok | **≥90%** (на том же judge sample) |
+| L2 | send_as_is | **≥50%** · combined ≥4.0 |
+| L3 | send_as_is + avg uniqueness | **≥50%** · uniq **≥3.0** |
+| Код | `pytest tests/test_l3_human_style.py tests/test_o97_complexity.py -q` | green |
+| Neon | — | **не** regen в сдаче Coder |
+
+### w1 — L1 (`ai_analyze.py` lite path)
+
+1. **`complexity` обязателен 1–4** — post-validate: если пусто/0 → default **2** + warn в log (не fail ingest).
+2. **Категория:** «макет», «UI/UX», «figma», «продающая страница» без кода → `primary_category=design`, не dev (см. judge #9520).
+3. **Few-shot complexity** в `_LITE_SYSTEM` (3–5 строк из judge § Top complexity-fix): SMM месяц=2, книга=3–4, транскрипция+перевод=2, лидgen 4000=3.
+4. **Не менять** L1 модель, judge-инфру, Neon schema.
+
+### w2 — L2 shared (`l3_human_style.build_shared_l2_system` + `_shared_reply_system`)
+
+**Substance-first** (судья r3): проблема **не тон**, а **якоря ТЗ** + галлюцинации.
+
+1. **2–3 якоря** из «Описание заказа» в `reply_draft` (цифры, названия, стек **только из ТЗ**).
+2. **Тип заказа:** `primary_category` text/design → **игнор** PHP/WordPress из `tools_required` (#8772).
+3. **Вопросы:** max **1** с «?»; если ТЗ полное — **0** (утверждение понимания вместо «подскажите стек»).
+4. **Anti-hallucination:** запрет упоминать WP Rocket, LCP/CLS, WooCommerce, PageSpeed если **нет** в описании (#10362, #9885).
+5. **Плотность:** 4–5 предл., не «обсудим детали»; глагол действия в 1–2 фразе.
+6. **BAD/GOOD** — 2 мини-примера в промпт из judge worst (#9366 TON, #8772 creative).
+
+### w3 — L3 uniquify (`l3_human_style` + `ai_analyze.rephrase_*`)
+
+1. **Модель:** новый env **`OPENROUTER_MODEL_L3_UNIQUIFY=google/gemini-2.5-flash`** · `config.py` поле `ai_model_l3_uniquify` · `rephrase_reply_draft_per_user_model()` → **только** этот ключ (fallback flash, не shared pro).
+2. **Структурные паттерны** по `variation_seed`: 3 каркаса в `build_uniquify_system` — (A) опыт→план→вопрос (B) вопрос первым (C) суть→детали ТЗ→вопрос; seed выбирает каркас.
+3. **`l3_too_similar`:** `_L3_SIMILAR_MIN_RATIO` **0.63 → 0.70**; retry text: «другой каркас, не синонимы».
+4. **Temperature:** cap 0.5 на L3 (flash стабильнее).
+5. **Не** возвращать `seed` в OpenRouter body (HTTP 400 — уже убрано).
+
+### w4 — тесты
+
+- `test_l3_human_style.py`: cosmetic pair → **similar=True** при 0.70; restructured TON example → **False**.
+- Новый test: `build_uniquify_system` содержит 3 каркаса.
+- Опц.: unit на L1 complexity default.
+
+### Файлы
+
+`src/l3_human_style.py` · `src/ai_analyze.py` (L1 lite + rephrase model only) · `src/config.py` · `tests/test_l3_human_style.py` · `.env.example`
+
+**Не трогать:** `regen_*.py`, `preprod_ai_prod_audit.py`, парсеры, WP, L1 ingest модель slug.
+
+### Как проверить (Coder → STATUS)
+
+1. `pytest tests/test_l3_human_style.py tests/test_o97_complexity.py -q`
+2. Локально: mock `rephrase_reply_draft_per_user` → assert model == `google/gemini-2.5-flash` при env.
+3. **STATUS:** что изменил в промптах · env keys · **не** прикладывать judge (владелец гоняет Sonnet).
+
+### После сдачи (владелец + Sonnet judge)
+
+```powershell
+.venv\Scripts\python.exe scripts\regen_shared_reply_drafts.py --profile site --apply --limit 80 --since 2026-06-01
+.venv\Scripts\python.exe scripts\regen_personal_reply_drafts.py --profile site --apply --force --since 2026-06-01
+.venv\Scripts\python.exe scripts\preprod_ai_prod_audit.py --profile site --limit 71 --judge --judge-limit 71 --judge-l1 --judge-l1-limit 71 --judge-l3 --judge-l3-limit 25 --judge-since 2026-06-01
+```
+
+Канон: [`OWNER_INTENT.md`](OWNER_INTENT.md) § O89 · [`2026-06-03-o98-reply-humanize-bench.md`](../../problems/2026-06-03-o98-reply-humanize-bench.md) § Wave 2
+
+---
+
+## § O63-FIX — закрыто (2026-06-03)
+
+**Код ✅** · **deploy VPS ✅** (Lead verify) · fixture `o63_freelance_ru_listing_live.html` · **10 OK** `test_o63_parsers`.
+
+| source | DoD | Факт VPS после deploy |
+|--------|-----|------------------------|
+| **freelance.ru** | ≥3 скачано | **25 новых** · Neon **69** (+20) · L1 идёт |
+| **freelancejob** | filter 6 | ✅ документировано `FILTERS_SITE.md` |
+| **youdo** | browser, не httpx-ban | ✅ `browser_fail` · Playwright на VPS — **install chromium** + опц. `YOUDO_PROXY_URLS` |
+| **pchyol** | floor cap | код + тесты · на листинге часто 0 новых (floor/dup) |
+
+Deploy: `scripts/deploy-youdo-browser-vps.py` · детали: [`2026-06-03-ingest-l1-tg-youdo.md`](../../problems/2026-06-03-ingest-l1-tg-youdo.md) § O63.
+
 ---
 
 # § O71 — API HTTPS + shared draft gate (**✅ Lead verify 2026-05-30**)
@@ -4417,6 +4616,74 @@ Ctrl+F5 на `http://radarzakaz.local/lenta/` (uvicorn :18766).
 ## Закрыто
 
 § P · 3b · 3c · W · 3d · 3e · **3g**
+
+---
+
+## § hotfix-youdo-playwright — ✅ 2026-06-03
+
+**Symptom:** `Playwright Sync API inside the asyncio loop` — YouDo после FL/Kwork.
+
+**Fix:** `_fetch_youdo_ephemeral` → `_get_playwright().chromium.launch()` без nested `sync_playwright()`.
+
+**Файлы:** `src/exchange_browser_fetch.py` · `tests/test_exchange_browser_fetch.py`
+
+**Deploy:** `deploy-youdo-browser-vps.py` · Lead verify unittest 22 OK.
+
+---
+
+## § O105-WP — ✅ prod 1.18.1 · 2026-06-03
+
+**Scope:** D1 hero+trust · D2 `#pricing-preview` · D3 `/pricing/` · D7 cabinet trial UI (copy/UI only).
+
+**Файлы:** `pricing-card.php` · `page-pricing.php` · `features.php` · `hero.php` · `page-cabinet.php` · `rawlead-cabinet.js` · `rawlead.css` · `inc/template-tags.php`
+
+**Lead fix post-Coder:** `rawlead_get_part($slug, array $vars)` — иначе `/pricing/` рендерил preview без payment rows.
+
+**Deploy:** `deploy-o105-wp-vps.py` · verify `_verify_o105_prod.py`.
+
+**Не в scope:** bot `/pay` · trial API · O101 slots backend.
+
+---
+
+## § O105-WP-r2 — ✅ Lead verify prod 1.18.2 · 2026-06-03
+
+**Scope:** PM Z5 P0 + Design D4 collapsed card.
+
+**Файлы:** `inc/marketing.php` (FAQ Q7/Q8/Q9 · how 790) · `rawlead-feed.js` (delay notice · slot line · tags max 2 · meta→expand) · `rawlead.css` · bump **1.18.2**
+
+**Verify:** `_verify_o105_prod.py` ALL OK · prod FAQ 790+Q8+Q9 · feed js 1.18.2
+
+**P2 остаток:** `marketing.php` pricing fallback HTML · anon strip OK in r3.
+
+---
+
+## § O105-WP-r3 — ✅ Lead verify prod 1.18.3 · 2026-06-03
+
+**Scope:** anon strip TWO-SPEEDS · delay dedup · cabinet notif Premium//pay.
+
+**Verify:** `_verify_o105_prod.py` ALL OK · prod `/lenta/` `/cabinet/`
+
+---
+
+## § O72e-L2-r3 — ✅ Lead verify 2026-06-03
+
+**Scope:** «Глубина без простыни» · tools_required vs Описание · BAD/GOOD #9831/#8752/#9843/#10442/#9581/#8772.
+
+**Verify:** unittest 16/16 · deploy `deploy-o72e-l2-r3-vps.py` r3_ok
+
+**Owner next:** regen 10 ids + pilot judge r3
+
+---
+
+## § O72e-L2-r2 — ✅ Lead verify 2026-06-03
+
+**Scope:** L2 `build_shared_l2_system` — specificity domain block + BAD/GOOD #8925/#10442/#9581/#9326 · `_JUDGE_L2_SEND_MIN=0.7`.
+
+**Файлы:** `l3_human_style.py` · `preprod_ai_prod_audit.py` · `test_l3_human_style.py`
+
+**Verify:** unittest 9/9 · deploy VPS `l3_human_style.py`
+
+**Owner next:** pilot judge 10 ids (commands in CODER_PROMPT § O72e-L2-r2 archive copy).
 
 ---
 

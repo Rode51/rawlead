@@ -16,6 +16,12 @@
 
   .venv\\Scripts\\python.exe scripts\\replay_neon_lite_site.py --profile site --fresh-l1 --limit 200
 
+  .venv\\Scripts\\python.exe scripts\\replay_neon_lite_site.py --profile site --o97-replay --limit 80
+
+  .venv\\Scripts\\python.exe scripts\\replay_neon_lite_site.py --profile site --tools-replay --limit 80
+
+  .venv\\Scripts\\python.exe scripts\\replay_neon_lite_site.py --profile site --tools-replay-force --limit 71
+
 """
 
 
@@ -37,6 +43,7 @@ for _stream in (sys.stdout, sys.stderr):
             pass
 
 from collections import defaultdict
+from datetime import date, datetime, timezone
 
 from pathlib import Path
 
@@ -66,6 +73,7 @@ from listing import ListingProject
 
 from listing_dedup import listing_content_hash
 
+from lead_pipeline import replay_tools_for_rows
 from pg_storage import NeonLeadRow, pg_storage_from_config
 
 from public_feed import public_feed_sources
@@ -510,6 +518,38 @@ def _run_backfill_missing(args, cfg, pg, errors: list[str]) -> int:
 
 
 
+def _parse_since(raw: str) -> datetime | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    parsed = date.fromisoformat(text)
+    return datetime(parsed.year, parsed.month, parsed.day, tzinfo=timezone.utc)
+
+
+def _run_tools_replay(
+    args,
+    cfg,
+    pg,
+    rows: list[NeonLeadRow],
+    errors: list[str],
+    *,
+    label: str,
+) -> int:
+    if args.dry_run:
+        print(f"{label}: dry-run {len(rows)} rows")
+        for row in rows[:10]:
+            print(f"  id={row.lead_id} {row.source}:{row.external_id} {row.title[:50]}")
+        if len(rows) > 10:
+            print(f"  … ещё {len(rows) - 10}")
+        return 0
+    if not cfg.ai_active:
+        print("AI не активен — tools replay пропущен", file=sys.stderr)
+        return 2
+    ok = replay_tools_for_rows(cfg, pg, rows, errors=errors)
+    print(f"{label}: tools ok={ok}/{len(rows)} errors={len(errors)}")
+    return 0 if ok > 0 or not errors else 1
+
+
 def main() -> int:
 
     parser = argparse.ArgumentParser(description="Replay L1 для Neon (site only)")
@@ -535,9 +575,45 @@ def main() -> int:
     )
 
     parser.add_argument(
+        "--o97-replay",
+        action="store_true",
+        help="O97 backfill: re-L1 для visible лидов без complexity в ai_reasons",
+    )
+
+    parser.add_argument(
+        "--o97-replay-force",
+        action="store_true",
+        help="O97 re-bench: re-L1 для последних visible лидов с L1 (после правки промпта)",
+    )
+
+    parser.add_argument(
         "--fresh-l1",
         action="store_true",
         help="L1 для последних N id DESC (§ FEED-FRESHNESS one-shot)",
+    )
+
+    parser.add_argument(
+        "--since",
+        default="",
+        help="O97 re-bench: created_at >= YYYY-MM-DD (с --o97-replay-force)",
+    )
+
+    parser.add_argument(
+        "--lead-ids",
+        default="",
+        help="Точечный re-L1: id через запятую (judge sample)",
+    )
+
+    parser.add_argument(
+        "--tools-replay",
+        action="store_true",
+        help="O98: L2 tools-only для visible без tools_required",
+    )
+
+    parser.add_argument(
+        "--tools-replay-force",
+        action="store_true",
+        help="O98: перезаписать tools_required у последних visible с L1 (bench)",
     )
 
     parser.add_argument("--profile", default="", help="legacy|site (default: env)")
@@ -589,6 +665,61 @@ def main() -> int:
     if args.tg_replay:
         rows = _fetch_tg_replay_rows(pg, limit=args.limit, errors=errors)
         return _run_l1_replay(args, cfg, pg, rows, errors, label="TG replay")
+
+    if args.lead_ids.strip():
+        raw_ids = [p.strip() for p in args.lead_ids.split(",") if p.strip()]
+        lead_ids: list[int] = []
+        for p in raw_ids:
+            try:
+                lead_ids.append(int(p))
+            except ValueError:
+                print(f"skip:invalid lead id {p!r}", file=sys.stderr)
+        rows = pg.fetch_leads_by_ids(lead_ids, errors=errors)
+        if args.tools_replay or args.tools_replay_force:
+            label = "Lead-ids tools replay"
+            if args.tools_replay_force:
+                label += " (force)"
+            return _run_tools_replay(args, cfg, pg, rows, errors, label=label)
+        return _run_l1_replay(args, cfg, pg, rows, errors, label="Lead-ids replay")
+
+    if args.tools_replay or args.tools_replay_force:
+        since = _parse_since(args.since) if args.since else None
+        if args.tools_replay_force:
+            rows = pg.fetch_visible_leads_with_l1(
+                limit=args.limit,
+                order_desc=True,
+                since=since,
+                errors=errors,
+            )
+            label = "O98 tools re-bench (force)"
+        else:
+            rows = pg.fetch_leads_missing_tools(limit=args.limit, errors=errors)
+            label = "O98 tools backfill"
+        if since is not None:
+            label += f" since={args.since.strip()}"
+        return _run_tools_replay(args, cfg, pg, rows, errors, label=label)
+
+    if args.o97_replay or args.o97_replay_force:
+        since = _parse_since(args.since) if args.since else None
+        if args.o97_replay_force:
+            rows = pg.fetch_visible_leads_with_l1(
+                limit=args.limit,
+                order_desc=True,
+                since=since,
+                errors=errors,
+            )
+            label = "O97 re-bench (force)"
+        else:
+            rows = pg.fetch_leads_missing_complexity(
+                limit=args.limit,
+                order_desc=not bool(since),
+                since=since,
+                errors=errors,
+            )
+            label = "O97 complexity backfill"
+        if since is not None:
+            label += f" since={args.since.strip()}"
+        return _run_l1_replay(args, cfg, pg, rows, errors, label=label)
 
     if args.fresh_l1:
         backlog = pg.count_leads_missing_l1(errors=errors)

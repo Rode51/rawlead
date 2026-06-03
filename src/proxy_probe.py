@@ -87,23 +87,20 @@ def probe_proxy_tcp(proxy_url: str, *, timeout: float | None = None) -> tuple[bo
 
 def _try_alert_owner(text: str) -> None:
     try:
-        from config import load_config
-        from health_check import send_owner_text
-
-        cfg = load_config()
+        from health_check import send_flparsing_admin_text
     except SystemExit:
         return
     except Exception as exc:
-        print(f"[!] Алерт: load_config: {exc}", flush=True)
+        print(f"[!] Алерт: {exc}", flush=True)
         return
 
-    ok, err = send_owner_text(cfg, text)
+    ok, err = send_flparsing_admin_text(text)
     if not ok:
         print(f"[!] Алерт боту не ушёл: {err}", flush=True)
 
 
 def _format_proxy_alert(failures: list[tuple[str, str, str]]) -> str:
-    lines = ["⛔ RawLead · прокси недоступен", ""]
+    lines = ["⛔ FLPARSING · Telethon-прокси", ""]
     for account, detail, proxy_url in failures:
         lines.append(f"{account}: {mask_proxy_endpoint(proxy_url)} — {detail}")
     lines.extend(

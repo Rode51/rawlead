@@ -41,10 +41,22 @@ function rawlead_render_demo_preview_card(array $card, string $lenta_url): void 
 	$perfect_badge = $perfect
 		? '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>'
 		: '';
+	$niche = (string) ($card['category'] ?? '');
+	$niche_icons = [
+		'dev'       => '</>',
+		'design'    => '✦',
+		'marketing' => '◎',
+		'text'      => 'Aa',
+	];
+	$niche_icon = isset($niche_icons[$niche])
+		? '<span class="rl-niche-icon rl-niche-icon--' . esc_attr($niche) . '" aria-hidden="true">'
+			. esc_html($niche_icons[$niche]) . '</span>'
+		: '';
 	?>
 	<article class="<?php echo esc_attr(implode(' ', $classes)); ?>">
 		<div class="rl-feed-card__head">
 			<div class="rl-feed-card__head-start">
+				<?php echo $niche_icon; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above ?>
 				<span class="rl-feed-card__source rl-feed-card__source--<?php echo esc_attr($source); ?>">
 					<?php echo esc_html($source_label); ?>
 				</span>
@@ -82,6 +94,7 @@ $demo_cards = [
 		'pct' => 50,
 		'source' => 'fl',
 		'source_label' => 'FL.ru',
+		'category' => 'dev',
 		'title' => 'Доработка CRM под отчёты',
 		'tags' => ['PHP', 'MySQL', 'REST API'],
 	],
@@ -89,6 +102,7 @@ $demo_cards = [
 		'pct' => 100,
 		'source' => 'tg',
 		'source_label' => 'TG',
+		'category' => 'dev',
 		'title' => 'Интеграция Telegram-бота с CRM',
 		'tags' => ['Python', 'REST API', 'PostgreSQL'],
 		'perfect' => true,
@@ -98,6 +112,7 @@ $demo_cards = [
 		'pct' => 80,
 		'source' => 'kwork',
 		'source_label' => 'Kwork',
+		'category' => 'design',
 		'title' => 'Лендинг на WordPress + форма',
 		'tags' => ['WordPress', 'CSS', 'PHP'],
 	],

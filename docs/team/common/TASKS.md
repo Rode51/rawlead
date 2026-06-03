@@ -6,21 +6,23 @@
 
 ## Сейчас
 
-| # | Задача | Статус |
-|---|--------|--------|
-| **O94-L1** | AI.md + targeted L1 bench | **→ @coder** |
-| **E2E UX** | Playwright walk «обычный юзер» | **→ Lead / agent** |
-| **O92b** | pending_tags | **⏸** после E2E |
-| **Реклама** | soft launch | **⏸** |
+| # | Задача | Кто | Статус |
+|---|--------|-----|--------|
+| **O72e pilot re-judge** | regen 10 + judge r3 | **owner** | **→ сейчас** |
+| **E2E / vault** | | owner | L2 PASS |
 
 ---
 
-## Закрыто 2026-06-02
+## Закрыто 2026-06-03
 
-**O94-code** v0.5 catalog + UI 4 ниши · deploy VPS  
-**O93-w2/w2b** modal лента · auto-L3 · sort UX · **1.14.0**  
-**O94-v0.5** PM research · **O93** · O72e-9
+**O72e-L2-r3** ✅ · O105-WP-r3 · youdo-lite · O72e-L2-r2 · O105 wave
 
 ---
 
-_Lead · 2026-06-02_
+## После vault
+
+O101 · O105-w1
+
+---
+
+_Lead · 2026-06-03_

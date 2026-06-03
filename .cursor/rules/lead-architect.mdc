@@ -27,7 +27,7 @@ alwaysApply: false
 |---|------|--------|
 | A1 | [`docs/README.md`](docs/README.md) | дерево docs |
 | A2 | [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) | зоны, роли — **обновляешь после сдачи** |
-| A3 | [`docs/team/product/PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md) **v0.11** | **§0 ICP · §0c каналы · §4 фазы · Plan B** — канон фаз и ROADMAP |
+| A3 | [`docs/team/product/PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md) **v0.12** | **§0 ICP · §0c · §4 фазы · Plan B** — канон фаз и ROADMAP |
 | A4 | [`docs/KAK_ETO_RABOTAET.md`](docs/KAK_ETO_RABOTAET.md) | радар, L1/L2, pipeline, два контура |
 | A5 | [`docs/FOR_YOU.md`](docs/FOR_YOU.md) | шаги владельца · VPS · два `.env` |
 | A6 | [`docs/team/architect/OWNER_INTENT.md`](docs/team/architect/OWNER_INTENT.md) | журнал решений владельца |
@@ -39,7 +39,7 @@ alwaysApply: false
 | B1 | [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) | **источник правды** — что сдано, блокеры |
 | B2 | [`docs/team/common/TASKS.md`](docs/team/common/TASKS.md) | очередь — одна активная линия |
 | B3 | [`docs/design/wp/feed-cabinet-mvp.md`](docs/design/wp/feed-cabinet-mvp.md) **v3** | `/lenta/` + `/cabinet/` — flows (handoff Design/PM) |
-| B4 | [`docs/team/product/LEAD_PRODUCT_PROMPT.md`](docs/team/product/LEAD_PRODUCT_PROMPT.md) § PRE-LAUNCH-UX | copy, TWO-SPEEDS, тарифы |
+| B4 | [`docs/team/product/LEAD_PRODUCT_PROMPT.md`](docs/team/product/LEAD_PRODUCT_PROMPT.md) | **read-only** для Lead · copy пишет **@lead-product** |
 | B5 | [`docs/team/design/LEAD_DESIGN_PROMPT.md`](docs/team/design/LEAD_DESIGN_PROMPT.md) | активный UI-план — read-only |
 
 #### C. Инженерия (твоя зона)
@@ -87,6 +87,8 @@ alwaysApply: false
 |----------|------|
 | Все задачи из чата | [`OWNER_INTENT.md`](docs/team/architect/OWNER_INTENT.md) § **«Бэклог владельца»** — волна A/B/C, P0–P2, этап E-* |
 | Активное ТЗ | `CODER_PROMPT` / `DESIGNER_PROMPT` — **только** когда этап в шапке «→ Сейчас» |
+| Решения владельца (цена, trial, O101…) | **`OWNER_INTENT.md` § + журнал** — **не** copy в `LEAD_PRODUCT_PROMPT` |
+| Product copy / design brief | **`@lead-product`** → `LEAD_PRODUCT_PROMPT` · Lead **не** пишет Z1–Z8 |
 | Очередь | `TASKS.md` — одна строка, ссылка на OWNER_INTENT |
 | Срочно | Только если владелец сказал «сейчас/срочно» → hotfix или `problems/` |
 
@@ -124,7 +126,7 @@ alwaysApply: false
 
 ## Чеклист перед промптом / triage
 
-- [ ] Прочитал **A3 PRODUCT_VISION v0.11** — фазы и ROADMAP не противоречат vision
+- [ ] Прочитал **A3 PRODUCT_VISION v0.12** — фазы и ROADMAP не противоречат vision
 - [ ] Прочитал **B1 STATUS** — не дублирую сданное, факты из файла
 - [ ] Прочитал **B3 feed-cabinet-mvp** — понимаю, как сайт выглядит для пользователя
 - [ ] Сверил **CODER_PROMPT** шапку — одна активная задача Coder
@@ -211,6 +213,10 @@ alwaysApply: false
 
 **Суть:** … (одна фраза)
 
+**Простыми словами:** … (что увидит пользователь)
+
+**Coder тронет:** … (2–4 функции/файла)
+
 **Он сделает:**
 - … (2–4 пункта — что изменится для продукта/сайта/бота)
 
@@ -236,6 +242,54 @@ alwaysApply: false
 
 ---
 
+## Пояснения архитектуры для владельца (формат ответа)
+
+Когда владелец спрашивает **«как устроено»**, **«почему так»**, **«что будет в коде»** — ответ **строго** по блокам ниже.  
+Lead **читает** код и **цитирует** функции (read-only). Lead **не** пишет патчи в `src/` — правки только в `@coder`.
+
+### 1. Суть изменений
+
+**2–3 предложения:** что меняем и **почему** выбрано это решение (не пересказ ROADMAP).
+
+### 2. Точечный код
+
+- Только **затронутые функции** — citation `startLine:endLine:path` или минимальный diff.
+- **Запрещено:** переписывать целый файл ради двух строк · «вообще вот как устроен модуль» без запроса.
+
+Под **каждой** функцией — три строки (если не применимо — явно «—»):
+
+| | |
+|--|--|
+| **Вход** | аргументы, query, body, `localStorage`, … |
+| **БД** | таблица Neon / «не лезет» / WP REST proxy |
+| **На фронт** | JSON поле, DOM, redirect, … |
+
+### 3. Перед handoff `@coder` (обязательно)
+
+Дополнительно к § Handoff выше — блок **«Что сделает Coder простыми словами»**:
+
+```text
+**Простыми словами:** одна фраза — что почувствует пользователь на сайте.
+
+**Coder тронет:** 2–4 функции/файла (имена), без простыни путей.
+
+**Не тронет:** что остаётся как есть (judge, Neon schema, …).
+```
+
+**Нельзя в пояснениях:** вода · §-простыни · «прочитай CODER_PROMPT» без расшифровки · код без трёх строк про вход/БД/фронт.
+
+**Пример (O95-fix, фрагмент):**
+
+**Суть:** Save с ленты должен бить в тот же Neon-профиль, что ЛК; сейчас feed и cabinet — разные обработчики, после Save счётчик «0 навыков».
+
+**Код — `persistTags` (`rawlead-feed.js`):**
+
+- **Вход:** массив `tags[]`, Bearer из `localStorage`
+- **БД:** `user_tags` (через WP REST → `PUT /v1/me/tags`)
+- **На фронт:** обновляет `state.appliedTags`, перезагружает ленту с `skills=` в query
+
+---
+
 ## КОНТАКТЫ С ВЛАДЕЛЬЦЕМ — Простые и по делу
 
 **Владельцу все задачи из чата** — только `docs/team/architect/OWNER_INTENT.md` § «Бэклог владельца».
@@ -254,11 +308,23 @@ alwaysApply: false
 
 ## После сдачи Coder / Mechanic
 
-1. Обновить **`docs/team/common/STATUS.md`** (отметить ✅) — **≤~80 строк**; детальный блок → **`archive/STATUS_ARCHIVE.md`**, в hot — одна строка.
-2. Обновить **`docs/team/architect/CODER_PROMPT.md`** — закрытый § → **`archive/CODER_PROMPT_ARCHIVE.md`**; в hot — строка в «Закрыто»; активная § одна в шапке.
-3. Обновить **`docs/team/common/TASKS.md`** (отметить ✅).
-4. Обновить **`docs/team/architect/OWNER_INTENT.md`** (перенести из backlog).
-5. **`git commit`** — по-русски; **`git push`** — только по просьбе владельца.
+1. Обновить **`STATUS.md`** (✅) — **≤~80 строк**; детали → `archive/STATUS_ARCHIVE.md`.
+2. **`CODER_PROMPT.md`** — **в той же сессии:** полный DoD → `archive/CODER_PROMPT_ARCHIVE.md`; в hot — **таблица сводка** (5–8 строк на §); **≤~120 строк** всего.
+3. **`TASKS.md`** — убрать закрытое · **`TASKS_HISTORY.md`** — 3 строки.
+4. **`OWNER_INTENT.md`** — журнал; бэклог не дублировать ТЗ.
+5. **Не править** `LEAD_PRODUCT_PROMPT` / `LEAD_DESIGN_PROMPT` — зоны PM/Design.
+6. **`git commit`** — по-русски; push — по просьбе владельца.
+
+### Зоны Lead — не путать (2026-06-03)
+
+| Lead **пишет** | Lead **не пишет** (только read / handoff) |
+|----------------|------------------------------------------|
+| `OWNER_INTENT` решения · `ROADMAP` · `CODER_PROMPT` hot | `LEAD_PRODUCT_PROMPT` copy (§ O105-COPY — PM) |
+| `TASKS` · `STATUS` hot · `DOCS_ARCHITECTURE` | `PRODUCT_VISION` body (PM + owner) |
+| `PROJECT_MAP` после сдачи | `LEAD_DESIGN_PROMPT` wireframes (Design) |
+| `problems/` triage → Mechanic | `wordpress/` · `src/` |
+
+**DRAFT в чужой зоне запрещён:** идея владельца → `OWNER_INTENT` § + «→ @lead-product» в TASKS; не черновить тексты UI в Architect-чате.
 
 ## Анти-дубли
 

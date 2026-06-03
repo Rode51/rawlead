@@ -8,23 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from config import normalize_proxy_url
-
-
-def _parse_pool(name_plural: str, name_single: str) -> list[str]:
-    raw = os.environ.get(name_plural, "").strip()
-    parts = [p.strip() for p in raw.split(",") if p.strip()] if raw else []
-    if not parts:
-        one = os.environ.get(name_single, "").strip()
-        if one:
-            parts = [one]
-    out: list[str] = []
-    for p in parts:
-        try:
-            out.append(normalize_proxy_url(p))
-        except ValueError:
-            continue
-    return out
+from exchange_proxy import _shared_exchange_pool, _urls_for_source
 
 
 def _probe_tcp(proxy_url: str, timeout_sec: float) -> bool:
@@ -46,8 +30,8 @@ def _probe_tcp(proxy_url: str, timeout_sec: float) -> bool:
 
 def probe_exchange_pools(timeout_sec: float = 5.0) -> dict[str, dict[str, int]]:
     pools = {
-        "fl": _parse_pool("FL_PROXY_URLS", "FL_PROXY_URL"),
-        "kwork": _parse_pool("KWORK_PROXY_URLS", "KWORK_PROXY_URL"),
+        "fl": _urls_for_source("fl")[1] or _shared_exchange_pool(),
+        "kwork": _urls_for_source("kwork")[1] or _shared_exchange_pool(),
     }
     out: dict[str, dict[str, int]] = {}
     for source, urls in pools.items():

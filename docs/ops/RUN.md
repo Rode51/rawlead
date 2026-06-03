@@ -300,7 +300,11 @@ scripts\start-radar-all.bat
 # Разовый join одного acc (без daemon)
 python scripts/tg_join_queue.py --account acc2
 
-# acc1 в отдельном процессе — запрещено (database locked на сессии tg_main)
+# acc1/acc2/acc3 в отдельном процессе при TG_JOIN_IN_TG_MAIN=1 — запрещено (database locked).
+# Обход: systemctl stop rawlead-radar + sed TG_JOIN_IN_TG_MAIN=0 в .env.site → join → вернуть 1.
+
+# acc2 без chat_ids: tg_monitor join-bootstrap (pending из TG_JOIN_QUEUE_v2.csv).
+# См. docs/problems/2026-06-03-ingest-l1-tg-youdo.md
 
 # Legacy: все ссылки сразу
 python scripts/tg_join.py
@@ -314,3 +318,31 @@ python scripts/tg_list_dialogs.py --account acc2
 Лог очереди join: `data/tg_join.log`. Расписание и лимиты — [`TG_JOIN_SCHEDULE.md`](TG_JOIN_SCHEDULE.md).
 
 Лог тех же строк, что у радара: `data/radar.log` (или `RADAR_LOG_PATH`). Ночью 02:00–07:00 Irkutsk пауза переподключения длиннее (`TG_RECONNECT_NIGHT_SEC`).
+
+---
+
+## 12. YouDo (secondary, O63)
+
+| Параметр | Значение |
+|----------|----------|
+| Парсер | `src/youdo_parser.py` |
+| URL по умолчанию | `https://youdo.com/tasks-all-opened-all` (`YOUDO_LISTING_URL`) |
+| Опрос | Каждый **2-й** цикл radar (`SECONDARY_FETCH_EVERY_N_CYCLES=2`) |
+| Fetch | `EXCHANGE_LISTING_BROWSER=1` → Chromium per proxy slot, затем httpx |
+| Прокси | `YOUDO_PROXY_URLS` (пусто → secondary pool) |
+| Баны | Только `youdo:host` (не банит FL/Kwork) |
+
+**Категории на сайте** (чекбоксы в UI) **не** передаются в парсер — лента «все открытые»; фильтр ниши — word_filter + L1.
+
+**Ops:** `scripts/deploy-youdo-browser-vps.py` · `scripts/clear-vps-proxy-bans.py` · канон [`../problems/2026-06-03-ingest-l1-tg-youdo.md`](../problems/2026-06-03-ingest-l1-tg-youdo.md).
+
+---
+
+## 13. L1 backlog (Site)
+
+| Env | Смысл |
+|-----|--------|
+| `L1_BACKLOG_DRAIN=1` | Пачка L1 для Neon без verdict в конце цикла (`L1_BATCH_PER_CYCLE`, default 40) |
+| `clear_l1_backlog.py --by-age --days-old 2` | Пометить старый хвост «Пропущено» без OpenRouter |
+
+`/status`: «Без L1 (48 ч)» — свежий хвост; полная очередь — отдельная цифра. Runbook: problem-doc §1.

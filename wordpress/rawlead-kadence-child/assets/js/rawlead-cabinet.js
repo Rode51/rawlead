@@ -28,6 +28,7 @@
   var cfg = window.rawleadCabinet;
 
   var TOKEN_KEY = "rawlead_access_token";
+  var TAGS_SYNC_KEY = "rawlead_user_tags_rev";
   var AUTH_COOKIE = "rl_access";
   var AUTH_COOKIE_MAX_AGE = 7 * 24 * 3600;
 
@@ -49,6 +50,27 @@
   var GUEST_SKILLS_KEYS = ["rawlead_lenta_skills", "rawlead_guest_skills"];
   var MAX_USER_TAGS = 12;
   var NICHE_ORDER = ["dev", "design", "marketing", "text"];
+  var TIER_A_BY_NICHE = {
+    dev: [
+      "telegram_bot_dev",
+      "wordpress_dev",
+      "web_scraping",
+      "api_integration",
+      "llm_integration",
+      "python",
+      "javascript",
+    ],
+    design: ["ui_ux", "figma", "logo_design", "banner_design"],
+    marketing: ["smm", "seo", "email_marketing", "target_ads", "yandex_direct", "google_ads"],
+    text: [
+      "copywriting",
+      "seo_copywriting",
+      "article_writing",
+      "technical_writing",
+      "editing_proofreading",
+      "translation",
+    ],
+  };
   var NICHE_ROOT_LABELS = {
     dev: "Разработка",
     design: "Дизайн",
@@ -56,9 +78,33 @@
     text: "Тексты",
   };
   var DEV_PICKER_SUBHEADS = [
-    { key: "use_case", label: "По задаче" },
-    { key: "technology", label: "По технологии" },
+    { key: "use_case", label: "ПО ЗАДАЧЕ" },
+    { key: "technology", label: "ПО ТЕХНОЛОГИИ" },
   ];
+  var NICHE_ICONS = {
+    dev: "</>",
+    design: "✦",
+    marketing: "◎",
+    text: "Aa",
+  };
+  var DIFFICULTY_BADGES = {
+    1: {
+      badge: "🟢 Один вечер",
+      tip: "Скрипт, один файл, понятное ТЗ — вечер работы.",
+    },
+    2: {
+      badge: "🟡 Проект",
+      tip: "Типовая архитектура — FastAPI, лендинг, бот. Понятно с первого прочтения.",
+    },
+    3: {
+      badge: "🟠 Система",
+      tip: "Несколько компонентов или монолит с нормальным ТЗ. Потребует время на разбор.",
+    },
+    4: {
+      badge: "🔴 Без норм ТЗ",
+      tip: "Нет нормального ТЗ, «сделайте красиво» или каша в описании. Риск на тебе.",
+    },
+  };
 
   var loginEl = document.getElementById("rl-cabinet-login");
 
@@ -770,9 +816,11 @@
   var logoutBtn = document.getElementById("rl-cabinet-logout");
   var subEl = document.getElementById("rl-cabinet-sub");
   var subBadgeEl = document.getElementById("rl-cabinet-sub-badge");
-  var subPlanEl = document.getElementById("rl-cabinet-sub-plan");
+  var subPriceEl = document.getElementById("rl-cabinet-sub-price");
   var subDetailEl = document.getElementById("rl-cabinet-sub-detail");
+  var subTrialEl = document.getElementById("rl-cabinet-sub-trial");
   var subPayEl = document.getElementById("rl-cabinet-sub-pay");
+  var subBillingEl = document.getElementById("rl-cabinet-sub-billing");
   var subPauseEl = document.getElementById("rl-cabinet-sub-pause");
   var subResumeEl = document.getElementById("rl-cabinet-sub-resume");
   var subNoteEl = document.getElementById("rl-cabinet-sub-note");
@@ -845,15 +893,36 @@
     }
   }
 
-  function subscriptionStatusLabel(status) {
+  function botDeepLink(start) {
+    var user = cfg.tgBotUsername || "rawlead_bot";
+    return "https://t.me/" + user + "?start=" + start;
+  }
+
+  function subscriptionStatusLabel(status, data) {
+    if (status === "trial" && data && data.trial_days_left != null) {
+      return "Trial · " + data.trial_days_left + " дн.";
+    }
     var map = {
-      beta: "Beta",
-      free: "Бесплатно",
-      active: "Подписка активна ✓",
+      beta: "PREMIUM",
+      free: "",
+      active: "PREMIUM",
+      trial: "Trial",
       paused: "Пауза",
       expired: "Истекла",
     };
-    return map[status] || status || "—";
+    return map[status] || status || "";
+  }
+
+  function setSubLink(el, href, label) {
+    if (!el) {
+      return;
+    }
+    el.href = href;
+    el.textContent = label;
+    el.setAttribute("target", "_blank");
+    el.setAttribute("rel", "noopener");
+    el.removeAttribute("aria-disabled");
+    el.classList.remove("is-disabled");
   }
 
   function renderSubscription(data) {
@@ -867,63 +936,91 @@
     }
     subEl.hidden = false;
     var status = data.status || "free";
+    var isTrial = status === "trial" || !!data.is_trial;
+    if (data.is_trial) {
+      status = "trial";
+      isTrial = true;
+    }
+
     if (subBadgeEl) {
-      subBadgeEl.textContent = subscriptionStatusLabel(status);
+      var badgeText = subscriptionStatusLabel(status, data);
+      subBadgeEl.textContent = badgeText;
+      subBadgeEl.hidden = badgeText === "";
       subBadgeEl.className =
-        "rl-cabinet-sub__badge rl-cabinet-sub__badge--" + status;
+        "rl-cabinet-sub__badge rl-cabinet-sub__badge--" + (isTrial ? "trial" : status);
     }
-    if (subPlanEl) {
-      subPlanEl.textContent = data.plan_label || "ИИ-агент";
+
+    if (subPriceEl) {
+      subPriceEl.hidden = status === "active" || status === "trial" || status === "paused" || status === "beta";
     }
+
     if (subDetailEl) {
       var detail = "";
-      if (status === "paused" && data.paused_until) {
+      if (isTrial && data.active_until) {
+        detail = "Premium активен до " + formatSubDate(data.active_until);
+      } else if (status === "paused" && data.paused_until) {
         detail = "На паузе до " + formatSubDate(data.paused_until);
       } else if (status === "active" && data.active_until) {
-        detail = "Активна до " + formatSubDate(data.active_until);
+        detail = "✅ Premium активен до " + formatSubDate(data.active_until);
       } else if (status === "beta") {
-        detail = "Полный доступ в режиме beta — оплата пока не требуется";
+        detail = "Полный доступ в режиме beta";
       } else if (status === "free") {
-        detail = "Лента с задержкой 15 мин. Stars — мгновенный доступ и «Написать отклик» на ленте.";
+        detail = "Лента с задержкой 15 мин · Premium — без задержки и уникальные черновики";
       } else if (status === "expired") {
-        detail = "Подписка истекла — продлите через Telegram Stars";
+        detail = "Подписка истекла — продлите через @rawlead_bot /pay";
       }
       subDetailEl.textContent = detail;
     }
-    if (subPayEl) {
-      if (data.stars_available) {
-        subPayEl.href = cfg.botPayUrl || "https://t.me/rawlead_bot?start=pay";
-        subPayEl.setAttribute("target", "_blank");
-        subPayEl.setAttribute("rel", "noopener");
-        subPayEl.removeAttribute("aria-disabled");
-        subPayEl.classList.remove("is-disabled");
-        subPayEl.textContent = "Оплатить Stars";
-      } else {
-        subPayEl.href = cfg.pricingUrl || subPayEl.getAttribute("href") || "#";
-        subPayEl.removeAttribute("target");
-        subPayEl.setAttribute("aria-disabled", "true");
-        subPayEl.classList.add("is-disabled");
-        subPayEl.textContent = "Оплатить Stars — скоро";
+
+    var payUrl = cfg.botPayUrl || botDeepLink("pay");
+    var trialUrl = botDeepLink("trial");
+
+    if (subTrialEl) {
+      subTrialEl.hidden = status !== "free";
+      if (status === "free") {
+        setSubLink(subTrialEl, trialUrl, "Попробовать 3 дня бесплатно");
+        subTrialEl.classList.add("rl-btn--primary");
+        subTrialEl.classList.remove("rl-btn--ghost");
       }
     }
+
+    if (subPayEl) {
+      if (status === "free") {
+        subPayEl.hidden = false;
+        subPayEl.classList.remove("rl-btn--primary");
+        subPayEl.classList.add("rl-btn--ghost");
+        setSubLink(subPayEl, payUrl, "Подключить Premium →");
+      } else if (isTrial) {
+        subPayEl.hidden = false;
+        subPayEl.classList.add("rl-btn--primary");
+        subPayEl.classList.remove("rl-btn--ghost");
+        setSubLink(subPayEl, payUrl, "Оплатить 790 ₽ →");
+      } else {
+        subPayEl.hidden = true;
+      }
+    }
+
+    if (subBillingEl) {
+      if (status === "active" || status === "beta") {
+        subBillingEl.hidden = false;
+        setSubLink(subBillingEl, payUrl, "Оплата");
+      } else {
+        subBillingEl.hidden = true;
+      }
+    }
+
     if (subPauseEl) {
-      subPauseEl.hidden = !data.can_pause;
-      subPauseEl.disabled = !data.can_pause;
+      var showPause = data.can_pause || isTrial || status === "active" || status === "beta";
+      subPauseEl.hidden = !showPause || status === "free" || status === "expired";
+      subPauseEl.disabled = !data.can_pause && !isTrial;
+      subPauseEl.textContent = "Пауза";
     }
     if (subResumeEl) {
       subResumeEl.hidden = status !== "paused";
     }
     if (subNoteEl) {
-      if (status === "active" || status === "paused") {
-        subNoteEl.textContent =
-          "Пауза без штрафов — доступ к платным функциям приостановится до даты возобновления.";
-      } else if (data.stars_available) {
-        subNoteEl.textContent =
-          "Оплата через Telegram Stars — мгновенная лента, «Написать отклик» и push match в боте.";
-      } else {
-        subNoteEl.textContent =
-          "Сейчас лента и кабинет бесплатны в режиме beta. Оплата через Telegram Stars подключится в следующем релизе.";
-      }
+      subNoteEl.hidden = true;
+      subNoteEl.textContent = "";
     }
     updateInboxEmptyStates();
     loadNotificationSettings(data);
@@ -1518,6 +1615,10 @@
 
     pickerDraft: [],
 
+    tagsLimitFlash: false,
+
+    tagsSyncRev: "",
+
     expandedNiches: { dev: false, design: false, marketing: false, text: false },
 
     expandedL1: {},
@@ -1950,7 +2051,9 @@
 
         "</p>" +
 
-        '<button type="button" class="rl-btn rl-btn--ghost rl-feed-card__copy" data-copy-reply>Скопировать черновик</button>' +
+        '<p class="rl-feed-card__reply-note">AI адаптирует формулировку под тебя</p>' +
+
+        '<button type="button" class="rl-btn rl-btn--ghost rl-feed-card__copy" data-copy-reply>Скопировать текст</button>' +
 
         "</div>";
 
@@ -2300,7 +2403,7 @@
 
       html +=
 
-        '<button type="button" class="rl-cabinet-tag--empty-link" id="rl-cabinet-tag-add">+ Добавь навыки для совместимости →</button>';
+        '<button type="button" class="rl-cabinet-tag--empty-link" id="rl-cabinet-tag-add">Добавь навыки для совместимости →</button>';
 
       if (tagsHint) {
 
@@ -2480,37 +2583,62 @@
     );
   }
 
-  function renderL1ChipBlock(row, atLimit, niche) {
-    var tag = row.tag || "";
-    var selected = state.pickerDraft.indexOf(tag) >= 0;
-    var children = row.children || [];
-    var hasL3 = children.length > 0;
-    var l3Open = selected && hasL3;
-    var html =
+  function renderL1ChipOnly(row, atLimit, niche) {
+    return (
       '<div class="rl-l1-chip-wrap">' +
       skillTreeChipHtml(row, atLimit, { niche: niche, level: "L1" }) +
-      "</div>";
-    if (hasL3) {
-      html +=
-        '<div class="rl-l3-row' +
-        (l3Open ? " is-visible" : "") +
-        '" data-l3-parent="' +
-        escapeHtml(tag) +
-        '">';
-      for (var ci = 0; ci < children.length; ci++) {
-        html += skillTreeChipHtml(
-          {
-            tag: children[ci].tag,
-            title_ru: children[ci].title_ru,
-            category: niche,
-            picker_level: "L3",
-          },
-          atLimit,
-          { niche: niche, level: "L3" }
-        );
+      "</div>"
+    );
+  }
+
+  function renderL3TrayHtml(l1skills, atLimit, niche) {
+    var activeParents = [];
+    var seen = {};
+    var merged = [];
+    var i;
+    for (i = 0; i < l1skills.length; i++) {
+      var row = l1skills[i];
+      if (!row || !(row.children || []).length) {
+        continue;
       }
-      html += "</div>";
+      if (state.pickerDraft.indexOf(row.tag) >= 0) {
+        activeParents.push(row);
+      }
     }
+    if (!activeParents.length) {
+      return '<div class="rl-l3-tray" data-subhead-tray aria-hidden="true"></div>';
+    }
+    for (i = 0; i < activeParents.length; i++) {
+      var parent = activeParents[i];
+      var ch;
+      for (ch = 0; ch < parent.children.length; ch++) {
+        var child = parent.children[ch];
+        if (!child || !child.tag || seen[child.tag]) {
+          continue;
+        }
+        seen[child.tag] = true;
+        merged.push(child);
+      }
+    }
+    if (!merged.length) {
+      return '<div class="rl-l3-tray" data-subhead-tray aria-hidden="true"></div>';
+    }
+    var html = '<div class="rl-l3-tray is-visible" data-subhead-tray>';
+    html += '<p class="rl-l3-tray__label">Уточнение (необязательно)</p>';
+    html += '<div class="rl-l3-tray__group" data-l3-deduped>';
+    for (i = 0; i < merged.length; i++) {
+      html += skillTreeChipHtml(
+        {
+          tag: merged[i].tag,
+          title_ru: merged[i].title_ru,
+          category: niche,
+          picker_level: "L3",
+        },
+        atLimit,
+        { niche: niche, level: "L3" }
+      );
+    }
+    html += "</div></div>";
     return html;
   }
 
@@ -2719,12 +2847,15 @@
       if (!l1skills.length) {
         continue;
       }
+      bodyHtml += '<div class="rl-niche-subhead-block">';
       bodyHtml +=
         '<p class="rl-niche-subhead">' + escapeHtml(String(sh.label).toUpperCase()) + "</p>";
       bodyHtml += '<div class="rl-niche-root__chips">';
       for (var lj = 0; lj < l1skills.length; lj++) {
-        bodyHtml += renderL1ChipBlock(l1skills[lj], atLimit, niche);
+        bodyHtml += renderL1ChipOnly(l1skills[lj], atLimit, niche);
       }
+      bodyHtml += "</div>";
+      bodyHtml += renderL3TrayHtml(l1skills, atLimit, niche);
       bodyHtml += "</div>";
     }
     return bodyHtml;
@@ -2797,7 +2928,7 @@
 
     if (skillTreeLimitEl) {
 
-      skillTreeLimitEl.hidden = !atLimit;
+      skillTreeLimitEl.hidden = !state.tagsLimitFlash;
 
     }
 
@@ -3048,6 +3179,8 @@
 
       });
 
+      state.tagsLimitFlash = false;
+
       if (state.expandedL1[tag]) {
 
         delete state.expandedL1[tag];
@@ -3060,6 +3193,8 @@
 
       if (state.pickerDraft.length >= MAX_USER_TAGS) {
 
+        state.tagsLimitFlash = true;
+
         updateSkillTreeChrome();
 
         renderSkillTree();
@@ -3067,6 +3202,8 @@
         return;
 
       }
+
+      state.tagsLimitFlash = false;
 
       state.pickerDraft = state.pickerDraft.concat([tag]);
 
@@ -3170,9 +3307,11 @@
 
     }
 
+    state.tagsLimitFlash = false;
+
     if (skillTreeLimitEl) {
 
-      skillTreeLimitEl.hidden = state.pickerDraft.length < MAX_USER_TAGS;
+      skillTreeLimitEl.hidden = true;
 
     }
 
@@ -3298,6 +3437,42 @@
 
 
 
+  function readTagsSyncRev() {
+
+    try {
+
+      return localStorage.getItem(TAGS_SYNC_KEY) || "";
+
+    } catch (e) {
+
+      return "";
+
+    }
+
+  }
+
+
+
+  function bumpTagsSyncRev() {
+
+    var rev = String(Date.now());
+
+    try {
+
+      localStorage.setItem(TAGS_SYNC_KEY, rev);
+
+    } catch (e) {
+
+      return;
+
+    }
+
+    state.tagsSyncRev = rev;
+
+  }
+
+
+
   function saveTags(tags, opts) {
 
     opts = opts || {};
@@ -3350,7 +3525,13 @@
 
         state.tags = data.tags || tags;
 
+        state.pickerDraft = state.tags.slice();
+
+        state.tagsLimitFlash = false;
+
         renderTags();
+
+        bumpTagsSyncRev();
 
         if (opts.fromSheet) {
 
@@ -3419,6 +3600,8 @@
       .then(function (data) {
 
         state.tags = data.tags || [];
+
+        state.tagsSyncRev = readTagsSyncRev();
 
         state.tagsStripSkeleton = false;
 
@@ -3525,38 +3708,117 @@
     return "";
   }
 
+  function qualityScore(item) {
+    var s = item.ai_score;
+    if (s == null || s === "") {
+      return null;
+    }
+    var n = Math.round(Number(s));
+    return isNaN(n) ? null : n;
+  }
+
+  function matchPctForQuality(item) {
+    var fr = item.final_rank;
+    if (fr != null && fr !== "") {
+      return Math.round(Number(fr)) || 0;
+    }
+    var q = qualityScore(item);
+    return q != null ? q : 0;
+  }
+
+  function inferCategoryFromItem(item) {
+    var c = String((item && item.category) || "").trim();
+    if (NICHE_ICONS[c]) {
+      return c;
+    }
+    var tags = leadTagKeys(item);
+    var i;
+    var niche;
+    var j;
+    var tag;
+    for (i = 0; i < NICHE_ORDER.length; i++) {
+      niche = NICHE_ORDER[i];
+      var tier = TIER_A_BY_NICHE[niche] || [];
+      for (j = 0; j < tags.length; j++) {
+        tag = tags[j];
+        if (tier.indexOf(tag) !== -1) {
+          return niche;
+        }
+      }
+    }
+    return "";
+  }
+
+  function nicheIconHtml(category) {
+    var c = String(category || "").trim();
+    if (!NICHE_ICONS[c]) {
+      return "";
+    }
+    return (
+      '<span class="rl-niche-icon rl-niche-icon--' +
+      escapeHtml(c) +
+      '" aria-hidden="true">' +
+      NICHE_ICONS[c] +
+      "</span>"
+    );
+  }
+
+  function nicheIconHtmlForItem(item) {
+    return nicheIconHtml(inferCategoryFromItem(item));
+  }
+
+  function renderDifficultyRow(item) {
+    var d = item.difficulty;
+    if (d == null || d === "") {
+      return "";
+    }
+    var n = parseInt(String(d), 10);
+    var meta = DIFFICULTY_BADGES[n];
+    if (!meta) {
+      return "";
+    }
+    return (
+      '<div class="rl-difficulty-row">' +
+      '<span class="rl-difficulty-row__label">Сложность:</span> ' +
+      '<span class="rl-difficulty-badge" title="' +
+      escapeHtml(meta.tip) +
+      '">' +
+      escapeHtml(meta.badge) +
+      "</span></div>"
+    );
+  }
+
   function renderMatchBreakdown(item) {
-    if (hasUserSkills()) {
-      var counts = countMatchedSkills(item);
-      var km = item.keyword_match != null ? item.keyword_match : 0;
-      var text =
-        counts.total > 0
-          ? "Совпало " + counts.matched + " из " + counts.total + " навыков заказа"
-          : "Совпадение навыков " + km + "%";
-      return '<div class="rl-match-breakdown">' + escapeHtml(text) + "</div>";
+    if (!hasUserSkills()) {
+      return (
+        '<div class="rl-match-breakdown">' +
+        '<button type="button" class="rl-match-breakdown__cta" data-open-skills>' +
+        escapeHtml("Добавь навыки — увидишь совместимость →") +
+        "</button></div>"
+      );
+    }
+    var km = item.keyword_match != null ? item.keyword_match : 0;
+    if (km <= 0) {
+      return "";
     }
     return (
       '<div class="rl-match-breakdown">' +
-      escapeHtml("Укажи навыки в кабинете") +
+      escapeHtml("Навыки: " + km + "%") +
       "</div>"
     );
   }
 
-  function renderMatchBlock(item) {
-    if (!hasUserSkills()) {
-      return (
-        '<div class="rl-match rl-match--no-skills">' +
-        renderMatchBreakdown(item) +
-        "</div>"
-      );
-    }
+  function renderCompatMatchBar(item) {
     var km = item.keyword_match != null ? item.keyword_match : 0;
-    var perfect = isPerfectMatch(item);
     var compatTitle =
       ' title="Насколько ваш стек совпадает с заказом — не оценка качества заказа"';
     return (
       '<div class="rl-match">' +
-      '<div class="rl-match-row">' +
+      '<div class="rl-match__label"><span' +
+      compatTitle +
+      ">" +
+      km +
+      "% Совместимость</span></div>" +
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
       km +
       '" aria-valuemin="0" aria-valuemax="100">' +
@@ -3564,18 +3826,16 @@
       km +
       '%"></span>' +
       "</div>" +
-      '<div class="rl-match__label">' +
-      '<span class="rl-match__pct">' +
-      km +
-      "%</span> " +
-      '<span class="rl-match__name"' +
-      compatTitle +
-      ">Совместимость</span>" +
-      renderPerfectBadge(perfect) +
-      "</div></div>" +
       renderMatchBreakdown(item) +
       "</div>"
     );
+  }
+
+  function renderMatchBlock(item) {
+    if (!hasUserSkills()) {
+      return '<div class="rl-match rl-match--no-skills">' + renderMatchBreakdown(item) + "</div>";
+    }
+    return renderCompatMatchBar(item);
   }
 
   var VIEWS_EYE_SVG =
@@ -3632,16 +3892,18 @@
     return '<span class="rl-badge rl-badge--replied">Отклик ✓</span>';
   }
 
-  function headBadgesHtml(item) {
+  function headBadgesHtml(item, perfect) {
     var src = sourceLabel(item.source);
     var reply = prepForDisplay(item.reply_draft || "", false).trim();
     var repliedBadge = reply ? repliedBadgeHtml() : "";
     return (
+      nicheIconHtmlForItem(item) +
       '<span class="rl-feed-card__source rl-feed-card__source--' +
       src.cls +
       '">' +
       escapeHtml(src.label) +
       "</span>" +
+      renderPerfectBadge(perfect) +
       repliedBadge +
       hotBadgeHtml(item)
     );
@@ -3661,7 +3923,7 @@
       '" tabindex="0" role="button">' +
       '<div class="rl-feed-card__head">' +
       '<div class="rl-feed-card__head-start">' +
-      headBadgesHtml(item) +
+      headBadgesHtml(item, perfect) +
       "</div>" +
       '<div class="rl-feed-card__head-meta">' +
       '<span class="rl-feed-card__time">' +
@@ -3683,9 +3945,11 @@
       escapeHtml(budget) +
       "</p>" +
       renderMatchBlock(item) +
+      renderDifficultyRow(item) +
       '<div class="rl-chips">' +
       renderTagChips(item) +
       "</div>" +
+      '<div class="rl-feed-card__cta"></div>' +
       '<div class="rl-feed-card__body">' +
       '<div class="rl-feed-card__body-inner">' +
       renderExpandedBody(item) +
@@ -4332,7 +4596,7 @@
         deleteBtn.getAttribute("data-reply-id") || card.getAttribute("data-id"),
         10
       );
-      if (!id || !window.confirm("Удалить отклик из кабинета?")) {
+      if (!id || !window.confirm("Удалить?")) {
         return;
       }
       deleteBtn.disabled = true;
@@ -4377,7 +4641,7 @@
         navigator.clipboard.writeText(text).then(function () {
           copyBtn.textContent = "Скопировано ✓";
           window.setTimeout(function () {
-            copyBtn.textContent = "Скопировать черновик";
+            copyBtn.textContent = "Скопировать текст";
           }, 2000);
         });
       }
@@ -4774,6 +5038,50 @@
 
 
 
+  function reloadTagsFromSync() {
+
+    if (!cfg.restTags) {
+
+      return;
+
+    }
+
+    var rev = readTagsSyncRev();
+
+    if (rev === state.tagsSyncRev) {
+
+      return;
+
+    }
+
+    loadTags()
+
+      .then(function () {
+
+        if (skillsModalEl && !skillsModalEl.hidden) {
+
+          state.pickerDraft = state.tags.slice();
+
+          state.tagsLimitFlash = false;
+
+          renderSkillTree();
+
+        }
+
+        resetAndLoad();
+
+      })
+
+      .catch(function () {
+
+        /* ignore background sync errors */
+
+      });
+
+  }
+
+
+
   function bootCabinet() {
 
     state.tagsStripSkeleton = true;
@@ -4801,6 +5109,26 @@
         showError("Не удалось загрузить навыки.");
 
       });
+
+    window.addEventListener("storage", function (e) {
+
+      if (e.key === TAGS_SYNC_KEY) {
+
+        reloadTagsFromSync();
+
+      }
+
+    });
+
+    document.addEventListener("visibilitychange", function () {
+
+      if (document.visibilityState === "visible") {
+
+        reloadTagsFromSync();
+
+      }
+
+    });
 
   }
 

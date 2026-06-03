@@ -9,7 +9,9 @@ from urllib.parse import urlparse
 import requests
 
 from config import Config
+from exchange_browser_fetch import fetch_listing_html_browser, listing_browser_enabled
 from exchange_proxy import exchange_fetch_begin, exchange_fetch_end, exchange_get, proxy_log_hint
+from html_fetch import HtmlFetchError
 from lead_category import category_from_kwork_listing_url, category_from_kwork_want
 from listing import SOURCE_KWORK, ListingProject
 from radar_cycle_log import log_pipeline_line
@@ -147,22 +149,32 @@ def _guess_blocked_or_changed(html: str) -> str | None:
 def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[ListingProject]:
     """GET `cfg.kwork_projects_url`, первая страница (без пагинации в MVP)."""
     url = cfg.kwork_projects_url
-    headers = {"User-Agent": cfg.http_user_agent}
     exchange_fetch_begin("kwork")
     log_pipeline_line(cfg.radar_log_path, f"fetch:kwork proxy={proxy_log_hint('kwork')}")
     try:
-        try:
-            resp = exchange_get("kwork", url, headers=headers, timeout_sec=timeout_sec)
-        except requests.RequestException as exc:
-            raise KworkListingError(f"Сетевой сбой при запросе ленты: {exc}") from exc
+        html: str | None = None
+        if listing_browser_enabled():
+            try:
+                html = fetch_listing_html_browser(
+                    "kwork",
+                    url,
+                    user_agent=cfg.http_user_agent,
+                    timeout_sec=timeout_sec,
+                )
+            except HtmlFetchError as exc:
+                logger.warning("kwork_listing: Playwright failed (%s) — httpx fallback", exc)
+        if html is None:
+            headers = {"User-Agent": cfg.http_user_agent}
+            try:
+                resp = exchange_get("kwork", url, headers=headers, timeout_sec=timeout_sec)
+            except requests.RequestException as exc:
+                raise KworkListingError(f"Сетевой сбой при запросе ленты: {exc}") from exc
+            if resp.status_code != 200:
+                raise KworkListingError(f"HTTP {resp.status_code} для ленты Kwork.")
+            encoding = resp.encoding or "utf-8"
+            html = resp.content.decode(encoding, errors="replace")
     finally:
         exchange_fetch_end("kwork")
-
-    if resp.status_code != 200:
-        raise KworkListingError(f"HTTP {resp.status_code} для ленты Kwork.")
-
-    encoding = resp.encoding or "utf-8"
-    html = resp.content.decode(encoding, errors="replace")
 
     try:
         projects = parse_listing_html(html, url)

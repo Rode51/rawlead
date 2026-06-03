@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import psycopg
 from contextlib import contextmanager
@@ -86,9 +86,14 @@ def _lite_tags_json(lite: AiLiteAnalysis | None) -> str:
 
 
 def _lite_reasons_json(lite: AiLiteAnalysis | None) -> str | None:
-    if lite is None or not lite.ai_reasons:
+    if lite is None:
         return None
-    return json.dumps(list(lite.ai_reasons), ensure_ascii=False)
+    from ai_reasons import serialize_lite_ai_reasons
+
+    return serialize_lite_ai_reasons(
+        lite.ai_reasons,
+        complexity=lite.complexity,
+    )
 
 
 def _is_visible_lite(lite: AiLiteAnalysis | None, category: str = "") -> bool:
@@ -738,6 +743,186 @@ class NeonLeadStorage:
             ]
         except Exception as exc:
             msg = f"pg:fetch_missing_l1:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return []
+
+    def fetch_leads_missing_complexity(
+        self,
+        *,
+        limit: int = 80,
+        order_desc: bool = True,
+        since: datetime | None = None,
+        errors: list[str] | None = None,
+    ) -> list[NeonLeadRow]:
+        """O97 backfill: visible лиды с L1, но без complexity в ai_reasons."""
+        if not self.enabled:
+            return []
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return []
+        err = errors if errors is not None else []
+        lim = max(1, min(int(limit), 500))
+        order_sql = "DESC" if order_desc else "ASC"
+        since_sql = ""
+        params: list[Any] = [sources]
+        if since is not None:
+            since_sql = " AND created_at >= %s"
+            params.append(since)
+        params.append(lim)
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"""
+                        SELECT id, source, external_id, title, body, url,
+                               budget_text, COALESCE(category, '')
+                        FROM leads
+                        WHERE is_visible = TRUE
+                          AND source = ANY(%s)
+                          AND ai_verdict IS NOT NULL
+                          AND COALESCE(NULLIF(task_summary, ''), '') <> ''
+                          {since_sql}
+                          AND (
+                            ai_reasons IS NULL
+                            OR jsonb_typeof(ai_reasons) = 'array'
+                            OR (
+                              jsonb_typeof(ai_reasons) = 'object'
+                              AND NOT (ai_reasons ? 'complexity')
+                            )
+                            OR (
+                              jsonb_typeof(ai_reasons) = 'object'
+                              AND (ai_reasons->>'complexity') IS NULL
+                            )
+                          )
+                        ORDER BY id {order_sql}
+                        LIMIT %s
+                        """,
+                        tuple(params),
+                    )
+                    rows = cur.fetchall()
+            return [
+                NeonLeadRow(
+                    lead_id=int(r[0]),
+                    source=str(r[1]),
+                    external_id=str(r[2]),
+                    title=str(r[3] or ""),
+                    body=str(r[4] or ""),
+                    url=str(r[5] or ""),
+                    budget_text=str(r[6] or ""),
+                    category=str(r[7] or ""),
+                )
+                for r in rows
+            ]
+        except Exception as exc:
+            msg = f"pg:fetch_missing_complexity:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return []
+
+    def fetch_visible_leads_with_l1(
+        self,
+        *,
+        limit: int = 80,
+        order_desc: bool = True,
+        since: datetime | None = None,
+        errors: list[str] | None = None,
+    ) -> list[NeonLeadRow]:
+        """O97 re-bench: visible лиды с L1 (в т.ч. уже с complexity) — повтор после правки промпта."""
+        if not self.enabled:
+            return []
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return []
+        err = errors if errors is not None else []
+        lim = max(1, min(int(limit), 500))
+        order_sql = "DESC" if order_desc else "ASC"
+        since_sql = ""
+        params: list[Any] = [sources]
+        if since is not None:
+            since_sql = " AND created_at >= %s"
+            params.append(since)
+        params.append(lim)
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"""
+                        SELECT id, source, external_id, title, body, url,
+                               budget_text, COALESCE(category, '')
+                        FROM leads
+                        WHERE is_visible = TRUE
+                          AND source = ANY(%s)
+                          AND ai_verdict IS NOT NULL
+                          AND COALESCE(NULLIF(task_summary, ''), '') <> ''
+                          {since_sql}
+                        ORDER BY id {order_sql}
+                        LIMIT %s
+                        """,
+                        tuple(params),
+                    )
+                    rows = cur.fetchall()
+            return [
+                NeonLeadRow(
+                    lead_id=int(r[0]),
+                    source=str(r[1]),
+                    external_id=str(r[2]),
+                    title=str(r[3] or ""),
+                    body=str(r[4] or ""),
+                    url=str(r[5] or ""),
+                    budget_text=str(r[6] or ""),
+                    category=str(r[7] or ""),
+                )
+                for r in rows
+            ]
+        except Exception as exc:
+            msg = f"pg:fetch_visible_l1:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return []
+
+    def fetch_leads_by_ids(
+        self,
+        lead_ids: list[int],
+        *,
+        errors: list[str] | None = None,
+    ) -> list[NeonLeadRow]:
+        """O97: точечный re-L1 по id (judge sample / owner ids)."""
+        if not self.enabled or not lead_ids:
+            return []
+        err = errors if errors is not None else []
+        ids = [int(x) for x in lead_ids if int(x) > 0]
+        if not ids:
+            return []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id, source, external_id, title, body, url,
+                               budget_text, COALESCE(category, '')
+                        FROM leads
+                        WHERE id = ANY(%s)
+                        """,
+                        (ids,),
+                    )
+                    rows = cur.fetchall()
+            by_id = {
+                int(r[0]): NeonLeadRow(
+                    lead_id=int(r[0]),
+                    source=str(r[1]),
+                    external_id=str(r[2]),
+                    title=str(r[3] or ""),
+                    body=str(r[4] or ""),
+                    url=str(r[5] or ""),
+                    budget_text=str(r[6] or ""),
+                    category=str(r[7] or ""),
+                )
+                for r in rows
+            }
+            return [by_id[i] for i in ids if i in by_id]
+        except Exception as exc:
+            msg = f"pg:fetch_by_ids:{_short_pg_err(exc)}"
             logger.warning("%s", msg)
             err.append(msg)
             return []

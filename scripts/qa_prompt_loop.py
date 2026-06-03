@@ -10,7 +10,7 @@ Usage (owner):
   .venv\\Scripts\\python.exe scripts\\qa_prompt_loop.py --profile site --full --skip-deploy
   .venv\\Scripts\\python.exe scripts\\qa_prompt_loop.py --profile site --apply --llm-edit-prompt
 
-Gate (exit 0): L2 combined ≥4.0 · send_as_is ≥50% · L1 l1_usable ≥70%
+Gate (exit 0): L2 combined ≥4.0 · send_as_is ≥50% · L1 l1_usable ≥70% · O97 complexity_ok ≥70% (or avg≥4)
 Logs: data/qa_prompt_loop_<ts>.json · data/qa_prompt_loop_<ts>.md
 Patches: data/qa_prompt_patches/iter_<N>.md
 
@@ -53,6 +53,7 @@ from ai_analyze import (
     resolve_l1_primary_category,
     sanitize_l1_category,
 )
+from ai_reasons import serialize_lite_ai_reasons
 from config import Config, apply_profile_argv, load_config, load_radar_env
 from pg_storage import neon_ai_verdict
 from public_feed import public_feed_source_sql
@@ -175,15 +176,19 @@ def _gate_pass(l2: dict[str, Any], l1: dict[str, Any]) -> bool:
         l2.get("avg_combined_3", 0) >= _JUDGE_L2_COMBINED_MIN
         and l2.get("send_as_is_pct", 0) >= _JUDGE_L2_SEND_MIN * 100
         and l1.get("l1_usable_pct", 0) >= _JUDGE_L1_USABLE_MIN * 100
+        and l1.get("accept_complexity", False)
     )
 
 
 def _pick_patch_block(l2: dict[str, Any], l1: dict[str, Any]) -> str:
     l1_fail = l1.get("l1_usable_pct", 0) < _JUDGE_L1_USABLE_MIN * 100
+    cx_fail = not l1.get("accept_complexity", True)
     l2_fail = (
         l2.get("avg_combined_3", 0) < _JUDGE_L2_COMBINED_MIN
         or l2.get("send_as_is_pct", 0) < _JUDGE_L2_SEND_MIN * 100
     )
+    if cx_fail and not l1_fail and not l2_fail:
+        return "_LITE_SYSTEM_HEAD"
     if l1_fail and not l2_fail:
         return "_LITE_SYSTEM_HEAD"
     if l2_fail and not l1_fail:
@@ -196,12 +201,16 @@ def _pick_patch_block(l2: dict[str, Any], l1: dict[str, Any]) -> str:
         if l1_gap >= max(send_gap, comb_gap):
             return "_LITE_SYSTEM_HEAD"
         return "_SHARED_REPLY_CORE"
+    if cx_fail:
+        return "_LITE_SYSTEM_HEAD"
     return "_SHARED_REPLY_CORE"
 
 
 def _top_fixes(l2: dict[str, Any], l1: dict[str, Any], block: str) -> list[str]:
     if block == "_LITE_SYSTEM_HEAD":
-        return list(l1.get("l1_prompt_recommendations", [])[:5])
+        fixes = list(l1.get("l1_prompt_recommendations", [])[:3])
+        fixes.extend(l1.get("complexity_prompt_recommendations", [])[:3])
+        return fixes[:5]
     if block == "_TOOLS_ONLY_SYSTEM":
         return list(l2.get("prompt_recommendations", [])[:5])
     return list(l2.get("prompt_recommendations", [])[:5])
@@ -409,6 +418,7 @@ def _render_md(run: dict[str, Any]) -> str:
                 f"- combined: **{it['l2'].get('avg_combined_3')}** · "
                 f"send: **{it['l2'].get('send_as_is_pct')}%** · "
                 f"L1 usable: **{it['l1'].get('l1_usable_pct')}%** · "
+                f"cx_ok: **{it['l1'].get('complexity_ok_pct')}%** · "
                 f"gate: {'PASS' if it.get('gate_pass') else 'FAIL'}",
             ]
         )
@@ -487,6 +497,7 @@ def _one_iteration(
         f"Iter {iteration}: combined={l2.get('avg_combined_3')} "
         f"send={l2.get('send_as_is_pct')}% "
         f"L1 usable={l1.get('l1_usable_pct')}% "
+        f"cx_ok={l1.get('complexity_ok_pct')}% "
         f"({'PASS' if gate else 'FAIL'})",
         flush=True,
     )
@@ -506,6 +517,8 @@ def _one_iteration(
         "l2_combined": l2.get("avg_combined_3"),
         "send_as_is_pct": l2.get("send_as_is_pct"),
         "l1_usable_pct": l1.get("l1_usable_pct"),
+        "complexity_ok_pct": l1.get("complexity_ok_pct"),
+        "avg_complexity_rating": l1.get("avg_complexity_rating"),
     }
     try:
         new_content, rationale = _llm_edit_block(
@@ -617,7 +630,9 @@ def _replay_l1_tools(cfg: Config, leads: list[dict[str, Any]]) -> dict[str, Any]
                         neon_ai_verdict(lite),
                         lite.task_summary,
                         json.dumps(list(lite.lead_tags), ensure_ascii=False),
-                        json.dumps(list(lite.ai_reasons), ensure_ascii=False),
+                        serialize_lite_ai_reasons(
+                            lite.ai_reasons, complexity=lite.complexity
+                        ),
                         category,
                         lead_id,
                     ),

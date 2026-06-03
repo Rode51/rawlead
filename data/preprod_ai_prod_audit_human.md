@@ -1,12 +1,12 @@
 # O72 — AI prod audit (human)
 
-- **Time:** 2026-06-01T10:22:53.771651+00:00
-- **L2 sample (reply_draft):** 22 leads
-- **Draft quality (L1+L2, без tools):** **100.0%** (✅ ≥95%) · 22/22 pass
-- **Tools bucket (отдельно):** **27.3%** · 6/22 pass · KNOWN_TOOLS + canonical aliases
-- **Combined auto-pass (draft+tools):** 27.3% (❌ <85%)
+- **Time:** 2026-06-03T13:32:05.330267+00:00
+- **L2 sample (reply_draft):** 72 leads
+- **Draft quality (L1+L2, без tools):** **95.8%** (✅ ≥95%) · 69/72 pass
+- **Tools bucket (отдельно):** **97.2%** · 70/72 pass · KNOWN_TOOLS + canonical aliases
+- **Combined auto-pass (draft+tools):** 93.1% (✅ ≥85%)
 - **L1 empty bucket:** 0 leads · missing summary **0**
-- **Merged rows:** 22
+- **Merged rows:** 72
 - **Profile:** site
 
 > **O72b:** draft-only % — gate качества отклика (L1+L2); tools — отдельная строка (KNOWN_TOOLS whitelist + canonical aliases, без раздувания picker 51).
@@ -15,41 +15,42 @@
 
 ## Draft fail types (L1+L2)
 
-- _(none)_
+- `L2:reply_draft`: **3**
 
 ## Tools fail types
 
-- `tools:not_in_catalog`: **14**
-- `tools:vendor_lock`: **2**
 - `tools:min_2_required`: **2**
 
 ## Top draft fail cases
 
+- **#8734** [kwork/dev] 'Нужно настроить почтовый сервер MailWizz'
+  - fails: L2:reply_draft: обязательное начало «Здравствуйте»
+- **#8720** [kwork/marketing] 'Парсинг email кадровых агенств'
+  - fails: L2:reply_draft: обязательное начало «Здравствуйте»
+- **#8702** [kwork/dev] 'Установка и доработка WordPress-темы ресторана'
+  - fails: L2:reply_draft: обязательное начало «Здравствуйте»
 
 ## Top tools fail cases
 
-- **#8764** [kwork/dev] 'Консультация по Авито'
-  - fails: tools:min_2_required, tools:not_in_catalog:avito
-- **#8752** [kwork/design] 'Платформа для учебного центра'
-  - fails: tools:vendor_lock:telethon,neon, tools:not_in_catalog:aiogram_3
-- **#8925** [fl/dev] 'Скрипты из Google-таблиц перестали работать. Нужно адаптировать сценарии к новой'
-  - fails: tools:not_in_catalog:google_sheets
-- **#8902** [kwork/dev] 'Сделать футажи'
-  - fails: tools:not_in_catalog:after_effects,cinema_4d
-- **#8812** [kwork/dev] 'Помощь в работе с блогерами'
+- **#8812** [kwork/marketing] 'Помощь в работе с блогерами'
   - fails: tools:min_2_required
-- **#8794** [kwork/design] 'Ускорьте сайт WP-Elementor'
-  - fails: tools:not_in_catalog:elementor
-- **#8788** [kwork/design] 'Есть сайт на неткате'
-  - fails: tools:not_in_catalog:netcat
-- **#8782** [kwork/marketing] 'SEO оптимизация сайта'
-  - fails: tools:not_in_catalog:robots_txt,sitemap_xml
-- **#8776** [kwork/design] 'Улучшить скорость работы сайта Elementor, WC, Tutor'
-  - fails: tools:not_in_catalog:elementor,woocommerce,tutor_lms,pagespeed_insights,wp_rocket
-- **#8774** [kwork/design] 'Разместить на саите каталог автопитера'
-  - fails: tools:vendor_lock:telethon,neon
+- **#8782** [kwork/dev] 'SEO оптимизация сайта'
+  - fails: tools:min_2_required
 
 ## LLM judge (O72c)
 
-- L2 scored: 22/22 · combined **4.03**/5 · send_as_is **31.8%** · ❌
+- L2 scored: 10/10 · combined **3.83**/5 · send_as_is **40.0%** · ❌
 - Подробно: `data/preprod_ai_prod_audit_judge.md`
+
+## Owner lead_ids (root cause)
+
+- **#8925**: auto_pass
+- **#10442**: auto_pass
+- **#9843**: auto_pass
+- **#8752**: auto_pass
+- **#9581**: auto_pass
+- **#8772**: auto_pass
+- **#9831**: auto_pass
+- **#9374**: auto_pass
+- **#9326**: auto_pass
+- **#10362**: auto_pass

@@ -10,8 +10,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from config import load_config
-from health_check import send_owner_text
+from config import load_config, radar_tg_enabled
+from exchange_health import (
+    ALERT_COOLDOWN_SEC,
+    health_source_ids,
+    load_all_health,
+    load_health,
+    maybe_send_red_alert,
+)
+from health_check import send_flparsing_admin_text
 from pg_storage import pg_storage_from_config
 from radar_cycle_log import load_cycle_summary
 from proxy_exchange_probe import probe_exchange_pools
@@ -66,6 +73,21 @@ def _maybe_restart(gap_min: int, restart_gap_min: int, auto_restart: bool) -> st
     return "restart ok"
 
 
+def _watchdog_sources() -> tuple[str, ...]:
+    ids = list(health_source_ids())
+    if "tg" in ids and not radar_tg_enabled():
+        ids.remove("tg")
+    return tuple(ids)
+
+
+def _insert_gap_threshold(source: str, *, default: int, youdo_gap: int) -> int:
+    if source == "youdo":
+        return youdo_gap
+    if source in ("fl", "kwork"):
+        return default
+    return youdo_gap
+
+
 def main() -> int:
     cfg = load_config()
     storage = storage_from_config(cfg)
@@ -75,6 +97,7 @@ def main() -> int:
 
     cycle_gap_min = _env_int("WATCHDOG_CYCLE_GAP_MIN", 15)
     insert_gap_min = _env_int("WATCHDOG_INSERT_GAP_MIN", 20)
+    youdo_gap_min = _env_int("WATCHDOG_YOUDO_GAP_MIN", 45)
     l1_backlog_limit = _env_int("WATCHDOG_L1_BACKLOG", 120)
     restart_gap_min = _env_int("WATCHDOG_RESTART_GAP_MIN", 25)
     auto_restart = os.environ.get("WATCHDOG_AUTO_RESTART", "1").strip().lower() not in (
@@ -82,16 +105,17 @@ def main() -> int:
         "false",
         "no",
     )
-    cooldown = _env_int("WATCHDOG_ALERT_COOLDOWN_SEC", 1800)
+    cooldown = _env_int("WATCHDOG_ALERT_COOLDOWN_SEC", ALERT_COOLDOWN_SEC)
 
     summary = load_cycle_summary(storage)
     ops = pg.ingest_ops_snapshot()
     backlog = pg.count_leads_missing_l1_recent(hours=48)
     pools = probe_exchange_pools()
+    all_health = load_all_health(storage)
 
     gaps = {
         src: int((ops.get(src) or {}).get("last_insert_gap_sec", 0) // 60)
-        for src in ("fl", "kwork")
+        for src in _watchdog_sources()
     }
     cycle_gap = 0
     if summary and summary.ts:
@@ -109,9 +133,14 @@ def main() -> int:
     reasons: list[str] = []
     if cycle_gap > cycle_gap_min:
         reasons.append(f"cycle_gap={cycle_gap}m>{cycle_gap_min}m")
-    for src in ("fl", "kwork"):
-        if gaps[src] > insert_gap_min:
-            reasons.append(f"{src}_insert_gap={gaps[src]}m>{insert_gap_min}m")
+    for src in _watchdog_sources():
+        threshold = _insert_gap_threshold(
+            src,
+            default=insert_gap_min,
+            youdo_gap=youdo_gap_min,
+        )
+        if gaps.get(src, 0) > threshold:
+            reasons.append(f"{src}_insert_gap={gaps[src]}m>{threshold}m")
     if backlog > l1_backlog_limit:
         reasons.append(f"l1_backlog={backlog}>{l1_backlog_limit}")
     for src in ("fl", "kwork"):
@@ -136,7 +165,7 @@ def main() -> int:
     if now_bad:
         if _should_alert(storage, cooldown):
             restart_note = _maybe_restart(
-                max([cycle_gap, gaps["fl"], gaps["kwork"]]),
+                max([cycle_gap, *gaps.values()] or [0]),
                 restart_gap_min,
                 auto_restart,
             )
@@ -148,15 +177,28 @@ def main() -> int:
             )
             if restart_note:
                 text += f"\n- {restart_note}"
-            send_owner_text(cfg, text)
+            send_flparsing_admin_text(text)
             _mark_alert(storage)
     elif was_bad:
-        send_owner_text(
-            cfg,
+        fl_g = gaps.get("fl", 0)
+        kw_g = gaps.get("kwork", 0)
+        send_flparsing_admin_text(
             "✅ RawLead ingest recovered\n"
             f"- cycle_gap={cycle_gap}m\n"
-            f"- fl gap={gaps['fl']}m, kwork gap={gaps['kwork']}m\n"
+            f"- fl gap={fl_g}m, kwork gap={kw_g}m\n"
             f"- backlog={backlog}",
+        )
+
+    for src in _watchdog_sources():
+        health = all_health.get(src) or load_health(storage, src)
+        st = summary.sources.get(src) if summary else None
+        fetch_failed = bool(st and st.fetch_error)
+        maybe_send_red_alert(
+            storage,
+            src,
+            health,
+            fetch_failed=fetch_failed,
+            cooldown_sec=cooldown,
         )
 
     print(json.dumps(status, ensure_ascii=False))

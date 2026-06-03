@@ -813,34 +813,35 @@ def drain_l1_backlog(
     return done
 
 
-def drain_tools_backlog(
+def _tools_lite_for_row(row: NeonLeadRow) -> tuple[ListingProject, AiLiteAnalysis]:
+    project = _listing_from_neon_row(row)
+    snippet = (project.listing_snippet or project.title or "").strip()
+    lite = AiLiteAnalysis(
+        feed_visible=True,
+        task_summary=snippet[:400],
+        lead_tags=(),
+        ai_reasons=(),
+    )
+    return project, lite
+
+
+def replay_tools_for_rows(
     cfg: Config,
     pg: NeonLeadStorage,
+    rows: list[NeonLeadRow],
     *,
     errors: list[str],
-    limit: int = 8,
 ) -> int:
-    """Site: L2 tools-only для visible leads без tools_required."""
-    if not cfg.ai_active or not pg.enabled:
+    """O98: L2 tools-only + persist для выбранных Neon rows."""
+    if not cfg.ai_active or not pg.enabled or not rows:
         return 0
-    if cfg.radar_profile != "site":
-        return 0
-    rows = pg.fetch_leads_missing_tools(limit=limit, errors=errors)
-    if not rows:
-        return 0
-    from ai_analyze import AiLiteAnalysis, analyze_lead_tools
+    from ai_analyze import analyze_lead_tools
 
     done = 0
     for row in rows:
-        project = _listing_from_neon_row(row)
+        project, lite = _tools_lite_for_row(row)
         snippet = (project.listing_snippet or project.title or "").strip()
         log_prefix = f"{row.source}:id={row.external_id} tools:"
-        lite = AiLiteAnalysis(
-            feed_visible=True,
-            task_summary=snippet[:400],
-            lead_tags=(),
-            ai_reasons=(),
-        )
         tools = analyze_lead_tools(
             cfg,
             title=project.title,
@@ -864,6 +865,24 @@ def drain_tools_backlog(
                 f"{row.source}:id={row.external_id} tools:ok n={len(tools)}"
             )
     return done
+
+
+def drain_tools_backlog(
+    cfg: Config,
+    pg: NeonLeadStorage,
+    *,
+    errors: list[str],
+    limit: int = 8,
+) -> int:
+    """Site: L2 tools-only для visible leads без tools_required."""
+    if not cfg.ai_active or not pg.enabled:
+        return 0
+    if cfg.radar_profile != "site":
+        return 0
+    rows = pg.fetch_leads_missing_tools(limit=limit, errors=errors)
+    if not rows:
+        return 0
+    return replay_tools_for_rows(cfg, pg, rows, errors=errors)
 
 
 def process_legacy_neon_listing(

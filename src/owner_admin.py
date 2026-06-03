@@ -59,6 +59,9 @@ th{background:#121820} .err{color:var(--bad)} .btn{font-size:.75rem;padding:.2re
 __LOGIN_BLOCK__
 <p class="sub" id="rl-ops-status">__STATUS__</p>
 <div class="grid" id="rl-ops-cards">__CARDS__</div>
+<section><h3>Биржи и скорость</h3>
+<div class="grid" id="rl-ops-exchanges">__EXCHANGES__</div>
+</section>
 <section><h3>Управление</h3><div class="ctl" id="rl-ops-controls">__CONTROLS__</div><div id="rl-ops-control-status" class="ctl-status"><span class="dot"></span><span>Ожидание команд</span></div></section>
 <section><h3>Последние заказы в ленте</h3>
 <table id="rl-ops-leads"><thead><tr><th>#</th><th>Источник</th><th>Заголовок</th><th></th></tr></thead><tbody>__LEADS__</tbody></table>
@@ -638,18 +641,19 @@ def _ingest_metrics_snapshot() -> dict[str, dict[str, int | float | str]]:
                 )
                 for row in cur.fetchall():
                     bucket = str(row[0] or "")
-                    if bucket in ("fl", "kwork", "tg"):
-                        out[bucket] = {
-                            "last_insert_gap_sec": int(row[1] or 0),
-                            "last_insert_at": str(row[2] or ""),
-                            "backlog": int(row[3] or 0),
-                            "ingest_p50_sec": float(row[4] or 0.0),
-                            "ingest_p95_sec": float(row[5] or 0.0),
-                            "l1_p50_sec": float(row[6] or 0.0),
-                            "l1_p95_sec": float(row[7] or 0.0),
-                            "feed_p50_sec": float(row[8] or 0.0),
-                            "feed_p95_sec": float(row[9] or 0.0),
-                        }
+                    if not bucket:
+                        continue
+                    out[bucket] = {
+                        "last_insert_gap_sec": int(row[1] or 0),
+                        "last_insert_at": str(row[2] or ""),
+                        "backlog": int(row[3] or 0),
+                        "ingest_p50_sec": float(row[4] or 0.0),
+                        "ingest_p95_sec": float(row[5] or 0.0),
+                        "l1_p50_sec": float(row[6] or 0.0),
+                        "l1_p95_sec": float(row[7] or 0.0),
+                        "feed_p50_sec": float(row[8] or 0.0),
+                        "feed_p95_sec": float(row[9] or 0.0),
+                    }
     except Exception:
         return {}
     return out
@@ -672,6 +676,38 @@ def _format_ingest_hint(metrics: dict[str, dict[str, int | float | str]]) -> str
             f"p95(in/l1/feed) {ingest_p95}/{l1_p95}/{feed_p95}m"
         )
     return " | ".join(parts)
+
+
+def _exchange_ops_rows() -> list[dict[str, Any]]:
+    sqlite = _resolve_sqlite_path()
+    if sqlite is None:
+        return []
+    try:
+        from exchange_health import build_ops_exchange_row, health_source_ids, load_all_health
+        from radar_cycle_log import load_cycle_summary
+        from storage import ProjectStorage
+
+        storage = ProjectStorage(sqlite)
+        summary = load_cycle_summary(storage)
+        all_health = load_all_health(storage)
+        ingest = _ingest_metrics_snapshot()
+    except Exception:
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for sid in health_source_ids():
+        health = all_health.get(sid) or {}
+        st = summary.sources.get(sid) if summary else None
+        fetch_failed = bool(st and st.fetch_error)
+        rows.append(
+            build_ops_exchange_row(
+                sid,
+                health,
+                ingest.get(sid),
+                fetch_failed=fetch_failed,
+            )
+        )
+    return rows
 
 
 def hide_lead(database_url: str, lead_id: int) -> bool:
@@ -833,6 +869,7 @@ def fetch_dashboard(database_url: str) -> dict[str, Any]:
         "problems": count_log_errors(),
         "users": users,
         "pageviews": pageviews,
+        "exchanges": _exchange_ops_rows(),
     }
 
 
@@ -873,6 +910,32 @@ def _render_cards(data: dict[str, Any]) -> str:
         + _card_html("Бот", f"{int(bot.get('push_subscribers') or 0)} с push", push_hint, "ok")
         + _card_html("Проблемы за 24 ч", f"{auth_e} вход · {fetch_e} парсер", "Детали — radar.log", p_level)
     )
+
+
+def _render_exchanges(data: dict[str, Any]) -> str:
+    rows = data.get("exchanges") or []
+    if not rows:
+        return '<div class="card"><p class="hint">Нет данных о биржах (SQLite или Neon недоступны)</p></div>'
+    parts: list[str] = []
+    for row in rows:
+        level = str(row.get("level") or "warn")
+        name = str(row.get("name") or "—")
+        status = str(row.get("status_label") or "—")
+        gap = int(row.get("last_insert_ago_min") or 0)
+        last_ins = str(row.get("last_insert_at") or "").strip()
+        insert_hint = f"{last_ins} ({gap} мин назад)" if last_ins else "ещё не было"
+        ingest_min = row.get("ingest_p50_min")
+        feed_min = row.get("feed_p50_min")
+        lag_parts: list[str] = []
+        if ingest_min is not None:
+            lag_parts.append(f"На бирже → к нам: {ingest_min} мин")
+        if feed_min is not None:
+            lag_parts.append(f"К нам → в ленту: {feed_min} мин")
+        lag_hint = " · ".join(lag_parts) if lag_parts else "Тайминги — после накопления данных"
+        what = html.escape(str(row.get("what_happened") or "—"))
+        hint = html.escape(f"Последний заказ: {insert_hint} · {lag_hint} · {what}")
+        parts.append(_card_html(name, status, hint, level))
+    return "".join(parts)
 
 
 def _render_controls() -> str:
@@ -954,6 +1017,7 @@ def ops_html(*, api_base: str, data: dict[str, Any] | None = None) -> str:
             _OPS_HTML.replace("__LOGIN_BLOCK__", "")
             .replace("__STATUS__", f"Обновлено {updated}")
             .replace("__CARDS__", _render_cards(data))
+            .replace("__EXCHANGES__", _render_exchanges(data))
             .replace("__CONTROLS__", _render_controls())
             .replace("__LEADS__", _render_leads_rows(data))
             .replace("__VIEWS__", _render_views_rows(data))
@@ -966,6 +1030,7 @@ def ops_html(*, api_base: str, data: dict[str, Any] | None = None) -> str:
         _OPS_HTML.replace("__LOGIN_BLOCK__", _OPS_LOGIN_BLOCK)
         .replace("__STATUS__", "Нужен вход в кабинет (см. шаги ниже)")
         .replace("__CARDS__", "")
+        .replace("__EXCHANGES__", "")
         .replace("__CONTROLS__", "")
         .replace("__LEADS__", "")
         .replace("__VIEWS__", "")

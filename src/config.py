@@ -55,10 +55,12 @@ class Config:
     tg_proxy_url: str
     ai_enabled: bool
     ai_api_key: str
+    ai_api_key_l1_b: str
     ai_model: str
     ai_model_summary: str
     ai_model_premium: str
     ai_model_shared_draft: str
+    ai_model_l3_uniquify: str
     ai_model_judge: str
     ai_provider: str
     min_budget_rub: int
@@ -83,6 +85,14 @@ class Config:
     def ai_active(self) -> bool:
         """ИИ включён в .env и задан ключ."""
         return self.ai_enabled and bool(self.ai_api_key)
+
+    def l1_openrouter_api_key(self, worker_slot: int) -> str:
+        """L1 hot path: чётные воркеры → OPENROUTER_API_KEY_L1_B, нечётные → основной."""
+        alt = (self.ai_api_key_l1_b or "").strip()
+        if not alt:
+            return self.ai_api_key
+        slot = max(1, int(worker_slot))
+        return alt if slot % 2 == 0 else self.ai_api_key
 
     @property
     def ai_uses_l1_l2(self) -> bool:
@@ -122,8 +132,10 @@ def _apply_profile_defaults(profile: str) -> None:
             os.environ[key] = value
 
 
-def load_radar_env() -> str:
-    """Профиль → defaults → `.env.{profile}` или fallback `.env`."""
+def load_radar_env(*, merge_root_env: bool = True) -> str:
+    """Профиль → defaults → `.env.{profile}`; опц. fallback `.env`."""
+    if os.environ.get("RADAR_ENV_NO_MERGE", "").strip().lower() in ("1", "true", "yes"):
+        merge_root_env = False
     apply_profile_argv()
     profile = radar_profile()
     os.environ["RADAR_PROFILE"] = profile
@@ -132,7 +144,7 @@ def load_radar_env() -> str:
     fallback = _PROJECT_ROOT / ".env"
     if specific.is_file():
         load_dotenv(specific, override=True)
-    if fallback.is_file():
+    if merge_root_env and fallback.is_file():
         load_dotenv(fallback, override=False)
     return profile
 
@@ -812,6 +824,8 @@ def load_config() -> Config:
     ai_enabled = _parse_bool_flag(os.environ.get("AI_ENABLED"), default=False)
     ai_key_raw = os.environ.get("AI_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
     ai_api_key = str(ai_key_raw).strip() if ai_key_raw is not None else ""
+    ai_key_b_raw = os.environ.get("OPENROUTER_API_KEY_L1_B", "").strip()
+    ai_api_key_l1_b = str(ai_key_b_raw).strip() if ai_key_b_raw else ""
 
     ai_model_raw = os.environ.get("AI_MODEL")
     ai_model = (
@@ -836,6 +850,12 @@ def load_config() -> Config:
         str(shared_raw).strip()
         if shared_raw and str(shared_raw).strip()
         else ai_model_premium
+    )
+    l3_uniquify_raw = os.environ.get("OPENROUTER_MODEL_L3_UNIQUIFY")
+    ai_model_l3_uniquify = (
+        str(l3_uniquify_raw).strip()
+        if l3_uniquify_raw and str(l3_uniquify_raw).strip()
+        else ai_model_shared_draft
     )
     judge_raw = os.environ.get("OPENROUTER_MODEL_JUDGE")
     ai_model_judge = (
@@ -896,10 +916,12 @@ def load_config() -> Config:
         tg_proxy_url=tg_proxy_url,
         ai_enabled=ai_enabled,
         ai_api_key=ai_api_key,
+        ai_api_key_l1_b=ai_api_key_l1_b,
         ai_model=ai_model,
         ai_model_summary=ai_model_summary,
         ai_model_premium=ai_model_premium,
         ai_model_shared_draft=ai_model_shared_draft,
+        ai_model_l3_uniquify=ai_model_l3_uniquify,
         ai_model_judge=ai_model_judge,
         ai_provider=ai_provider,
         min_budget_rub=min_budget_rub,
@@ -920,3 +942,28 @@ def load_config() -> Config:
         stars_price_xtr=stars_price_xtr,
         stars_subscription_days=stars_subscription_days,
     )
+
+
+def load_config_for_profile(
+    profile: str,
+    *,
+    merge_root_env: bool = True,
+) -> Config:
+    """Загрузить `.env.{profile}` без смены процесса (ops-алерты site → legacy бот)."""
+    prev = os.environ.get("RADAR_PROFILE")
+    prev_no_merge = os.environ.get("RADAR_ENV_NO_MERGE")
+    prof = profile.strip().casefold()
+    os.environ["RADAR_PROFILE"] = prof
+    if not merge_root_env:
+        os.environ["RADAR_ENV_NO_MERGE"] = "1"
+    try:
+        return load_config()
+    finally:
+        if prev is None:
+            os.environ.pop("RADAR_PROFILE", None)
+        else:
+            os.environ["RADAR_PROFILE"] = prev
+        if prev_no_merge is None:
+            os.environ.pop("RADAR_ENV_NO_MERGE", None)
+        else:
+            os.environ["RADAR_ENV_NO_MERGE"] = prev_no_merge

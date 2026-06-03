@@ -91,6 +91,7 @@ def test_legacy_poll_interval_config() -> None:
         tg_proxy_url="http://127.0.0.1:8080",
         ai_enabled=False,
         ai_api_key="",
+        ai_api_key_l1_b="",
         ai_model="m",
         ai_model_summary="m",
         ai_model_premium="m",

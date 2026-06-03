@@ -6,7 +6,6 @@ import os
 import random
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Callable
 from pathlib import Path
 
@@ -50,6 +49,15 @@ from vc_ru_parser import VcRuListingError, fetch_listing_projects as fetch_vc_ru
 from l1_pool import L1Pool
 from delist_checker import run_delist_batch
 from feed_retention import run_feed_retention_batch
+from exchange_health import (
+    GREEN_MAX_MIN,
+    append_health_log,
+    format_health_log_line,
+    load_health,
+    maybe_send_red_alert,
+    record_fetch,
+    record_ok_ping,
+)
 from lead_pipeline import drain_l1_backlog, drain_tools_backlog, process_new_listing, short_err
 from listing import ListingProject
 from pg_storage import NeonLeadStorage, pg_storage_from_config
@@ -218,33 +226,6 @@ def _process_listings(
     return new_ids, notifications
 
 
-def _fetch_listings_parallel(
-    cfg: Config,
-    enabled_sources: set[str],
-    errors: list[str],
-) -> dict[str, list[ListingProject] | None]:
-    """Параллельный fetch FL + Kwork (только сеть, без SQLite)."""
-    tasks: dict[str, Callable[[], list[ListingProject]]] = {}
-    if "fl" in enabled_sources:
-        tasks["fl"] = lambda: fetch_listing_projects(cfg)
-    if "kwork" in enabled_sources and cfg.kwork_projects_url:
-        tasks["kwork"] = lambda: fetch_kwork_listing_projects(cfg)
-    out: dict[str, list[ListingProject] | None] = {k: None for k in tasks}
-    if not tasks:
-        return out
-    with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
-        future_map = {pool.submit(fn): label for label, fn in tasks.items()}
-        for future in as_completed(future_map):
-            label = future_map[future]
-            try:
-                out[label] = future.result()
-            except (FlListingError, KworkListingError) as exc:
-                errors.append(f"{label}:fetch:{short_err(exc)}")
-            except Exception as exc:
-                errors.append(f"{label}:fetch:{short_err(exc)}")
-    return out
-
-
 def _fetch_source(
     label: str,
     fetch_fn: Callable[[Config], list[ListingProject]],
@@ -270,6 +251,61 @@ def _fetch_source(
 
 def _log_source_line(log_path: Path, stats: SourceCycleStats) -> None:
     _append_log_line(log_path, stats.format_line(), echo=True)
+
+
+def _record_source_health(
+    storage: ProjectStorage,
+    source: str,
+    stats: SourceCycleStats,
+    *,
+    ts: str,
+) -> None:
+    ok = not stats.fetch_error
+    health = record_fetch(
+        storage,
+        source,
+        ok=ok,
+        error_msg=stats.fetch_error,
+        downloaded=stats.downloaded,
+        new_ids=stats.new_ids,
+        ts=ts,
+    )
+    maybe_send_red_alert(storage, source, health, fetch_failed=not ok)
+
+
+def _log_cycle_health_lines(
+    cfg: Config,
+    storage: ProjectStorage,
+    summary: CycleSummary,
+    *,
+    lag_report: dict[str, dict[str, float | int]] | None = None,
+) -> None:
+    for sid, st in summary.sources.items():
+        health = load_health(storage, sid)
+        lag_row = (lag_report or {}).get(sid) or {}
+        p50 = float(lag_row.get("ingest_p50_sec", 0.0) or 0.0)
+        lag_min = int(p50 // 60) if p50 > 0 else None
+        line = format_health_log_line(
+            sid,
+            health,
+            fetch_ok=not st.fetch_error,
+            ingest_lag_p50_min=lag_min,
+        )
+        append_health_log(cfg.radar_log_path, line)
+
+
+def _should_fetch_secondary(storage: ProjectStorage) -> bool:
+    """O99: secondary (YouDo, Пчёл, …) реже — не блокирует hot FL/Kwork."""
+    every = max(1, int(os.getenv("SECONDARY_FETCH_EVERY_N_CYCLES", "2") or "2"))
+    if every <= 1:
+        return True
+    raw = storage.get_setting("main_cycle_count", "0") or "0"
+    try:
+        n = int(raw) + 1
+    except ValueError:
+        n = 1
+    storage.set_setting("main_cycle_count", str(n))
+    return (n - 1) % every == 0
 
 
 def _collect_misc_errors(errors: list[str], summary: CycleSummary) -> None:
@@ -316,13 +352,9 @@ def run_cycle(
     ):
         l1_pool = L1Pool(cfg, pg, errors=errors)
 
-    prefetched = _fetch_listings_parallel(cfg, enabled_sources, errors)
-
     if "fl" in enabled_sources:
         stats_fl = summary.ensure("fl")
-        fl_projects = prefetched.get("fl")
-        if fl_projects is None and not any(e.startswith("fl:fetch:") for e in errors):
-            fl_projects = _fetch_source("fl", fetch_listing_projects, cfg, errors, stats_fl)
+        fl_projects = _fetch_source("fl", fetch_listing_projects, cfg, errors, stats_fl)
         if fl_projects is None:
             for err in errors:
                 if err.startswith("fl:fetch:"):
@@ -346,19 +378,16 @@ def run_cycle(
             stats_fl.to_bot = notify
             summary.total_to_bot += notify
         _log_source_line(cfg.radar_log_path, stats_fl)
+        _record_source_health(storage, "fl", stats_fl, ts=ts)
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
     if "kwork" in enabled_sources:
         stats_kwork = summary.ensure("kwork")
         if cfg.kwork_projects_url:
-            kwork_projects = prefetched.get("kwork")
-            if kwork_projects is None and not any(
-                e.startswith("kwork:fetch:") for e in errors
-            ):
-                kwork_projects = _fetch_source(
-                    "kwork", fetch_kwork_listing_projects, cfg, errors, stats_kwork
-                )
+            kwork_projects = _fetch_source(
+                "kwork", fetch_kwork_listing_projects, cfg, errors, stats_kwork
+            )
             if kwork_projects is not None:
                 stats_kwork.downloaded = len(kwork_projects)
                 n, notify = _process_listings(
@@ -376,11 +405,31 @@ def run_cycle(
                 stats_kwork.to_bot = notify
                 summary.total_to_bot += notify
         _log_source_line(cfg.radar_log_path, stats_kwork)
+        _record_source_health(storage, "kwork", stats_kwork, ts=ts)
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
+    if l1_pool is not None:
+        l1_hot = l1_pool.drain(shutdown=False)
+        if l1_hot > 0:
+            _append_log_line(
+                cfg.radar_log_path,
+                f"pipeline:L1 hot done={l1_hot} workers={cfg.l1_max_workers}",
+                echo=True,
+            )
+
+    fetch_secondary = _should_fetch_secondary(storage)
+    if not fetch_secondary:
+        _append_log_line(
+            cfg.radar_log_path,
+            "fetch:secondary skip (SECONDARY_FETCH_EVERY_N_CYCLES)",
+            echo=False,
+        )
+
     for source_label, fetch_fn in _P1_WEB_SOURCES:
         if source_label not in enabled_sources:
+            continue
+        if not fetch_secondary:
             continue
         stats_web = summary.ensure(source_label)
         _tg_poll_if_due(cfg, storage, tg_poll_state)
@@ -404,6 +453,7 @@ def run_cycle(
             stats_web.to_bot = notify
             summary.total_to_bot += notify
         _log_source_line(cfg.radar_log_path, stats_web)
+        _record_source_health(storage, source_label, stats_web, ts=ts)
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
@@ -457,22 +507,32 @@ def run_cycle(
     record_cycle_summary(storage, summary)
     storage.set_setting("status_main_last_cycle_at", summary.ts)
     for src in sorted(enabled_sources):
-        st = summary.by_source.get(src)
+        st = summary.sources.get(src)
         ok = bool(st and not st.fetch_error)
         storage.set_setting(f"status_fetch_ok_{src}", "1" if ok else "0")
+    lag_report: dict[str, dict[str, float | int]] | None = None
     if pg is not None and pg.enabled:
         snap = pg.ingest_ops_snapshot(errors)
+        lag_report = pg.ingest_lag_report(errors=errors)
         newest = ""
         newest_gap = None
         for src in ("fl", "kwork", "tg"):
             row = snap.get(src) or {}
-            ts = str(row.get("last_insert_at", "")).strip()
+            ins_ts = str(row.get("last_insert_at", "")).strip()
             gap = int(row.get("last_insert_gap_sec", 0) or 0)
-            if ts and (newest_gap is None or gap < newest_gap):
-                newest = ts
+            if ins_ts and (newest_gap is None or gap < newest_gap):
+                newest = ins_ts
                 newest_gap = gap
+            if src == "tg" and gap <= GREEN_MAX_MIN * 60:
+                record_ok_ping(storage, "tg", ts=summary.ts)
         if newest:
             storage.set_setting("status_neon_last_insert_at", newest)
+        for src, row in snap.items():
+            gap = int(row.get("last_insert_gap_sec", 0) or 0)
+            if gap <= GREEN_MAX_MIN * 60 and src in summary.sources:
+                record_ok_ping(storage, src, ts=summary.ts)
+
+    _log_cycle_health_lines(cfg, storage, summary, lag_report=lag_report)
 
     _append_log_line(
         cfg.radar_log_path,

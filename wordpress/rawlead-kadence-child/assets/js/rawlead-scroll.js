@@ -16,6 +16,26 @@
 
   /** Demo km on homepage: card1 50%, card2 100% ideal, card3 80% — real titles from feed. */
   var PREVIEW_KM = [50, 100, 80];
+  var NICHE_ICONS = {
+    dev: "</>",
+    design: "✦",
+    marketing: "◎",
+    text: "Aa",
+  };
+
+  function nicheIconHtml(category) {
+    var c = String(category || "").trim();
+    if (!NICHE_ICONS[c]) {
+      return "";
+    }
+    return (
+      '<span class="rl-niche-icon rl-niche-icon--' +
+      escapeHtml(c) +
+      '" aria-hidden="true">' +
+      NICHE_ICONS[c] +
+      "</span>"
+    );
+  }
 
   document.documentElement.classList.add("rl-smooth-root");
 
@@ -192,6 +212,7 @@
       '">' +
       '<div class="rl-feed-card__head">' +
       '<div class="rl-feed-card__head-start">' +
+      nicheIconHtml(item && item.category) +
       '<span class="rl-feed-card__source rl-feed-card__source--' +
       src.cls +
       '">' +

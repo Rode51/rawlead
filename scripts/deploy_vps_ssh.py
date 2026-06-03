@@ -82,6 +82,42 @@ _SKIP_DIRS = {
 }
 _SKIP_FILES = {".env", ".env.legacy", ".env.site"}
 
+# L1 ingest: менять только вместе (иначе VPS radar TypeError на AiLiteAnalysis).
+INGEST_COUPLED_SRC = (
+    "ai_analyze.py",
+    "l1_pool.py",
+    "ai_reasons.py",
+    "lead_pipeline.py",
+    "pg_storage.py",
+    "match_push.py",
+    "radar_cycle_log.py",
+    "radar_status.py",
+    "exchange_health.py",
+    "main.py",
+    "exchange_proxy.py",
+    "exchange_browser_fetch.py",
+    "fl_parser.py",
+    "kwork_parser.py",
+    "health_check.py",
+    "config.py",
+    "proxy_probe.py",
+    "tools_catalog.py",
+)
+
+
+def deploy_ingest_coupled_src(remote_src: str = "/opt/rawlead/src") -> list[str]:
+    """Upload INGEST_COUPLED_SRC; return uploaded basenames."""
+    uploaded: list[str] = []
+    for name in INGEST_COUPLED_SRC:
+        local = _ROOT / "src" / name
+        if not local.is_file():
+            raise FileNotFoundError(local)
+        remote = f"{remote_src}/{name}"
+        upload(local, remote)
+        run(f"chown rawlead:rawlead {remote}")
+        uploaded.append(name)
+    return uploaded
+
 
 def sync_project(local_root: Path | None = None, remote_root: str = "/opt/rawlead") -> int:
     """Upload repo from PC (private git on GitHub is not cloneable without token)."""

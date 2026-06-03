@@ -18,7 +18,7 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 	<section class="rl-cabinet-login" id="rl-cabinet-login">
 		<div class="rl-cabinet-login__card">
 			<h1 class="rl-cabinet-login__title"><?php esc_html_e('Кабинет', 'rawlead-kadence-child'); ?></h1>
-			<p class="rl-cabinet-login__lead"><?php esc_html_e('Войди через Telegram — навыки, отклики и уведомления в одном месте.', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-cabinet-login__lead"><?php esc_html_e('Настроишь навыки — лента покажет заказы под твой стек. Черновик отклика — за один клик.', 'rawlead-kadence-child'); ?></p>
 			<button type="button" class="rl-btn rl-btn--primary rl-cabinet-login__btn" id="rl-cabinet-login-btn">
 				<svg class="rl-cabinet-login__icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
 					<path fill="currentColor" d="M9.04 15.314l-.376 5.302c.538 0 .77-.231 1.049-.508l2.518-2.418 5.217 3.823c.957.527 1.637.251 1.898-.885l3.438-16.08.001-.001c.305-1.423-.514-1.98-1.447-1.634L1.12 9.775c-1.392.541-1.369 1.317-.236 1.667l4.913 1.533L18.9 5.48c.595-.394 1.136-.176.691.218"/>
@@ -67,25 +67,29 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 		</div>
 		<section class="rl-cabinet-sub" id="rl-cabinet-sub" aria-labelledby="rl-cabinet-sub-title" hidden>
 			<div class="rl-cabinet-sub__head">
-				<h2 class="rl-cabinet-sub__title" id="rl-cabinet-sub-title"><?php esc_html_e('Подписка', 'rawlead-kadence-child'); ?></h2>
+				<h2 class="rl-cabinet-sub__title" id="rl-cabinet-sub-title"><?php esc_html_e('RawLead Premium', 'rawlead-kadence-child'); ?></h2>
 				<span class="rl-cabinet-sub__badge" id="rl-cabinet-sub-badge" aria-live="polite"></span>
 			</div>
-			<p class="rl-cabinet-sub__plan" id="rl-cabinet-sub-plan"></p>
+			<p class="rl-cabinet-sub__price" id="rl-cabinet-sub-price"><?php esc_html_e('790 ₽/мес · или 300 ⭐ Stars', 'rawlead-kadence-child'); ?></p>
 			<p class="rl-cabinet-sub__detail" id="rl-cabinet-sub-detail"></p>
 			<div class="rl-cabinet-sub__actions">
-				<a class="rl-btn rl-btn--primary rl-cabinet-sub__pay" id="rl-cabinet-sub-pay" href="<?php echo esc_url(rawlead_page_url('pricing')); ?>">
-					<?php esc_html_e('Оплатить Stars — скоро', 'rawlead-kadence-child'); ?>
+				<a class="rl-btn rl-btn--primary rl-cabinet-sub__trial" id="rl-cabinet-sub-trial" href="<?php echo esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=trial'); ?>" target="_blank" rel="noopener" hidden>
+					<?php esc_html_e('Попробовать 3 дня бесплатно', 'rawlead-kadence-child'); ?>
+				</a>
+				<a class="rl-btn rl-btn--ghost rl-cabinet-sub__pay" id="rl-cabinet-sub-pay" href="<?php echo esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay'); ?>" target="_blank" rel="noopener">
+					<?php esc_html_e('Подключить Premium →', 'rawlead-kadence-child'); ?>
 				</a>
 				<button type="button" class="rl-btn rl-btn--ghost rl-cabinet-sub__pause" id="rl-cabinet-sub-pause" hidden disabled>
-					<?php esc_html_e('Поставить на паузу', 'rawlead-kadence-child'); ?>
+					<?php esc_html_e('Пауза', 'rawlead-kadence-child'); ?>
 				</button>
 				<button type="button" class="rl-btn rl-btn--ghost rl-cabinet-sub__resume" id="rl-cabinet-sub-resume" hidden>
 					<?php esc_html_e('Возобновить', 'rawlead-kadence-child'); ?>
 				</button>
+				<a class="rl-btn rl-btn--ghost rl-cabinet-sub__billing" id="rl-cabinet-sub-billing" href="<?php echo esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay'); ?>" target="_blank" rel="noopener" hidden>
+					<?php esc_html_e('Оплата', 'rawlead-kadence-child'); ?>
+				</a>
 			</div>
-			<p class="rl-cabinet-sub__note" id="rl-cabinet-sub-note">
-				<?php esc_html_e('Сейчас лента и кабинет бесплатны в режиме beta. Оплата через Telegram Stars подключится в следующем релизе.', 'rawlead-kadence-child'); ?>
-			</p>
+			<p class="rl-cabinet-sub__note" id="rl-cabinet-sub-note" hidden></p>
 		</section>
 		<section class="rl-cabinet-notif" id="rl-cabinet-notif" aria-labelledby="rl-cabinet-notif-title" hidden>
 			<h2 class="rl-cabinet-notif__title" id="rl-cabinet-notif-title"><?php esc_html_e('Уведомления', 'rawlead-kadence-child'); ?></h2>
@@ -103,7 +107,7 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 			<div class="rl-cabinet-notif__row rl-cabinet-notif__row--toggle">
 				<div class="rl-cabinet-notif__toggle-wrap">
 					<span class="rl-cabinet-notif__label" id="rl-cabinet-notif-enabled-label"><?php esc_html_e('Push в Telegram', 'rawlead-kadence-child'); ?></span>
-					<p class="rl-cabinet-notif__toggle-hint"><?php esc_html_e('Подключи Stars и нажми /start в @rawlead_bot', 'rawlead-kadence-child'); ?></p>
+					<p class="rl-cabinet-notif__toggle-hint"><?php esc_html_e('Premium в @rawlead_bot — /pay или кнопка в кабинете. Нажми /start в боте.', 'rawlead-kadence-child'); ?></p>
 				</div>
 				<button type="button" class="rl-toggle" id="rl-cabinet-notif-enabled" role="switch" aria-checked="true" aria-labelledby="rl-cabinet-notif-enabled-label">
 					<span class="rl-toggle__knob"></span>
@@ -112,7 +116,7 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 			<p class="rl-cabinet-notif__status" id="rl-cabinet-notif-status" aria-live="polite"></p>
 		</section>
 		<p class="rl-cabinet-notif__hint" id="rl-cabinet-notif-hint" hidden>
-			<?php esc_html_e('Push в Telegram: подключи Stars и нажми /start в @rawlead_bot — иначе уведомления не дойдут.', 'rawlead-kadence-child'); ?>
+			<?php esc_html_e('Push: активируй Premium (@rawlead_bot /pay) и /start — иначе уведомления не дойдут.', 'rawlead-kadence-child'); ?>
 		</p>
 		<div class="rl-feed-main rl-cabinet-inbox">
 			<header class="rl-cabinet-head">
@@ -122,7 +126,7 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 				<div class="rl-cabinet-tags" id="rl-cabinet-tags" role="list" aria-live="polite"></div>
 				<button type="button" class="rl-btn rl-btn--ghost rl-cabinet-tags-clear" id="rl-cabinet-tags-clear" hidden><?php esc_html_e('Сбросить', 'rawlead-kadence-child'); ?></button>
 				<p class="rl-cabinet-head__hint rl-cabinet-head__hint--empty" id="rl-cabinet-tags-hint" hidden>
-					<?php esc_html_e('Добавь навыки — на ленте точнее подберём заказы', 'rawlead-kadence-child'); ?>
+					<?php esc_html_e('Добавь навыки для совместимости →', 'rawlead-kadence-child'); ?>
 				</p>
 			</header>
 			<header class="rl-feed-head rl-cabinet-feed-head">
@@ -130,21 +134,21 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 			</header>
 			<div class="rl-feed-banner" id="rl-cabinet-error" role="alert" hidden></div>
 			<div class="rl-cabinet-empty rl-cabinet-empty--no-tags" id="rl-cabinet-no-tags" hidden>
-				<p><?php esc_html_e('Добавь навыки — на ленте точнее подберём заказы', 'rawlead-kadence-child'); ?></p>
-				<button type="button" class="rl-btn rl-btn--primary" id="rl-cabinet-add-first"><?php esc_html_e('Добавить навык', 'rawlead-kadence-child'); ?></button>
+				<p><?php esc_html_e('Добавь навыки — покажем заказы под твой стек.', 'rawlead-kadence-child'); ?></p>
+				<button type="button" class="rl-btn rl-btn--primary" id="rl-cabinet-add-first"><?php esc_html_e('Добавить навыки', 'rawlead-kadence-child'); ?></button>
 			</div>
 			<div class="rl-cabinet-empty rl-cabinet-empty--no-match" id="rl-cabinet-no-match" hidden>
-				<p><?php esc_html_e('Ещё ни одного отклика — самое время', 'rawlead-kadence-child'); ?></p>
-				<a class="rl-btn rl-btn--primary" href="<?php echo esc_url(rawlead_page_url('lenta')); ?>"><?php esc_html_e('Лента →', 'rawlead-kadence-child'); ?></a>
+				<p><?php esc_html_e('Откликнулся на ленте — черновик появится здесь.', 'rawlead-kadence-child'); ?></p>
+				<a class="rl-btn rl-btn--primary" href="<?php echo esc_url(rawlead_page_url('lenta')); ?>"><?php esc_html_e('На ленту →', 'rawlead-kadence-child'); ?></a>
 			</div>
 			<div class="rl-cabinet-empty rl-cabinet-empty--no-match-free" id="rl-cabinet-no-match-free" hidden>
-				<p><?php esc_html_e('Доступно с подпиской · 300 ⭐', 'rawlead-kadence-child'); ?></p>
-				<a class="rl-btn rl-btn--primary" href="<?php echo esc_url(rawlead_page_url('pricing')); ?>"><?php esc_html_e('Подключить', 'rawlead-kadence-child'); ?></a>
+				<p><?php esc_html_e('Черновики откликов — с подпиской ИИ-агент.', 'rawlead-kadence-child'); ?></p>
+				<a class="rl-btn rl-btn--primary" href="<?php echo esc_url(rawlead_page_url('pricing')); ?>"><?php esc_html_e('Тарифы →', 'rawlead-kadence-child'); ?></a>
 			</div>
 			<div class="rl-feed-list rl-inbox-list" id="rl-cabinet-list" aria-live="polite"></div>
 			<div class="rl-feed-pagination" id="rl-cabinet-pagination">
 				<button type="button" class="rl-btn rl-btn--primary rl-btn--load-more" id="rl-cabinet-load-more">
-					<?php esc_html_e('Ещё лиды', 'rawlead-kadence-child'); ?> <span class="rl-btn__arrow" aria-hidden="true">→</span>
+					<?php esc_html_e('Показать ещё', 'rawlead-kadence-child'); ?> <span class="rl-btn__arrow" aria-hidden="true">→</span>
 				</button>
 				<span class="rl-feed-pagination__count" id="rl-cabinet-pagination-count"><?php esc_html_e('Показано', 'rawlead-kadence-child'); ?> <span id="rl-cabinet-shown">0</span> <?php esc_html_e('из', 'rawlead-kadence-child'); ?> <span id="rl-cabinet-total">0</span></span>
 				<div class="rl-feed-loading" id="rl-cabinet-loading" hidden>
@@ -164,8 +168,8 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 				<p class="rl-skill-tree__counter" id="rl-cabinet-skill-tree-counter" aria-live="polite"><?php esc_html_e('Выбрано 0 / 12', 'rawlead-kadence-child'); ?></p>
 				<button type="button" class="rl-skill-tree__close" id="rl-cabinet-skill-tree-close" aria-label="<?php esc_attr_e('Закрыть', 'rawlead-kadence-child'); ?>">✕</button>
 			</header>
-			<p class="rl-skill-tree__hint" id="rl-cabinet-skill-tree-hint" hidden><?php esc_html_e('⚡ Рекомендуем 6–8 ключевых — так совместимость точнее', 'rawlead-kadence-child'); ?></p>
-			<p class="rl-skill-tree__limit-msg" id="rl-cabinet-skill-tree-limit" hidden><?php esc_html_e('Максимум 12 навыков — сними лишние, чтобы добавить новые', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-skill-tree__hint" id="rl-cabinet-skill-tree-hint" hidden><?php esc_html_e('Слишком широко — match упадёт. Оставь 6–8 ключевых.', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-skill-tree__limit-msg" id="rl-cabinet-skill-tree-limit" hidden><?php esc_html_e('Максимум 12 — сними лишние.', 'rawlead-kadence-child'); ?></p>
 			<div class="rl-skill-tree__body" id="rl-cabinet-skill-tree-body">
 				<div class="rl-skill-tree__roots" id="rl-cabinet-skill-tree-roots" aria-live="polite"></div>
 			</div>

@@ -54,7 +54,7 @@ class L1Pool:
         )
         self._futures.append(future)
 
-    def drain(self) -> int:
+    def drain(self, *, shutdown: bool = True) -> int:
         from lead_pipeline import short_err
 
         done = 0
@@ -68,7 +68,8 @@ class L1Pool:
                     self._errors.append(msg)
                 log_pipeline_line(self._cfg.radar_log_path, msg)
         self._futures.clear()
-        self._executor.shutdown(wait=False)
+        if shutdown:
+            self._executor.shutdown(wait=False)
         return done
 
     def __enter__(self) -> L1Pool:
@@ -99,6 +100,7 @@ def _l1_worker(
         url=project.url,
         errors=errors,
         log_prefix=log_prefix,
+        l1_worker_slot=worker_slot,
     )
     if lite is None:
         pg.mark_l1_failed(project, errors, body_snippet=snippet)

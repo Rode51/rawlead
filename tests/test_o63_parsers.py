@@ -39,6 +39,37 @@ class TestO63Parsers(unittest.TestCase):
         self.assertIn("лендинг", p.listing_snippet)
         self.assertIn("25 000", p.budget_text)
 
+    def test_freelance_ru_task_card_fixture(self) -> None:
+        html = (_FIXTURES / "o63_freelance_ru_listing_live.html").read_text(encoding="utf-8")
+        projects = parse_freelance_ru(html, "https://freelance.ru/project/search")
+        self.assertEqual(len(projects), 1)
+        p = projects[0]
+        self.assertEqual(p.project_id, 1847)
+        self.assertIn("WordPress", p.title)
+        self.assertIn("25 000", p.budget_text)
+        self.assertIn("2 часа", p.published_at)
+
+    def test_youdo_browser_fail_no_httpx_fallback(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from config import Config
+        from youdo_parser import YoudoListingError, fetch_listing_projects
+
+        cfg = MagicMock(spec=Config)
+        cfg.http_user_agent = "test-ua"
+        cfg.radar_log_path = _ROOT / "data" / "_test_radar.log"
+        with patch("youdo_parser.listing_browser_enabled", return_value=True):
+            with patch(
+                "youdo_parser.fetch_listing_html_browser_slots",
+                side_effect=__import__("html_fetch", fromlist=["HtmlFetchError"]).HtmlFetchError(
+                    "youdo: all browser slots failed"
+                ),
+            ):
+                with patch("youdo_parser.exchange_get") as mock_get:
+                    with self.assertRaises(YoudoListingError):
+                        fetch_listing_projects(cfg)
+                    mock_get.assert_not_called()
+
     def test_youdo_parse_fixture(self) -> None:
         html = (_FIXTURES / "o63_youdo_listing.html").read_text(encoding="utf-8")
         projects = parse_youdo(html, "https://youdo.com/tasks-all-opened-all")
@@ -117,6 +148,28 @@ class TestO63Parsers(unittest.TestCase):
         ]
         kept = filter_new_pchyol_projects(projects, storage)
         self.assertEqual([p.project_id for p in kept], [1626001])
+
+    def test_pchyol_floor_above_listing_max(self) -> None:
+        from pchyol_parser import filter_new_pchyol_projects  # noqa: E402
+
+        class _HighFloorStorage:
+            def max_project_id(self, source: str) -> int:
+                assert source == SOURCE_PCHYOL
+                return 9999999
+
+        projects = [
+            ListingProject(
+                project_id=1626400,
+                title="Open on listing",
+                budget_text="",
+                url="https://pchel.net/jobs/x/1626400/",
+                published_at="",
+                listing_snippet="New",
+                source=SOURCE_PCHYOL,
+            ),
+        ]
+        kept = filter_new_pchyol_projects(projects, _HighFloorStorage())
+        self.assertEqual([p.project_id for p in kept], [1626400])
 
 
 if __name__ == "__main__":

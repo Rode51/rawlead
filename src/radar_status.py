@@ -466,6 +466,7 @@ def _source_row_label(source_id: str) -> str:
 
 
 def _format_exchange_line(st: SourceCycleStats, *, neon_insert: int) -> str:
+    """Legacy helper — предпочитайте format_exchange_status_line + health."""
     label = _source_row_label(st.source_id).ljust(7)
     if st.fetch_error:
         return (
@@ -478,6 +479,71 @@ def _format_exchange_line(st: SourceCycleStats, *, neon_insert: int) -> str:
     elif st.new_ids == 0:
         parts.append("fetch OK")
     return f"{label} 🟢 {' · '.join(parts)}"
+
+
+def _format_exchanges_block(
+    cfg: Config,
+    storage: ProjectStorage,
+    problems: list[str],
+) -> list[str]:
+    from exchange_health import (
+        format_exchange_status_line,
+        health_source_ids,
+        load_all_health,
+        load_health,
+        maybe_send_red_alert,
+        silence_minutes,
+        status_level,
+    )
+
+    lines = ["", "── Биржи (последний цикл) ──"]
+    summary = load_cycle_summary(storage)
+    all_health = load_all_health(storage)
+    source_ids = health_source_ids()
+    if not source_ids:
+        lines.append("биржи выкл в конфиге")
+        return lines
+
+    had_any = False
+    for sid in source_ids:
+        if sid == "tg" and not radar_tg_enabled():
+            continue
+        had_any = True
+        health = all_health.get(sid) or load_health(storage, sid)
+        st = summary.sources.get(sid) if summary and summary.sources else None
+        fetch_failed = bool(st and st.fetch_error)
+        if sid == "tg":
+            tg_ok, tg_detail = _tg_monitor_state(storage)
+            if not tg_ok:
+                fetch_failed = True
+                problems.append(f"TG-монитор: {tg_detail}")
+            elif tg_ok:
+                fetch_failed = False
+        elif fetch_failed and st:
+            problems.append(f"{st.label}: {st.fetch_error[:80]}")
+        level = status_level(health, fetch_failed=fetch_failed)
+        if level == "red":
+            maybe_send_red_alert(storage, sid, health, fetch_failed=fetch_failed)
+            mins = silence_minutes(health)
+            if mins is not None and mins >= 45:
+                problems.append(
+                    f"{_source_row_label(sid)}: тишина {mins} мин"
+                )
+        lines.append(
+            format_exchange_status_line(
+                sid,
+                health,
+                fetch_failed=fetch_failed,
+                downloaded=st.downloaded if st else None,
+                new_ids=st.new_ids if st else None,
+            )
+        )
+
+    if not had_any:
+        lines.append("биржи выкл в конфиге")
+    elif summary and summary.misc_errors:
+        problems.extend(str(e)[:80] for e in summary.misc_errors[:3])
+    return lines
 
 
 def _tg_pulse_short(detail: str) -> str:
@@ -566,40 +632,10 @@ def _format_site_status_v2(
     *,
     unit_state: str | None,
 ) -> list[str]:
-    lines = ["", "── Биржи (последний цикл) ──"]
+    lines = _format_exchanges_block(cfg, storage, problems)
+    lines.extend(_format_proxy_cascade_status(problems))
+
     summary = load_cycle_summary(storage)
-    neon_ins = summary.neon_insert if summary else 0
-
-    if summary and summary.ts:
-        had_sources = False
-        for st in summary.iter_sources():
-            if st.source_id not in ("fl", "kwork"):
-                continue
-            had_sources = True
-            if st.fetch_error:
-                problems.append(f"{st.label}: {st.fetch_error[:80]}")
-            lines.append(_format_exchange_line(st, neon_insert=neon_ins))
-        if not had_sources:
-            lines.append("биржи выкл в конфиге")
-        if summary.misc_errors:
-            problems.extend(str(e)[:80] for e in summary.misc_errors[:3])
-    else:
-        lines.append("ещё не было цикла")
-
-    if radar_tg_enabled():
-        ingest_down = bool(
-            unit_state
-            and unit_state.strip().lower() not in ("active", "activating")
-        )
-        if ingest_down:
-            lines.append("TG      🔴 ingest остановлен")
-        else:
-            tg_ok, tg_detail = _tg_monitor_state(storage)
-            icon = "🟢" if tg_ok else "🔴"
-            if not tg_ok:
-                problems.append(f"TG-монитор: {tg_detail}")
-            lines.append(f"TG      {icon} {_tg_pulse_short(tg_detail)}")
-
     rollup = load_site_rollup_line(storage)
     lines.extend(_format_cycle_block_v2(summary, rollup))
 
@@ -644,8 +680,72 @@ def _format_site_status_v2(
     return lines
 
 
-def _format_legacy_status_v2(cfg: Config, storage: ProjectStorage) -> list[str]:
-    lines = ["", "── Neon consumer ──"]
+def _format_proxy_pool_block(
+    title: str,
+    ps: dict,
+    *,
+    problems: list[str],
+    problem_prefix: str,
+) -> list[str]:
+    lines = ["", title]
+    lines.append(
+        f"Активен: Proxy_{ps.get('active_slot', '?')} ({ps.get('active_host', '?')})"
+    )
+    lines.append(f"Свободно для {ps.get('source', '?')}: {ps.get('alive', 0)} из {ps.get('total', 0)}")
+    banned = ps.get("banned") or []
+    if banned:
+        lines.append("В бане (только этот источник):")
+        for row in banned[:5]:
+            host = row.get("host", "?")
+            reason = row.get("reason") or "ban"
+            lines.append(f"  · {host} — {reason}")
+    alive = int(ps.get("alive") or 0)
+    total = int(ps.get("total") or 0)
+    if total > 1 and alive <= 1:
+        problems.append(f"{problem_prefix}: осталось {alive}/{total}")
+    return lines
+
+
+def _format_proxy_cascade_status(problems: list[str]) -> list[str]:
+    """Прокси в /status (без пуша — пуш только FLPARSING)."""
+    lines: list[str] = []
+    try:
+        from exchange_proxy import cascade_status_summary
+
+        summary = cascade_status_summary()
+        fl_ps = summary.get("primary") or summary
+        sec_ps = summary.get("secondary") or {}
+        lines.extend(
+            _format_proxy_pool_block(
+                "── Прокси FL (primary) ──",
+                fl_ps,
+                problems=problems,
+                problem_prefix="Прокси FL",
+            )
+        )
+        if sec_ps:
+            lines.extend(
+                _format_proxy_pool_block(
+                    f"── Прокси secondary ({sec_ps.get('total', 0)} IP) ──",
+                    sec_ps,
+                    problems=problems,
+                    problem_prefix="Прокси secondary",
+                )
+            )
+    except Exception:
+        pass
+    return lines
+
+
+def _format_legacy_status_v2(
+    cfg: Config,
+    storage: ProjectStorage,
+    problems: list[str],
+) -> list[str]:
+    lines = _format_exchanges_block(cfg, storage, problems)
+    lines.extend(_format_proxy_cascade_status(problems))
+    lines.append("")
+    lines.append("── Neon consumer ──")
     cycle_at = storage.get_setting(_STATUS_NEON_CYCLE_AT, "").strip()
     session = _int_setting(storage, _STATUS_NEON_SESSION_TO_BOT)
     last_sample = _int_setting(storage, _STATUS_NEON_LAST_SAMPLE)
@@ -869,7 +969,7 @@ def format_status_message(
             )
         )
     else:
-        lines.extend(_format_legacy_status_v2(cfg, storage))
+        lines.extend(_format_legacy_status_v2(cfg, storage, problems))
 
     if cfg.radar_profile == "site" or radar_tg_enabled():
         lines.append("")

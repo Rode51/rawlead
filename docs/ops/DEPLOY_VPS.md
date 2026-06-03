@@ -108,7 +108,10 @@ RADAR_TG_ENABLED=1
 
 ### Карта прокси (5 IP, 2026-06-01)
 
-**Решение владельца:** один пул оплаченных HTTP-прокси; часть закреплена за Telethon/Bot API, остальные — **ротация FL/Kwork** каждый цикл (~1 мин) + **failover** при 403/429/timeout (§ O79 Coder).
+**Решение владельца (v2):** **два уровня пула** + баны **per-source**:
+- **`EXCHANGE_PROXY_URLS`** — primary (FL, Kwork); бан `fl:IP` не банит IP для `kwork` и не для Пчёла.
+- **`EXCHANGE_PROXY_URLS_SECONDARY`** — опц.; иначе primary + `TELETHON_PROXY_ACC2/ACC3/URL` (не `TG_PROXY` / acc1).
+- Sticky cascade, 403/429 сразу для **этого** source; пуш только @FLPARSINGBOT.
 
 | IP | Роль | Переменные |
 |----|------|------------|
@@ -139,12 +142,30 @@ TG_PROXY_URL=http://45.152.197.25:8000:USER:PASS
 TELETHON_PROXY_ACC1=http://45.152.197.25:8000:USER:PASS
 TELETHON_PROXY_ACC2=http://38.154.16.60:8000:USER:PASS
 TELETHON_PROXY_ACC3=http://168.90.199.99:8000:USER:PASS
-FL_PROXY_URLS=http://212.102.151.153:8000:U:P,http://185.147.131.15:8000:U:P,http://38.154.16.60:8000:U:P,http://168.90.199.99:8000:U:P
-KWORK_PROXY_URLS=http://212.102.151.153:8000:U:P,http://185.147.131.15:8000:U:P,http://38.154.16.60:8000:U:P,http://168.90.199.99:8000:U:P
+EXCHANGE_PROXY_URLS=http://185.147.131.15:8000:U:P,http://194.226.236.204:8000:U:P,http://194.226.236.197:8000:U:P,http://212.102.151.153:8000:U:P
+# KWORK_PROXY_URLS пусто → тот же каскад
 TELETHON_PROXY_PROBE=1
 ```
 
-После правки: `sudo systemctl restart rawlead-radar` · в `radar_site.log` — `fetch:fl proxy=212.102…` (host без пароля).
+После правки: `sudo systemctl restart rawlead-radar` · в `radar_site.log` — `fetch:fl proxy=185.147… slot=1/4 alive=4/4`.
+
+**Алерты прокси:** только в **@FLPARSINGBOT** (токен `.env.legacy`), не в @rawlead_bot. Баны — SQLite на VPS (`exchange_proxy_bans_v2`, per-source). Сброс: `python scripts/clear-vps-proxy-bans.py`.
+
+**Ops-скрипты с ПК (2026-06-03):** канон [`../problems/2026-06-03-ingest-l1-tg-youdo.md`](../problems/2026-06-03-ingest-l1-tg-youdo.md).
+
+| Скрипт | Назначение |
+|--------|------------|
+| `ops-vps-tg-l1-fix.py` | tg_monitor deploy, `L1_BACKLOG_DRAIN`, acc2 join (короткий), bot_start |
+| `ops-vps-tg-l1-finish.py` | stop долгий join, L1 sample replay, restart radar |
+| `deploy-youdo-browser-vps.py` | `exchange_browser_fetch.py` hotfix (shared Playwright) · youdo parsers · clear `youdo:*` bans · restart radar |
+| `deploy-o105-wp-vps.py` | O105-WP theme **1.18.x** · pricing 790 · trust strip · `page-pricing.php` · verify curl |
+| `scripts/_verify_o105_prod.py` | Smoke prod: home trust strip · `/pricing/` payment block |
+| `clear-vps-proxy-bans.py` | сброс всех exchange bans |
+| `clear_l1_backlog.py` | хвост без L1 без OpenRouter (`--by-age`) |
+
+**Симптом `alive=0/4` / `pool_exhausted`:** сброс `clear-vps-proxy-bans.py`. Стратегия не «ещё IP», а **O99:** browser-fetch FL/Kwork · fast Neon · отдельные IP под secondary — [`OWNER_INTENT.md`](../team/architect/OWNER_INTENT.md) § O99.
+
+**Watchdog** — алерты FLPARSING; скрипт `/opt/rawlead/scripts/ingest_watchdog.py`.
 
 **ПК / Cursor:** те же `TG_*` / `TELETHON_*` в локальном `.env`; `FL_PROXY_URLS` на ПК **не нужны**, если Site ■ (парсинг только VPS).
 

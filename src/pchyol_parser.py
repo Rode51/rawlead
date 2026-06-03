@@ -237,9 +237,17 @@ def filter_new_pchyol_projects(
     storage: object | None,
 ) -> list[ListingProject]:
     """Не тащить старые открытые карточки с листинга — только id выше floor."""
-    floor = pchyol_ingest_floor(storage)
-    if floor <= 0 or not projects:
+    if not projects:
         return projects
+    floor = pchyol_ingest_floor(storage)
+    listing_max = max(p.project_id for p in projects)
+    if floor >= listing_max:
+        logger.info(
+            "pchyol: floor %d above listing max %d — allow newest on page",
+            floor,
+            listing_max,
+        )
+        floor = listing_max - 1
     kept = [p for p in projects if p.project_id > floor]
     skipped = len(projects) - len(kept)
     if skipped:

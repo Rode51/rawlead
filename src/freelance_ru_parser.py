@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_LISTING_URL = "https://freelance.ru/project/search"
 _PROJECT_ID_RE = re.compile(r"-(\d+)\.html(?:\?|$)")
+_TASK_VIEW_RE = re.compile(r"/task/view/(\d+)(?:\?|$|/)")
 _PAGE_PATH_RE = re.compile(r"/page-\d+/?")
 
 
@@ -52,6 +53,12 @@ def _listing_page_url(base_url: str, page: int) -> str:
 
 def _project_id_from_href(href: str) -> int | None:
     m = _PROJECT_ID_RE.search(href or "")
+    if m:
+        try:
+            return int(m.group(1))
+        except ValueError:
+            pass
+    m = _TASK_VIEW_RE.search(href or "")
     if not m:
         return None
     try:
@@ -60,17 +67,58 @@ def _project_id_from_href(href: str) -> int | None:
         return None
 
 
-def parse_listing_html(html: str, page_url: str) -> list[ListingProject]:
-    """Разбор сохранённого HTML листинга (отладка / тесты)."""
-    if not html or not html.strip():
-        raise FreelanceRuListingError("Пустой HTML листинга Freelance.ru.")
-    soup = BeautifulSoup(html, "html.parser")
-    nodes = soup.select(".project")
-    if not nodes:
-        raise FreelanceRuListingError(
-            "На странице нет карточек `.project` — сменилась вёрстка или лента недоступна."
-        )
+def _parse_task_cards(nodes, page_url: str) -> list[ListingProject]:
+    """Новая вёрстка freelance.ru (2026): `article.task-card`, URL `/task/view/{id}`."""
+    out: list[ListingProject] = []
+    seen: set[int] = set()
+    for node in nodes:
+        title_a = node.select_one(".task-card__title-link[href], h2 a[href], a[href*='/task/view/']")
+        if not title_a or not title_a.get("href"):
+            continue
+        href = str(title_a["href"]).strip()
+        pid = _project_id_from_href(href)
+        if pid is None or pid in seen:
+            continue
+        seen.add(pid)
 
+        title = title_a.get_text(strip=True)
+        if not title:
+            continue
+
+        desc_el = node.select_one(".task-card__desc")
+        listing_snippet = desc_el.get_text(" ", strip=True) if desc_el else ""
+
+        budget_el = node.select_one(".task-card__budget")
+        budget_text = budget_el.get_text(" ", strip=True) if budget_el else ""
+
+        published_at = ""
+        for foot in node.select(".task-card__foot-item"):
+            part = foot.get_text(strip=True)
+            low = part.casefold()
+            if any(
+                x in low
+                for x in ("назад", "мин", "час", "день", "нед", "мес", "сегодня", "вчера")
+            ):
+                published_at = part
+                break
+
+        full_url = urljoin(page_url, href)
+        out.append(
+            ListingProject(
+                project_id=pid,
+                title=title,
+                budget_text=budget_text,
+                url=full_url,
+                published_at=published_at,
+                listing_snippet=listing_snippet or title,
+                source=SOURCE_FREELANCE_RU,
+            )
+        )
+    return out
+
+
+def _parse_project_cards(nodes, page_url: str) -> list[ListingProject]:
+    """Старая вёрстка: `.project`, URL `/projects/...-{id}.html`."""
     out: list[ListingProject] = []
     seen: set[int] = set()
     for node in nodes:
@@ -122,9 +170,27 @@ def parse_listing_html(html: str, page_url: str) -> list[ListingProject]:
                 source=SOURCE_FREELANCE_RU,
             )
         )
+    return out
+
+
+def parse_listing_html(html: str, page_url: str) -> list[ListingProject]:
+    """Разбор сохранённого HTML листинга (отладка / тесты)."""
+    if not html or not html.strip():
+        raise FreelanceRuListingError("Пустой HTML листинга Freelance.ru.")
+    soup = BeautifulSoup(html, "html.parser")
+    nodes = soup.select(".project")
+    if nodes:
+        out = _parse_project_cards(nodes, page_url)
+    else:
+        task_nodes = soup.select("article.task-card, .task-card")
+        if not task_nodes:
+            raise FreelanceRuListingError(
+                "На странице нет карточек `.project` / `.task-card` — сменилась вёрстка."
+            )
+        out = _parse_task_cards(task_nodes, page_url)
 
     if not out:
-        raise FreelanceRuListingError("Карточки `.project` без id — сменилась вёрстка.")
+        raise FreelanceRuListingError("Карточки без id — сменилась вёрстка.")
     return out
 
 

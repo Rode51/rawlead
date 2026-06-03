@@ -185,6 +185,8 @@ flowchart TB
 | TG не читает чат | `telethon_chat_ids_accN.txt`, `tg_monitor.py`, дубли tg_main |
 | Join | `tg_join_runner.py`, `TG_JOIN_QUEUE.csv` |
 | Бот молчит | VPN, proxy, `tg_smoke.py`, `telegram_notify.py` |
+| Биржи FL/Kwork 403, pool exhausted | `exchange_proxy.py`, `exchange_browser_fetch.py`, `.env` proxy URLs |
+| Secondary 0 лидов (YouDo/FR/job/Пчёл) | `youdo_parser.py`, `freelance_*_parser.py`, `pchyol_parser.py` · § **O63-FIX** |
 | Фильтр / ИИ | `filters.py`, `lead_pipeline.py`, `docs/ops/FILTERS.md` |
 
 ---
@@ -228,4 +230,4 @@ Lead проверяет перед выдачей промпта. Coder свер
 
 ---
 
-_Ведёт Lead · 2026-06-01 · обновлять при смене процессов/зон_
+_Ведёт Lead · 2026-06-03 · обновлять при смене процессов/зон_

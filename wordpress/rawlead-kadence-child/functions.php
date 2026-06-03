@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.14.0');
+define('RAWLEAD_CHILD_VERSION', '1.18.3');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -83,6 +83,24 @@ function rawlead_tg_login_bot_id(): int {
 add_action('after_setup_theme', static function (): void {
     add_theme_support('wp-block-styles');
     add_theme_support('responsive-embeds');
+});
+
+/** O96-Z1 / Z8 / Z9 — document title канон. */
+add_filter('document_title_parts', static function (array $title): array {
+    if (is_front_page()) {
+        $title['title'] = 'RawLead — Заказы под твой стек';
+        $title['tagline'] = '';
+        $title['site'] = '';
+    } elseif (is_page('pricing')) {
+        $title['title'] = 'Тарифы — RawLead';
+        $title['tagline'] = '';
+        $title['site'] = '';
+    } elseif (is_page('how')) {
+        $title['title'] = 'Как работает — RawLead';
+        $title['tagline'] = '';
+        $title['site'] = '';
+    }
+    return $title;
 });
 
 /**
@@ -168,6 +186,7 @@ add_action('wp_enqueue_scripts', static function (): void {
         );
         wp_localize_script('rawlead-feed', 'rawleadFeed', [
             'restFeed'         => esc_url_raw(rest_url('rawlead/v1/feed')),
+            'restMeFeed'       => esc_url_raw(rest_url('rawlead/v1/me/feed')),
             'restTags'         => esc_url_raw(rest_url('rawlead/v1/me/tags')),
             'restSkills'       => esc_url_raw(rest_url('rawlead/v1/skills/catalog')),
             'restDraft'        => esc_url_raw(rest_url('rawlead/v1/me/leads')),

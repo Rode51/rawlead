@@ -360,6 +360,49 @@ class TestPreprodAiProdAudit(TestCase):
         self.assertTrue(s["accept_l1"])
         self.assertGreaterEqual(s["l1_usable_pct"], 70)
 
+    def test_judge_l1_summary_accept_complexity(self) -> None:
+        judged = [
+            {
+                "lead_id": i,
+                "context_understanding": 4,
+                "l1_usable": True,
+                "complexity_rating": 5,
+                "complexity_ok": True,
+            }
+            for i in range(7)
+        ]
+        judged.extend(
+            [
+                {
+                    "lead_id": i,
+                    "context_understanding": 4,
+                    "l1_usable": True,
+                    "complexity_rating": 3,
+                    "complexity_ok": False,
+                }
+                for i in range(7, 10)
+            ]
+        )
+        s = _judge_l1_summary(judged)
+        self.assertTrue(s["accept_complexity"])
+        self.assertGreaterEqual(s["complexity_ok_pct"], 70)
+
+    def test_judge_l1_summary_fail_complexity(self) -> None:
+        judged = [
+            {
+                "lead_id": i,
+                "context_understanding": 4,
+                "l1_usable": True,
+                "complexity_rating": 2,
+                "complexity_ok": False,
+                "complexity_prompt_fix": "завышать complexity для монолитов",
+            }
+            for i in range(10)
+        ]
+        s = _judge_l1_summary(judged)
+        self.assertFalse(s["accept_complexity"])
+        self.assertTrue(s["complexity_prompt_recommendations"])
+
     def test_parse_feed_visible_legacy_verdict(self) -> None:
         from ai_analyze import _parse_lite_analysis
 

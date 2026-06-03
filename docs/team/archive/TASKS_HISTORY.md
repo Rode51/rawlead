@@ -4,7 +4,15 @@
 
 ---
 
-## 2026-06-01 — O72e gate wave + site UX close
+## 2026-06-03 — Lead slim CODER_PROMPT hot (40 строк)
+
+**Было:** hot ~225 строк — O104 + O72e-10 DoD дублировали «✅ принято».
+
+**Сделано:** DoD → [`CODER_PROMPT_ARCHIVE.md`](CODER_PROMPT_ARCHIVE.md) · hot — таблица сводка · правила Lead в `lead-architect.mdc` § зоны.
+
+**Урок:** Lead не пишет `LEAD_PRODUCT_PROMPT` copy — только `OWNER_INTENT` + «→ @lead-product» в TASKS.
+
+---
 
 **Закрыто:** O81-w1c · O88 · O85/O86/O78 · O72e-6 · O72e-7 r4 · O82-w2 · O63-w2.
 

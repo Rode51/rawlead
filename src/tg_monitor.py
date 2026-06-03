@@ -23,6 +23,7 @@ from config import (
     tg_join_in_tg_main,
 )
 from radar_status import (
+    _pending_join_by_account,
     record_tg_acc_ready,
     record_tg_message,
     record_tg_monitor_start,
@@ -342,13 +343,37 @@ async def run_monitor() -> None:
     chat_registry = load_chat_registry_from_queue()
     log_path = tg_cfg.radar_log_path
 
+    join_cfg = load_tg_join_config()
+    pending_join = _pending_join_by_account(join_cfg.queue_csv)
+    join_in_main = tg_join_in_tg_main()
+
     sessions: list[_MonitorSession] = []
+    join_bootstrap: list[_MonitorSession] = []
     for acfg in tg_cfg.accounts:
         if not acfg.chat_ids:
-            _append_log(
-                log_path,
-                f"{radar_timestamp()} тг:монитор:{acfg.account}: пропуск (нет chat_ids)",
-            )
+            pend = int(pending_join.get(acfg.account.strip().lower(), 0))
+            if join_in_main and pend > 0:
+                client = await connect_client(acfg.account)
+                await ensure_bot_started(
+                    client,
+                    acfg.account,
+                    log_fn=lambda msg: _append_log(
+                        log_path, f"{radar_timestamp()} {msg}"
+                    ),
+                )
+                join_bootstrap.append(
+                    _MonitorSession(acfg.account, client, set())
+                )
+                _append_log(
+                    log_path,
+                    f"{radar_timestamp()} тг:монитор:{acfg.account}: "
+                    f"join-bootstrap pending={pend} (нет chat_ids)",
+                )
+            else:
+                _append_log(
+                    log_path,
+                    f"{radar_timestamp()} тг:монитор:{acfg.account}: пропуск (нет chat_ids)",
+                )
             continue
         client = await connect_client(acfg.account)
         await ensure_bot_started(
@@ -391,12 +416,11 @@ async def run_monitor() -> None:
             chats_in_file=len(acfg.chat_ids),
         )
 
-    if not sessions:
+    if not sessions and not join_bootstrap:
         print("Ни один чат ни для одного аккаунта не найден в сессии.")
         raise SystemExit(1)
 
     night = "да" if is_night_window(tg_cfg) else "нет"
-    join_in_main = tg_join_in_tg_main()
     for sess in sessions:
         _append_log(
             log_path,
@@ -407,7 +431,7 @@ async def run_monitor() -> None:
 
     join_tasks: list[asyncio.Task] = []
     if join_in_main:
-        for sess in sessions:
+        for sess in list(sessions) + list(join_bootstrap):
             join_tasks.append(
                 asyncio.create_task(
                     _join_loop(
@@ -449,7 +473,7 @@ async def run_monitor() -> None:
 
     run_tasks = [
         asyncio.create_task(sess.client.run_until_disconnected())  # type: ignore[attr-defined]
-        for sess in sessions
+        for sess in sessions + join_bootstrap
     ]
     run_tasks.extend(join_tasks)
 
@@ -466,7 +490,7 @@ async def run_monitor() -> None:
                 await task
             except asyncio.CancelledError:
                 pass
-        for sess in sessions:
+        for sess in sessions + join_bootstrap:
             try:
                 await sess.client.disconnect()  # type: ignore[attr-defined]
             except Exception:

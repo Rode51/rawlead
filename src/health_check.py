@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import sys
 import time
@@ -21,6 +22,8 @@ from config import (
     telegram_requests_proxies,
 )
 from storage import ProjectStorage
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_CHECK_MIN = 15
 _DEFAULT_ALERT_COOLDOWN_MIN = 60
@@ -204,6 +207,88 @@ def _append_log(log_path: Path, line: str) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as f:
         f.write(line.rstrip("\n") + "\n")
+
+
+def _legacy_alert_credentials() -> tuple[str, str, str]:
+    """Токен/chat только из `.env.legacy` (не из os.environ site-радара)."""
+    from dotenv import dotenv_values
+
+    legacy_path = _PROJECT_ROOT / ".env.legacy"
+    if not legacy_path.is_file():
+        return "", "", "нет файла .env.legacy"
+    vals = dotenv_values(legacy_path)
+    token = (vals.get("TELEGRAM_BOT_TOKEN") or "").strip()
+    chat_id = (vals.get("TELEGRAM_CHAT_ID") or "").strip()
+    if not token or not chat_id:
+        return "", "", "в .env.legacy нет TELEGRAM_BOT_TOKEN или TELEGRAM_CHAT_ID"
+    return token, chat_id, ""
+
+
+def _verify_flparsing_bot_token(token: str) -> tuple[bool, str]:
+    """Не слать алерт, если getMe — не @FLPARSINGBOT (защита от токена @rawlead_bot)."""
+    url = f"https://api.telegram.org/bot{token}/getMe"
+    try:
+        resp = requests.get(url, timeout=15)
+        body = resp.json()
+    except requests.RequestException as exc:
+        return False, f"getMe: {exc}"
+    if not isinstance(body, dict) or not body.get("ok"):
+        desc = ""
+        if isinstance(body, dict):
+            d = body.get("description")
+            if isinstance(d, str):
+                desc = d.strip()
+        return False, f"getMe fail {desc}".strip()
+    username = str((body.get("result") or {}).get("username", "")).strip().lower()
+    if username in ("flparsingbot", "fl_parsingbot"):
+        return True, f"@{username}"
+    return False, f"ожидали @FLPARSINGBOT, getMe=@{username or '?'}"
+
+
+def send_flparsing_admin_text(text: str) -> tuple[bool, str]:
+    """Инженерные алерты только @FLPARSINGBOT (парсер), никогда @rawlead_bot."""
+    token, chat_id, err = _legacy_alert_credentials()
+    if err:
+        return False, err
+    ok_bot, bot_detail = _verify_flparsing_bot_token(token)
+    if not ok_bot:
+        logger.warning("flparsing alert blocked: %s", bot_detail)
+        return False, bot_detail
+
+    from config import load_config_for_profile
+
+    cfg = load_config_for_profile("legacy", merge_root_env=False)
+    proxies = telegram_requests_proxies(cfg)
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        session = requests.Session()
+        session.trust_env = False
+        resp = session.post(
+            url,
+            data={
+                "chat_id": chat_id,
+                "text": text,
+                "disable_web_page_preview": True,
+            },
+            timeout=25.0,
+            proxies=proxies,
+        )
+    except requests.RequestException as exc:
+        return False, f"сеть: {exc}"
+
+    if resp.status_code != 200:
+        detail = ""
+        try:
+            body = resp.json()
+            if isinstance(body, dict):
+                desc = body.get("description")
+                if isinstance(desc, str):
+                    detail = desc.strip()
+        except ValueError:
+            pass
+        return False, f"HTTP {resp.status_code} {detail}".strip()
+
+    return True, bot_detail
 
 
 def send_owner_text(cfg: Config, text: str) -> tuple[bool, str]:

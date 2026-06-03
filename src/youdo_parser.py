@@ -5,16 +5,21 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
+from pathlib import Path
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
 from config import Config
+from exchange_browser_fetch import (
+    fetch_listing_html_browser_slots,
+    listing_browser_enabled,
+)
 from exchange_proxy import (
     exchange_fetch_begin,
     exchange_fetch_end,
     exchange_get,
-    exchange_primary_proxy_url,
     proxy_log_hint,
 )
 from html_fetch import HtmlFetchError, fetch_html_playwright
@@ -40,7 +45,14 @@ def _looks_like_antibot(html: str) -> bool:
     if not html or not html.strip():
         return True
     low = html.casefold()
-    if any(m in low for m in _ANTIBOT_MARKERS):
+    # Живая лента SSR — не антибот (на нормальной странице тоже есть <noscript>)
+    if _TASK_ID_RE.search(html) or (
+        'data-id' in low and 'href="/t' in low.replace("'", '"')
+    ):
+        return False
+    if any(m in low for m in ("exhkqyad", "just a moment", "checking your browser")):
+        return True
+    if "403 forbidden" in low[:2500] and len(html.strip()) < 5000:
         return True
     if len(html.strip()) < 4000 and not _TASK_ID_RE.search(html):
         return True
@@ -68,6 +80,14 @@ def _canonical_task_url(page_url: str, task_id: int) -> str:
     host = parsed.netloc or "youdo.com"
     scheme = parsed.scheme or "https"
     return f"{scheme}://{host}/t{task_id}"
+
+
+def _save_listing_html_debug(html: str, *, tag: str = "youdo") -> str:
+    root = Path(__file__).resolve().parent.parent / "data" / "debug_listings"
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / f"{tag}_{int(time.time())}.html"
+    path.write_text(html[:500_000], encoding="utf-8", errors="replace")
+    return str(path)
 
 
 def parse_listing_html(html: str, page_url: str) -> list[ListingProject]:
@@ -133,10 +153,61 @@ def parse_listing_html(html: str, page_url: str) -> list[ListingProject]:
         )
 
     if not out:
+        saved = _save_listing_html_debug(html)
         raise YoudoListingError(
             "На странице нет карточек заданий (`a[data-id]` / `/t{id}`) — сменилась вёрстка."
+            f" HTML saved: {saved}"
         )
     return out
+
+
+def _fetch_listing_html_browser(
+    url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float,
+) -> str:
+    """Browser-only (O63): все живые слоты, без httpx fallback."""
+    try:
+        html = fetch_listing_html_browser_slots(
+            "youdo",
+            url,
+            user_agent=cfg.http_user_agent,
+            timeout_sec=timeout_sec,
+        )
+    except HtmlFetchError as exc:
+        msg = f"browser_fail={exc}"
+        log_pipeline_line(cfg.radar_log_path, f"youdo_listing: {msg}")
+        logger.warning("youdo_listing: %s — no httpx fallback", msg)
+        raise YoudoListingError(f"browser failed ({exc})") from exc
+
+    if _looks_like_antibot(html):
+        saved = _save_listing_html_debug(html, tag="youdo_antibot")
+        msg = f"browser_fail=antibot HTML saved={saved}"
+        log_pipeline_line(cfg.radar_log_path, f"youdo_listing: {msg}")
+        raise YoudoListingError(
+            "Ответ похож на антибот после browser — смените YOUDO_PROXY_URLS / слот."
+            f" HTML saved: {saved}"
+        )
+    return html
+
+
+def _fetch_listing_html(
+    url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float,
+) -> str:
+    """EXCHANGE_LISTING_BROWSER=1 → только Playwright; иначе httpx → legacy Playwright."""
+    if listing_browser_enabled():
+        return _fetch_listing_html_browser(url, cfg, timeout_sec=timeout_sec)
+
+    hint = proxy_log_hint("youdo")
+    html = _fetch_html_requests(url, cfg, timeout_sec=timeout_sec)
+    if _looks_like_antibot(html):
+        logger.info("youdo_listing: antibot HTML — legacy Playwright fallback (%s)", hint)
+        html = _fetch_html_playwright(url, cfg, timeout_sec=timeout_sec)
+    return html
 
 
 def _fetch_html_requests(
@@ -159,6 +230,8 @@ def _fetch_html_requests(
 
 
 def _fetch_html_playwright(url: str, cfg: Config, *, timeout_sec: float) -> str:
+    from exchange_proxy import exchange_primary_proxy_url
+
     proxy_url = exchange_primary_proxy_url("youdo")
     try:
         return fetch_html_playwright(
@@ -178,10 +251,7 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 45.0) -> list[Li
     exchange_fetch_begin("youdo")
     log_pipeline_line(cfg.radar_log_path, f"fetch:youdo proxy={proxy_log_hint('youdo')}")
     try:
-        html = _fetch_html_requests(url, cfg, timeout_sec=timeout_sec)
-        if _looks_like_antibot(html):
-            logger.info("youdo_listing: antibot HTML — Playwright fallback")
-            html = _fetch_html_playwright(url, cfg, timeout_sec=timeout_sec)
+        html = _fetch_listing_html(url, cfg, timeout_sec=timeout_sec)
         return parse_listing_html(html, url)
     finally:
         exchange_fetch_end("youdo")

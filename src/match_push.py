@@ -196,11 +196,10 @@ def _canonical_lead_tags(raw: Any) -> list[str]:
 
 
 def _parse_ai_reasons(raw: Any) -> list[str]:
-    if raw is None:
-        return []
-    if isinstance(raw, list):
-        return [str(x).strip() for x in raw if str(x).strip()]
-    return []
+    from ai_reasons import parse_ai_reasons_raw
+
+    reasons, _ = parse_ai_reasons_raw(raw)
+    return reasons
 
 
 def _parse_tools_required(raw: Any) -> list[str]:
