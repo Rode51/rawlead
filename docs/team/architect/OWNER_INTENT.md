@@ -916,6 +916,27 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 ---
 
+## § O109 — Kwork delist + bot deeplink «Лента» (**→ ✅ Coder · 2026-06-04**)
+
+**Боль (владелец 2026-06-03):** бот прислал Match push по Kwork, карточки **нет в `/lenta/`**; кнопка «Лента» открывает общую ленту, а не нужный заказ.
+
+**Корень:** O65 `delist_reason=source_gone` — ложный срабатывание: в `_KWORK_GONE_MARKERS` была подстрока `"404"` (встречается в тексте ТЗ, не только HTTP 404). Push успевал до delist.
+
+**Решение:**
+
+| # | Что | DoD |
+|---|-----|-----|
+| 1 | **Delist fix** | убрать `"404"` из HTML-маркеров; HTTP 404 status — оставить; grace **6 ч** после `l1_completed_at` перед recheck |
+| 2 | **Relist** | `UPDATE` kwork с `delist_reason=source_gone` за 14 дней (скрипт `ops-relist-kwork-vps.py`) |
+| 3 | **Bot deeplink** | «Лента» → `https://rawlead.ru/lenta/?lead={id}` |
+| 4 | **Feed UX** | parse `?lead=` · fetch card если нет в списке · scroll + expand · pulse `.rl-lead-card--push-focus` |
+
+**Theme:** **1.18.6** · verify lead **#11837** (Kwork 3190279) в feed.
+
+**Процесс:** код сессии до ужесточения Lead rules — retroactive verify; rules A+B+C в `lead-no-code.mdc` / `lead-architect.mdc` / `LEAD.md`.
+
+---
+
 ## § O108 (архив spec 2026-06-03)
 
 _Заменено решением v1.1 B+C выше._

@@ -49,6 +49,7 @@ class TestMatchPushO50(TestCase):
         self.assertEqual(rows[1][0]["text"], "Открыть заказ")
         self.assertEqual(rows[1][0]["url"], "https://fl.ru/projects/123/")
         self.assertEqual(rows[1][1]["text"], "Лента")
+        self.assertEqual(rows[1][1]["url"], "https://rawlead.ru/lenta/?lead=7019")
 
     def test_push_keyboard_free_no_generate(self) -> None:
         raw = _push_keyboard(show_generate=False, lead_id=42, order_url="https://kwork.ru/project/1")

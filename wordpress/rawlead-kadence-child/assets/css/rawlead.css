@@ -2995,6 +2995,26 @@ button#rl-feed-skills-trigger.rl-feed-skills-dd__trigger::after {
   }
 }
 
+.rl-lead-card--push-focus {
+  outline: 3px solid #facc15;
+  outline-offset: 2px;
+  animation: rl-push-focus-pulse 0.9s ease-out 3;
+}
+
+@keyframes rl-push-focus-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.55);
+  }
+
+  70% {
+    box-shadow: 0 0 0 16px rgba(250, 204, 21, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
+  }
+}
+
 .rl-badge--perfect {
   display: inline-flex;
   align-items: center;

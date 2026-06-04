@@ -9,11 +9,13 @@
 | # | Задача | Кто | Статус |
 |---|--------|-----|--------|
 | **E2E S6** | PRE-PROD smoke + UX walk | **owner** | **→ сейчас** |
-| **O72e full judge 71** | pilot send 7/10 | **owner** | параллельно |
+| **O72e full judge 71** | regen 71 + L2 judge (pilot send 7/10 ✅) | **owner** | параллельно |
 
 ---
 
 ## Закрыто 2026-06-04
+
+**O109** ✅ Kwork delist false-positive + bot «Лента» deeplink · theme **1.18.6**
 
 **O108-BC** ✅ TZ attachments B+C · theme **1.18.5** · TG в ленту (21 канал)
 
@@ -27,4 +29,4 @@ stress · vault · O101 · O105-w1
 
 ---
 
-_Lead · 2026-06-04 · O108-BC → Coder_
+_Lead · 2026-06-04 · O109 ✅ · очередь → owner E2E_

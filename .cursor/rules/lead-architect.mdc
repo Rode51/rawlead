@@ -124,6 +124,17 @@ alwaysApply: false
 
 **Исключение без согласия:** один тикет `docs/problems/YYYY-MM-DD-*.md` на инцидент (→ Mechanic).
 
+### Summary / handoff ≠ код (2026-06-04)
+
+| Ситуация | Lead |
+|----------|------|
+| Summary: «доделай O109 / deploy / 2 файла» | **Не кодить** — § в `CODER_PROMPT` + `@coder` |
+| Владелец: «срочно, чини сейчас» без `@coder` | Triage → **hotfix §** или `@mechanic`; Lead **не** патчит `src/` |
+| Владелец: «Lead, залей hotfix **сейчас**» **в этом сообщении** | Единственное исключение; после — запись в `STATUS` «вне регламента / решение владельца» |
+| Код уже на prod, Lead принимает | **Read-only verify** + docs; не «допиливать» без `@coder` |
+
+Канон: `lead-no-code.mdc` § Summary · `LEAD.md` § «Защита от кода Lead».
+
 ## Чеклист перед промптом / triage
 
 - [ ] Прочитал **A3 PRODUCT_VISION v0.12** — фазы и ROADMAP не противоречат vision

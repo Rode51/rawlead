@@ -1754,6 +1754,7 @@ class NeonLeadStorage:
         self,
         *,
         limit: int = 20,
+        grace_hours: int = 6,
         errors: list[str] | None = None,
     ) -> list[tuple[int, str, str]]:
         """(id, source, url) visible leads для delist batch (O65)."""
@@ -1775,10 +1776,12 @@ class NeonLeadStorage:
                           AND source = ANY(%s)
                           AND url <> ''
                           AND created_at >= NOW() - make_interval(days => %s)
+                          AND COALESCE(l1_completed_at, created_at)
+                              < NOW() - make_interval(hours => %s)
                         ORDER BY last_source_check_at NULLS FIRST, created_at DESC
                         LIMIT %s
                         """,
-                        (sources, FEED_VISIBILITY_DAYS, int(limit)),
+                        (sources, FEED_VISIBILITY_DAYS, int(grace_hours), int(limit)),
                     )
                     return [
                         (int(r[0]), str(r[1]), str(r[2] or ""))

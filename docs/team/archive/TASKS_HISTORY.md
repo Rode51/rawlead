@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-06-04 — O109 ✅ + Lead rules A+B+C
+
+**Сделано:** Kwork delist false-positive · bot «Лента» → `/lenta/?lead={id}` · theme **1.18.6** · STATUS/TASKS hot slim · `lead-no-code` + wordpress ban.
+
+**Урок:** Lead не кодит даже после conversation summary — только docs + `@coder`.
+
+---
+
 ## 2026-06-03 — Lead slim CODER_PROMPT hot (40 строк)
 
 **Было:** hot ~225 строк — O104 + O72e-10 DoD дублировали «✅ принято».

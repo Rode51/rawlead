@@ -132,6 +132,8 @@
     expandedId: null,
     loadGeneration: 0,
     itemsById: {},
+    focusLeadId: null,
+    focusLeadHandled: false,
   };
 
   var subscriptionState = null;
@@ -2364,6 +2366,10 @@
         bindCards();
         observeLeadCards(listEl);
         updatePagination();
+        if (replace && state.focusLeadId && !state.focusLeadHandled) {
+          state.focusLeadHandled = true;
+          focusLeadCard(state.focusLeadId);
+        }
       })
       .catch(function () {
         if (gen !== state.loadGeneration) {
@@ -2409,6 +2415,79 @@
     if (replyEl) {
       replyEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
+  }
+
+  function parseFocusLeadId() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      var raw = params.get("lead") || params.get("id") || "";
+      var id = parseInt(raw, 10);
+      return id > 0 ? id : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function leadDetailApiUrl(leadId) {
+    var base = cfg.restFeed || "";
+    if (base.indexOf("/feed") >= 0) {
+      return base.replace(/\/feed\/?$/, "/leads/" + leadId);
+    }
+    return base.replace(/\/?$/, "/leads/" + leadId);
+  }
+
+  function pulseFocusCard(card) {
+    card.classList.add("rl-lead-card--push-focus");
+    window.setTimeout(function () {
+      card.classList.remove("rl-lead-card--push-focus");
+    }, 2800);
+  }
+
+  function focusLeadCard(leadId) {
+    if (!leadId || !listEl) {
+      return Promise.resolve();
+    }
+    var card = listEl.querySelector('.rl-lead-card[data-id="' + leadId + '"]');
+    if (card) {
+      listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
+        c.classList.remove("is-expanded");
+      });
+      state.expandedId = leadId;
+      card.classList.add("is-expanded");
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      pulseFocusCard(card);
+      return Promise.resolve();
+    }
+    return fetch(leadDetailApiUrl(leadId), {
+      credentials: "same-origin",
+      headers: authHeaders(),
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status);
+        }
+        return res.json();
+      })
+      .then(function (item) {
+        if (!item || !item.id) {
+          return;
+        }
+        state.itemsById[item.id] = item;
+        listEl.insertAdjacentHTML("afterbegin", renderCard(item, true));
+        state.totalShown += 1;
+        var newCard = listEl.querySelector('.rl-lead-card[data-id="' + leadId + '"]');
+        if (!newCard) {
+          return;
+        }
+        state.expandedId = leadId;
+        newCard.classList.add("is-expanded");
+        bindCards();
+        newCard.scrollIntoView({ behavior: "smooth", block: "center" });
+        pulseFocusCard(newCard);
+      })
+      .catch(function () {
+        /* карточка недоступна — остаёмся на ленте */
+      });
   }
 
   var cardDelegationReady = false;
@@ -2982,6 +3061,8 @@
   }
 
   ensureCardDelegation();
+
+  state.focusLeadId = parseFocusLeadId();
 
   if (getToken()) {
     syncAuthCookie(getToken());

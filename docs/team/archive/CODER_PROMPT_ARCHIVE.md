@@ -9,6 +9,18 @@
 
 # Перенесено из hot **2026-06-03** (Lead slim CODER_PROMPT)
 
+## § O109 — Kwork delist + bot deeplink (архив DoD **2026-06-04**)
+
+**Симптом:** push Match 82% Kwork «Разработать дизайн сайта AAA» — карточка скрыта из ленты; «Лента» в боте без якоря.
+
+**Fix:** `kwork_parser._KWORK_GONE_MARKERS` без `"404"` · grace 6h · relist 234 rows · `match_push._lenta_lead_url` · feed JS/CSS pulse · theme 1.18.6.
+
+**Tests:** `test_kwork_delist_gone.py` · `test_match_push_o50.py` (9/9).
+
+**Deploy:** `deploy-o109-bot-deeplink-vps.py` · `ops-relist-kwork-vps.py`.
+
+---
+
 ## § O104 — Биржи (архив DoD)
 
 **Решение владельца 2026-06-03:** «Как узнать, если YouDo/биржа снова отъебёт?» — **понятная админка + бот FLPARSING** с причинами и таймингами. Язык — **простой**, как у хороших SaaS, без ops-жаргона.

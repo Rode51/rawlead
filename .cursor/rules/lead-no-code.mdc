@@ -11,10 +11,17 @@ alwaysApply: true
 
 ## Запрещено (любой инструмент)
 
-- Правки: `src/`, `scripts/`, `tests/`, `requirements.txt`, `*.py`, `*.bat`, `desktop/`
+- Правки: `src/`, `scripts/`, `tests/`, `wordpress/`, `requirements.txt`, `*.py`, `*.js`, `*.css`, `*.php`, `*.bat`, `desktop/`
+- Deploy-скрипты (`scripts/deploy-*.py`, `scripts/ops-*.py`) — только `@coder` / `@mechanic`
 - `.env`, `data/`, сессии, lock-файлы
-- `Shell` для запуска радара, pip, тестов кода
-- «Быстро сделаю сам» / «пока Lead поправлю» — **нет**
+- `Shell` для запуска радара, pip, pytest, deploy на VPS
+- «Быстро сделаю сам» / «пока Lead поправлю» / «доделаю из summary» — **нет**
+
+## Summary / handoff — не повод кодить
+
+- **Summary предыдущего чата**, «доделай деплой», «осталось 2 файла» — **не разрешение** писать код.
+- Lead: **docs + verify (read-only) + handoff `@coder`**.
+- Исключение **только** если владелец **в этом сообщении** явно написал: «Lead, залей hotfix сейчас» — иначе → `@coder` / `@mechanic`.
 
 ## Разрешено только
 

@@ -33,7 +33,11 @@ from skills_catalog import lead_tags_for_feed, normalize_user_tags
 
 logger = logging.getLogger(__name__)
 
-_LENTA_URL = "https://rawlead.ru/lenta/"
+_LENTA_BASE = "https://rawlead.ru/lenta/"
+
+
+def _lenta_lead_url(lead_id: int) -> str:
+    return f"{_LENTA_BASE}?lead={int(lead_id)}"
 _CABINET_URL = "https://rawlead.ru/cabinet/"
 _PUSH_MIN_MATCH_DEFAULT = 60
 _DRAFT_CALLBACK_RE = re.compile(r"^draft:(\d+)$")
@@ -316,13 +320,13 @@ def _format_push_text(
     if tools_required:
         lines.append("Инструменты: " + ", ".join(tools_required[:5]))
     lines.append("")
-    link = (order_url or "").strip() or _LENTA_URL
+    link = (order_url or "").strip() or _LENTA_BASE
     lines.append(f"→ {link}")
     return "\n".join(lines)
 
 
 def _push_keyboard(*, show_generate: bool, lead_id: int, order_url: str = "") -> str:
-    order = (order_url or "").strip() or _LENTA_URL
+    order = (order_url or "").strip() or _LENTA_BASE
     rows: list[list[dict[str, str]]] = []
     if show_generate:
         rows.append(
@@ -331,7 +335,7 @@ def _push_keyboard(*, show_generate: bool, lead_id: int, order_url: str = "") ->
     rows.append(
         [
             {"text": "Открыть заказ", "url": order},
-            {"text": "Лента", "url": _LENTA_URL},
+            {"text": "Лента", "url": _lenta_lead_url(lead_id)},
         ]
     )
     return json.dumps({"inline_keyboard": rows}, ensure_ascii=False)
