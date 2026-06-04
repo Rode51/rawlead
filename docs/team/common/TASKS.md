@@ -8,18 +8,28 @@
 
 | # | Задача | Кто | Статус |
 |---|--------|-----|--------|
-| **O72e-L2-r6** | промпт 3 ids → pilot judge → **один** full 71 · **≤$3 API** | **@coder** + owner cmds | **→ сейчас** |
-| **E2E S6** | PRE-PROD smoke + UX walk | **owner** | параллельно |
+| **E2E S6** | PRE-PROD smoke + UX walk | **owner** | **→ сейчас** |
+
+---
+
+## ⏸ Когда придёт время (не сейчас)
+
+| # | Задача | Триггер |
+|---|--------|---------|
+| **O72e full judge 71** | pilot r7 ✅ · full 71 + vault gate | после E2E / перед рекламой |
+| **VPS scale** | worker или апгрейд RAM | первые пользователи / OOM |
 
 ---
 
 ## Закрыто 2026-06-04
 
-**O109** ✅ Kwork delist false-positive + bot «Лента» deeplink · theme **1.18.6**
+**O72e-L2-r6/r7** ✅ pilot PASS (combined **4.3** · send **80%**) · full 71 ⏸
 
-**O108-BC** ✅ TZ attachments B+C · theme **1.18.5** · TG в ленту (21 канал)
+**O109** ✅ delist + deeplink · theme **1.18.6**
 
-**PRE-RELEASE-AUDIT** ✅ theme **1.18.4** · BUG-1…5 + P1
+**O108-BC** ✅ TZ B+C · theme **1.18.5**
+
+**PRE-RELEASE-AUDIT** ✅ theme **1.18.4**
 
 ---
 
@@ -29,4 +39,4 @@ stress · vault · O101 · O105-w1
 
 ---
 
-_Lead · 2026-06-04 · O109 ✅ · очередь → owner E2E_
+_Lead · 2026-06-04 · очередь → owner E2E_

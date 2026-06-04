@@ -807,6 +807,8 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 | 2026-06-03 | **Copy уникальный отклик** | Главная + pricing + бот | **O89 copy** · @lead-product параллельно judge |
 | 2026-06-03 | **O107 Trial 3 дня** | Бесплатный Premium 1× на аккаунт · явная активация · заменяет 3q на запуске | § **O107** · PM + O105-w1 |
 | 2026-06-04 | **O72e budget** | **≤ ~$3/день** на judge+regen · pilot→full **один раз** · regen 71 / qa `--full` **запрещены** без «да» | § **O72e-L2-r6** |
+| 2026-06-04 | **O72e full judge ⏸** | Pilot r7 **PASS** (combined 4.3 / send 80%) · **full 71 и stress — когда придёт время**, не сейчас | § O72e · после E2E/vault |
+| 2026-06-04 | **VPS scale ⏸** | Playwright+radar на одном VPS — **ок до первых юзеров** · тогда **2-й VPS worker** или **апгрейд тарифа** (не сейчас) | § O110-worker backlog |
 | 2026-06-03 | **L1/L2/L3 premium** | Judge full: L1/L3 ✅ · L2 send **40.8%** FAIL | **O72e-10** r1 |
 | 2026-06-03 | **Датчики бирж O104** | Админка `/ops/` + `/status`/push **@FLPARSINGBOT**: кто жив, причина, lag биржа→Neon→лента · cooldown 30 мин | **→ @coder P0** · § O104 |
 
