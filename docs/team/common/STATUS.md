@@ -38,25 +38,70 @@
 
 ---
 
-## O72e-L2-r7 ✅ pilot PASS (2026-06-04)
+### O114 ✅ Lead verify + VPS (2026-06-04)
 
-**Coder:** `l3_human_style.py` · tests **19/19** · regen #8772,#8752 · pilot r7
+**Coder:** `vacancy_filter.py` · pre-L1 в `analyze_lite` · post-L1 guard · L1 block VACANCY (O114) · `backfill_vacancy_hide.py`
 
-| Прогон | combined | send |
-|--------|----------|------|
-| pilot r7 | **4.30 ✅** | **80% ✅** |
+**Тесты:** **24/24** unittest (vacancy + l3 + l1 complexity)
 
-**Full judge 71 ⏸** — решение владельца: когда придёт время (после E2E).
+**VPS:** `deploy-o114-o115-vps.py` OK · `VACANCY (O114)` on prod
+
+**Backfill:** **12** скрыто ✅ (#7049, #6943, #7240, …)
+
+**Judge post-O114 (30 id, без regen):** combined **4.26** ✅ · send **56.7%** ❌ · `preprod_ai_prod_audit_judge_post_o114_30.md`
 
 ---
 
-## Сейчас (очередь)
+### O115 ⚠️ Lead verify частично (2026-06-04)
 
-| # | Задача | Кто | Статус |
-|---|--------|-----|--------|
-| **E2E S6** | PRE-PROD smoke + UX walk | **owner** | **→ сейчас** |
+**Health:** tg **25 ingest / 24h** · **2 visible / 24h** · `tg_main` active on VPS · recent #12789
 
-**VPS ⏸:** один инстанс ок до юзеров → 2-й worker или апгрейд тарифа.
+**Gaps:** `radar_site_tg.log` пуст/нет · judge pilot **только tg:%** не гоняли · top-3 feed API без tg (норм если L1 скрыл)
+
+---
+
+**Regen:** pool 30 since 2026-05-20 · догон **16/17** (fail **#7049** forbidden words) · **#6907** allow-cliche ok
+
+**Judge:** combined **4.2** · send **63.3%** ❌ (&lt;70%) · `preprod_ai_prod_audit_judge_r8_30.md`
+
+**Full 71:** ⏸ · промпт r8 на VPS ✅ · новые лиды ingest без regen
+
+---
+
+## O72e-L2-r7 ✅ pilot PASS (2026-06-04)
+
+**Coder:** `l3_human_style.py` · tests **19/19** · pilot r7 **4.30/80%** · Full judge ⏸
+
+---
+
+## O114+O115 ✅ Coder (2026-06-04)
+
+**O114:** `vacancy_filter.py` pre-L1 + L1 **VACANCY** block + `_finalize` override · `backfill_vacancy_hide.py` · tests **3/3** · dry-run 800 visible → **4** hits
+
+**O115:** `o115_tg_feed_health.py` · Neon tg **24**/24h (2 visible) · judge hook `--source-like tg:%%` · deploy `deploy-o114-o115-vps.py`
+
+**Lead:** VPS deploy + `backfill_vacancy_hide.py` (без `--dry-run`) · TG pilot judge 10 · Pay/SEO/UI — backlog «перед рекламой»
+
+---
+
+## Сейчас — **Фаза A: freeze done · r11 опционально**
+
+| # | Задача | Статус |
+|---|--------|--------|
+| **O72e-A-freeze** | regen 52/55 + judge 71 | ✅ send **60.6%** · L1/L3 ✅ |
+| **O72e-L2-r11** | #9843 TG wording, CRM depth… | **→ по ситуации** |
+| **UI/UX pre-ads** | wireframes, copy | **→ @lead-architect** (параллельно) |
+| **O114** | backfill **12** | ✅ |
+
+**Gate:** L2 send **60.6%** (цель 70%) · combined **4.27** · L1 **83%** · L3 **92%**
+
+**Judge freeze:** [`preprod_ai_prod_audit_judge_o72e_a_freeze.md`](../../data/preprod_ai_prod_audit_judge_o72e_a_freeze.md) · regen [`regen_o72e_a_freeze.json`](../../data/regen_o72e_a_freeze.json)
+
+**Промпт r9+r10:** VPS ✅ · L2 — **можно гонять ingest/regen волнами** без блокировки UI.
+
+**Owner параллельно:** UI/UX чат · pay smoke · stress — после send ≥70% или релиза.
+
+**FL proxy ⏸:** монитор → **O110**
 
 ---
 

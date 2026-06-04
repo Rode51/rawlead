@@ -153,10 +153,10 @@ class TestL3HumanStyle(unittest.TestCase):
         self.assertIn("text/design/творческий", body)
 
     def test_shared_l2_r3_ed_platform_no_telegram(self) -> None:
-        """O72e-L2-r5: #8752 ed platform — без telegram (judge штрафует)."""
+        """O72e-L2-r7: #8752 ed platform — Telegram только из текста ТЗ, не из tools_required."""
         body = build_shared_l2_system()
         self.assertIn("экзамены, видео-плеер, адаптив", body)
-        self.assertIn("judge штрафует", body)
+        self.assertIn("Telegram/API — **не добавляй**", body)
 
     def test_shared_l2_r3_ai_design_rounds(self) -> None:
         """O72e-L2-r3: #10442 AI-дизайн — раунды генерации → Figma, ограничения AI."""
@@ -169,6 +169,81 @@ class TestL3HumanStyle(unittest.TestCase):
         body = build_shared_l2_system()
         self.assertIn("#9831", body)
         self.assertIn("#8752", body)
+
+
+    def test_shared_l2_r6_fixes(self) -> None:
+        """O72e-L2-r6: #8772 литература, #10442 Figma/HTML вилка."""
+        body = build_shared_l2_system()
+        # #8772: литература явно в creative/text категории
+        self.assertIn("литература", body)
+        # #10442: обязательный вопрос Figma vs HTML когда оба в ТЗ
+        self.assertIn("Figma-макет или готовая", body)
+        self.assertIn("вопрос-вилку", body)
+        self.assertIn("tools_required", body)
+
+
+    def test_shared_l2_r7_fixes(self) -> None:
+        """O72e-L2-r7: #8772 creative — вопрос объём/формат; #8752 — нет TG из tools_required."""
+        body = build_shared_l2_system()
+        # #8772: вопрос для creative только про объём/формат, не про сюжет
+        self.assertIn("объём (знаки или слова)", body)
+        self.assertIn("никогда", body)
+        # #8752: Telegram/API не добавляй если нет в Описании
+        self.assertIn("Telegram/API — **не добавляй**", body)
+        self.assertNotIn("упомяни Telegram/API если они в", body)
+
+    def test_shared_l2_r8_creative_tags(self) -> None:
+        """O72e-L2-r8: #8772 — фраза «творческая» + «теги карточки»; #8752 — reconcile TG rule."""
+        body = build_shared_l2_system()
+        # #8772: GOOD-пример содержит «творческая» и «теги карточки»
+        self.assertIn("творческая", body)
+        self.assertIn("теги карточки", body)
+        # #8772: правило creative/text с пояснением tech-тегов
+        self.assertIn("creative/text (#8772", body)
+        # #8752: TG только если и в Описании и в tools_required
+        self.assertIn("и** в Описании **и** в tools_required", body)
+        # #8752: три GOOD/BAD примера присутствуют
+        self.assertIn("GOOD (#8752 нет TG", body)
+        self.assertIn("GOOD (#8752 TG есть", body)
+
+    def test_shared_l2_r9_w1_send_gate(self) -> None:
+        """O72e-L2-r9: judge w1 send 50% → блоки send-ready, tools_required, якоря w1."""
+        body = build_shared_l2_system()
+
+        # A1: блок «Структура send-ready» присутствует
+        self.assertIn("Структура send-ready", body)
+        self.assertIn("≥4 предложени", body)
+        # A1: FAIL-условие send
+        self.assertIn("FAIL send", body)
+        self.assertIn("готов присоединиться", body)
+
+        # A2: блок «tools_required — сверка перед ответом»
+        self.assertIn("tools_required — сверка перед ответом", body)
+        self.assertIn("не из** tools_required", body)
+
+        # A3: якорь #11332 WP каталог — PHP + этапы
+        self.assertIn("#11332", body)
+        self.assertIn("PHP", body)
+        # A3: якорь #9875 книга — Excel
+        self.assertIn("#9875", body)
+        self.assertIn("Excel", body)
+        # A3: якорь #10442 — HTML/CSS вилка
+        self.assertIn("HTML/CSS", body)
+
+        # BAD w1: «готов начать» без этапов и инструментов
+        self.assertIn("готов начать", body)
+        # GOOD #11332: PHP + фильтры + навигация
+        self.assertIn("GOOD (#11332)", body)
+        # GOOD #9875: Excel + структура книги
+        self.assertIn("GOOD (#9875)", body)
+
+    def test_shared_l2_r10_12148_stack_conflict(self) -> None:
+        """O72e-L2-r10: #12148 — NestJS/Nuxt из ТЗ, PHP из tools не упоминать."""
+        body = build_shared_l2_system()
+        self.assertIn("#12148", body)
+        self.assertIn("Конфликт tools_required vs Описание", body)
+        self.assertIn("GOOD (#12148)", body)
+        self.assertIn("webhook handlers", body)
 
 
 if __name__ == "__main__":

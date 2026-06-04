@@ -2,42 +2,66 @@
 
 **Снимок:** [`STATUS.md`](STATUS.md)
 
+**Решение владельца 2026-06-04:** **Фаза A** L2 send 60.6% — **релиз промпта ok**, r11 по ситуации · **UI/UX — параллельный чат @lead-architect** · stress после send ≥70%.
+
 ---
 
-## Сейчас
+## Фаза A — ИИ gate (**freeze done, r11 опционально**)
 
 | # | Задача | Кто | Статус |
 |---|--------|-----|--------|
-| **O72e-L2-r8** | L1 complexity + L2 #8772/#8752 prompt | **@coder** | **→ сейчас** |
-| **E2E S6** | smoke UX | **owner** | параллельно |
+| **O72e-A-w1** | regen **21** + judge w1 | **Lead** | ✅ send **50%** FAIL |
+| **O72e-L2-r9** | prompt send gate · tests 25/25 | **@coder** | ✅ |
+| **O72e-L2-r10** | #12148 stack conflict · regen 1 | **Lead** | ✅ draft ok · judge rubric ⏸ |
+| **O72e-A-freeze** | regen 52/55 + judge 71 | **Lead** | ✅ send **60.6%** ❌ |
+| **O72e-L2-r11** | паттерны freeze FAIL → prompt | **@coder** | **→ по ситуации** |
+| **O72e-A-w3** | judge **tg-only 10** · L1 spot-check | Lead | backlog |
+
+**Gate freeze:** L2 combined ≥4.0 · send **≥70%** · L1 usable ≥70% · L3 smoke ✅
+
+**Бюджет:** волны ~$4–6 · full 71 ~$2.5 · **не** regen 71 blind.
 
 ---
 
-## ⏸ Когда придёт время (не сейчас)
+## Параллельно (**→ owner + @lead-architect**, не блокирует r11)
+
+| # | Задача | Чат |
+|---|--------|-----|
+| **UI/UX pre-ads** | wireframes, copy, lenta/cabinet/pricing | **@lead-architect** + @lead-designer |
+| **O105-w1** | pay prod smoke | owner |
+| **O113-seo** | backlog | — |
+
+---
+
+## ⏸ После Фазы A
+
+| # | Задача |
+|---|--------|
+| **Stress / vault** | стабильность |
+| **O112-support** | FAB |
+| **O107** | Trial |
+| **E2E-UX финал** | polish перед ads |
+| **Soft ads** | после freeze |
+
+---
+
+## ⏸ Ops фон
 
 | # | Задача | Триггер |
 |---|--------|---------|
-| **O72e full judge 71** | pilot r7 ✅ · full 71 + vault gate | после E2E / перед рекламой |
-| **VPS scale** | worker или апгрейд RAM | первые пользователи / OOM |
+| **O110-fl-proxy** | FL 403 | >2×/сутки |
+| **O115-tg-feed** | tg ingest | ✅ 25/24h |
 
 ---
 
 ## Закрыто 2026-06-04
 
-**O72e-L2-r6/r7** ✅ pilot PASS (combined **4.3** · send **80%**) · full 71 ⏸
+**O114-vacancy** ✅ · backfill **12** · judge post-O114 send **56.7%**
 
-**O109** ✅ delist + deeplink · theme **1.18.6**
+**O72e-L2-r8** ✅ · pilot r8 **80%** (10 regen)
 
-**O108-BC** ✅ TZ B+C · theme **1.18.5**
-
-**PRE-RELEASE-AUDIT** ✅ theme **1.18.4**
+**O109** ✅ · **O108-BC** ✅ · **PRE-RELEASE-AUDIT** ✅
 
 ---
 
-## После E2E
-
-stress · vault · O101 · O105-w1
-
----
-
-_Lead · 2026-06-04 · очередь → owner E2E_
+_Lead · 2026-06-04 · Фаза A → stress → ads_
