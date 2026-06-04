@@ -19,7 +19,7 @@ $year = (int) gmdate('Y');
 			<li><a href="<?php echo esc_url(rawlead_page_url('pricing')); ?>"><?php esc_html_e('Тарифы', 'rawlead-kadence-child'); ?></a></li>
 			<li><a href="<?php echo esc_url(rawlead_page_url('faq')); ?>"><?php esc_html_e('Вопросы', 'rawlead-kadence-child'); ?></a></li>
 			<li><a href="<?php echo esc_url(rawlead_page_url('contact')); ?>"><?php esc_html_e('Контакты', 'rawlead-kadence-child'); ?></a></li>
-			<li><a href="https://t.me/rcnn43" target="_blank" rel="noopener">Telegram @rcnn43</a></li>
+			<li><a href="https://t.me/rawlead_bot" target="_blank" rel="noopener">Telegram @rawlead_bot</a></li>
 		</ul>
 		<p class="rl-footer__copy">
 			<span class="rl-footer__byline"><?php esc_html_e('RawLead · by Rode51', 'rawlead-kadence-child'); ?></span>

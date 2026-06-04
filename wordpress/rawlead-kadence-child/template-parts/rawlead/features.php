@@ -25,7 +25,7 @@ $items = [
 $trust_chips = [
     __('Не один текст на всех', 'rawlead-kadence-child'),
     __('Не автоспам', 'rawlead-kadence-child'),
-    __('Не бан за шаблон', 'rawlead-kadence-child'),
+    __('До 10 откликов на заказ — не шаблон, не бан', 'rawlead-kadence-child'),
 ];
 ?>
 <section class="rl-section rl-features-scroll rl-reveal" aria-labelledby="rl-features-title">

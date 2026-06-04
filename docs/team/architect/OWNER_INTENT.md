@@ -875,6 +875,74 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 | 2026-05-29 | **Admin /ops/** | VPS · только owner TG | **O45** ✅ scope |
 | 2026-05-29 | **WAVE-4-MICRO** | FAB → окно чата (stub ok) · навыки ленты ≠ ЛК · «Мои навыки» на ленте · modal ЛК по центру · убрать hero-счётчик | → `CODER_PROMPT` § WAVE-4-MICRO |
 
+| 2026-06-04 | **O108 v1.1 B+C** | Лимиты по типу · маркер «файл есть, не прочитан» · красный chip на карточке | **✅ решение владельца** · § O108 · **→ Coder** |
+| 2026-06-04 | **TG в PUBLIC_FEED** | 21 канал allowlist + secondary биржи в `/lenta/` | **✅ решение владельца** · VPS `.env.site` |
+
+---
+
+## § O108 — TZ из вложений (**→ Coder · v1 + v1.1 B+C**)
+
+**Боль:** на FL/Kwork полное ТЗ часто **только во вложении** — L1/L2 «слепые»; модель пишет «вижу ZIP», хотя файла не читала.
+
+**Решение владельца 2026-06-04:** гибрид **B + C** — умные лимиты + маркер честности + **красный** индикатор на карточке, если ТЗ на странице есть, но текст не извлечён (**причина — вес**).
+
+### v1.1 B — умные лимиты (`.env`)
+
+| Тип | Лимит | Поведение |
+|-----|-------|-----------|
+| `.docx` `.pdf` `.txt` | **8 MB** (`TZ_ATTACHMENT_MAX_TEXT_MB`) | полный extract |
+| `.zip` `.rar` | **2 MB** (`TZ_ATTACHMENT_MAX_ARCHIVE_MB`) | ≤2 MB — extract текстовых внутри; **>**2 MB — **только листинг имён** |
+
+### v1.1 C — маркер честности
+
+```text
+[TZ attachment — файл на странице, 52 MB, текст не извлечён из-за размера]
+```
+
+**L2:** можно «вижу, что прикрепили архив N MB — ознакомлюсь в диалоге» · **нельзя** описывать содержимое.
+
+**Persist:** `ai_reasons.tz_attachment` → `{status, filename, size_mb, reason}`.
+
+### UI — красный chip (`/lenta/`)
+
+| status | Chip (**#C0392B**, `.rl-feed-card__tz-warn`) |
+|--------|-----------------------------------------------|
+| `skipped_size` | **ТЗ не прочитано · 52 MB** |
+| `skipped_auth` | **ТЗ не прочитано · нужен вход на биржу** |
+| `skipped_empty` | **ТЗ не прочитано · файл без текста** |
+| `extracted` | chip не показывать (v1.1) |
+
+Под «Суть задания», над черновиком. Полный DoD → `CODER_PROMPT` § O108-BC.
+
+---
+
+## § O108 (архив spec 2026-06-03)
+
+_Заменено решением v1.1 B+C выше._
+
+**Боль (архив):** listing/body короткий → L1/L2 «слепые», judge FAIL on specificity.
+
+**Идея владельца 2026-06-03:** Playwright на **странице заказа** видит ссылку на файл → скачать → вытащить текст → дописать в контекст перед L1/L2.
+
+| # | Решение | DoD v1 |
+|---|---------|--------|
+| 1 | **Detect** | на detail-fetch FL/Kwork: `<a href*="download">` / known CDN patterns · whitelist `.docx` `.pdf` `.txt` |
+| 2 | **Download** | Playwright → `/tmp/rawlead_attach/{lead_id}/` · max **2 MB** · timeout 30s · cleanup после extract |
+| 3 | **Extract** | `python-docx` (docx) · `pypdf` (pdf text-layer) · fallback skip |
+| 4 | **Enrich** | append к `body` / `task_text` с маркером `[TZ attachment]` · cap **8k chars** в prompt |
+| 5 | **Persist** | опц. `leads.attachment_text` или поле в `ai_reasons` — не дублировать каждый L1 |
+| 6 | **Fail-open** | нет файла / auth wall / scan-PDF → ingest как сейчас, **не** блокировать |
+
+**Lead: идея ✅ норм**, с оговорками:
+
+- **v1 без OCR** — сканы в PDF не прочитаем (pypdf пустой) · v2: Tesseract opt-in.
+- **Auth:** часть файлов только залогиненному — нужна cookie-сессия browser profile (как O99), не httpx.
+- **Когда качать:** только **detail page** (не listing) · только если `len(body) < N` или явная ссылка «скачать ТЗ».
+- **Не в v1:** .zip, .rar, exe · malware scan · хранение файлов на диске Neon.
+- **Оценка:** ~1 вечер spike + ~1 вечер prod (FL+Kwork) · отдельный § Coder после **O72e vault PASS**.
+
+**Очередь:** после E2E/vault · параллельно не блокирует O101/O105.
+
 ---
 
 ## Что Lead **не** делает (напоминание)

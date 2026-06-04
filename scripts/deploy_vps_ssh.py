@@ -98,6 +98,8 @@ INGEST_COUPLED_SRC = (
     "exchange_browser_fetch.py",
     "fl_parser.py",
     "kwork_parser.py",
+    "tz_attachments.py",
+    "l3_human_style.py",
     "health_check.py",
     "config.py",
     "proxy_probe.py",

@@ -447,6 +447,7 @@ class NeonLeadStorage:
         lite: AiLiteAnalysis | None,
         errors: list[str],
         body_snippet: str,
+        tz_attachment: dict[str, Any] | None = None,
     ) -> None:
         """После L1: поля ленты (не перезаписывать полным FL-body)."""
         if not self.enabled:
@@ -457,6 +458,14 @@ class NeonLeadStorage:
         task_summary = lite.task_summary.strip() if lite is not None else None
         lead_tags = _lite_tags_json(lite)
         reasons = _lite_reasons_json(lite)
+        if tz_attachment is None:
+            from tz_attachments import infer_tz_attachment_from_body
+
+            tz_attachment = infer_tz_attachment_from_body(snippet)
+        if tz_attachment is not None:
+            from ai_reasons import merge_tz_attachment_into_reasons_json
+
+            reasons = merge_tz_attachment_into_reasons_json(reasons, tz_attachment)
         if lite is not None:
             category = resolve_l1_primary_category(
                 lite.primary_category,

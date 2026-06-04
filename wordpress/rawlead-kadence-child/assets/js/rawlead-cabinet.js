@@ -936,10 +936,19 @@
     }
     subEl.hidden = false;
     var status = data.status || "free";
+    if (data.is_active && (status === "free" || status === "expired")) {
+      status = "active";
+    }
+    if (data.effective_access && status === "free") {
+      status = "active";
+    }
     var isTrial = status === "trial" || !!data.is_trial;
-    if (data.is_trial) {
+    if (data.is_trial && status !== "active" && status !== "beta") {
       status = "trial";
       isTrial = true;
+    }
+    if (status === "active" || status === "beta" || status === "paused") {
+      isTrial = false;
     }
 
     if (subBadgeEl) {
@@ -975,28 +984,61 @@
     var payUrl = cfg.botPayUrl || botDeepLink("pay");
     var trialUrl = botDeepLink("trial");
 
-    if (subTrialEl) {
-      subTrialEl.hidden = status !== "free";
+    var subActionsEl = subEl.querySelector(".rl-cabinet-sub__actions");
+    if (subActionsEl) {
+      subActionsEl.classList.remove(
+        "rl-cabinet-sub__actions--free",
+        "rl-cabinet-sub__actions--trial",
+        "rl-cabinet-sub__actions--paid"
+      );
       if (status === "free") {
-        setSubLink(subTrialEl, trialUrl, "Попробовать 3 дня бесплатно");
-        subTrialEl.classList.add("rl-btn--primary");
-        subTrialEl.classList.remove("rl-btn--ghost");
+        subActionsEl.classList.add("rl-cabinet-sub__actions--free");
+      } else if (isTrial) {
+        subActionsEl.classList.add("rl-cabinet-sub__actions--trial");
+      } else if (status === "active" || status === "beta") {
+        subActionsEl.classList.add("rl-cabinet-sub__actions--paid");
+      }
+    }
+
+    function setSubActionClass(el, role) {
+      if (!el) {
+        return;
+      }
+      el.classList.remove("rl-cabinet-sub__action-primary", "rl-cabinet-sub__action-secondary");
+      if (role === "primary") {
+        el.classList.add("rl-cabinet-sub__action-primary");
+        el.classList.remove("rl-btn--ghost");
+        el.classList.add("rl-btn--primary");
+      } else if (role === "secondary") {
+        el.classList.add("rl-cabinet-sub__action-secondary");
+        el.classList.remove("rl-btn--primary");
+        el.classList.add("rl-btn--ghost");
+      } else {
+        el.classList.remove("rl-btn--primary", "rl-btn--ghost");
+      }
+    }
+
+    if (subTrialEl) {
+      var showTrial = status === "free" && !data.is_active && !data.effective_access;
+      subTrialEl.hidden = !showTrial;
+      if (showTrial) {
+        setSubLink(subTrialEl, trialUrl, "Попробовать 3 дня →");
+        setSubActionClass(subTrialEl, "primary");
       }
     }
 
     if (subPayEl) {
       if (status === "free") {
         subPayEl.hidden = false;
-        subPayEl.classList.remove("rl-btn--primary");
-        subPayEl.classList.add("rl-btn--ghost");
         setSubLink(subPayEl, payUrl, "Подключить Premium →");
+        setSubActionClass(subPayEl, "secondary");
       } else if (isTrial) {
         subPayEl.hidden = false;
-        subPayEl.classList.add("rl-btn--primary");
-        subPayEl.classList.remove("rl-btn--ghost");
         setSubLink(subPayEl, payUrl, "Оплатить 790 ₽ →");
+        setSubActionClass(subPayEl, "primary");
       } else {
         subPayEl.hidden = true;
+        setSubActionClass(subPayEl, "");
       }
     }
 
@@ -1004,8 +1046,10 @@
       if (status === "active" || status === "beta") {
         subBillingEl.hidden = false;
         setSubLink(subBillingEl, payUrl, "Оплата");
+        setSubActionClass(subBillingEl, "secondary");
       } else {
         subBillingEl.hidden = true;
+        setSubActionClass(subBillingEl, "");
       }
     }
 
@@ -1014,9 +1058,19 @@
       subPauseEl.hidden = !showPause || status === "free" || status === "expired";
       subPauseEl.disabled = !data.can_pause && !isTrial;
       subPauseEl.textContent = "Пауза";
+      if (status === "active" || status === "beta") {
+        setSubActionClass(subPauseEl, "secondary");
+      } else if (isTrial) {
+        setSubActionClass(subPauseEl, "secondary");
+      } else {
+        setSubActionClass(subPauseEl, "");
+      }
     }
     if (subResumeEl) {
       subResumeEl.hidden = status !== "paused";
+      if (status === "paused") {
+        setSubActionClass(subResumeEl, "primary");
+      }
     }
     if (subNoteEl) {
       subNoteEl.hidden = true;
@@ -1110,9 +1164,19 @@
     }
     notifEl.hidden = false;
     if (notifThresholdEl) {
-      var threshold = String(data.push_min_match || 60);
+      var raw = parseInt(String(data.push_min_match || 60), 10);
+      var threshold = 60;
+      if (!isNaN(raw)) {
+        if (raw >= 100) {
+          threshold = 100;
+        } else if (raw >= 80) {
+          threshold = 80;
+        } else {
+          threshold = 60;
+        }
+      }
       notifThresholdEl.querySelectorAll(".rl-notif-threshold-chip").forEach(function (chip) {
-        var active = chip.getAttribute("data-value") === threshold;
+        var active = parseInt(chip.getAttribute("data-value"), 10) === threshold;
         chip.classList.toggle("is-active", active);
         chip.setAttribute("aria-pressed", active ? "true" : "false");
       });

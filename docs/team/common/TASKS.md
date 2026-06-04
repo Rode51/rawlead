@@ -8,21 +8,23 @@
 
 | # | Задача | Кто | Статус |
 |---|--------|-----|--------|
-| **O72e pilot re-judge** | regen 10 + judge r3 | **owner** | **→ сейчас** |
-| **E2E / vault** | | owner | L2 PASS |
+| **E2E S6** | PRE-PROD smoke + UX walk | **owner** | **→ сейчас** |
+| **O72e full judge 71** | pilot send 7/10 | **owner** | параллельно |
 
 ---
 
-## Закрыто 2026-06-03
+## Закрыто 2026-06-04
 
-**O72e-L2-r3** ✅ · O105-WP-r3 · youdo-lite · O72e-L2-r2 · O105 wave
+**O108-BC** ✅ TZ attachments B+C · theme **1.18.5** · TG в ленту (21 канал)
 
----
-
-## После vault
-
-O101 · O105-w1
+**PRE-RELEASE-AUDIT** ✅ theme **1.18.4** · BUG-1…5 + P1
 
 ---
 
-_Lead · 2026-06-03_
+## После E2E
+
+stress · vault · O101 · O105-w1
+
+---
+
+_Lead · 2026-06-04 · O108-BC → Coder_

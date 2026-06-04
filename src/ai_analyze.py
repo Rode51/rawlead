@@ -1850,11 +1850,15 @@ def _build_shared_reply_user(
         desc = desc[: _MAX_SHARED_SNIPPET_CHARS - 1] + "…"
     body_block = f"Описание заказа:\n{desc}\n\n" if desc else ""
     hints = _tz_stack_hints_for_reply(title, desc, lite.task_summary)
+    from tz_attachments import attachment_prompt_hint
+
+    attach_hint = attachment_prompt_hint(desc)
     return (
         f"Заголовок: {title.strip()}\n"
         f"Бюджет: {budget_text.strip()}\n\n"
         f"Суть заказа (task_summary):\n{lite.task_summary.strip()}\n\n"
         f"{body_block}"
+        f"{attach_hint}"
         f"{hints}"
         f"Инструменты (tools_required, справочно — §1 стек из текста выше): "
         f"{tools_line or 'не указаны'}\n\n"
@@ -1928,6 +1932,17 @@ def analyze_shared_reply_draft(
             smell = reply_ai_smell_reason(draft)
             if smell and attempt < 3:
                 retry_reason = smell
+                time.sleep(
+                    _SHARED_DRAFT_BACKOFF_SEC[
+                        min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)
+                    ]
+                )
+                continue
+            from tz_attachments import reply_attachment_claim_reason
+
+            attach_reason = reply_attachment_claim_reason(draft, description)
+            if attach_reason and attempt < 3:
+                retry_reason = attach_reason
                 time.sleep(
                     _SHARED_DRAFT_BACKOFF_SEC[
                         min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)

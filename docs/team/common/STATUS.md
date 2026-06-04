@@ -8,6 +8,18 @@
 
 ---
 
+## PRE-RELEASE-AUDIT ✅ Lead verify (2026-06-04)
+
+**Theme:** **1.18.4** · deploy VPS ✅ · prod curl OK (BUG-1 CSS, footer bot, trust chip, slot-hint)
+
+**Coder:** BUG-1–5 + P1-A–G · `/pricing/` visible · cabinet sub · notif 3 presets
+
+**Замечание (не блокер):** P1-F — `.rl-live-preview` hide (не `.rl-hero__preview`; floats уже off @900px)
+
+**Owner:** глаза `/pricing/` + ЛК premium · **→ E2E S6**
+
+---
+
 ## Hotfix draft VPS ✅ (2026-06-03 ~13:00 UTC)
 
 **Симптом:** баннер «ИИ временно недоступен — повторите» на `/lenta/` при «Написать отклик».
@@ -65,9 +77,25 @@
 
 **Тест:** unittest **16/16** · deploy `deploy-o72e-l2-r3-vps.py` **r3_ok**
 
-**Pilot r2 baseline:** 4/10 send — `preprod_ai_prod_audit_judge_pilot.md`
+**Pilot r2:** 4/10 · **r3:** 6/10 (60%) · **r4:** 6/10 · **r5:** **7/10 (70%) send ✅** — `preprod_ai_prod_audit_judge_pilot_r5.md`
 
-**Re-pilot (owner → сейчас):** regen 10 ids → judge → `preprod_ai_prod_audit_judge_pilot_r3.md`
+**r5 send=True:** #8925 #9843 #9581 #9831 #9374 #9326 #10362 · **False:** #8772 #10442 #8752
+
+**r4→r5:** #10442 #9843 PASS (GAS) · #10362 #9581 восстановлены · combined **3.97** (<4.0) — script Accept L2 still ❌
+
+**Regen r4:** 10/10 · **r5:** 4 ids (#10362 #8752 #8772 #9581) · deploy `l3_human_style.py` VPS
+
+**Дальше:** full regen 71 + L2 judge (send gate OK) · или r6 на #8772/#8752 flip-flop tools
+
+---
+
+## O108-BC ✅ Lead verify + VPS (2026-06-04)
+
+**Theme:** **1.18.5** · `deploy-o108-bc-vps.py` OK · curl `1.18.5` · `tz_attachments_ok` · deps docx/pypdf
+
+**Prod env:** `PUBLIC_FEED_SOURCES` = fl,kwork,youdo,freelance_ru,freelancejob,pchyol + **21× tg:** (решение владельца) · TZ 8/2 MB
+
+**Тесты:** unittest tz_attachments + l3 **31/31 OK**
 
 ---
 
@@ -75,7 +103,8 @@
 
 | # | Задача | Кто | Статус |
 |---|--------|-----|--------|
-| **O72e pilot re-judge** | regen 10 + L2 judge r3 | **owner** | **→ сейчас** |
+| **O108-BC** | Lead verify + VPS deploy | **Lead** | ✅ |
+| **O72e full judge 71** | pilot send **7/10 ✅** → regen all + L2 judge | **owner** | |
 | **E2E / vault** | | owner | L2 PASS |
 
 ---

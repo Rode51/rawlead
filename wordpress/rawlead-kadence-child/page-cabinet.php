@@ -96,12 +96,9 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 			<div class="rl-cabinet-notif__row">
 				<span class="rl-cabinet-notif__label" id="rl-cabinet-notif-threshold-label"><?php esc_html_e('Уведомлять от % совпадения', 'rawlead-kadence-child'); ?></span>
 				<div class="rl-cabinet-notif__chips" id="rl-cabinet-notif-threshold" role="group" aria-labelledby="rl-cabinet-notif-threshold-label">
-					<?php
-					foreach ( [ 30, 40, 50, 60, 70, 80, 90, 100 ] as $pct ) :
-						$active = 60 === $pct ? ' is-active' : '';
-						?>
-					<button type="button" class="rl-notif-threshold-chip<?php echo esc_attr( $active ); ?>" data-value="<?php echo (int) $pct; ?>" aria-pressed="<?php echo 60 === $pct ? 'true' : 'false'; ?>"><?php echo (int) $pct; ?>%</button>
-					<?php endforeach; ?>
+					<button type="button" class="rl-notif-threshold-chip is-active" data-value="60" aria-pressed="true"><?php esc_html_e('Все подходящие (60%+)', 'rawlead-kadence-child'); ?></button>
+					<button type="button" class="rl-notif-threshold-chip" data-value="80" aria-pressed="false"><?php esc_html_e('Хорошие (80%+)', 'rawlead-kadence-child'); ?></button>
+					<button type="button" class="rl-notif-threshold-chip" data-value="100" aria-pressed="false"><?php esc_html_e('Только идеальные (100%)', 'rawlead-kadence-child'); ?></button>
 				</div>
 			</div>
 			<div class="rl-cabinet-notif__row rl-cabinet-notif__row--toggle">

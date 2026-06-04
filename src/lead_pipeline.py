@@ -15,7 +15,7 @@ from ai_analyze import (
 from budget import meets_min_budget
 from config import Config
 from filters import ListingWordFilter
-from fl_parser import fetch_project_description
+from listing import SOURCE_FL, SOURCE_KWORK
 from listing import SOURCE_FL, ListingProject
 from lead_category import category_for_listing
 from listing_dedup import listing_content_hash
@@ -56,22 +56,83 @@ def short_err(exc: BaseException, *, max_len: int = 240) -> str:
     return s
 
 
+def _resolve_ingest_body(
+    project: ListingProject,
+    cfg: Config,
+    errors: list[str],
+) -> tuple[str, dict | None]:
+    """Полный текст ТЗ для ingest/L1/L2: detail page + O108 вложения."""
+    base = (project.listing_snippet or project.title or "").strip()
+    html = ""
+    ext_id = str(project.project_id)
+
+    if project.source == SOURCE_FL:
+        from fl_parser import fetch_project_detail
+
+        text, html, ok = fetch_project_detail(
+            project.url,
+            cfg,
+            fallback_snippet=base,
+        )
+        if ok and text:
+            base = text
+        elif not ok:
+            errors.append(f"{project.source}:id={ext_id} ai:detail:fallback")
+    elif project.source == SOURCE_KWORK:
+        from kwork_parser import fetch_project_detail, fetch_project_page_html
+        from tz_attachments import body_promises_attachment, tz_attachments_enabled
+
+        need_page = tz_attachments_enabled() and (
+            len(base) < 400 or body_promises_attachment(base)
+        )
+        if need_page:
+            text, html, ok = fetch_project_detail(
+                project.url,
+                cfg,
+                fallback_snippet=base,
+            )
+            if ok and text:
+                base = text
+            else:
+                page_html, page_ok = fetch_project_page_html(project.url, cfg)
+                if page_ok:
+                    html = page_html
+        else:
+            return base, None
+    else:
+        return base, None
+
+    if project.source not in (SOURCE_FL, SOURCE_KWORK) or not html.strip():
+        return base, None
+
+    from tz_attachments import enrich_body_with_attachments, tz_attachments_enabled
+
+    if not tz_attachments_enabled():
+        return base, None
+
+    result = enrich_body_with_attachments(
+        project.source,
+        html,
+        base,
+        cfg,
+        page_url=project.url,
+        errors=errors,
+    )
+    tz_dict = result.tz_attachment.to_dict() if result.tz_attachment else None
+    if result.tz_attachment:
+        st = result.tz_attachment.status
+        errors.append(f"{project.source}:id={ext_id} tz_attachment:{st}")
+    return result.body, tz_dict
+
+
 def _resolve_description(
     project: ListingProject,
     cfg: Config,
     errors: list[str],
 ) -> str:
-    if project.source == SOURCE_FL:
-        desc, ok = fetch_project_description(
-            project.url,
-            cfg,
-            fallback_snippet=project.listing_snippet,
-        )
-        if not ok:
-            errors.append(
-                f"{project.source}:id={project.project_id} ai:detail:fallback"
-            )
-        return desc
+    if project.source in (SOURCE_FL, SOURCE_KWORK):
+        body, _ = _resolve_ingest_body(project, cfg, errors)
+        return body
     return project.listing_snippet or project.title
 
 
@@ -441,6 +502,8 @@ def plan_new_listing(
             stats.note_skip("skip:budget")
         return inserted or neon_replay or neon_sqlite_resync, None
 
+    ingest_body, tz_attachment_meta = _resolve_ingest_body(project, cfg, errors)
+
     if neon_wide and pg is not None and not in_neon:
         in_neon, neon_replay, neon_sqlite_resync, dup_abort = _insert_neon_after_gates(
             project,
@@ -538,6 +601,7 @@ def plan_new_listing(
                         lite=lite_analysis,
                         errors=errors,
                         body_snippet=ingest_snippet,
+                        tz_attachment=tz_attachment_meta,
                     )
                     _rollup_after_lite(
                         cfg, project, lite_analysis, ingest_snippet=ingest_snippet
@@ -550,6 +614,7 @@ def plan_new_listing(
                     lite=lite_analysis,
                     errors=errors,
                     body_snippet=ingest_snippet,
+                    tz_attachment=tz_attachment_meta,
                 )
                 _rollup_after_lite(
                     cfg, project, lite_analysis, ingest_snippet=ingest_snippet

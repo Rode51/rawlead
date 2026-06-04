@@ -247,6 +247,64 @@ def _fetch_listing_pages(
     ]
 
 
+def _parse_fl_detail_html(html: str, *, fallback_snippet: str = "") -> str:
+    soup = BeautifulSoup(html, "html.parser")
+    desc_el = soup.select_one(".fl-project-content__description-text")
+    if desc_el:
+        text = desc_el.get_text(" ", strip=True)
+        if text:
+            return text
+    blocks: list[str] = []
+    for sel in (".fl-project-content .b-layout__txt", ".b-layout__txt"):
+        for node in soup.select(sel):
+            t = node.get_text(" ", strip=True)
+            if len(t) > 40:
+                blocks.append(t)
+    if blocks:
+        return max(blocks, key=len)
+    return fallback_snippet
+
+
+def fetch_project_page_html(
+    project_url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float = 30.0,
+) -> tuple[str, bool]:
+    """GET страницы проекта FL → HTML. (html, ok)."""
+    url = (project_url or "").strip()
+    if not url:
+        return "", False
+    headers = {"User-Agent": cfg.http_user_agent}
+    try:
+        resp = exchange_get("fl", url, headers=headers, timeout_sec=timeout_sec)
+    except requests.RequestException:
+        return "", False
+    if resp.status_code != 200:
+        return "", False
+    encoding = resp.encoding or "utf-8"
+    return resp.content.decode(encoding, errors="replace"), True
+
+
+def fetch_project_detail(
+    project_url: str,
+    cfg: Config,
+    *,
+    fallback_snippet: str = "",
+    timeout_sec: float = 30.0,
+) -> tuple[str, str, bool]:
+    """
+    GET страницы проекта FL → (description, html, detail_ok).
+    При ошибке — fallback_snippet, "", detail_ok=False.
+    """
+    html, ok = fetch_project_page_html(project_url, cfg, timeout_sec=timeout_sec)
+    if not ok:
+        return fallback_snippet, "", False
+    text = _parse_fl_detail_html(html, fallback_snippet=fallback_snippet)
+    detail_ok = bool(text and text != (fallback_snippet or "").strip())
+    return text, html, detail_ok
+
+
 def fetch_project_description(
     project_url: str,
     cfg: Config,
@@ -258,39 +316,13 @@ def fetch_project_description(
     GET страницы проекта FL → полный текст ТЗ.
     Возвращает (description, detail_ok). При ошибке — fallback_snippet, detail_ok=False.
     """
-    url = (project_url or "").strip()
-    if not url:
-        return fallback_snippet, False
-
-    headers = {"User-Agent": cfg.http_user_agent}
-    try:
-        resp = exchange_get("fl", url, headers=headers, timeout_sec=timeout_sec)
-    except requests.RequestException:
-        return fallback_snippet, False
-
-    if resp.status_code != 200:
-        return fallback_snippet, False
-
-    encoding = resp.encoding or "utf-8"
-    html = resp.content.decode(encoding, errors="replace")
-    soup = BeautifulSoup(html, "html.parser")
-
-    desc_el = soup.select_one(".fl-project-content__description-text")
-    if desc_el:
-        text = desc_el.get_text(" ", strip=True)
-        if text:
-            return text, True
-
-    blocks: list[str] = []
-    for sel in (".fl-project-content .b-layout__txt", ".b-layout__txt"):
-        for node in soup.select(sel):
-            t = node.get_text(" ", strip=True)
-            if len(t) > 40:
-                blocks.append(t)
-    if blocks:
-        return max(blocks, key=len), True
-
-    return fallback_snippet, False
+    text, _, ok = fetch_project_detail(
+        project_url,
+        cfg,
+        fallback_snippet=fallback_snippet,
+        timeout_sec=timeout_sec,
+    )
+    return text, ok
 
 
 _FL_GONE_MARKERS = (

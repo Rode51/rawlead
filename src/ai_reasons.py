@@ -60,3 +60,43 @@ def serialize_lite_ai_reasons(
         return json.dumps(rows, ensure_ascii=False)
     payload: dict[str, Any] = {"reasons": rows, "complexity": c}
     return json.dumps(payload, ensure_ascii=False)
+
+
+def parse_tz_attachment_from_raw(raw: Any) -> dict[str, Any] | None:
+    """O108: {status, filename, size_mb, reason} из ai_reasons JSONB."""
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        tz = raw.get("tz_attachment")
+        return tz if isinstance(tz, dict) else None
+    if isinstance(raw, str) and raw.strip():
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        return parse_tz_attachment_from_raw(data)
+    return None
+
+
+def merge_tz_attachment_into_reasons_json(
+    reasons_json: str | None,
+    tz: dict[str, Any] | None,
+) -> str | None:
+    if tz is None:
+        return reasons_json
+    payload: dict[str, Any]
+    if reasons_json:
+        try:
+            data = json.loads(reasons_json)
+        except json.JSONDecodeError:
+            data = {"reasons": [reasons_json.strip()]}
+        if isinstance(data, list):
+            payload = {"reasons": data}
+        elif isinstance(data, dict):
+            payload = dict(data)
+        else:
+            payload = {}
+    else:
+        payload = {}
+    payload["tz_attachment"] = tz
+    return json.dumps(payload, ensure_ascii=False)

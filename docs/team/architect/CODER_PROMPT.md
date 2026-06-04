@@ -1,37 +1,42 @@
-# Coder — горячий контур (активное)
-
-**→ Сейчас:** **O72e pilot re-judge** (owner) — regen 10 ids после r3
-
-**Gate vault:** L2 send **≥70%** · pilot **7/10**
-
-История: [`archive/CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md)
-
----
-
-## Закрыто — сводка (2026-06-03)
-
-| § | Статус | Lead verify |
-|---|--------|-------------|
-| **O72e-L2-r3** | ✅ | unittest **16/16** · VPS r3_ok |
-| **O105-WP-r3** · youdo-lite | ✅ | prod **1.18.3** |
-| **O105-WP + r2** | ✅ | |
-| **O72e-L2-r2** | ✅ | pilot r2 4/10 → r3 |
-
-DoD § O72e-L2-r3 → **архив**.
-
-**Owner next:** regen 10 ids + pilot judge → `preprod_ai_prod_audit_judge_pilot_r3.md`
-
----
-
-## Следом (после vault)
-
-O101 · O105-w1
-
-Очередь: [TASKS.md](../common/TASKS.md)
-
----
-
-## Правило hot-файла
-
-**≤ ~120 строк** · закрытый DoD → `archive/CODER_PROMPT_ARCHIVE.md`
-
+# Coder — горячий контур (активное)
+
+**→ Сейчас:** **нет активного §** — O108-BC ✅ · E2E S6 (owner)
+
+**Gate:** bugfix ✅ · E2E S6 — owner параллельно
+
+История: [`archive/CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) · канон: [`OWNER_INTENT.md`](OWNER_INTENT.md) § O108
+
+---
+
+## § O108-BC — ✅ Lead verify + VPS deploy (2026-06-04)
+
+Theme **1.18.5** · `tz_attachments.py` · TG в `PUBLIC_FEED_SOURCES` (**21** канал + secondary) · tests **14/14**
+
+---
+
+## § PRE-RELEASE-AUDIT — ✅ Lead verify (2026-06-04)
+
+Theme **1.18.4** · BUG-1…5 + P1 ✅
+
+---
+
+## Закрыто — сводка
+
+| § | Статус |
+|---|--------|
+| PRE-RELEASE-AUDIT | ✅ **1.18.4** |
+| O108-BC | ✅ **1.18.5** deploy |
+
+---
+
+## Следом
+
+**E2E S6** (owner) · O72e full 71 · O101
+
+Очередь: [TASKS.md](../common/TASKS.md)
+
+---
+
+## Правило hot-файла
+
+**≤ ~120 строк** · закрытый DoD → `archive/CODER_PROMPT_ARCHIVE.md`

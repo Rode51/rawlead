@@ -677,6 +677,26 @@
     return html;
   }
 
+  function renderTzAttachmentWarn(item) {
+    var tz = item && item.tz_attachment;
+    if (!tz || !tz.status || tz.status.indexOf("skipped_") !== 0) {
+      return "";
+    }
+    var label = "ТЗ не прочитано";
+    if (tz.status === "skipped_size") {
+      label += " · " + (tz.size_mb != null ? tz.size_mb : "?") + " MB";
+    } else if (tz.status === "skipped_auth") {
+      label += " · нужен вход на биржу";
+    } else if (tz.status === "skipped_empty") {
+      label += " · файл без текста";
+    }
+    return (
+      '<p class="rl-feed-card__tz-warn" role="status">' +
+      escapeHtml(label) +
+      "</p>"
+    );
+  }
+
   function renderExpandedBody(item) {
     var task = taskBodyText(item);
     var html = renderExpandedMeta(item);
@@ -691,6 +711,7 @@
       html +=
         '<p class="rl-feed-card__text rl-feed-card__muted">Краткое описание появится после следующего цикла радара.</p>';
     }
+    html += renderTzAttachmentWarn(item);
     var reply = prepForDisplay(item.reply_draft || "", false).trim();
     var tools = isLoggedIn() && reply ? item.tools_required || [] : [];
     if (tools.length) {
@@ -738,6 +759,9 @@
   }
 
   function renderSlotLine(item) {
+    if (!isLoggedIn()) {
+      return "";
+    }
     var n = replySlotsRemaining(item);
     if (n <= 0) {
       return "";
@@ -751,7 +775,8 @@
       cls +
       '" title="До 10 уникальных откликов на заказ — без толпы ботов">' +
       escapeHtml(text) +
-      ' <span class="rl-feed-card__slot-info" aria-hidden="true">ⓘ</span></p>'
+      ' <span class="rl-feed-card__slot-info" aria-hidden="true">ⓘ</span></p>' +
+      '<p class="rl-slot-hint">Разные тексты — не шаблон → нет бана на бирже</p>'
     );
   }
 

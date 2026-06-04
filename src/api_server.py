@@ -181,11 +181,16 @@ def _row_to_item(
         tools_required,
         reply_draft,
     ) = row
-    from ai_reasons import difficulty_from_ai_reasons, parse_ai_reasons_raw
+    from ai_reasons import (
+        difficulty_from_ai_reasons,
+        parse_ai_reasons_raw,
+        parse_tz_attachment_from_raw,
+    )
 
     tags, tag_labels = lead_tags_for_feed(lead_tags)
     reasons_list, _ = parse_ai_reasons_raw(ai_reasons)
     difficulty = difficulty_from_ai_reasons(ai_reasons)
+    tz_attachment = parse_tz_attachment_from_raw(ai_reasons)
     km = keyword_match_val
     fr = final_rank_val
     if fr is None:
@@ -216,6 +221,7 @@ def _row_to_item(
         "is_hot": _lead_is_hot(created_at),
         "tools_required": tools,
         "reply_draft": rd,
+        "tz_attachment": tz_attachment,
         "display_views": display_views(lead_id, created_at, feed_delayed=feed_delayed),
     }
 

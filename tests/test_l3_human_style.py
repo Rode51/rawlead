@@ -127,11 +127,19 @@ class TestL3HumanStyle(unittest.TestCase):
         self.assertIn("UI-kit или редизайн с нуля", body)
 
     def test_shared_l2_r3_tg_limits(self) -> None:
-        """O72e-L2-r3: #9843 TG+Google — Python/Telethon + лимиты Telegram."""
+        """O72e-L2-r3/r4: #9843 TG+Google — GAS branch + Python when in TZ."""
         body = build_shared_l2_system()
-        self.assertIn("Python/Telethon", body)
+        self.assertIn("Google Apps Script", body)
+        self.assertIn("People API", body)
         self.assertIn("anti-flood", body)
-        self.assertIn("import→validate→groups grid", body)
+
+    def test_shared_l2_r4_fail_ids(self) -> None:
+        """O72e-L2-r4/r5: pilot fixes — GAS, SEO no perf, FontLab mandatory."""
+        body = build_shared_l2_system()
+        self.assertIn("GOOD (#9843 GAS)", body)
+        self.assertIn("SEO-урок WP (#10362)", body)
+        self.assertIn("FontLab", body)
+        self.assertIn("wireframe", body)
 
     def test_shared_l2_r3_fontlab(self) -> None:
         """O72e-L2-r3: #9581 SVG — FontLab при тексте в логотипе."""
@@ -145,10 +153,10 @@ class TestL3HumanStyle(unittest.TestCase):
         self.assertIn("text/design/творческий", body)
 
     def test_shared_l2_r3_ed_platform_no_telegram(self) -> None:
-        """O72e-L2-r3: #8752 ed platform — без telegram если не в Описании."""
+        """O72e-L2-r5: #8752 ed platform — без telegram (judge штрафует)."""
         body = build_shared_l2_system()
         self.assertIn("экзамены, видео-плеер, адаптив", body)
-        self.assertIn("telegram/api если не в Описании", body)
+        self.assertIn("judge штрафует", body)
 
     def test_shared_l2_r3_ai_design_rounds(self) -> None:
         """O72e-L2-r3: #10442 AI-дизайн — раунды генерации → Figma, ограничения AI."""

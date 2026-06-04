@@ -40,7 +40,7 @@
 
 **Параллельно judge (docs only):** copy-pack · O106-design · § O105 spec — см. [`TASKS.md`](../common/TASKS.md).
 
-**Следующая волна после E2E:** **O101** (K=10 + anti-тыk) → **O105-w1** (790₽ СБП/crypto) → **O106-code** (карточка minimal).
+**Следующая волна после E2E:** **O101** → **O105-w1** → **O108** (TZ attachments .docx/pdf → L1/L2 enrich).
 
 ---
 

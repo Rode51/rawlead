@@ -1644,6 +1644,11 @@ section.rl-flow.rl-section {
   line-height: 1.5;
 }
 
+.rl-price-card__list li,
+#pricing-preview .rl-price-card__list li {
+  color: var(--rl-text-primary);
+}
+
 .rl-price-card__badge {
   font-size: 0.8125rem;
   color: var(--rl-text-muted);
@@ -1844,6 +1849,12 @@ section.rl-flow.rl-section {
 
 .rl-pricing-page {
   padding-bottom: 3rem;
+}
+
+/* Inner /pricing/ — no scroll-reveal parent; card must stay visible (BUG-1) */
+.rl-pricing-page .rl-price-card {
+  opacity: 1;
+  transform: none;
 }
 
 @media (min-width: 768px) {
@@ -2781,18 +2792,7 @@ button#rl-feed-skills-trigger.rl-feed-skills-dd__trigger::after {
   position: relative;
 }
 
-.rl-feed-list > .rl-lead-card .rl-niche-icon,
-#rl-cabinet-list > .rl-lead-card .rl-niche-icon {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 1;
-}
-
-.rl-feed-list > .rl-lead-card .rl-feed-card__head,
-#rl-cabinet-list > .rl-lead-card .rl-feed-card__head {
-  padding-left: 22px;
-}
+/* Niche icon inline in head-start (BUG-2) — not absolute overlay */
 
 .rl-feed-list .rl-lead-card {
   display: flex;
@@ -3100,6 +3100,18 @@ button#rl-feed-skills-trigger.rl-feed-skills-dd__trigger::after {
   white-space: pre-wrap;
 }
 
+.rl-feed-card__tz-warn {
+  margin: 0.35rem 0 0.75rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.08);
+  border-left: 3px solid #c0392b;
+  border-radius: 0 4px 4px 0;
+}
+
 .rl-feed-card__tools {
   margin: 0;
   padding-left: 1.15rem;
@@ -3365,6 +3377,29 @@ body.page-lenta #rl-feed-list > .rl-feed-end {
   margin-bottom: 0.75rem;
 }
 
+.rl-cabinet-sub__actions .rl-cabinet-sub__action-secondary {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--rl-text-muted);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0.25rem 0;
+  min-height: auto;
+  width: auto;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rl-cabinet-sub__actions .rl-cabinet-sub__action-secondary:hover {
+  color: var(--rl-text-primary);
+}
+
+.rl-cabinet-sub__actions--paid .rl-cabinet-sub__pause,
+.rl-cabinet-sub__actions--paid .rl-cabinet-sub__billing {
+  flex: 0 0 auto;
+}
+
 @media (min-width: 480px) {
   .rl-cabinet-sub__actions {
     flex-direction: row;
@@ -3445,6 +3480,7 @@ body.page-lenta #rl-feed-list > .rl-feed-end {
   min-width: 2.75rem;
   min-height: 2.25rem;
   padding: 6px 10px;
+  white-space: nowrap;
   border-radius: var(--rl-radius-chip);
   background: var(--rl-bg-section);
   border: var(--rl-border-width) solid var(--rl-border);
@@ -4755,7 +4791,11 @@ body.page-lenta #rl-feed-list > .rl-feed-end {
 
   .rl-hero {
     padding: 24px 16px 40px;
-    min-height: 100svh;
+    min-height: 88svh;
+  }
+
+  .rl-live-preview {
+    display: none;
   }
 
   .rl-hero__title {
@@ -4976,6 +5016,12 @@ body.rl-skill-tree-open {
 .rl-feed-card__slot-line--last {
   color: #f59e0b;
   font-weight: 600;
+}
+
+.rl-slot-hint {
+  margin: 2px 0 0;
+  font: 400 11px/1.35 var(--font-main);
+  color: var(--rl-text-muted);
 }
 
 .rl-feed-card__slot-info {
@@ -5358,6 +5404,12 @@ section.rl-section--alt[aria-labelledby="rl-flow-title"] {
   margin: 0;
   color: var(--rl-text-muted);
   line-height: 1.55;
+}
+
+body.page-how .rl-prose > p,
+body.page-how .rl-prose > ul,
+body.page-how .rl-prose > ul li {
+  color: var(--rl-text-primary);
 }
 
 .rl-pricing-table {

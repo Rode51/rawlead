@@ -215,6 +215,77 @@ _KWORK_GONE_MARKERS = (
 )
 
 
+def _parse_kwork_detail_html(html: str, *, fallback_snippet: str = "") -> str:
+    """Текст ТЗ со страницы /projects/{id}/view."""
+    import re
+
+    for pat in (
+        r'"description"\s*:\s*"((?:\\.|[^"\\])*)"',
+        r'"text"\s*:\s*"((?:\\.|[^"\\])*)"',
+    ):
+        m = re.search(pat, html)
+        if m:
+            try:
+                text = json.loads(f'"{m.group(1)}"')
+            except json.JSONDecodeError:
+                text = m.group(1).replace("\\n", "\n").replace('\\"', '"')
+            text = str(text).strip()
+            if len(text) > len((fallback_snippet or "").strip()):
+                return text
+
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    for sel in (
+        ".want-card__description",
+        ".want-description",
+        ".wants-card__text",
+        ".breakwords",
+    ):
+        node = soup.select_one(sel)
+        if node:
+            text = node.get_text(" ", strip=True)
+            if len(text) > 40:
+                return text
+    return fallback_snippet
+
+
+def fetch_project_page_html(
+    project_url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float = 30.0,
+) -> tuple[str, bool]:
+    url = (project_url or "").strip()
+    if not url:
+        return "", False
+    headers = {"User-Agent": cfg.http_user_agent}
+    try:
+        resp = exchange_get("kwork", url, headers=headers, timeout_sec=timeout_sec)
+    except requests.RequestException:
+        return "", False
+    if resp.status_code != 200:
+        return "", False
+    encoding = resp.encoding or "utf-8"
+    return resp.content.decode(encoding, errors="replace"), True
+
+
+def fetch_project_detail(
+    project_url: str,
+    cfg: Config,
+    *,
+    fallback_snippet: str = "",
+    timeout_sec: float = 30.0,
+) -> tuple[str, str, bool]:
+    """(description, html, detail_ok)."""
+    html, ok = fetch_project_page_html(project_url, cfg, timeout_sec=timeout_sec)
+    if not ok:
+        return fallback_snippet, "", False
+    text = _parse_kwork_detail_html(html, fallback_snippet=fallback_snippet)
+    detail_ok = bool(text and text != (fallback_snippet or "").strip())
+    return text, html, detail_ok
+
+
 def check_project_page_gone(
     project_url: str,
     cfg: Config,
