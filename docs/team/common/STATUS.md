@@ -42,10 +42,10 @@
 
 | # | Задача | Кто | Статус |
 |---|--------|-----|--------|
-| **E2E S6** | PRE-PROD smoke + UX walk | **owner** | **→ сейчас** |
-| **O72e full judge 71** | pilot send **7/10 ✅** → regen all + L2 judge | **owner** | параллельно |
+| **O72e-L2-r6** | эконом: patch → regen **3** → pilot **10** → full **71** ×1 · cap **~$3** | **@coder** + owner | **→ сейчас** |
+| **E2E S6** | PRE-PROD smoke + UX walk | **owner** | параллельно |
 
-**Gate L2:** vault send ≥70% · full 71 после pilot PASS
+**L2 факты:** full 71 combined **4.16** / send **41%** · pilot r5 send **70%** / combined **3.97** — добиваем **оба** на pilot, потом один full judge.
 
 ---
 

@@ -8,8 +8,8 @@
 
 | # | Задача | Кто | Статус |
 |---|--------|-----|--------|
-| **E2E S6** | PRE-PROD smoke + UX walk | **owner** | **→ сейчас** |
-| **O72e full judge 71** | regen 71 + L2 judge (pilot send 7/10 ✅) | **owner** | параллельно |
+| **O72e-L2-r6** | промпт 3 ids → pilot judge → **один** full 71 · **≤$3 API** | **@coder** + owner cmds | **→ сейчас** |
+| **E2E S6** | PRE-PROD smoke + UX walk | **owner** | параллельно |
 
 ---
 
