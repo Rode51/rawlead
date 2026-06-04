@@ -1,86 +1,90 @@
 # Coder — горячий контур (активное)
 
-**→ Сейчас:** **§ O72e-L2-r6** — экономный добой L2 gate (pilot 10 → один full 71)
+**→ Сейчас:** **§ O72e-L2-r8** — L1 complexity + L2 creative/tools (приоритет качества)
 
-**Gate:** L2 combined **≥4.0** · send as-is **≥70%** · **бюджет сегодня ≤ ~$3** на API (без `--full` / regen 71)
+**Gate:** L1 usable ≥70% · L2 combined ≥4.0 · send ≥70% · L3 уже ✅
 
 История: [`archive/CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) · канон: [`OWNER_INTENT.md`](OWNER_INTENT.md) § O72e
 
 ---
 
-## § O72e-L2-r6 — экономный цикл (**→ @coder**)
+## § O72e-L2-r8 — L1 + L2 prompt (**→ @coder**)
 
-**Контекст (факты):**
+**Цель:** максимум качества **без API** — только промпт + unittest. Regen/judge — Lead/owner после сдачи.
 
-| Прогон | combined | send | Accept L2 |
-|--------|----------|------|-----------|
-| **full 71** (2026-06-03) | **4.16 ✅** | **40.8% ❌** | ❌ |
-| **pilot 10 r5** | **3.97 ❌** | **70% ✅** | ❌ |
+### A. L1 — `src/ai_analyze.py` → `_LITE_SYSTEM_HEAD`
 
-Pilot bench ids (фиксированные 10): `8772,10442,8752,8925,9843,9581,9831,9374,9326,10362`
+**Проблема (full 71):** ~11 id с **пустым complexity**; редко dev вместо design (#9520).
 
-**3 провала send (r5):** `#8772` (литература vs php/wp tools) · `#10442` (нейродизайн, нет HTML/Figma вилки) · `#8752` (учебная платформа, нет API/Telegram из tools)
-
-**Цель к 10:00:** pilot **оба** gate ✅ → **один** full judge 71 (без regen всех 71).
-
-### Шаг 0 — Coder (**$0**, только промпт)
-
-Файл: `src/l3_human_style.py` (shared L2 / BAD-GOOD якоря).
-
-| id | Паттерн fix |
-|----|-------------|
-| 8772 | creative/text лиды — **не** тащить dev-tools из `tools_required`; акцент литературный |
-| 10442 | design+AI: Midjourney → **Figma или HTML/CSS** (если в ТЗ оба) + 1 уточняющий вопрос |
-| 8752 | платформа/ЛMS: перечислить функционал из ТЗ + **API/Telegram** если в tools, без лишней БД-простыни |
-
-**DoD:** unittest `tests/test_l3_human_style.py` зелёный · **не** трогать L1/L3 judge · **не** regen из Coder-чата.
-
-### Шаг 1 — владелец regen (**~$0.2–0.5**)
-
-Только 3 id:
+**Вставить** после строки про `complexity — целое 1–4` (одним блоком):
 
 ```text
-python scripts/regen_shared_reply_drafts.py --profile site --apply --lead-ids 8772,10442,8752
+**COMPLEXITY — жёстко (FAIL если пропуск):**
+- Поле complexity **обязательно в каждом JSON** — целое 1, 2, 3 или 4. **Никогда null, never omit.**
+- Если сомневаешься — ставь **2** (типовой проект с ясным ТЗ), не оставляй пустым.
+- Якоря «complexity пустой» из аудита:
+  · Google/YouTube Ads, VK таргет, SMM месяц, Power BI отчёт → **2**
+  · транскрипция+перевод часового видео → **2**
+  · написание/редактура книги, крупный редакторский объём → **3**
+  · лидgen 4000 заявок с валидацией → **3**
+  · «разместить готовые посты по списку» без создания контента → **1**
+- **design vs dev:** «макет страницы / UI в Figma / 3 версии (desktop, mobile)» **без кода** → primary_category **design**, complexity **2** — не dev.
 ```
 
-### Шаг 2 — владелец pilot judge (**~$0.4–0.6**)
+**DoD L1:** `tests/test_l1_pipeline.py` или новый `test_l1_complexity_canon.py` — assert substring `Никогда null` / `обязательно в каждом JSON` в `_LITE_SYSTEM`.
 
-Только 10 id, **без** L1/L3:
+---
+
+### B. L2 — `src/l3_human_style.py` → `build_shared_l2_system`
+
+**Проблема #8772 (pilot r7):** judge видит PHP/WP в `tools_required` и ставит send=False, хотя в draft нет tech-слов.
+
+**Добавить** в блок «Тип заказа» (text/design) **одну фразу-шаблон**:
 
 ```text
-python scripts/preprod_ai_prod_audit.py --profile site --limit 1 --empty-l1-limit 0 ^
-  --lead-ids 8772,10442,8752,8925,9843,9581,9831,9374,9326,10362 ^
-  --judge --judge-limit 10 ^
-  --judge-md-out data/preprod_ai_prod_audit_judge_pilot_r6.md
+- **creative/text (#8772 и аналоги):** если в tools_required есть PHP/WordPress/Python, а заказ — **рассказ, статья, копирайт, перевод** — **одной короткой фразой** поясни: «Задача творческая, технические теги карточки к тексту не относятся» (или эквивалент); **не называй** PHP/WP/Python в отклике; вопрос — только **объём (знаки/слова)** или **формат файла (doc/pdf)**.
 ```
 
-**Stop-rule:** если pilot снова ❌ — **стоп API** → Lead смотрит `pilot_r6.md`, Coder **ещё один** узкий патч по worst-1..2 (не regen 71).
-
-### Шаг 3 — один full judge (**~$2–3**, только если pilot ✅ оба gate)
+**Обновить GOOD (#8772)** — добавить эту фразу в пример:
 
 ```text
-python scripts/preprod_ai_prod_audit.py --profile site --judge --judge-limit 71 --limit 71 ^
-  --judge-md-out data/preprod_ai_prod_audit_judge_full_r6.md
+GOOD (#8772): «Здравствуйte! Задача творческая — технические теги карточки к тексту не относятся. Напишу рассказ про маму Лену: посёлок, платье в краске, беседка. Все 4 пункта ТЗ учту. Подскажите объём — в знаках или словах?»
 ```
 
-**Без** `--judge-l1` · **без** `--judge-l3` · **без** `regen --limit 80`.
+**#8752 (с reconcile r6↔r7):** judge r7 хочет TG/API **если** в `tools_required`. Правило:
 
-### Запрещено сегодня (экономия)
+```text
+- **учебная платформа (#8752):** функционал из **Описания** (экзамены, видео, адаптив, Yii2/Python). **Telegram/API** — **одной фразой**, только если **и** в Описании **и** в tools_required есть telegram/api; иначе **не добавляй**.
+```
 
-- `qa_prompt_loop.py --full` / `--apply` (~$3–8)
-- `regen_shared_reply_drafts.py --apply --limit 71`
-- Повторный full judge без нового pilot PASS
-- L1/L3 re-judge (уже ✅)
+Обновить BAD/GOOD #8752 под это правило.
+
+**DoD L2:** `tests/test_l3_human_style.py` — дополнить `test_shared_l2_r7_fixes` или `test_shared_l2_r8`: assert «творческая» + «теги карточки» в body; assert правило #8752 telegram.
+
+---
+
+### C. Не трогать
+
+- L3 `build_uniquify_system` — уже PASS
+- Модели, Neon, judge, regen-скрипты
+- **Не** запускать OpenRouter из Coder-чата
+
+---
+
+### D. После сдачи (Lead)
+
+1. Deploy VPS: `l3_human_style.py` + `ai_analyze.py` → `/opt/rawlead/src/` · restart `rawlead-api rawlead-radar`
+2. Owner (когда скажет): regen worst ids · pilot · full 71
 
 ---
 
 ## Закрыто — сводка
 
-| § | Статус | Theme |
-|---|--------|-------|
-| O109 | ✅ delist + deeplink | 1.18.6 |
-| O108-BC | ✅ TZ B+C | 1.18.5 |
-| PRE-RELEASE-AUDIT | ✅ | 1.18.4 |
+| § | Статус |
+|---|--------|
+| O72e-L2-r7 | ✅ pilot r7 PASS 4.3/80% |
+| O72e-L2-r6 | ✅ pilot r6 |
+| O109 | ✅ 1.18.6 |
 
 Очередь: [TASKS.md](../common/TASKS.md)
 
@@ -88,4 +92,4 @@ python scripts/preprod_ai_prod_audit.py --profile site --judge --judge-limit 71 
 
 ## Правило hot-файла
 
-**≤ ~120 строк** · закрытый DoD → `archive/CODER_PROMPT_ARCHIVE.md`
+**≤ ~120 строк** · DoD → `archive/CODER_PROMPT_ARCHIVE.md`
