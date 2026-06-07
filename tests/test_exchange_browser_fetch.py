@@ -18,6 +18,8 @@ from exchange_browser_fetch import (  # noqa: E402
     _fetch_youdo_ephemeral,
     _should_abort_playwright_request,
     fetch_listing_html_browser,
+    invalidate_browser_slot,
+    pick_browser_user_agent,
     reset_browser_contexts_for_tests,
 )
 
@@ -138,6 +140,30 @@ class TestExchangeBrowserFetch(unittest.TestCase):
                         self.assertEqual(sync_starts, ["start"])
                         mock_pw.chromium.launch_persistent_context.assert_called_once()
                         mock_pw.chromium.launch.assert_called_once()
+
+    def test_pick_browser_user_agent_rejects_flradar(self) -> None:
+        ua = pick_browser_user_agent("Mozilla/5.0 (compatible; FLRadar/1.0)")
+        self.assertNotIn("flradar", ua.casefold())
+        self.assertIn("Chrome", ua)
+
+    def test_pick_browser_user_agent_keeps_explicit(self) -> None:
+        custom = "Mozilla/5.0 CustomBrowser/99.0"
+        self.assertEqual(pick_browser_user_agent(custom), custom)
+
+    def test_invalidate_browser_slot_wipes_profile(self) -> None:
+        profile_root = Path(tempfile.mkdtemp())
+        key_name = "fl_1_2_3_4_8000"
+        key_dir = profile_root / key_name
+        key_dir.mkdir(parents=True)
+        (key_dir / "cookies.sqlite").write_text("x", encoding="utf-8")
+        with patch("exchange_browser_fetch._data_root", return_value=profile_root):
+            with patch("exchange_browser_fetch._profile_key", return_value=key_name):
+                invalidate_browser_slot(
+                    "fl",
+                    "http://u:p@1.2.3.4:8000",
+                    wipe_disk=True,
+                )
+        self.assertFalse(key_dir.exists())
 
 
 if __name__ == "__main__":

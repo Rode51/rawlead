@@ -1,67 +1,47 @@
 # TASKS (активное)
 
-**Снимок:** [`STATUS.md`](STATUS.md)
+**Снимок:** [`STATUS.md`](STATUS.md) · **карта:** [`ROADMAP.md`](../architect/ROADMAP.md)
 
-**Решение владельца 2026-06-04:** **Фаза A** L2 send 60.6% — **релиз промпта ok**, r11 по ситуации · **UI/UX — параллельный чат @lead-architect** · stress после send ≥70%.
-
----
-
-## Фаза A — ИИ gate (**freeze done, r11 опционально**)
-
-| # | Задача | Кто | Статус |
-|---|--------|-----|--------|
-| **O72e-A-w1** | regen **21** + judge w1 | **Lead** | ✅ send **50%** FAIL |
-| **O72e-L2-r9** | prompt send gate · tests 25/25 | **@coder** | ✅ |
-| **O72e-L2-r10** | #12148 stack conflict · regen 1 | **Lead** | ✅ draft ok · judge rubric ⏸ |
-| **O72e-A-freeze** | regen 52/55 + judge 71 | **Lead** | ✅ send **60.6%** ❌ |
-| **O72e-L2-r11** | паттерны freeze FAIL → prompt | **@coder** | **→ по ситуации** |
-| **O72e-A-w3** | judge **tg-only 10** · L1 spot-check | Lead | backlog |
-
-**Gate freeze:** L2 combined ≥4.0 · send **≥70%** · L1 usable ≥70% · L3 smoke ✅
-
-**Бюджет:** волны ~$4–6 · full 71 ~$2.5 · **не** regen 71 blind.
+**Фаза:** **Launch path** · prod theme **1.18.34**
 
 ---
 
-## Параллельно (**→ owner + @lead-architect**, не блокирует r11)
+## Где мы
 
-| # | Задача | Чат |
-|---|--------|-----|
-| **UI/UX pre-ads** | wireframes, copy, lenta/cabinet/pricing | **@lead-architect** + @lead-designer |
-| **O105-w1** | pay prod smoke | owner |
-| **O113-seo** | backlog | — |
-
----
-
-## ⏸ После Фазы A
-
-| # | Задача |
-|---|--------|
-| **Stress / vault** | стабильность |
-| **O112-support** | FAB |
-| **O107** | Trial |
-| **E2E-UX финал** | polish перед ads |
-| **Soft ads** | после freeze |
+| ✅ | ⏳ до ads |
+|----|----------|
+| O121 ops · O126 · O127 · **O128** · **W1 stress** | **O129 v2** |
+| ИИ gate · VPS · O125 on-demand | **ads последним** |
 
 ---
 
-## ⏸ Ops фон
+## Шаги
 
-| # | Задача | Триггер |
-|---|--------|---------|
-| **O110-fl-proxy** | FL 403 | >2×/сутки |
-| **O115-tg-feed** | tg ingest | ✅ 25/24h |
-
----
-
-## Закрыто 2026-06-04
-
-**O114-vacancy** ✅ · backfill **12** · judge post-O114 send **56.7%**
-
-**O72e-L2-r8** ✅ · pilot r8 **80%** (10 regen)
-
-**O109** ✅ · **O108-BC** ✅ · **PRE-RELEASE-AUDIT** ✅
+| # | Что | Кто | Статус |
+|---|-----|-----|--------|
+| 1–8c | … · O121-w3-acc2 | — | ✅ |
+| **9a** | **O126** category API + backfill | @coder | ✅ prod |
+| **9b–9c** | **O127-D/WP** + theme deploy | @coder | ✅ **1.18.34** |
+| **9d** | **O124-w2** BrowserSync tail | owner | ✅ минимально |
+| **9e** | **O128 L2 voice B** | @coder | ✅ **36/36** · VPS |
+| **10** | **Stress Wave 1** (PREPROD) | owner | ✅ **2026-06-07** |
+| **10b** | **O129 stress v2** | @coder | **→ сейчас** |
+| **11** | Sign-off · **ads** | owner | после 10b |
 
 ---
 
-_Lead · 2026-06-04 · Фаза A → stress → ads_
+## L2 smoke (owner, после deploy)
+
+1. Premium → лид **без** `reply_draft` → «Написать отклик» → tools + draft за ≤30s
+2. Повторный клик → cache, без LLM
+3. `/ops/` → radar active · env `TOOLS_BACKLOG_DRAIN=0` · models = `gemini-2.5-pro`
+
+---
+
+## ⏸ После ads
+
+O113 · O123-w2 · O105-w2
+
+---
+
+_W1 ✅ **2026-06-07** · O129 Coder **→** sign-off **→** ads_

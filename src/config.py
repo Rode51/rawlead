@@ -80,6 +80,16 @@ class Config:
     stars_enabled: bool
     stars_price_xtr: int
     stars_subscription_days: int
+    pay_premium_rub: int
+    pay_sbp_phone: str
+    pay_sbp_bank: str
+    pay_btc_address: str
+    pay_eth_address: str
+    pay_usdt_trc20_address: str
+    pay_usdt_erc20_address: str
+    pay_ton_address: str
+    pay_crypto_memo_prefix: str
+    pay_approve_bot: str
 
     @property
     def ai_active(self) -> bool:
@@ -316,9 +326,12 @@ def _require_proxy_url(name: str) -> str:
     return normalize_proxy_url(raw)
 
 
-def telegram_requests_proxies(cfg: Config) -> dict[str, str]:
+def telegram_requests_proxies(cfg: Config) -> dict[str, str | None]:
     """Прокси только для Bot API; парсеры FL/Kwork/Avito его не используют."""
-    return {"http": cfg.tg_proxy_url, "https": cfg.tg_proxy_url}
+    from tg_proxy_pool import get_active_proxies_dict
+
+    _ = cfg  # пул из env; cfg.tg_proxy_url — fallback внутри get_active_proxies_dict
+    return get_active_proxies_dict()
 
 
 # Явно без прокси — не брать HTTP_PROXY/HTTPS_PROXY из окружения ОС.
@@ -816,7 +829,10 @@ def load_config() -> Config:
     http_user_agent = (
         str(ua_raw).strip()
         if ua_raw and str(ua_raw).strip()
-        else "Mozilla/5.0 (compatible; FLRadar/1.0; personal monitoring)"
+        else (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        )
     )
 
     tg_proxy_url = _require_proxy_url("TG_PROXY_URL")
@@ -892,16 +908,31 @@ def load_config() -> Config:
         os.environ.get("STARS_ENABLED"),
         default=False,
     )
-    stars_price_raw = os.environ.get("STARS_PRICE_XTR", "300").strip()
+    stars_price_raw = os.environ.get("STARS_PRICE_XTR", "600").strip()
     try:
         stars_price_xtr = max(1, int(stars_price_raw))
     except ValueError:
-        stars_price_xtr = 300
+        stars_price_xtr = 600
     stars_days_raw = os.environ.get("STARS_SUBSCRIPTION_DAYS", "30").strip()
     try:
         stars_subscription_days = max(1, min(365, int(stars_days_raw)))
     except ValueError:
         stars_subscription_days = 30
+
+    pay_rub_raw = os.environ.get("PAY_PREMIUM_RUB", "790").strip()
+    try:
+        pay_premium_rub = max(0, int(pay_rub_raw))
+    except ValueError:
+        pay_premium_rub = 790
+    pay_sbp_phone = str(os.environ.get("PAY_SBP_PHONE") or "").strip()
+    pay_sbp_bank = str(os.environ.get("PAY_SBP_BANK") or "T-Bank").strip()
+    pay_btc_address = str(os.environ.get("PAY_BTC_ADDRESS") or "").strip()
+    pay_eth_address = str(os.environ.get("PAY_ETH_ADDRESS") or "").strip()
+    pay_usdt_trc20_address = str(os.environ.get("PAY_USDT_TRC20_ADDRESS") or "").strip()
+    pay_usdt_erc20_address = str(os.environ.get("PAY_USDT_ERC20_ADDRESS") or "").strip()
+    pay_ton_address = str(os.environ.get("PAY_TON_ADDRESS") or "").strip()
+    pay_crypto_memo_prefix = str(os.environ.get("PAY_CRYPTO_MEMO_PREFIX") or "RL").strip()
+    pay_approve_bot = str(os.environ.get("PAY_APPROVE_BOT") or "legacy").strip()
 
     return Config(
         fl_projects_url=fl_url,
@@ -941,6 +972,16 @@ def load_config() -> Config:
         stars_enabled=stars_enabled,
         stars_price_xtr=stars_price_xtr,
         stars_subscription_days=stars_subscription_days,
+        pay_premium_rub=pay_premium_rub,
+        pay_sbp_phone=pay_sbp_phone,
+        pay_sbp_bank=pay_sbp_bank,
+        pay_btc_address=pay_btc_address,
+        pay_eth_address=pay_eth_address,
+        pay_usdt_trc20_address=pay_usdt_trc20_address,
+        pay_usdt_erc20_address=pay_usdt_erc20_address,
+        pay_ton_address=pay_ton_address,
+        pay_crypto_memo_prefix=pay_crypto_memo_prefix,
+        pay_approve_bot=pay_approve_bot,
     )
 
 

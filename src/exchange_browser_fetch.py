@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 import os
 import random
+import shutil
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,21 @@ _DEFAULT_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
+_CHROME_UAS = (
+    _DEFAULT_UA,
+    (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+    ),
+    (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    ),
+    (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) "
+        "Gecko/20100101 Firefox/124.0"
+    ),
+)
 
 
 def _data_root() -> Path:
@@ -45,6 +62,53 @@ def listing_browser_enabled() -> bool:
         "true",
         "yes",
     )
+
+
+def pick_browser_user_agent(preferred: str = "") -> str:
+    """Random Chrome/Firefox UA for a **new** persistent context (O110-B)."""
+    pref = (preferred or "").strip()
+    low = pref.casefold()
+    if pref and "flradar" not in low and "compatible;" not in low:
+        return pref
+    return random.choice(_CHROME_UAS)
+
+
+def _wipe_on_ban_enabled() -> bool:
+    return os.getenv("EXCHANGE_BROWSER_WIPE_ON_BAN", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def invalidate_browser_slot(
+    source: str,
+    proxy_url: str,
+    *,
+    wipe_disk: bool | None = None,
+) -> None:
+    """Close Playwright context (+ optional profile dir) after ban/challenge (O110-B)."""
+    proxy = (proxy_url or "").strip()
+    if not proxy:
+        return
+    key = _profile_key(source, proxy)
+    with _LOCK:
+        _close_context(key)
+    do_wipe = _wipe_on_ban_enabled() if wipe_disk is None else wipe_disk
+    if not do_wipe:
+        return
+    profile_dir = _data_root() / key
+    if profile_dir.is_dir():
+        try:
+            shutil.rmtree(profile_dir, ignore_errors=True)
+            logger.info(
+                "browser: wiped profile %s after %s ban/challenge",
+                key,
+                source,
+            )
+        except OSError as exc:
+            logger.warning("browser: wipe profile %s failed: %s", key, exc)
+
 
 
 def _profile_key(source: str, proxy_url: str) -> str:
@@ -151,7 +215,7 @@ def fetch_listing_html_browser(
     """GET листинга через Chromium persistent context (cookies на слот прокси)."""
     proxy = (proxy_url or "").strip() or exchange_primary_proxy_url(source)
     key = _profile_key(source, proxy)
-    ua = (user_agent or "").strip() or _DEFAULT_UA
+    ua = pick_browser_user_agent(user_agent)
     timeout_ms = max(int(timeout_sec * 1000), 5000)
     _jitter_sleep()
 
@@ -179,23 +243,66 @@ def fetch_listing_html_browser(
                 raise HtmlFetchError(f"Playwright launch failed ({source}): {exc}") from exc
             _CONTEXTS[key] = ctx
 
-        page = ctx.new_page()
+    page = ctx.new_page()
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+        page.wait_for_timeout(min(1500, timeout_ms // 4))
+        html = page.content()
+    finally:
         try:
-            page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-            page.wait_for_timeout(min(1500, timeout_ms // 4))
-            html = page.content()
-        finally:
-            try:
-                page.close()
-            except Exception:
-                pass
+            page.close()
+        except Exception:
+            pass
 
     low = html.lower()
     if "cloudflare" in low and ("challenge" in low or "blocked" in low):
+        invalidate_browser_slot(source, proxy)
         raise HtmlFetchError(f"Cloudflare challenge ({source}, {key})")
-    if len(html.strip()) < 500:
+    if len(html.strip()) < 500 or "проверьте, что вы не робот" in low:
+        invalidate_browser_slot(source, proxy)
         raise HtmlFetchError(f"Слишком короткий ответ Playwright ({source}).")
     return html
+
+
+def fetch_listing_html_browser_wall_clock(
+    source: str,
+    url: str,
+    *,
+    user_agent: str,
+    timeout_sec: float = 45.0,
+    wall_clock_sec: float = 120.0,
+    proxy_url: str | None = None,
+) -> str:
+    """Hard cap on listing browser fetch — O117 Kwork hang guard."""
+    wall = max(float(wall_clock_sec), 1.0)
+    per_op = min(float(timeout_sec), wall)
+
+    def _run() -> str:
+        return fetch_listing_html_browser(
+            source,
+            url,
+            user_agent=user_agent,
+            timeout_sec=per_op,
+            proxy_url=proxy_url,
+        )
+
+    pool = ThreadPoolExecutor(max_workers=1)
+    fut = pool.submit(_run)
+    try:
+        return fut.result(timeout=wall)
+    except FuturesTimeout:
+        proxy = (proxy_url or "").strip() or exchange_primary_proxy_url(source)
+        key = _profile_key(source, proxy)
+        logger.warning(
+            "%s_listing: wall-clock timeout after %ss — closing browser context",
+            source,
+            int(wall),
+        )
+        with _LOCK:
+            _close_context(key)
+        raise HtmlFetchError(f"wall-clock timeout after {int(wall)}s ({source})")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def fetch_listing_html_browser_slots(
@@ -230,6 +337,7 @@ def fetch_listing_html_browser_slots(
             )
         except HtmlFetchError as exc:
             last_exc = exc
+            invalidate_browser_slot(source, proxy_url)
             logger.warning(
                 "%s_listing: browser slot %s failed: %s",
                 source,

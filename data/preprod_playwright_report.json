@@ -1,38 +1,38 @@
 {
-  "generated_at": "2026-06-03T06:10:47.752140+00:00",
+  "generated_at": "2026-06-07T13:27:17.430718+00:00",
   "base_url": "https://rawlead.ru",
   "scenarios_total": 5,
-  "scenarios_pass": 4,
-  "s2_pass": false,
+  "scenarios_pass": 5,
+  "s2_pass": true,
   "results": [
     {
       "name": "lenta_loads",
       "pass": true,
-      "ms": 6405,
+      "ms": 1070,
       "error": null
     },
     {
       "name": "multi_category",
       "pass": true,
-      "ms": 3424,
+      "ms": 1708,
       "error": null
     },
     {
       "name": "skills_apply",
-      "pass": false,
-      "ms": 30161,
-      "error": "Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"#rl-feed-skills-trigger\")\n    - locator resolved to <button type=\"button\" id=\"rl-feed-skills-trigger\" class=\"rl-filter-dropdown-btn rl-feed-skills-dd__trigger\">…</button>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is not visible\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is not visible\n    - retrying click action\n      - waiting 100ms\n    56 × waiting for element to be visible, enabled and stable\n       - element is not visible\n     - retrying click action\n       - waiting 500ms\n"
+      "pass": true,
+      "ms": 610,
+      "error": null
     },
     {
       "name": "cabinet_login_stub",
       "pass": true,
-      "ms": 471,
+      "ms": 1216,
       "error": null
     },
     {
       "name": "no_verdict_chips",
       "pass": true,
-      "ms": 1734,
+      "ms": 1878,
       "error": null
     }
   ]

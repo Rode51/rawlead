@@ -70,6 +70,19 @@ cd C:\Users\hramo\uisness
 
 **Красные флаги:** массовые `errors` с `401`/`429`; пустой `reply_draft` на всех L2.
 
+### S1-b — `skills_mismatch` (edge case, **→ Coder в matrix**)
+
+**Боль:** в ЛК пользователь ставит **редкие** навыки (Yii2, FontLab), открывает заказ **другого домена** (Node.js) — L3 не должен **падать**, **зависать** или **вшивать** чужой стек из профиля; отклик = **нейтральный каркас по ТЗ** (O128-B).
+
+| # | Проверка | Статус |
+|---|----------|--------|
+| 1 | Фикстура matrix: lead **Node.js** + user tags **`yii2`** (или `fontlab`) | ⏳ `preprod_ai_matrix.py --scenario skills_mismatch` |
+| 2 | Ожидание: `reply_draft` **не пустой** · без 5xx · стек из **ТЗ**, не из профиля | |
+| 3 | Нет галлюцинации «опыт на Yii2» на Node-заказе (O128) | |
+| 4 | API: `POST …/draft` при km=0 — **200/202**, не hang (O62) | ручная S6-b |
+
+**Пока скрипта нет:** ручная **S6-b** (ниже). После Coder — прогон в S1.
+
 ---
 
 ## Слой 2 — Сайт Playwright (S2, S5 частично)
@@ -100,6 +113,30 @@ Debug с окном браузера: `--headed`
 
 ## Слой 3 — API нагрузка (S3)
 
+### S3-pre — лимит соединений Postgres (edge case, **до** k6/load)
+
+**Prod БД:** **Neon Postgres** (`DATABASE_URL`), не Supabase — но лимит **max connections** тот же класс проблем.
+
+**Как сейчас в коде:** `NeonLeadStorage.connection()` → **`psycopg.connect()` на каждый запрос** без app-level pool (`src/pg_storage.py`). 50 воркеров = до **50 одновременных** сессий к Postgres.
+
+| Симптом при перегрузе | Значение |
+|-----------------------|----------|
+| p95 **> 5000 ms**, рост 502 от nginx | connection starvation / DB reject |
+| `too many connections` · `53300` · `42P05` | лимит Neon исчерпан |
+| 5xx **> 1%** только под нагрузкой | не «медленный API», а **DB pool** |
+
+**Перед запуском S3 (checklist):**
+
+| # | Проверка |
+|---|----------|
+| 1 | **`DATABASE_URL`** на VPS — **pooler** Neon (host `*-pooler.*` или порт **6543**), не direct при 50 VU. См. Neon dashboard → Connection pooling. |
+| 2 | Если только direct URL — **снизить** load: `--workers 15–20` или k6 `VUS=20`, не 50 с первого раза. |
+| 3 | **Ramp-up:** 2 мин × 10 VU → 3 мин × 30 → 5 мин × 50 (k6 stages или два прогона `preprod_load_feed.py`). |
+| 4 | Во время прогона: `journalctl -u rawlead-api -n 50` — нет лавины `psycopg` / `connection` / `53300`. |
+| 5 | **→ Coder backlog (O129):** app-level pool или `psycopg_pool` + cap; до фикса — жёсткий ceiling VU в runbook. |
+
+**PASS S3 с оговоркой:** p95 < 2s @ целевых VU **после** pooler/ramp. FAIL если 502/5xx коррелируют с ростом workers — сначала DB, потом nginx.
+
 ### Вариант A — k6 (если установлен)
 
 ```powershell
@@ -124,7 +161,7 @@ k6 run -e API_URL=https://api.rawlead.ru -e VUS=50 -e DURATION=5m scripts/prepro
 
 Эндпоинты в прогоне: `/health`, `/v1/feed?limit=20`, `/v1/skills/catalog` — **без** L1/L2.
 
-**Красные флаги:** CORS на WP; 502 от nginx; p95 > 5 с при 20 VU.
+**Красные флаги:** CORS на WP; 502 от nginx; p95 > 5 с при 20 VU; **Postgres connections** (S3-pre).
 
 ---
 
@@ -137,6 +174,21 @@ k6 run -e API_URL=https://api.rawlead.ru -e VUS=50 -e DURATION=5m scripts/prepro
 3. В футере цикла: `neon_insert` или `neon_replay` > 0 (или явная причина `0`)
 4. Нет лавины `ai:http:401` / `429`
 
+### S4-pre — ловушка «бесконечного ретрая прокси»
+
+**Боль:** все слоты в бане → `exchange_get` крутит cascade (`max_attempts ≈ slots × strikes` в `exchange_proxy.py`) → **цикл радара растягивается**, кажется что «радар завис».
+
+| Красный флаг в `radar_site.log` | Что значит |
+|--------------------------------|------------|
+| `proxy cascade exhausted` / `pool exhausted (0/N alive)` **каждый цикл** | ingest **заблокирован** прокси |
+| Один `proxy=host:port` + 403/timeout **много строк подряд** | ретраи на мёртвый слот |
+| `cycle_sec` **>>** нормы (напр. >180s при ~60s) | цикл съели fetch + Playwright retries |
+| `health:fl kind=proxy` при живом kwork | per-source бан FL |
+
+**Перед S4:** `/ops/` → ≥1 живой слот FL/Kwork · при exhausted → **«Сбросить баны»** · 3 цикла без spam `cascade exhausted`.
+
+**PASS S4:** 2–4 цикла · нет runaway `cycle_sec` · kind≠proxy на primary (или явный fix).
+
 Записать в [`STATUS.md`](../team/common/STATUS.md) § PRE-PROD-STRESS одну строку baseline, напр.:
 
 `цикл FL+Kwork ~N мин │ ИИ L1=M │ neon_insert=K`
@@ -148,7 +200,10 @@ k6 run -e API_URL=https://api.rawlead.ru -e VUS=50 -e DURATION=5m scripts/prepro
 | # | Действие | ~время |
 |---|----------|--------|
 | S5 | 15 мин на `https://rawlead.ru/lenta/` — 10 карточек осмысленные, без вердикт-чипов | 15 мин |
-| S6 | `/cabinet/`: смена навыков → другой `reply_draft` на том же лиде (если L2 есть) | 10 мин |
+| S6 | `/cabinet/`: смена навыков → другой `reply_draft` на том же лиде (L3 uniquify) | 10 мин |
+| **S6-b** | **skills_mismatch:** в ЛК навыки **Yii2/FontLab** (нет в ленте) → отклик на **Node.js** лид → draft **≤30s**, текст **по ТЗ**, без Yii2/«опыт», без 5xx/hang | 5 мин |
+
+**S6-b PASS:** «По ТЗ вижу…» + Node из описания · **не** «на Yii2 делал» · API не 502.
 
 Подписать в чат Lead: «S1–S6 зелёные» → «едем на прод».
 
@@ -158,11 +213,11 @@ k6 run -e API_URL=https://api.rawlead.ru -e VUS=50 -e DURATION=5m scripts/prepro
 
 ```
 1. DNS + certbot + WP theme (владелец)
-2. preprod_ai_matrix.py          → S1
-3. preprod_playwright/smoke.py   → S2 (+ часть S5)
-4. preprod_k6_feed.js или load   → S3
-5. radar_site.log на VPS         → S4
-6. глазами S5–S6                 → владелец
+2. preprod_ai_matrix.py          → S1 (+ S1-b когда Coder)
+3. preprod_playwright/smoke.py   → S2
+4. S3-pre: Neon pooler / ramp    → затем k6 или load
+5. radar_site.log (S4-pre прокси) → S4
+6. глазами S5–S6–S6-b            → владелец
 ```
 
 ---
@@ -188,4 +243,84 @@ k6 run -e API_URL=https://api.rawlead.ru -e VUS=50 -e DURATION=5m scripts/prepro
 
 ---
 
-_Lead / Coder · 2026-05-28_
+---
+
+## Wave 1 — ✅ 2026-06-07 (owner)
+
+**Цель:** прогнать **существующие** скрипты на prod · baseline + красные флаги до O129.
+
+### Sign-off (факт)
+
+| Gate | PASS | Значение |
+|------|------|----------|
+| UX anon | ✅ | 24/24 · `preprod_ux_audit_anon.json` |
+| UX free | ✅ | 24/24 · `preprod_ux_audit_free.json` |
+| UX premium | ✅ | 24/24 · `preprod_ux_audit_premium.json` |
+| Smoke | ✅ | 5/5 · `preprod_playwright_report.json` |
+| Load S3 | ✅ | p95 feed **1846ms** · 0% err · 3047 req |
+| AI S5 | ✅ | **96%** draft+tools (50 sample) |
+| Radar S4 | ✅ | FL **4/4** after ban clear + O110-B deploy |
+| ux_journey | ⏸ | J1–J11 → **Wave 2 (O129)** |
+| LLM human.md | ⏸ | optional · Wave 2 |
+| load 50 VU | ⏸ | Wave 2 S3-pre ramp |
+
+```powershell
+cd C:\Users\hramo\uisness
+
+# 1) UX полный (desktop) — U1–U10 + LLM
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_audit.py --base-url https://rawlead.ru
+
+# 2) User journeys J1–J11 (draft ×2, mobile J10) — нужен RAWLEAD_PREPROD_ACCESS_TOKEN premium
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_journey.py --base-url https://rawlead.ru
+
+# 3) Smoke 5 сценариев
+.venv\Scripts\python.exe scripts\preprod_playwright\smoke.py --base-url https://rawlead.ru
+
+# 4) API read load — S3-pre: pooler/ramp, затем workers (не 50 с ходу без pooler)
+.venv\Scripts\python.exe scripts\preprod_load_feed.py --api-url https://api.rawlead.ru --workers 20 --duration 180
+# если OK → повтор --workers 50 --duration 300
+
+# 5) ИИ audit ($0 heuristics)
+.venv\Scripts\python.exe scripts\preprod_ai_prod_audit.py --profile site --limit 50
+
+# 6) VPS radar — 2–4 цикла в radar_site.log (SSH tail)
+```
+
+| # | PASS | Артеfact |
+|---|------|----------|
+| W1 | ux_audit 0 critical | `data/preprod_ux_audit_human.md` |
+| W2 | ux_journey J5 draft OK | `data/preprod_ux_journey.md` |
+| W3 | load p95 < 2s, 5xx < 1% | `data/preprod_load_summary.json` |
+| W4 | S4 radar без лавины 403/proxy | log snippet |
+| W5 | audit ≥95% draft | `preprod_ai_prod_audit_human.md` |
+
+**Anon/free/premium:** Wave 1 покрывает **anon** (J7, smoke) + **premium** (J5/J8 с token). **Trial/free logged** — глазами 10 мин или ждём O129 matrix.
+
+**Не гонять Wave 1:** 100+ concurrent draft (сжигает Gemini).
+
+---
+
+## Wave 2 — O129 (Coder)
+
+Полная симуляция: тиры × draft burst × TZ × **timings JSON** × parser snapshot. § **O129-STRESS-V2** в `CODER_PROMPT.md`.
+
+---
+
+## Parser: «сломан» vs «заказов нет»
+
+**Где смотреть:** @FLPARSINGBOT `/status` · `/ops/` биржи · строка `health:fl` в `radar_site.log`.
+
+| Симптом | Скорее всего | Действие |
+|---------|--------------|----------|
+| 🟢 **last_ok < 15 мин** · `downloaded > 0` · `new=0` | Парсер **жив**, фильтры L0/L1 или dup | OK для launch |
+| 🟢 fetch ok · `downloaded=0` · kind=**ok** | Лента биржи **пустая** или вёрстка 0 карточек | Сверить сайт руками; если на FL есть заказы — тикет parse |
+| 🔴 kind=**proxy** / **403** / pool exhausted | Прокси | `/ops/` → сброс баны · switch slot |
+| 🔴 kind=**browser** / antibot | Playwright/YouDo | proxy/antibot runbook |
+| 🟡 **15–45 мин** без ok | Secondary редкий опрос или тишина | Не паника; смотри `last_downloaded` |
+| 🔴 **> 45 мин** без ok | Вероятно **не работает** | Mechanic или `/ops/` |
+
+**Правило:** `downloaded ≥ 1` за цикл → ingest **не мёртв**. `new=0` ≠ «парсер сломан».
+
+---
+
+_Lead · Wave 1+2 · edge cases S3-pre/S4-pre/S1-b · 2026-06-07_

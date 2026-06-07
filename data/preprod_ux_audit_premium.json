@@ -1,0 +1,354 @@
+{
+  "generated_at": "2026-06-07T12:53:29.012095+00:00",
+  "base_url": "https://rawlead.ru",
+  "tier": "premium",
+  "browser": "chromium+token",
+  "has_auth": true,
+  "viewports": [
+    "desktop",
+    "mobile"
+  ],
+  "scenarios_total": 24,
+  "scenarios_pass": 24,
+  "critical_count": 0,
+  "pass": true,
+  "results": [
+    {
+      "id": "U1",
+      "title": "Header + footer links",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 6890,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U1_desktop_before.png",
+        "after": "data/preprod_ux_audit/U1_desktop_after.png"
+      }
+    },
+    {
+      "id": "U2",
+      "title": "Лента: категория + навыки",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 9957,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U2_desktop_before.png",
+        "after": "data/preprod_ux_audit/U2_desktop_after.png"
+      }
+    },
+    {
+      "id": "U3",
+      "title": "Сортировка + закрытие",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 6965,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U3_desktop_before.png",
+        "after": "data/preprod_ux_audit/U3_desktop_after.png"
+      }
+    },
+    {
+      "id": "U4",
+      "title": "Expand + tap outside",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 9255,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U4_desktop_before.png",
+        "after": "data/preprod_ux_audit/U4_desktop_after.png"
+      }
+    },
+    {
+      "id": "U10b",
+      "title": "Draft×3 tools audit",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 18503,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U10b_desktop_before.png",
+        "after": "data/preprod_ux_audit/U10b_desktop_after.png"
+      }
+    },
+    {
+      "id": "U11",
+      "title": "Match breakdown",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 7747,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U11_desktop_before.png",
+        "after": "data/preprod_ux_audit/U11_desktop_after.png"
+      }
+    },
+    {
+      "id": "U5",
+      "title": "Draft + инструменты",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 9532,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U5_desktop_before.png",
+        "after": "data/preprod_ux_audit/U5_desktop_after.png"
+      }
+    },
+    {
+      "id": "U12",
+      "title": "Tools auth-only",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 9365,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U12_desktop_before.png",
+        "after": "data/preprod_ux_audit/U12_desktop_after.png"
+      }
+    },
+    {
+      "id": "U6",
+      "title": "FAB support modal",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 6059,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U6_desktop_before.png",
+        "after": "data/preprod_ux_audit/U6_desktop_after.png"
+      }
+    },
+    {
+      "id": "U7",
+      "title": "ЛК: навыки + inbox",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 12854,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U7_desktop_before.png",
+        "after": "data/preprod_ux_audit/U7_desktop_after.png"
+      }
+    },
+    {
+      "id": "U9",
+      "title": "Marketing CTA",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 417,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U9_desktop_before.png",
+        "after": "data/preprod_ux_audit/U9_desktop_after.png"
+      }
+    },
+    {
+      "id": "U10",
+      "title": "Console + network",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 99,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U10_desktop_before.png",
+        "after": "data/preprod_ux_audit/U10_desktop_after.png"
+      }
+    },
+    {
+      "id": "U1",
+      "title": "Header + footer links",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 7931,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U1_mobile_before.png",
+        "after": "data/preprod_ux_audit/U1_mobile_after.png"
+      }
+    },
+    {
+      "id": "U2",
+      "title": "Лента: категория + навыки",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 11331,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U2_mobile_before.png",
+        "after": "data/preprod_ux_audit/U2_mobile_after.png"
+      }
+    },
+    {
+      "id": "U3",
+      "title": "Сортировка + закрытие",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 8478,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U3_mobile_before.png",
+        "after": "data/preprod_ux_audit/U3_mobile_after.png"
+      }
+    },
+    {
+      "id": "U4",
+      "title": "Expand + tap outside",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 9737,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U4_mobile_before.png",
+        "after": "data/preprod_ux_audit/U4_mobile_after.png"
+      }
+    },
+    {
+      "id": "U11",
+      "title": "Match breakdown",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 7880,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U11_mobile_before.png",
+        "after": "data/preprod_ux_audit/U11_mobile_after.png"
+      }
+    },
+    {
+      "id": "U5",
+      "title": "Draft + инструменты",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 8803,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U5_mobile_before.png",
+        "after": "data/preprod_ux_audit/U5_mobile_after.png"
+      }
+    },
+    {
+      "id": "U12",
+      "title": "Tools auth-only",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 8699,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U12_mobile_before.png",
+        "after": "data/preprod_ux_audit/U12_mobile_after.png"
+      }
+    },
+    {
+      "id": "U6",
+      "title": "FAB support modal",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 5996,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U6_mobile_before.png",
+        "after": "data/preprod_ux_audit/U6_mobile_after.png"
+      }
+    },
+    {
+      "id": "U7",
+      "title": "ЛК: навыки + inbox",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 12785,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U7_mobile_before.png",
+        "after": "data/preprod_ux_audit/U7_mobile_after.png"
+      }
+    },
+    {
+      "id": "U8",
+      "title": "Mobile bottom sheet",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 10429,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U8_mobile_before.png",
+        "after": "data/preprod_ux_audit/U8_mobile_after.png"
+      }
+    },
+    {
+      "id": "U9",
+      "title": "Marketing CTA",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 420,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U9_mobile_before.png",
+        "after": "data/preprod_ux_audit/U9_mobile_after.png"
+      }
+    },
+    {
+      "id": "U10",
+      "title": "Console + network",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 82,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U10_mobile_before.png",
+        "after": "data/preprod_ux_audit/U10_mobile_after.png"
+      }
+    }
+  ],
+  "findings": [],
+  "draft_reviews": [
+    {
+      "lead_id": "16851",
+      "index": 1,
+      "tools": [
+        "consulting",
+        "javascript",
+        "consulting",
+        "javascript"
+      ],
+      "draft_preview": "Здравствуйте! По ТЗ вижу, что нужно настроить терминал Vendista для приёма карт в Химках. План такой: я приеду на место, подключу устройство к вашему автомату, настрою его через личный кабинет Vendista и проведу тестовый платёж для проверки. Подскажите, сам терминал уже закреплён на автомате или его монтаж тоже потребуется?",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card1_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card1_draft.png"
+      }
+    },
+    {
+      "lead_id": "16338",
+      "index": 2,
+      "tools": [
+        "php",
+        "javascript",
+        "php",
+        "javascript"
+      ],
+      "draft_preview": "Здравствуйте! Подскажите, синхронизация статуса заказа между amoCRM и ABCP нужна только в одну сторону или в обе? Сделаю связку через PHP-скрипт. Настрою webhook в amoCRM, который будет срабатывать при изменении кастомного поля. Скрипт будет принимать данные и через API обновлять статус в ABCP.",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card2_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card2_draft.png"
+      }
+    },
+    {
+      "lead_id": "16067",
+      "index": 3,
+      "tools": [
+        "javascript",
+        "php",
+        "javascript",
+        "php"
+      ],
+      "draft_preview": "Здравствуйте! По ТЗ вижу, что вам нужна интеграция стороннего API. Настрою обмен данными между сервисами на PHP и JavaScript. Подключу API к вашей платформе и обеспечу корректную передачу информации. Подскажите, с каким именно сервисом предстоит работать и куда нужно отправлять данные — в CRM или на сайт?",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card3_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card3_draft.png"
+      }
+    }
+  ],
+  "artifacts_dir": "data/preprod_ux_audit"
+}

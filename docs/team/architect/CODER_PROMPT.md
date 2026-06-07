@@ -1,358 +1,353 @@
 # Coder — горячий контур (активное)
 
-**→ Сейчас:** **O72e freeze done** (send 60.6%) · r11 опционально · **UI/UX → @lead-architect** параллельно
-
-**Gate:** L1 usable ≥70% · L2 combined ≥4.0 · **L2 send ≥70%** · L3 ✅
+**→ Сейчас:** **O129-STRESS-V2** (Coder) · Wave 1 ✅ **2026-06-07** — [`PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md)
 
 ---
 
-## § O72e-L2-r10 — #12148 stack conflict ✅ (**2026-06-04**)
+## § O129-W1 ✅ (2026-06-07)
 
-**Контекст:** единственный FAIL в w2 (10 worst) — judge штрафует за PHP в **tools_required** карточки при NestJS/Nuxt в ТЗ.
+| Gate | Result | Artifact |
+|------|--------|----------|
+| UX anon/free/premium | **24/24** each | `preprod_ux_audit_{anon,free,premium}.json` |
+| Smoke | **5/5** | `preprod_playwright_report.json` |
+| Load S3 | p95 **1846ms** · 0% err · 20×180s | `preprod_load_summary.json` |
+| AI S5 | **96%** draft+tools | `preprod_ai_prod_audit.json` |
+| Radar S4 | FL **alive=4/4** post ban-clear + O110-B | `radar_site.log` |
 
-**Coder/Lead:** правило «Конфликт tools_required vs Описание» · якорь #12148 (endpoints, webhooks, Nuxt components) · BAD/GOOD · test `test_shared_l2_r10_12148_stack_conflict` · regen #12148.
+**Не в W1:** `ux_journey` J1–J11 · LLM human.md · load 50 VU → **O129 v2**.
 
-**Spot judge #12148:** текст отклика без PHP ✅ · judge send **FAIL** — rubric видит PHP в поле tools_required (не в draft). **Не блокер** для freeze при w2 90%.
+---
 
-**VPS deploy:** `deploy-o72e-l2-r9-vps.py` (с grep r10) — после approve.
+## § O110-B ✅ (2026-06-07)
 
-**Freeze (ласт прогон):**
+`invalidate_browser_slot` · wipe profile on ban · failover cooldown 5–15s · random Chrome/Firefox UA · default HTTP UA Chrome 122 · VPS `deploy_ingest_coupled_src` ✅.
 
-```powershell
-.venv\Scripts\python.exe scripts\regen_shared_reply_drafts.py --profile site --apply --limit 71 --since 2026-06-01 --json-out data/regen_o72e_a_freeze.json
+---
 
-.venv\Scripts\python.exe scripts\preprod_ai_prod_audit.py --profile site --limit 71 --judge --judge-limit 71 --judge-l1 --judge-l1-limit 71 --judge-l3 --judge-l3-limit 25 --judge-since 2026-06-01 --judge-md-out data/preprod_ai_prod_audit_judge_o72e_a_freeze.md
+## § O129-PREMIUM-UX-r2 ✅ (2026-06-07)
+
+**Harness:** `ux_audit.py` + `feed_ui.py` · U10b rate-limit · U5→U12 reuse · U7 backdrop close.
+
+---
+
+## § O129-STRESS-V2 — полная симуляция наплыва (**→ Coder**)
+
+**Запрос владельца 2026-06-07:** stress «максимально хороший» — все тиры подписки, поток пользователей, draft+tools+TZ, **тайминги** по этапам, UX, парсеры «сломан vs тишина».
+
+**Mechanic сначала — нет.** Mechanic = инцидент «сломалось». Сначала **Wave 1** (готовые скрипты, owner) → **Wave 2** (этот §).
+
+### Scope Coder
+
+| # | Артеfact | DoD |
+|---|----------|-----|
+| 1 | `scripts/preprod_stress_v2.py` (orchestrator) | один entrypoint · JSON `data/preprod_stress_v2.json` + `.md` |
+| 2 | **Тиры:** anon · free JWT · trial · premium JWT | mint через `preprod_mint_token.py` / env · matrix в отчёте |
+| 3 | **Read load** | reuse k6 or `preprod_load_feed.py` · p50/p95/p99 |
+| 4 | **Draft burst (controlled)** | N users × M leads · **cap** `DRAFT_BURST_MAX=20` · **не** 1000 OpenRouter |
+| 5 | **Timings** | per phase ms: feed · expand · tools · shared L2 · L3 · TZ fetch · total; таблица в md |
+| 6 | **TZ** | 3–5 lead_id с `[TZ attachment` в body · assert detail fetch ok · log size/chars |
+| 7 | **Quality spot** | reuse validators O128 на burst sample (no judge) |
+| 8 | **Parser snapshot** | pull `exchange_health:*` + last `health:*` lines from radar log → секция отчёта |
+| 9 | **S3-pre** | ramp VU · fail if 502/`53300`; doc Neon pooler in report |
+| 10 | **S1-b** | `preprod_ai_matrix.py --scenario skills_mismatch` (Node lead + yii2 user tags) |
+| 11 | **S4-pre** | assert no runaway `cycle_sec` / cascade spam in parser snapshot |
+| 12 | tests | smoke unit for timing parser / tier matrix (minimal) |
+
+### Pass criteria (O129)
+
+| Gate | PASS |
+|------|------|
+| Read p95 feed | < 2s @ 50 VU |
+| Draft burst | 0% 5xx · p95 draft < 90s · 429 documented |
+| TZ leads | ≥2/3 attachment text loaded |
+| UX journey | J1–J11 0 critical (reuse `ux_journey.py`) |
+| Parsers | см. runbook § Parser — не все red |
+
+### Файлы
+
+- `scripts/preprod_stress_v2.py` · optional `scripts/preprod_draft_burst.py`
+- `docs/ops/PREPROD_STRESS_RUN.md` § Wave 1 + Wave 2
+- **Не:** mass regen · judge · Sonnet env · новый VPS
+
+### Deploy
+
+Только restart API если меняется instrumentation; иначе scripts-only.
+
+---
+
+## § O128-L2-VOICE ✅ (2026-06-07)
+
+**Coder:** `l3_human_style.py` (блок O128-B, uniquify A=план→шаги) · `ai_analyze.py` cliche/smell · tests **36/36** · deploy `deploy-l2-stack-vps.py` ✅
+
+**Verify Lead:** VPS `O128-B` ×2 · audit 50 **96%** draft/tools · GOOD #8752 без «предпочтение по стеку»
+
+---
+
+## § O128-L2-VOICE spec (архив DoD)
+
+**Боль:** L2 пишет «имею опыт / делал похожее» → заказчик просит кейсы. RawLead — **универсальный черновик**, не портфолио.
+
+**Решение B (владелец):**
+- ✅ **Можно:** «По ТЗ вижу…», «Для реализации [боль] выстрою: [шаги из ТЗ]», стек **из ТЗ** + 1 фраза «почему»
+- ❌ **Нельзя:** «имею опыт», «я эксперт», «уже делал», «N проектов», «делал похожее», «предпочтение по стеку?», «какой язык выбрать?»
+- **Вопросы:** 1 (редко 2) — только **бизнес-логика / edge case** из ТЗ: «В описании [X]. Как планируете [крайний случай]?»
+
+**Не трогать:** `match_push.py` flow · env моделей · mass regen · `--judge` · `wordpress/`
+
+### Файлы (только эти)
+
+| Файл | Что |
+|------|-----|
+| `src/l3_human_style.py` | `build_shared_l2_system`, `build_uniquify_system`, `_HUMAN_GOOD_PATTERNS`, `_REPLY_AI_SMELL_RE`, GOOD/BAD примеры |
+| `src/ai_analyze.py` | `_REPLY_DRAFT_CLICHE_RE`, `_FORBIDDEN_REPLY_GREETING_RE`, при необходимости `reply_draft_cliche_warn` |
+| `tests/test_l3_human_style.py` | § `test_o128_*` (минимум 8 кейсов) |
+| `tests/test_l3_human_style.py` или новый | smell/validator ловит BAD-фразы |
+
+### DoD
+
+| # | Критерий |
+|---|----------|
+| 1 | **L2 shared prompt:** блок «Позиция исполнителя» — план/шаги из ТЗ; запрет portfolio-claims; шаблон вопроса по edge case |
+| 2 | Убрать/переписать: «Делал похожее…» в `_HUMAN_GOOD_PATTERNS`; GOOD **#8752** без «предпочтение по стеку» |
+| 3 | **L3 uniquify:** каркас **(A)** был «опыт→план→вопрос» → **«план→шаги→вопрос»** (без кейса/опыта); retry suffix не предлагать «начни с опыта» |
+| 4 | **Validator/smell:** retry при «имею опыт», «эксперт», «делал похож», «предпочтение по стеку», «какой стек/язык предпочитаете» |
+| 5 | Сохранить: «Здравствуйте!», 4–6 предл., один «?», запрет Cursor/ИИ/промпт, O99 domain rules (creative/TG/attachments) |
+| 6 | `pytest tests/test_l3_human_style.py -q` — все зелёные + новые o128 |
+| 7 | Deploy: `python scripts/deploy-l2-stack-vps.py` |
+
+### GOOD / BAD (вставить в промпт)
+
+**BAD:** «Имею большой опыт интеграций AmoCRM. Готов обсудить.»  
+**BAD:** «Делал похожие боты. Подскажите, какой стек предпочитаете?»  
+**GOOD (B):** «Здравствуйте! По ТЗ — webhook AmoCRM: заявка с формы → сделка, тест на тестовом аккаунте. REST API Amo, как в описании. Подскажите, одна воронка или разные по источнику?»
+
+### Проверка
+
+```bat
+python -m pytest tests/test_l3_human_style.py -q
+python scripts/preprod_ai_prod_audit.py --profile site --limit 50
+python scripts/deploy-l2-stack-vps.py
 ```
 
----
+**Не делать:** Sonnet в `.env.site` · `backfill` reply_draft · правки `tools_catalog` (O125/O98 закрыты).
 
-## § O72e-L2-r9 — L2 send gate ✅ (**2026-06-04**, tests 25/25)
-
-**Сдача Coder:** `l3_human_style.py` + `test_shared_l2_r9_w1_send_gate` · L1 complexity hardening в промпте (было r8) · **#12602 perf tags** — не делали (optional, L1 gate ✅).
-
-**Lead next:** deploy → regen w2 → judge w2.
+**Опц. P2 (если успеешь):** #9909 — «ИИ-бот» в title: не fail validator на слово «бот» когда в ТЗ явно AI-продукт.
 
 ---
 
-## § O72e-L2-r9 — L2 send gate (spec, archived)
+## § L2-draft-tune ✅ (2026-06-07)
 
-**Judge w1 (2026-06-04, since 2026-06-01, n=40 L2):**
-
-| Метрика | Факт | Gate |
-|---------|------|------|
-| combined | **4.2** | ✅ ≥4.0 |
-| specificity | 3.8 | — |
-| universal_helpful | 3.88 | — |
-| **send_as_is** | **50%** | ❌ **≥70%** |
-
-L1 ✅ · L3 ✅ (92%). **Блокер — L2:** отклики **короткие**, без **этапов**, **tools_required** не названы или **подменены** (Midjourney не из списка).
-
-**Источник:** [`data/preprod_ai_prod_audit_judge_o72e_a_w1.md`](../../../data/preprod_ai_prod_audit_judge_o72e_a_w1.md) · regen w1: [`data/regen_o72e_a_w1.json`](../../../data/regen_o72e_a_w1.json) (21 id).
-
-**Scope:** только промпт + unittest. **Без** OpenRouter, regen, judge, VPS — Lead после сдачи.
+Audit 50: draft **96%** · tools **96%** · deploy `deploy-l2-stack-vps.py` ✅
 
 ---
 
-### A. L2 — `src/l3_human_style.py` → `build_shared_l2_system`
+## § O127-WP — Filter Bar v2 + Lead Card v3 ✅ (2026-06-07)
 
-#### A1. Блок «Структура send-ready» (после Substance-first)
+**Coder:** partials `feed-filter-bar.php` · `feed-card.php` · CSS §9 · JS `data-tier` · **1.18.19** · deploy VPS.
 
-```text
-## Структура send-ready (≥4 предложения для «Брать»)
-1. **Якорь** — 1 фраза: что именно из title/Описания берёшь (цифра, платформа, объект).
-2. **Этапы** — **2–3 шага через «→» или запятую** (не «готов начать» без содержания):
-   «анализ ТЗ → макет/код → тест/сдача» — подставь домен из заказа.
-3. **Инструменты** — **≥1 имя из tools_required** (Figma, PHP, Excel, Illustrator, TON API…), если релевантно типу заказа (см. creative/text — dev-tools игнорируй).
-4. **Финал** — **1 вопрос** по реальному пробелу **или** «По ТЗ учту: A, B, C» без «?».
+**Lead verify:** repo DoD ✅ · Local **1.18.19** + `rl-filter-btn--locked` ✅ · prod HTTP timeout из Lead env — owner Ctrl+Shift+R.
 
-FAIL send: только вопрос о стеке; «готов присоединиться»; <4 предложений при полном ТЗ.
+---
+
+## § O127-WP spec (архив DoD)
+
+**Design:** [`feed-cabinet-mvp.md`](../design/wp/feed-cabinet-mvp.md) **§9** · [`LEAD_DESIGN_PROMPT.md`](../team/design/LEAD_DESIGN_PROMPT.md) § O127-D ✅
+
+**Суть:** один filter bar chrome (anon = locked кнопки, не скрывать) · одна карточка `data-tier` · один CTA · 48px mobile.
+
+| # | DoD | Файл |
+|---|-----|------|
+| 1 | Unified filter bar: chips + `[Навыки▾]` + `[Сорт▾]` у **всех** тиров; anon `.rl-filter-btn--locked` + hint | `feed-filter-bar.php` / `page-lenta.php` · CSS §9.1 |
+| 2 | `data-tier` anon\|free\|premium на карточке; rows auth-only / paid-only | `feed-card.php` · `rawlead-feed.js` |
+| 3 | Lead Card v3 F-pattern · AC-1…AC-12 §9.2h | CSS §9.2g · JS |
+| 4 | Free CTA: inline upsell (не редирект с 1-го клика) · Premium draft · Cabinet accordion | регресс **O124** |
+| 5 | Убрать «Брать»/«Сомнительно» если остались | grep |
+| 6 | Bump `RAWLEAD_CHILD_VERSION` · **не** merge с O124-w2 отдельно — включить anon polish в эту волну |
+
+**Не трогать:** `src/` · `/ops/` · O126 API.
+
+**Smoke:** Local BS `localhost:3009/lenta/` — anon locked hint · free/premium same chrome · card tiers · 390px.
+
+**Deploy:** `deploy-wp-theme-vps.py` по команде owner.
+
+---
+
+## § O126-category-fix ✅ код (2026-06-07)
+
+**Lead verify:** tests **7/7** · `_passes_category_filter` в `api_server.py` · `infer` default **`other`** · `scripts/backfill_lead_category.py`
+
+| # | DoD | ✅ |
+|---|-----|---|
+| 1 | `lead_category.py` hints + other default | ✅ |
+| 2 | API filter = resolved category | ✅ |
+| 3 | backfill script | ✅ |
+| 4 | ingest via `category_for_listing` / `lead_category` | ✅ shared module |
+| 5 | `tests/test_o126_category.py` | ✅ **7/7** |
+
+**Prod:** ✅ **2026-06-07** — API + backfill 1757 · smoke `category=dev` → **dev:20** · theme **1.18.20** dev icon `escapeHtml`
+
+**Deploy owner:**
+```bat
+python scripts/backfill_lead_category.py --reconcile-visible --dry-run
+# upload src/lead_category.py src/api_server.py → restart rawlead-api rawlead-radar
+python scripts/backfill_lead_category.py --reconcile-visible
+```
+Smoke: `GET …/feed?limit=12&category=dev` → только `dev` в JSON.
+
+---
+
+## § O124-w2 — UI polish live-dev (**local ✅**, 2026-06-07)
+
+**Режим:** владелец смотрит **BrowserSync** (`npm run dev` → `localhost:3009+`) · пишет правки в чат · Coder правит → BS reload.
+
+**Setup (owner):** Local **radarzakaz** Start · junction OK · `RAWLEAD_API_URL=https://api.rawlead.ru` в wp-config.
+
+| # | Правило |
+|---|---------|
+| 1 | **Только** `wordpress/rawlead-kadence-child/` — CSS/PHP/мелкий JS layout |
+| 2 | **Не** трогать `src/` · парсеры · L2 · deploy без bump версии |
+| 3 | После сессии: bump `RAWLEAD_CHILD_VERSION` · `deploy-wp-theme-vps.py` · Lead/owner |
+| 4 | Регресс **O124**: accordion expand · flip только `--draft-flip` · free CTA 2-step · match-bar Premium |
+
+**Файлы hot:** `assets/css/rawlead.css` · `assets/js/rawlead-feed.js` (осторожно) · `template-parts/` · `inc/marketing.php`
+
+**Вход в чат:** владелец кидает список/скрины («кнопка ниже», «полоска как ЛК») — правишь пачкой, не переписываешь ленту.
+
+**Статус:** ✅ **1.18.34 prod** (2026-06-07) · BrowserSync tail минимально закрыт
+
+---
+
+## § O124-feed-card ✅ (2026-06-07)
+
+Лента: accordion expand · flip только отклик (`--draft-flip`) · `renderCompatMatchBar` Premium · free CTA 2-step · `rl-feed-shell--pending` + PHP cookie class · **1.18.18** VPS.
+
+---
+
+## § O121-w3-acc2 — acc2 join legacy filter ✅ (2026-06-05)
+
+**Deploy:** `deploy-o121-w3-acc2-vps.py` · tests **6/6** local
+
+| # | DoD | ✅ |
+|---|-----|---|
+| 1 | `_needs_join_bootstrap` · 0 listen + pending → join_loop | ✅ |
+| 2 | `test_o121_w3_acc2.py` | ✅ 6/6 |
+| 3 | Deploy VPS + `join-bootstrap acc2` в log | ⏳ owner |
+| 4 | 6 pending → done в v2 CSV | ⏳ ~1.5–2 ч после deploy |
+
+---
+
+## § O121-w2b — /ops/ control timeout ✅ (код)
+
+**Тикет:** [`2026-06-05-ops-failed-to-fetch.md`](../../problems/2026-06-05-ops-failed-to-fetch.md)
+
+**Lead verify:** `rawlead-api.php` — `clear-bans` + restart → **90s** · `deploy-o121-w2b-vps.py` есть.
+
+| # | DoD | ✅ |
+|---|-----|---|
+| 1 | timeout 90s в PHP | ✅ |
+| 2 | deploy script | ✅ |
+| 3 | **Owner smoke** `/ops/` clear-bans | ⏳ |
+| 4 | delist 120s (O122) без регресса | ⏳ |
+
+---
+
+## § O121-w2 — прокси UX ✅ (2026-06-05)
+
+**Deploy:** `deploy-o121-w2-vps.py` · VPS **active** · tests **9/9** local
+
+| # | DoD | ✅ |
+|---|-----|---|
+| 1 | «Сбросить баны» TG + биржи | |
+| 2 | Забанен → «Забанен — сначала сброс» | |
+| 3 | Подписи групп · `status_label` human | |
+| 4 | deploy VPS | |
+
+---
+
+## § O121-w3 — TG acc UI (**backlog**)
+
+Join-таблица в `/ops/` · listen count · после w3-acc2.
+
+---
+
+## Сводка закрытого
+
+O121-w0/w0b/w0c · O121-w1 · **O121-w2** · O122 · O120 · O107 · O123-w1 · O116 — [`STATUS.md`](../common/STATUS.md)
+
+---
+
+## § O105-w1-r3 (**⏸ по симптому**)
+
+---
+
+## § O125 — L2 только по «Написать отклик» ✅ (2026-06-07)
+
+**Решение владельца:** не гонять tools-L2 на radar вхолостую · `TOOLS_BACKLOG_DRAIN=0`.
+
+| # | DoD | ✅ |
+|---|-----|---|
+| 1 | `main.py` default `TOOLS_BACKLOG_DRAIN=0` | ✅ |
+| 2 | `match_push`: `_ondemand_lead_tools` (tools-only) + `analyze_shared_reply_draft` на клик; **без** `analyze_premium` | ✅ |
+| 3 | VPS `.env.site` `TOOLS_BACKLOG_DRAIN=0` · deploy `deploy-o125-l2-on-demand-vps.py` | ✅ |
+| 4 | tests o37b + shared_draft + o98 | ✅ |
+
+**Deploy:** `python scripts/deploy-o125-l2-on-demand-vps.py`
+
+---
+
+## § L2-tools-tune — consulting overuse ✅ (2026-06-07)
+
+**Контекст:** O82-w2 ошибочно поставил Sonnet на prod L2; уже откатили env на `google/gemini-2.5-pro`. В Neon ~2630 visible с `tools_required` — **consulting 28%** slug (catch-all). Настраиваем **tools-only L2** (`analyze_lead_tools`), не shared draft / judge.
+
+**Brief:** [`data/l2_tools_tune_brief.json`](../../../data/l2_tools_tune_brief.json) · audit [`data/preprod_ai_prod_audit_human.md`](../../../data/preprod_ai_prod_audit_human.md)
+
+| # | DoD | ✅ |
+|---|-----|---|
+| 1 | `_TOOLS_ONLY_SYSTEM`: consulting guard · rhino guard · whitelist-only | ✅ |
+| 2 | `tools_catalog`: alias html/css→javascript; reject cyrillic/unknown slugs; consulting post-filter | ✅ |
+| 3 | `finalize_tools_for_lead`: min 2 после фильтра; TZ-hints fallback | ✅ |
+| 4 | tests `test_tools_catalog_o98.py` (**11/11**) | ✅ |
+| 5 | deploy VPS: `ai_analyze.py` + `tools_catalog.py` · restart `rawlead-radar` | ✅ Lead verify |
+
+### Файлы (только эти)
+
+- `src/ai_analyze.py` — `_TOOLS_ONLY_SYSTEM`, при необходимости docstring `analyze_lead_tools`
+- `src/tools_catalog.py` — `_TOOL_ALIAS_MAP`, `normalize_tools_required` / `finalize_tools_for_lead`
+- `tests/test_tools_catalog_o98.py` — кейсы consulting/rhino/cyrillic/html
+- `scripts/deploy-fix-l2-models-vps.py` — **не трогать** (env уже ok) · deploy через `deploy_vps_ssh` upload + restart
+
+### Правила промпта (обязательно в `_TOOLS_ONLY_SYSTEM`)
+
+1. **`consulting`** — только если в title/body явно: консультация, аудит, сопровождение, «нужна консультация», без работ исполнителя. Иначе — предметные slug (seo, wordpress_dev, photoshop…).
+2. **`rhino`** — только при 3D / Rhino / Grasshopper / CAD в тексте. **Не** для GAS, ботов, таблиц.
+3. **Whitelist-only** — только slug из списка в промпте; html+css → javascript; google sheets → google_sheets_api.
+4. Исправить строку «GAS/Rhino/google-таблица → … rhino» — она провоцирует false positive (lead #9907).
+
+### Post-process (`tools_catalog`)
+
+- Drop slug с кириллицей / не из KNOWN_TOOLS+canonical после alias.
+- Если после normalize остался один `consulting` без «консульта»-маркеров в TZ — заменить hints из `tools_from_tz_text`.
+- Alias: `html`, `css` → `javascript` (или `html_css` если уже в KNOWN_TOOLS).
+
+### Как проверить
+
+```bat
+python -m pytest tests/test_tools_catalog_o98.py -q
+python -m pytest tests/test_preprod_ai_prod_audit.py -q
 ```
 
-#### A2. Блок «tools_required — жёстко»
+Deploy (local):
 
-```text
-## tools_required — сверка перед ответом
-- Прочитай tools_required (первые 3). **Каждый релевантный** — **назови по имени** в отклике.
-- **Запрещено** инструмент **не из** tools_required и не из Описания (пример FAIL: Midjourney в отклике, если только Figma/HTML в tools).
-- **design-tools** (Figma, Illustrator, Photoshop, PowerPoint, Excel) — **называй** даже в text/design, если в tools_required и нужны для работы (книга → Excel для структуры; презентация → PowerPoint).
-- **dev-tools** (PHP, WordPress, Python) — только если заказ **tech/dev**; в creative/text — правило #8772.
-- **Стек из Описания:** не подменяй (если в ТЗ NestJS+ Nuxt — не пиши только PHP; если PHP в tools — назови PHP).
+```bat
+python scripts/deploy_vps_ssh.py
 ```
 
-#### A3. Domain-якоря w1 (добавить в Specificity + BAD/GOOD)
+или upload `src/ai_analyze.py` + `src/tools_catalog.py` → `/opt/rawlead/src/` · `systemctl restart rawlead-radar`.
 
-| id | Заказ | Что добавить в промпт |
-|----|-------|------------------------|
-| **#9366** | TON mini app | TON API, смарт-контракты, NFT metadata, Web Apps — **не** только «какой стек?» |
-| **#10442** | AI дизайн сайта | Figma + **HTML/CSS** из tools; Midjourney **только** если в tools/Описании; вилка Figma vs вёрстка |
-| **#11332** | WP каталог | PHP, таксономии, фильтры/поиск, API если в ТЗ; этапы: анализ референса → тема → навигация |
-| **#10001** | WP верстка по фото | этапы: разбор фото-макета → вёрстка → интеграция; Elementor vs классическая тема |
-| **#9875** | книга/редактура | **Excel** для структуры глав; этапы: записи → структура → редактура → шлифовка |
-| **#12148** | Яндекс Доставка | стек **как в ТЗ** (Nuxt/NestJS); API методы, webhooks, ЛК — не выдумывай другой стек |
-| **#10291** | сайт-визитка | SEO для .ru, формы (PHP/JS), этапы; не только «тексты готовы?» |
-| **#10009** | Elementor+Woo | каталог, корзина, checkout, платежи — **этапы**, не только LCP/CLS |
-| **#9328** | презентация 17 слайдов | PowerPoint + Photoshop/Figma для графики; процесс согласования; тематика слайдов |
-| **#9320** | акварель открытки | Illustrator/Photoshop, CMYK, вылеты под печать |
+**Не делать:** `--judge` · `backfill_tools_required.py` mass · `qa_prompt_loop --full` · смена env моделей.
 
-**Примеры GOOD (кратко, вставить в BAD/GOOD):**
-
-```text
-GOOD (#11332): «…Настрою каталог на WordPress: кастомная тема или доработка, таксономии категорий и районов, фильтры и поиск. PHP для кастомных полей, если понадобится API — подключу. Сначала разберу референс → затем шапка и навигация. Где посмотреть референс?»
-
-GOOD (#9875): «…Соберу записи в структуру книги: в Excel — план глав, затем редактура и шлифовка мыслей. Подскажите объём записей и формат — текст, аудио или заметки?»
-
-GOOD (#10442): «…Сгенерирую концепции по ТЗ, соберу макет в Figma и при необходимости HTML/CSS. На выходе нужен только Figma или готовая вёрстка?»
-```
-
-**BAD w1 (добавить):**
-
-```text
-BAD (#10442): «Midjourney → Figma» без HTML/CSS из tools и без вилки выхода.
-BAD (#11332): «оформлю каталог, где референс?» — нет PHP, этапов, фильтров.
-BAD (#9366): «готов к бэкенду mini app, какой стек?» — нет TON/NFT якорей.
-BAD (универсальный): «По задаче всё понятно, готов начать» — нет этапов и tools.
-```
+**После deploy:** owner/Lead — `preprod_ai_prod_audit.py --profile site --limit 50` ($0) для сравнения consulting%.
 
 ---
 
-### B. L1 — лёгкий touch (`src/ai_analyze.py` → `_LITE_SYSTEM_HEAD`)
-
-**Только если Coder видит быстрый win без раздувания:**
-
-1. **complexity пустой** — r8 уже есть; добавить в post-validate: если complexity null → **2** (fallback в коде, не только промпт). Файл: место нормализации L1 JSON.
-2. **#10362** видеоурок SEO в WP admin → **text/marketing**, не dev.
-3. **#12602** performance → теги `performance_optimization` / `image_optimization`, не `web_scraping`.
-
-**DoD L1 (опционально):** 1–2 assert в `test_l1_complexity_canon.py` или `test_l1_pipeline.py`.
-
----
-
-### C. Тесты — `tests/test_l3_human_style.py`
-
-`test_shared_l2_r9_w1_send_gate`:
-
-- assert «Структура send-ready» или «≥4 предложения» в body
-- assert «tools_required — сверка» / «не из tools_required»
-- assert якоря: `#11332` + PHP; `#9875` + Excel; `#10442` + HTML/CSS
-- assert BAD «готов начать» без этапов
-
-**DoD:** `pytest tests/test_l3_human_style.py tests/test_l1_complexity_canon.py -q` — все зелёные (≥24).
-
----
-
-### D. Не трогать
-
-- L3 `build_uniquify_system` — PASS 92%
-- Модели, Neon, judge/regen скрипты
-- O105 pay · O114 · O115
-
----
-
-### E. После сдачи (Lead)
-
-1. Deploy VPS: `l3_human_style.py` (+ `ai_analyze.py` если B) → restart `rawlead-api rawlead-radar`
-2. Lead: **regen w2** worst 21–30 из judge w1 top-10 → **judge w2** (только `--lead-ids`, не full 78)
-3. Gate w2: send **≥70%** → иначе r10
-
-**Accept ids для regen w2 (из worst L2 w1):**  
-9366, 10442, 11332, 10001, 9875, 12148, 10291, 10009, 9328, 9320
-
----
-
-## § O72e-A — Фаза A (**активно**)
-
-**Цикл:** regen w1 ✅ (21) → judge w1 ❌ send 50% → **§ O72e-L2-r9** → regen w2 → judge w2.
-
-**Coder:** § **O72e-L2-r9** выше.
-
-**Не делать:** stress · vault · regen 71 · full judge 78 без «да».
-
----
-
-## § O105-w1-r3 — pay hotfix bot-poll (**→ @coder**, P0 prod)
-
-**Симптом (owner 2026-06-04):** `?start=pay_crypto` → счёт Stars 300 ⭐, нет «Изменить способ оплаты».
-
-**Root cause (Lead verify):**
-1. **`rawlead-bot-poll.service`** не рестартился при deploy — процесс держал **старый** `telegram_control.py` + `STARS_PRICE_XTR=300` (config кэшируется при старте `bot_poll_main.py`).
-2. **`.env.site`:** дубликат `STARS_PRICE_XTR=300` и `600` — dotenv брал **300**.
-
-**DoD:**
-1. Deploy **всегда** `systemctl restart rawlead-bot-poll` вместе с radar/api.
-2. Env: **одна** строка `STARS_PRICE_XTR=600` в `.env` + `.env.site` (dedupe awk).
-3. Smoke: `?start=pay_crypto` → crypto-экран + «← Изменить способ оплаты»; `?start=pay_stars` → intro 600 ⭐, не invoice сразу.
-4. Verify pricing href содержит `start=pay_crypto`.
-
-**Не делать:** менять UX-канон O105.
-
----
-
-## § O114-vacancy — не показывать вакансии (**→ @coder**, P0)
-
-**Решение владельца 2026-06-04:** вакансии/найм в штат **не нужны** — не в `/lenta/`, не в L2, не в judge-выборке фриланса.
-
-**Сейчас:** L1 уже пишет `feed_visible=false` для вакансий, но **протекает** (#7049, #6943, #7240 в judge r8-30).
-
-**DoD:**
-
-1. **Pre-L1** (title+body): стоп-фразы из `FILTERS_DEEP_RESEARCH` §3 — `оклад от`, `трудовой договор`, `полная занятость`, `пришлите резюме`, `вакансия`+контекст штата, `з/п от`+найм; **не** резать «разовый проект» без маркеров штата.
-2. **L1** `_LITE_SYSTEM`: явный блок **VACANCY → feed_visible=false всегда** + якоря (Digital Marketing Lead, сценарист в штат, копирайтер вакансия, анкета HR).
-3. **Neon backfill:** `is_visible=false`, `ai_verdict=МИМО` для уже видимых лидов с маркерами вакансии (скрипт ops, без regen).
-4. **Тесты:** `tests/test_vacancy_filter.py` — 5 positive freelance / 5 negative vacancy.
-
-**Не делать:** Habr Career / VC jobs в `PUBLIC_FEED_SOURCES` (парсеры не включать).
-
----
-
-## § O115-tg-feed — TG в ленту для тестов (**→ @coder**, P0)
-
-**Решение владельца 2026-06-04:** TG **давно** должен быть в `/lenta/` — на нём же гонять judge/качество ИИ, не только FL/Kwork.
-
-**Факт:** `PUBLIC_FEED_SOURCES` уже 21× `tg:-100…` (local + VPS `.env.site`) · Neon **17 visible** tg · **последний insert ~07:02 UTC** — мало свежих, нужен health-check.
-
-**DoD:**
-
-1. **VPS verify:** `rawlead-radar` · tg_main acc1/2/3 · `radar_site_tg.log` без silent fail · `/status` показывает tg.
-2. **Ingest:** новые посты из монитор-chats → Neon `source=tg:peer` · `is_visible` по L1 · карточка в `/lenta/` с badge TG.
-3. **Smoke:** ≥1 новый tg-lead за 24 ч на prod · Lead curl feed API `source` like `tg:%`.
-4. **Judge hook:** после O114 — pilot 10 ids **только `source LIKE 'tg:%'`** (отдельный прогон, не смешивать с FL).
-
-**Не блокер O114:** можно параллельно, но оба P0 до UI/рекламы.
-
----
-
-## § O105-w1 — Premium pay (**→ @coder**, перед рекламой)
-
-**Env (owner 2026-06-04, `.env` + VPS `/opt/rawlead/.env`):**
-
-| Key | Пример |
-|-----|--------|
-| `PAY_PREMIUM_RUB` | `790` |
-| `PAY_RATE_MODE` | `at_payment_moment` |
-| `PAY_SBP_PHONE` | `+79249966496` |
-| `PAY_SBP_BANK` | `T-Bank` |
-| `PAY_BTC_ADDRESS` | bc1q… |
-| `PAY_ETH_ADDRESS` | 0x7a94… |
-| `PAY_USDT_TRC20_ADDRESS` | TV9F… |
-| `PAY_USDT_ERC20_ADDRESS` | 0x7a94… (same wallet ok) |
-| `PAY_TON_ADDRESS` | UQD7… |
-| `PAY_CRYPTO_MEMO_PREFIX` | `RL` → memo `RL{user_id}` |
-| `PAY_APPROVE_BOT` | `legacy` → approve в **@FLPARSINGBOT** |
-
-**UX:** канон § O105 + wireframes O105-D в `LEAD_DESIGN_PROMPT.md`.
-
-**DoD:**
-
-1. `/pay` и `?start=pay` → **меню 3 кнопки** (СБП · Crypto · Stars), не сразу Stars.
-2. СБП/Crypto → pending row Neon · экран «Проверить оплату» · курс **на момент оплаты** (API или ручной snapshot в сообщении).
-3. Owner approve: **FLPARSING** inline «✅ User #123 Premium 30d» / «❌ Отклонить» → `subscriptions` как Stars.
-4. Crypto экран: показать **все** сети owner дал (BTC, ETH, USDT TRC20/ERC20, TON) + copy buttons.
-5. Stars — **не ломать** `stars_billing.py`.
-
-**Не в w1:** ЮKassa · WalletConnect · авто TronGrid (→ O105-w2).
-
----
-
-## § O110-fl-proxy — FL 403 / pool_exhausted (**⏸ backlog**)
-
-**Триггер:** FL `alive=0/4` **>2×/сутки** после `clear-vps-proxy-bans.py` · или ingest FL мёртв **>24 ч**.
-
-| # | Задача | DoD |
-|---|--------|-----|
-| 1 | Env: **`FL_PROXY_URLS`** — отдельный пул (1–2 новых DC IP), Kwork не трогать | `fetch:fl alive≥2/4` 24 ч |
-| 2 | Код: **2× http_403 подряд** на `fl:host` → ban (O99 #4) | unit test · меньше «все 4 за один заход» |
-| 3 | Опц.: **1** node-proxy в `FL_PROXY_URLS` (не `YOUDO_PROXY_URLS`) | fallback только FL · owner budget |
-
-**Не делать:** merge residential в общий `EXCHANGE_PROXY_URLS` · не трогать YouDo-пул без «да».
-
----
-
-## § O72e-L2-r8 — L1 + L2 prompt (**✅ 2026-06-04**)
-
-**Цель:** максимум качества **без API** — только промпт + unittest. Regen/judge — Lead/owner после сдачи.
-
-### A. L1 — `src/ai_analyze.py` → `_LITE_SYSTEM_HEAD`
-
-**Проблема (full 71):** ~11 id с **пустым complexity**; редко dev вместо design (#9520).
-
-**Вставить** после строки про `complexity — целое 1–4` (одним блоком):
-
-```text
-**COMPLEXITY — жёстко (FAIL если пропуск):**
-- Поле complexity **обязательно в каждом JSON** — целое 1, 2, 3 или 4. **Никогда null, never omit.**
-- Если сомневаешься — ставь **2** (типовой проект с ясным ТЗ), не оставляй пустым.
-- Якоря «complexity пустой» из аудита:
-  · Google/YouTube Ads, VK таргет, SMM месяц, Power BI отчёт → **2**
-  · транскрипция+перевод часового видео → **2**
-  · написание/редактура книги, крупный редакторский объём → **3**
-  · лидgen 4000 заявок с валидацией → **3**
-  · «разместить готовые посты по списку» без создания контента → **1**
-- **design vs dev:** «макет страницы / UI в Figma / 3 версии (desktop, mobile)» **без кода** → primary_category **design**, complexity **2** — не dev.
-```
-
-**DoD L1:** `tests/test_l1_pipeline.py` или новый `test_l1_complexity_canon.py` — assert substring `Никогда null` / `обязательно в каждом JSON` в `_LITE_SYSTEM`.
-
----
-
-### B. L2 — `src/l3_human_style.py` → `build_shared_l2_system`
-
-**Проблема #8772 (pilot r7):** judge видит PHP/WP в `tools_required` и ставит send=False, хотя в draft нет tech-слов.
-
-**Добавить** в блок «Тип заказа» (text/design) **одну фразу-шаблон**:
-
-```text
-- **creative/text (#8772 и аналоги):** если в tools_required есть PHP/WordPress/Python, а заказ — **рассказ, статья, копирайт, перевод** — **одной короткой фразой** поясни: «Задача творческая, технические теги карточки к тексту не относятся» (или эквивалент); **не называй** PHP/WP/Python в отклике; вопрос — только **объём (знаки/слова)** или **формат файла (doc/pdf)**.
-```
-
-**Обновить GOOD (#8772)** — добавить эту фразу в пример:
-
-```text
-GOOD (#8772): «Здравствуйte! Задача творческая — технические теги карточки к тексту не относятся. Напишу рассказ про маму Лену: посёлок, платье в краске, беседка. Все 4 пункта ТЗ учту. Подскажите объём — в знаках или словах?»
-```
-
-**#8752 (с reconcile r6↔r7):** judge r7 хочет TG/API **если** в `tools_required`. Правило:
-
-```text
-- **учебная платформа (#8752):** функционал из **Описания** (экзамены, видео, адаптив, Yii2/Python). **Telegram/API** — **одной фразой**, только если **и** в Описании **и** в tools_required есть telegram/api; иначе **не добавляй**.
-```
-
-Обновить BAD/GOOD #8752 под это правило.
-
-**DoD L2:** `tests/test_l3_human_style.py` — дополнить `test_shared_l2_r7_fixes` или `test_shared_l2_r8`: assert «творческая» + «теги карточки» в body; assert правило #8752 telegram.
-
----
-
-### C. Не трогать
-
-- L3 `build_uniquify_system` — уже PASS
-- Модели, Neon, judge, regen-скрипты
-- **Не** запускать OpenRouter из Coder-чата
-
----
-
-### D. После сдачи (Lead)
-
-1. Deploy VPS: `l3_human_style.py` + `ai_analyze.py` → `/opt/rawlead/src/` · restart `rawlead-api rawlead-radar`
-2. Owner (когда скажет): regen worst ids · pilot · full 71
-
----
-
-## Закрыто — сводка
-
-| § | Статус |
-|---|--------|
-| **O72e-L2-r9** | ✅ tests 25/25 · **→ deploy + regen w2** |
-| O72e-L2-r8 | ✅ tests 24/24 · VPS deploy |
-| O114-vacancy | ✅ code+tests · backfill dry-run 12 |
-| O115-tg-feed | ⚠️ ingest OK · judge tg pilot ⏸ |
-| O72e-L2-r7 | ✅ pilot r7 PASS 4.3/80% |
-| O72e-L2-r6 | ✅ pilot r6 |
-| O109 | ✅ 1.18.6 |
-
-Очередь: [TASKS.md](../common/TASKS.md)
-
----
-
-## Правило hot-файла
-
-**≤ ~120 строк** · DoD → `archive/CODER_PROMPT_ARCHIVE.md`
+_Lead · L2-tools-tune активно · w3-acc2/w2b deploy owner_

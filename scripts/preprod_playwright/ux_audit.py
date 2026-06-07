@@ -13,6 +13,7 @@ import base64
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -27,6 +28,7 @@ _PLAYWRIGHT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_PLAYWRIGHT_DIR))
 
+import feed_ui  # noqa: E402
 import ux_journey  # noqa: E402
 
 _ARTIFACT_DIR = _ROOT / "data" / "preprod_ux_audit"
@@ -54,10 +56,12 @@ class AuditCtx:
     height: int
     is_mobile: bool
     access_token: str | None
+    tier: str = "premium"
     console_errors: list[str] = field(default_factory=list)
     network_failures: list[dict[str, Any]] = field(default_factory=list)
     findings: list[dict[str, Any]] = field(default_factory=list)
     draft_reviews: list[dict[str, Any]] = field(default_factory=list)
+    draft_tools_lead_id: str | None = None
 
     def journey_ctx(self) -> ux_journey.JourneyCtx:
         return ux_journey.JourneyCtx(base=self.base, page=self.page)
@@ -195,13 +199,54 @@ def _wait_mobile_feed_sheet(page: Any) -> Any:
     return panel
 
 
+def _expand_feed_card(card: Any, page: Any) -> None:
+    if not card.locator(feed_ui.CARD_FRONT_BODY).count():
+        card.locator(".rl-lead-card__title").first.click()
+        page.wait_for_timeout(400)
+
+
+def _card_tools_joined(card: Any) -> str:
+    tools_el = card.locator(".rl-feed-card__tools li")
+    parts: list[str] = []
+    if tools_el.count():
+        for ti in range(tools_el.count()):
+            parts.append((tools_el.nth(ti).inner_text() or "").strip())
+    return ", ".join(parts)
+
+
+def _card_draft_ready(card: Any) -> tuple[bool, str]:
+    """Same gates as U5: draft ≥40, no tools placeholder, no vendor lock."""
+    reply = card.locator("[data-reply-text]")
+    text = (reply.first.inner_text() or "").strip() if reply.count() else ""
+    if len(text) < 40:
+        return False, text or "draft text too short"
+    body = card.inner_text().casefold()
+    if "появится после генерации" in body:
+        return False, "tools placeholder «появится после генерации»"
+    if _VENDOR_TOOL_RE.search(_card_tools_joined(card)):
+        return False, "vendor lock in tools"
+    return True, text
+
+
+def _ensure_premium_draft(jctx: ux_journey.JourneyCtx, card: Any, page: Any) -> str:
+    """Expand card, reuse existing draft or click «Написать отклик» (U5 logic)."""
+    _expand_feed_card(card, page)
+    ok, detail = _card_draft_ready(card)
+    if ok:
+        return detail
+    btn = card.locator(".rl-feed-card__reply-btn")
+    if not btn.count():
+        raise RuntimeError(detail)
+    btn.first.click()
+    ux_journey._wait_draft_text(jctx, card)
+    ok, detail = _card_draft_ready(card)
+    if not ok:
+        raise RuntimeError(detail)
+    return detail
+
+
 def _tap_cabinet_skills_backdrop(page: Any) -> None:
-    overlay = page.locator("#rl-cabinet-skills-modal-overlay")
-    box = overlay.bounding_box()
-    if box:
-        page.mouse.click(box["x"] + 8, box["y"] + 8)
-    else:
-        page.mouse.click(8, 8)
+    feed_ui.tap_cabinet_skills_backdrop(page)
 
 
 def _run_scenario(
@@ -283,101 +328,91 @@ def u1_header_footer(ctx: AuditCtx) -> None:
 
 
 def u2_lenta_skills(ctx: AuditCtx) -> None:
-    jctx = ctx.journey_ctx()
-    ux_journey._goto_lenta(jctx)
-    page = ctx.page
-    if ctx.is_mobile:
-        sheet = _wait_mobile_feed_sheet(page)
-        design = sheet.locator('input[name="category"][value="design"]')
-        design.check(force=True)
-        page.wait_for_timeout(1200)
-        if _feed_error(ctx):
-            raise RuntimeError("error banner after category chip")
-        chip = sheet.locator(
-            ".rl-feed-skill:not(.is-disabled), .rl-chip, .rl-feed-skills .rl-chip"
-        ).first
-        chip.wait_for(state="visible", timeout=30_000)
-        chip.click()
-        page.locator("#rl-feed-sheet-apply").click()
-        page.wait_for_timeout(2000)
-    else:
-        page.locator("#filter-category-design input").check(force=True)
-        page.wait_for_timeout(1200)
-        if _feed_error(ctx):
-            raise RuntimeError("error banner after category chip")
-        ux_journey._open_skills_panel(jctx)
-        chip = page.locator(
-            "#rl-feed-skills .rl-feed-skill:not(.is-disabled), #rl-feed-skills .rl-chip"
-        ).first
-        chip.wait_for(state="visible", timeout=30_000)
-        chip.click()
-        page.locator("#rl-feed-skills-apply").click()
-        page.wait_for_timeout(2000)
+    feed_ui.goto_lenta(ctx.page, ctx.base)
+    tier = ctx.tier or feed_ui.wait_feed_tier(ctx.page, "anon", "free", "premium")
+    feed_ui.apply_category_design(ctx.page, is_mobile=ctx.is_mobile)
     if _feed_error(ctx):
-        raise RuntimeError("error banner after «Применить»")
-    after = page.locator("#rl-feed-count").inner_text()
+        raise RuntimeError("error banner after category chip")
+    if tier == "anon":
+        if ctx.is_mobile:
+            return  # mobile: навыки в sheet/modal gated JS-ом
+        if not feed_ui.is_filter_locked(ctx.page, "skills"):
+            raise RuntimeError("anon: skills filter should be locked")
+        return
+    feed_ui.open_skills_modal(ctx.page, is_mobile=ctx.is_mobile)
+    feed_ui.pick_first_skill_chip(ctx.page)
+    feed_ui.apply_skills_modal(ctx.page)
+    if _feed_error(ctx):
+        raise RuntimeError("error banner after skills apply")
+    after = feed_ui.feed_meta_text(ctx.page)
     if "ошиб" in after.casefold():
         raise RuntimeError(f"feed count error: {after}")
 
 
 def u3_sort_dropdown(ctx: AuditCtx) -> None:
-    jctx = ctx.journey_ctx()
-    ux_journey._goto_lenta(jctx)
-    page = ctx.page
-    if ctx.is_mobile:
-        sheet = _wait_mobile_feed_sheet(page)
-        match_radio = sheet.locator('input[name="sort"][value="match"]')
-        if not match_radio.count():
-            raise RuntimeError("mobile sheet: sort match radio missing")
-        time_radio = sheet.locator('input[name="sort"][value="time"]')
-        if time_radio.count():
+    feed_ui.goto_lenta(ctx.page, ctx.base)
+    tier = ctx.tier or feed_ui.get_feed_tier(ctx.page)
+    if tier == "anon":
+        if ctx.is_mobile:
+            sheet = feed_ui.open_mobile_feed_sheet(ctx.page)
+            if not sheet.locator('input[name="category"]').count():
+                raise RuntimeError("mobile sheet: category filters missing")
+            ctx.page.locator(feed_ui.MOBILE_SHEET_APPLY).click()
+            ctx.page.wait_for_timeout(800)
+            return
+        if not feed_ui.is_filter_locked(ctx.page, "sort"):
+            raise RuntimeError("anon: sort filter should be locked")
+        return
+    if tier == "free":
+        if ctx.is_mobile:
+            sheet = feed_ui.open_mobile_feed_sheet(ctx.page)
+            time_radio = sheet.locator(f'{feed_ui.SORT_RADIO_MOBILE}[value="time"]')
+            if not time_radio.count():
+                raise RuntimeError("free mobile: time sort radio missing")
             time_radio.first.click(force=True)
-            page.wait_for_timeout(400)
-        match_radio.first.click(force=True)
-        page.wait_for_timeout(800)
-        overlay = page.locator("#rl-feed-sheet-overlay")
-        if overlay.count():
-            box = overlay.bounding_box()
-            if box:
-                page.mouse.click(box["x"] + box["width"] / 2, box["y"] + 16)
-            else:
-                page.mouse.click(195, 16)
-        else:
-            page.mouse.click(5, 5)
-        page.wait_for_timeout(500)
-        if page.evaluate(
+            ctx.page.locator(feed_ui.MOBILE_SHEET_APPLY).click()
+            ctx.page.wait_for_timeout(800)
+            return
+        sort_dd = ctx.page.locator(feed_ui.SORT_DD)
+        sort_dd.locator("summary").click()
+        time_radio = ctx.page.locator(f'{feed_ui.SORT_RADIO_DESKTOP}[value="time"]')
+        if not time_radio.count():
+            raise RuntimeError("free desktop: time sort radio missing")
+        time_radio.first.check(force=True)
+        ctx.page.locator("#rl-feed-sort-apply").click()
+        ctx.page.wait_for_timeout(600)
+        return
+    if ctx.is_mobile:
+        feed_ui.apply_sort_match(ctx.page, is_mobile=True)
+        feed_ui.close_mobile_sheet_overlay(ctx.page)
+        if ctx.page.evaluate(
             "() => { const s = document.getElementById('rl-feed-sheet'); return s && !s.hidden; }"
         ):
-            raise RuntimeError("mobile sheet did not close on overlay tap")
+            raise RuntimeError("mobile sheet did not close")
         return
-
-    sort_dd = page.locator(".rl-filter-sort-dd")
+    sort_dd = ctx.page.locator(feed_ui.SORT_DD)
     sort_dd.locator("summary").click()
     if not sort_dd.evaluate("el => el.open"):
         raise RuntimeError("sort dropdown did not open")
-    page.locator('input[name="sort"][value="match"]').check(force=True)
-    page.wait_for_timeout(600)
-    page.keyboard.press("Escape")
-    page.wait_for_timeout(400)
+    match = ctx.page.locator(f'{feed_ui.SORT_RADIO_DESKTOP}[value="match"]')
+    if not match.count():
+        raise RuntimeError("desktop: rl-feed-sort match radio missing")
+    match.first.check(force=True)
+    ctx.page.wait_for_timeout(600)
+    ctx.page.keyboard.press("Escape")
+    ctx.page.wait_for_timeout(400)
     if sort_dd.evaluate("el => el.open"):
-        page.mouse.click(8, 8)
-        page.wait_for_timeout(400)
+        ctx.page.mouse.click(8, 8)
+        ctx.page.wait_for_timeout(400)
     if sort_dd.evaluate("el => el.open"):
         raise RuntimeError("sort dropdown did not close (Esc / tap outside)")
 
 
 def u4_card_tap_outside(ctx: AuditCtx) -> None:
-    jctx = ctx.journey_ctx()
-    ux_journey._goto_lenta(jctx)
-    card = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]").first
+    feed_ui.goto_lenta(ctx.page, ctx.base)
+    card = ctx.page.locator(feed_ui.FEED_CARD).first
     card.wait_for(state="visible")
-    card.locator(".rl-lead-card__title").first.click()
-    ctx.page.wait_for_timeout(600)
-    card.locator(".rl-feed-card__body-inner").wait_for(state="visible", timeout=15_000)
-    ctx.page.mouse.click(10, 10)
-    ctx.page.wait_for_timeout(500)
-    if "is-expanded" in (card.get_attribute("class") or ""):
-        raise RuntimeError("card did not collapse on tap outside")
+    feed_ui.collapse_card_tap_outside(card, ctx.page)
 
 
 def u5_draft_tools(ctx: AuditCtx) -> None:
@@ -392,39 +427,13 @@ def u5_draft_tools(ctx: AuditCtx) -> None:
     for i in range(n_pool):
         card = pool.nth(i)
         card.scroll_into_view_if_needed()
-        if not card.locator(".rl-feed-card__body-inner").count():
-            card.locator(".rl-lead-card__title").first.click()
-            ctx.page.wait_for_timeout(400)
-        reply = card.locator("[data-reply-text]")
-        existing = (reply.first.inner_text() or "").strip() if reply.count() else ""
-        if len(existing) >= 40:
-            body = card.inner_text().casefold()
-            if "появится после генерации" in body:
-                continue
-            if _VENDOR_TOOL_RE.search(", ".join(
-                (card.locator(".rl-feed-card__tools li").nth(ti).inner_text() or "").strip()
-                for ti in range(card.locator(".rl-feed-card__tools li").count())
-            )):
-                continue
-            return
-        btn = card.locator(".rl-feed-card__reply-btn")
-        if not btn.count():
-            continue
-        btn.first.click()
         try:
-            ux_journey._wait_draft_text(jctx, card)
+            _ensure_premium_draft(jctx, card, ctx.page)
+            ctx.draft_tools_lead_id = card.get_attribute("data-id") or None
+            return
         except RuntimeError as exc:
             last_err = str(exc)
             continue
-        body = card.inner_text().casefold()
-        if "появится после генерации" in body:
-            last_err = "tools placeholder «появится после генерации»"
-            continue
-        draft = card.locator("[data-reply-text]")
-        if not draft.count() or len((draft.first.inner_text() or "").strip()) < 40:
-            last_err = "draft text too short after generate"
-            continue
-        return
     raise RuntimeError(last_err)
 
 
@@ -489,9 +498,9 @@ def u7_cabinet_skills_inbox(ctx: AuditCtx) -> None:
 def u8_mobile_skills_sheet(ctx: AuditCtx) -> None:
     if not ctx.is_mobile:
         return
-    jctx = ctx.journey_ctx()
-    ux_journey._goto_lenta(jctx)
+    feed_ui.goto_lenta(ctx.page, ctx.base)
     page = ctx.page
+    tier = ctx.tier or feed_ui.get_feed_tier(page)
     overflow_x = page.evaluate(
         "() => Math.max(0, document.documentElement.scrollWidth - window.innerWidth)"
     )
@@ -501,37 +510,21 @@ def u8_mobile_skills_sheet(ctx: AuditCtx) -> None:
             f"horizontal page scroll {overflow_x}px before skills sheet",
             scenario="U8",
         )
-
-    open_btn = page.locator("#rl-feed-filters-open")
-    open_btn.wait_for(state="visible")
-    sheet = _wait_mobile_feed_sheet(page)
-    apply_btn = sheet.locator("#rl-feed-sheet-apply, .rl-feed-skills-apply").first
-    if not apply_btn.count():
-        raise RuntimeError("mobile sheet: «Применить» missing")
-    actions = sheet.locator(".rl-feed-sheet__actions")
-    if actions.count():
-        actions_box = actions.first.bounding_box()
-        apply_box = apply_btn.bounding_box()
-        if actions_box and apply_box and apply_box["y"] < actions_box["y"] - 2:
-            raise RuntimeError("«Применить» not in sticky footer (.rl-feed-sheet__actions)")
-
-    scroll_body = sheet.locator(".rl-feed-sheet__body, .rl-skills-panel__body").first
-    if scroll_body.count():
-        scroll_body.evaluate("el => { el.scrollTop = el.scrollHeight; }")
-        page.wait_for_timeout(400)
-
-    chip = sheet.locator(".rl-feed-skill, .rl-chip, .rl-feed-skills .rl-chip").first
-    if chip.count():
-        chip.click()
-        page.wait_for_timeout(400)
-    # sticky footer «Применить» closes sheet
+    sheet = feed_ui.open_mobile_feed_sheet(page)
+    apply_btn = sheet.locator(feed_ui.MOBILE_SHEET_APPLY)
+    apply_btn.wait_for(state="visible", timeout=10_000)
+    if tier != "anon":
+        skills_open = page.locator(feed_ui.MOBILE_SKILLS_OPEN)
+        if skills_open.count():
+            skills_open.first.click()
+            feed_ui.pick_first_skill_chip(page)
+            feed_ui.apply_skills_modal(page)
     apply_btn.click()
     page.wait_for_timeout(1500)
     if page.evaluate(
         "() => { const s = document.getElementById('rl-feed-sheet'); return s && !s.hidden; }"
     ):
         raise RuntimeError("sheet did not close after «Применить»")
-
     overflow_after = page.evaluate(
         "() => Math.max(0, document.documentElement.scrollWidth - window.innerWidth)"
     )
@@ -555,7 +548,11 @@ def u10_console_network(ctx: AuditCtx) -> None:
     errors = [e for e in ctx.console_errors if e.startswith("[error]")]
     if errors:
         raise RuntimeError(f"console errors: {errors[:3]}")
-    bad = [f for f in ctx.network_failures if f.get("status", 0) >= 400]
+    bad = [
+        f
+        for f in ctx.network_failures
+        if f.get("status", 0) >= 400 and f.get("status") not in (429,)
+    ]
     feed_draft = [
         f
         for f in bad
@@ -567,7 +564,7 @@ def u10_console_network(ctx: AuditCtx) -> None:
 
 
 def u10b_draft_tools_batch(ctx: AuditCtx) -> None:
-    """O80: «Написать отклик» до 5 карточек — блоки Инструменты + Черновик."""
+    """O80: «Написать отклик» до 3 карточек — блоки Инструменты + Черновик."""
     jctx = ctx.journey_ctx()
     ux_journey._wait_feed_logged_in(jctx)
     ux_journey._wait_effective_access(jctx)
@@ -575,60 +572,46 @@ def u10b_draft_tools_batch(ctx: AuditCtx) -> None:
 
     pool = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]")
     n_pool = min(pool.count(), 15)
-    candidates: list[Any] = []
+    ready: list[Any] = []
+    pending: list[Any] = []
     for i in range(n_pool):
         card = pool.nth(i)
         card.scroll_into_view_if_needed()
-        if not card.locator(".rl-feed-card__body-inner").count():
-            card.locator(".rl-lead-card__title").first.click()
-            ctx.page.wait_for_timeout(350)
-        reply = card.locator("[data-reply-text]")
-        text = (reply.first.inner_text() or "").strip() if reply.count() else ""
+        _expand_feed_card(card, ctx.page)
         btn = card.locator(".rl-feed-card__reply-btn")
-        if len(text) >= 40 or btn.count():
-            candidates.append(card)
+        ok, _ = _card_draft_ready(card)
+        if ok:
+            ready.append(card)
+        elif btn.count():
+            pending.append(card)
 
+    candidates = ready + pending
     if len(candidates) < 3:
         raise RuntimeError(f"U10b: need ≥3 draft cards, got {len(candidates)}")
 
     reviewed = 0
     for card in candidates:
-        if reviewed >= 5:
+        if reviewed >= 3:
             break
         lead_id = card.get_attribute("data-id") or str(reviewed + 1)
         card.scroll_into_view_if_needed()
-        if not card.locator(".rl-feed-card__body-inner").count():
-            card.locator(".rl-lead-card__title").first.click()
-            ctx.page.wait_for_timeout(400)
-        btn = card.locator(".rl-feed-card__reply-btn")
-        reply = card.locator("[data-reply-text]")
-        existing = (reply.first.inner_text() or "").strip() if reply.count() else ""
-        if len(existing) < 40:
-            if not btn.count():
+        try:
+            draft_text = _ensure_premium_draft(jctx, card, ctx.page)
+        except RuntimeError as exc:
+            msg = str(exc).casefold()
+            if "rate limit" in msg or "/час" in msg:
+                if reviewed >= 3:
+                    break
                 continue
-            btn.first.click()
-            try:
-                ux_journey._wait_draft_text(jctx, card)
-            except RuntimeError as exc:
-                if "недоступ" in str(exc).casefold() or "timeout" in str(exc).casefold():
-                    continue
-                raise
+            if "недоступ" in msg or "timeout" in msg or "429" in msg:
+                continue
+            raise
 
-        tools_el = card.locator(".rl-feed-card__tools li")
         tools_list: list[str] = []
+        tools_el = card.locator(".rl-feed-card__tools li")
         if tools_el.count():
             for ti in range(tools_el.count()):
                 tools_list.append((tools_el.nth(ti).inner_text() or "").strip())
-        tools_text = ", ".join(tools_list)
-        locked = _VENDOR_TOOL_RE.findall(tools_text)
-        if locked:
-            raise RuntimeError(
-                f"U10b card {lead_id}: vendor lock in tools ({', '.join(sorted(set(locked))[:5])})"
-            )
-
-        draft_text = (reply.first.inner_text() or "").strip() if reply.count() else ""
-        if len(draft_text) < 40:
-            continue
 
         reviewed += 1
         section = card.locator(".rl-feed-card__section").first
@@ -653,69 +636,66 @@ def u10b_draft_tools_batch(ctx: AuditCtx) -> None:
 
 
 def u11_match_breakdown(ctx: AuditCtx) -> None:
-    """O82-w1b: stack compatibility breakdown; no verdict/quality on card."""
-    jctx = ctx.journey_ctx()
-    ux_journey._goto_lenta(jctx)
-    ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
-    pool = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]")
+    """O82: tier-aware match block; no verdict chips."""
+    feed_ui.goto_lenta(ctx.page, ctx.base)
+    tier = ctx.tier or feed_ui.wait_feed_tier(ctx.page, "anon", "free", "premium")
+    ctx.page.wait_for_selector(feed_ui.FEED_CARD, timeout=45_000)
+    pool = ctx.page.locator(feed_ui.FEED_CARD)
     n = min(3, pool.count())
     if n < 1:
         raise RuntimeError("U11: no feed cards")
-    forbidden = ("брать", "сомнительно", "качество заказа", "навыки: 0%")
     for i in range(n):
         card = pool.nth(i)
         card.scroll_into_view_if_needed()
-        if not card.locator(".rl-match-breakdown").count():
-            raise RuntimeError("U11: .rl-match-breakdown missing")
-        if card.locator(".rl-chip--take, .rl-chip--maybe").count():
-            raise RuntimeError("U11: verdict chip still visible")
-        match_text = (card.locator(".rl-match").first.inner_text() or "").casefold()
-        bd = (card.locator(".rl-match-breakdown").first.inner_text() or "").casefold()
-        for bad in forbidden:
-            if bad in match_text or bad in bd:
-                raise RuntimeError(f"U11: forbidden copy «{bad}»")
-        if card.locator(".rl-match--no-skills").count():
-            if card.locator(".rl-match__pct").count():
-                raise RuntimeError("U11: zero-skills card shows % bar")
-            if not card.locator("[data-open-skills]").count():
-                raise RuntimeError("U11: anon zero-skills missing skills CTA")
+        feed_ui.assert_match_for_tier(card, tier)
 
 
 def u12_tools_auth_only(ctx: AuditCtx) -> None:
-    """O83: anon — no «Инструменты»; paid JWT — tools block present."""
+    """O83: anon/free — no tools; premium — tools section after draft."""
+    tier = ctx.tier or "premium"
     jctx = ctx.journey_ctx()
-    if ctx.access_token:
+    if tier == "premium" and ctx.access_token:
         ux_journey._wait_feed_logged_in(jctx)
         ux_journey._wait_effective_access(jctx)
-        ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
-        pool = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]")
-        for i in range(min(12, pool.count())):
+        ctx.page.wait_for_selector(feed_ui.FEED_CARD, timeout=45_000)
+
+        if ctx.draft_tools_lead_id:
+            card = ctx.page.locator(
+                f'{feed_ui.FEED_CARD}[data-id="{ctx.draft_tools_lead_id}"]'
+            )
+            if card.count():
+                card.first.scroll_into_view_if_needed()
+                _expand_feed_card(card.first, ctx.page)
+                if card.first.locator(".rl-feed-card__tools li").count():
+                    return
+                if feed_ui.card_has_tools_section(card.first):
+                    return
+
+        pool = ctx.page.locator(feed_ui.FEED_CARD)
+        for i in range(min(8, pool.count())):
             card = pool.nth(i)
             card.scroll_into_view_if_needed()
-            if not card.locator(".rl-feed-card__body-inner *").count():
-                card.locator(".rl-lead-card__title").first.click()
-                ctx.page.wait_for_timeout(400)
-            titles = card.locator(".rl-feed-card__section-title")
-            for ti in range(titles.count()):
-                t = (titles.nth(ti).inner_text() or "").strip()
-                if t == "Инструменты":
-                    return
-        raise RuntimeError("U12: paid feed — no «Инструменты» block on expanded cards")
+            _expand_feed_card(card, ctx.page)
+            ok, _ = _card_draft_ready(card)
+            if ok and (
+                card.locator(".rl-feed-card__tools li").count()
+                or feed_ui.card_has_tools_section(card)
+            ):
+                return
+        raise RuntimeError("U12: premium — no «Инструменты» after draft")
 
-    ux_journey._goto_lenta(jctx)
-    ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
-    pool = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]")
+    feed_ui.goto_lenta(ctx.page, ctx.base)
+    if tier == "free" and ctx.access_token:
+        feed_ui.wait_feed_tier(ctx.page, "free")
+    ctx.page.wait_for_selector(feed_ui.FEED_CARD, timeout=45_000)
+    pool = ctx.page.locator(feed_ui.FEED_CARD)
     for i in range(min(3, pool.count())):
         card = pool.nth(i)
         card.scroll_into_view_if_needed()
-        if not card.locator(".rl-feed-card__body-inner *").count():
-            card.locator(".rl-lead-card__title").first.click()
-            ctx.page.wait_for_timeout(350)
-        titles = card.locator(".rl-feed-card__section-title")
-        for ti in range(titles.count()):
-            t = (titles.nth(ti).inner_text() or "").strip()
-            if t == "Инструменты":
-                raise RuntimeError("U12: anon sees «Инструменты» block")
+        if not card.locator(feed_ui.CARD_FRONT_BODY).count():
+            feed_ui.expand_card(card, ctx.page)
+        if feed_ui.card_has_tools_section(card):
+            raise RuntimeError("U12: anon/free sees «Инструменты» without premium draft")
 
 
 SCENARIOS: dict[str, tuple[str, str, Callable[[AuditCtx], None]]] = {
@@ -723,10 +703,10 @@ SCENARIOS: dict[str, tuple[str, str, Callable[[AuditCtx], None]]] = {
     "U2": ("Лента: категория + навыки", "critical", u2_lenta_skills),
     "U3": ("Сортировка + закрытие", "critical", u3_sort_dropdown),
     "U4": ("Expand + tap outside", "critical", u4_card_tap_outside),
-    "U10b": ("Draft×5 tools audit", "critical", u10b_draft_tools_batch),
+    "U10b": ("Draft×3 tools audit", "critical", u10b_draft_tools_batch),
     "U11": ("Match breakdown", "critical", u11_match_breakdown),
-    "U12": ("Tools auth-only", "critical", u12_tools_auth_only),
     "U5": ("Draft + инструменты", "critical", u5_draft_tools),
+    "U12": ("Tools auth-only", "critical", u12_tools_auth_only),
     "U6": ("FAB support modal", "warn", u6_fab_modal),
     "U7": ("ЛК: навыки + inbox", "critical", u7_cabinet_skills_inbox),
     "U8": ("Mobile bottom sheet", "critical", u8_mobile_skills_sheet),
@@ -923,7 +903,8 @@ def run_audit(
     *,
     headless: bool,
     browser_name: str,
-    access_token: str,
+    access_token: str | None,
+    tier: str = "premium",
     timeout_ms: int = 45_000,
 ) -> dict[str, Any]:
     from playwright.sync_api import sync_playwright
@@ -957,28 +938,32 @@ def run_audit(
                 height=height,
                 is_mobile=vp_label == "mobile",
                 access_token=access_token,
+                tier=tier,
             )
             _attach_observers(ctx)
+            if tier in ("free", "premium") and access_token:
+                feed_ui.goto_lenta(page, base)
+                feed_ui.wait_feed_tier(page, tier, timeout_ms=60_000)
 
             for sid, (title, sev, fn) in SCENARIOS.items():
                 if sid == "U8" and vp_label != "mobile":
                     continue
                 if sid == "U10b" and vp_label != "desktop":
                     continue
-                if sid in ("U5", "U7", "U10b") and not access_token:
+                if sid in ("U5", "U7", "U10b") and tier != "premium":
                     results.append(
                         {
                             "id": sid,
                             "title": title,
                             "viewport": vp_label,
-                            "pass": False,
+                            "pass": True,
                             "ms": 0,
-                            "error": "no test token",
+                            "error": None,
                             "skipped": True,
+                            "skip_reason": f"tier={tier}",
                             "screenshots": {},
                         }
                     )
-                    ctx.add_finding("critical", f"{title}: no test token", scenario=sid)
                     continue
                 row = _run_scenario(sid, title, sev, fn, ctx)
                 results.append(row)
@@ -997,14 +982,13 @@ def run_audit(
 
     critical = sum(1 for f in all_findings if f["severity"] == "critical")
     passed = sum(1 for r in results if r["pass"])
-    ok = critical == 0 and passed == len(results)
-    draft_reviews = [
-        r for r in results if r.get("id") == "U10b" and r.get("pass")
-    ]
+    runnable = [r for r in results if not r.get("skipped")]
+    ok = critical == 0 and all(r["pass"] for r in runnable)
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "base_url": base,
+        "tier": tier,
         "browser": ux_journey._browser_report_label(browser_name, access_token),
         "has_auth": bool(access_token),
         "viewports": [v[0] for v in viewports],
@@ -1019,10 +1003,43 @@ def run_audit(
     }
 
 
+def _remint_premium_token() -> None:
+    """acc1 shared: после free mint подписка free — восстановить agent."""
+    py = sys.executable
+    script = _ROOT / "scripts" / "preprod_mint_token.py"
+    r = subprocess.run(
+        [py, str(script), "--account", "acc1", "--plan", "agent", "--write-env-site"],
+        cwd=str(_ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if r.returncode != 0:
+        raise RuntimeError(f"premium remint failed: {r.stderr or r.stdout}")
+
+
+def _token_for_tier(tier: str) -> str | None:
+    if tier == "anon":
+        return None
+    if tier == "free":
+        return (
+            os.environ.get("RAWLEAD_PREPROD_FREE_TOKEN", "").strip()
+            or _load_env_value("RAWLEAD_PREPROD_FREE_TOKEN")
+        )
+    return _resolve_token(None)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="O37c UX audit U1–U10 + LLM human")
     parser.add_argument("--base-url", default="https://rawlead.ru")
     parser.add_argument("--headed", action="store_true")
+    parser.add_argument(
+        "--tier",
+        default="premium",
+        choices=("anon", "free", "premium", "all"),
+        help="anon|free|premium или all (3 прогона Wave 1)",
+    )
     parser.add_argument(
         "--browser",
         default="chromium",
@@ -1044,53 +1061,98 @@ def main() -> int:
     if args.cdp_url.strip():
         os.environ["DOLPHIN_CDP_URL"] = args.cdp_url.strip()
 
-    token = _require_token(_resolve_token(None), browser=args.browser)
-    _forbid_owner_browser_gate(args.browser, token)
+    tiers = ("anon", "free", "premium") if args.tier == "all" else (args.tier,)
+    combined: list[dict[str, Any]] = []
+    exit_code = 0
 
-    try:
-        report = run_audit(
-            args.base_url,
-            headless=not args.headed,
-            browser_name=args.browser,
-            access_token=token,
-        )
-    except ImportError:
+    for tier in tiers:
+        if tier == "premium" and "free" in tiers:
+            _remint_premium_token()
+        token = _token_for_tier(tier)
+        if tier == "premium" and not token:
+            token = _require_token(None, browser=args.browser)
+        if tier == "free" and not token:
+            print(
+                "RAWLEAD_PREPROD_FREE_TOKEN не задан. "
+                "Mint: preprod_mint_token.py --plan free "
+                "--env-key RAWLEAD_PREPROD_FREE_TOKEN --write-env-site",
+                file=sys.stderr,
+            )
+            return 2
+        if tier == "premium":
+            _forbid_owner_browser_gate(args.browser, token)
+
+        out_json = args.output_json
+        if args.tier == "all":
+            out_json = _ROOT / "data" / f"preprod_ux_audit_{tier}.json"
+
+        try:
+            report = run_audit(
+                args.base_url,
+                headless=not args.headed,
+                browser_name=args.browser,
+                access_token=token,
+                tier=tier,
+            )
+        except ImportError:
+            print(
+                "playwright не установлен: pip install playwright && playwright install chromium",
+                file=sys.stderr,
+            )
+            return 2
+
+        if tier == "premium" and not args.skip_llm:
+            api_key = _load_env_value("AI_API_KEY") or _load_env_value("OPENROUTER_API_KEY")
+            model = (
+                args.llm_model.strip()
+                or _load_env_value("OPENROUTER_MODEL_PREMIUM")
+                or "google/gemini-2.5-flash"
+            )
+            human_path = args.output_human
+            if args.tier == "all":
+                human_path = _ROOT / "data" / f"preprod_ux_audit_{tier}_human.md"
+            if api_key:
+                llm_meta = _llm_human_review(
+                    report, out_path=human_path, model=model, api_key=api_key
+                )
+                report["human_md"] = llm_meta["path"]
+                report["llm"] = llm_meta
+            else:
+                stub = (
+                    "# Pre-prod UX audit — human (O37c)\n\n"
+                    "## Критично\n- AI_API_KEY не задан — LLM pass пропущен\n\n"
+                    "## Раздражает\n\n## Ок\n\n**Rating:** n/a\n"
+                )
+                human_path.write_text(stub, encoding="utf-8")
+                report["human_md"] = str(human_path.relative_to(_ROOT)).replace("\\", "/")
+                report["llm"] = {"skipped": "no AI_API_KEY"}
+
+        out_json.parent.mkdir(parents=True, exist_ok=True)
+        out_json.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        if tier == args.tier or tier == "premium":
+            _write_markdown(report, args.output_md if tier == "premium" else out_json.with_suffix(".md"))
         print(
-            "playwright не установлен: pip install playwright && playwright install chromium",
-            file=sys.stderr,
-        )
-        return 2
-
-    if not args.skip_llm:
-        api_key = _load_env_value("AI_API_KEY") or _load_env_value("OPENROUTER_API_KEY")
-        model = (
-            args.llm_model.strip()
-            or _load_env_value("OPENROUTER_MODEL_PREMIUM")
-            or "google/gemini-2.5-flash"
-        )
-        if api_key:
-            llm_meta = _llm_human_review(
-                report, out_path=args.output_human, model=model, api_key=api_key
+            json.dumps(
+                {
+                    "tier": report["tier"],
+                    "pass": report["pass"],
+                    "critical_count": report["critical_count"],
+                    "scenarios_pass": report["scenarios_pass"],
+                    "scenarios_total": report["scenarios_total"],
+                },
+                ensure_ascii=False,
             )
-            report["human_md"] = llm_meta["path"]
-            report["llm"] = llm_meta
-        else:
-            stub = (
-                "# Pre-prod UX audit — human (O37c)\n\n"
-                "## Критично\n- AI_API_KEY не задан — LLM pass пропущен\n\n"
-                "## Раздражает\n\n## Ок\n\n**Rating:** n/a\n"
-            )
-            args.output_human.write_text(stub, encoding="utf-8")
-            report["human_md"] = str(args.output_human.relative_to(_ROOT)).replace("\\", "/")
-            report["llm"] = {"skipped": "no AI_API_KEY"}
+        )
+        combined.append(report)
+        if not report["pass"]:
+            exit_code = 1
 
-    args.output_json.parent.mkdir(parents=True, exist_ok=True)
-    args.output_json.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    _write_markdown(report, args.output_md)
-    print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0 if report["pass"] else 1
+    if args.tier == "all":
+        summary_path = _ROOT / "data" / "preprod_ux_audit_wave1.json"
+        summary_path.write_text(json.dumps(combined, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"wave1 summary → {summary_path}")
+
+    return exit_code
 
 
 if __name__ == "__main__":

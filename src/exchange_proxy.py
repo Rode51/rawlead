@@ -10,7 +10,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import time
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -29,6 +31,8 @@ _CONNECT_TIMEOUT_SEC = float(os.getenv("EXCHANGE_PROXY_CONNECT_TIMEOUT_SEC", "5"
 _READ_TIMEOUT_SEC = float(os.getenv("EXCHANGE_PROXY_READ_TIMEOUT_SEC", "20"))
 _ALERT_COOLDOWN_SEC = float(os.getenv("EXCHANGE_PROXY_ALERT_COOLDOWN_SEC", "600"))
 _ALERT_LOW_POOL_SEC = float(os.getenv("EXCHANGE_PROXY_LOW_POOL_COOLDOWN_SEC", "300"))
+_FAILOVER_COOLDOWN_MIN_SEC = float(os.getenv("EXCHANGE_PROXY_FAILOVER_COOLDOWN_MIN_SEC", "5"))
+_FAILOVER_COOLDOWN_MAX_SEC = float(os.getenv("EXCHANGE_PROXY_FAILOVER_COOLDOWN_MAX_SEC", "15"))
 
 _BANS_STORAGE_KEY = "exchange_proxy_bans_v2"
 _BANS_STORAGE_KEY_LEGACY = "exchange_proxy_bans_v1"
@@ -419,6 +423,29 @@ def _send_owner_proxy_alert(
         logger.warning("fetch:proxy tg alert error: %s", exc)
 
 
+def _failover_cooldown_sleep(*, reason: str, banned_url: str | None) -> None:
+    """Pause 5–15s before next proxy slot after ban (O110-B)."""
+    if not banned_url and not str(reason).startswith("http_"):
+        return
+    lo = max(0.0, _FAILOVER_COOLDOWN_MIN_SEC)
+    hi = max(lo, _FAILOVER_COOLDOWN_MAX_SEC)
+    if hi <= 0:
+        return
+    delay = random.uniform(lo, hi)
+    if delay > 0:
+        logger.info("fetch:proxy cooldown %.1fs (%s)", delay, reason)
+        time.sleep(delay)
+
+
+def _invalidate_browser_slot_for_ban(source: str, proxy_url: str) -> None:
+    try:
+        from exchange_browser_fetch import invalidate_browser_slot
+
+        invalidate_browser_slot(source, proxy_url)
+    except Exception as exc:
+        logger.debug("fetch:proxy browser invalidate skipped: %s", exc)
+
+
 def _notify_proxy_switch(
     urls: list[str],
     *,
@@ -627,6 +654,8 @@ class ExchangeFetchSession:
                 reason=reason,
                 slot_idx=old_idx,
             )
+            _invalidate_browser_slot_for_ban(self.source, banned_url)
+            _failover_cooldown_sleep(reason=reason, banned_url=banned_url)
         for off in range(1, len(self.urls) + 1):
             idx = (old_idx + off) % len(self.urls)
             if _is_banned(self.urls[idx], self.source):
@@ -836,6 +865,144 @@ def exchange_get(
     finally:
         if own_session:
             exchange_fetch_end(source)
+
+
+def _exchange_ui_group(
+    *,
+    group_id: str,
+    title: str,
+    pool_key: str,
+    source: str,
+    urls: list[str],
+) -> dict[str, Any]:
+    from proxy_ops import mask, slot_status_label
+
+    _ensure_loaded()
+    if not urls:
+        return {
+            "id": group_id,
+            "title": title,
+            "active_slot": 0,
+            "slots": [],
+        }
+    slot_idx = _slot_index(pool_key, urls, source)
+    slots: list[dict[str, Any]] = []
+    for i, url in enumerate(urls):
+        banned = _is_banned(url, source)
+        key = _ban_key(url, source)
+        strikes_n = _strike_count.get(key, 0)
+        if banned:
+            status = "bad"
+        elif strikes_n > 0:
+            status = "warn"
+        else:
+            status = "ok"
+        until_ts = _banned_until.get(key) if banned else None
+        banned_until = None
+        if until_ts and until_ts > time.time():
+            banned_until = datetime.fromtimestamp(until_ts, tz=timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+        meta = _ban_meta.get(key) or {}
+        reason_raw = meta.get("reason") if banned else None
+        slots.append(
+            {
+                "slot": i + 1,
+                "mask": mask(url),
+                "status": status,
+                "status_label": slot_status_label(
+                    status=status,
+                    banned_until=banned_until,
+                    reason_raw=str(reason_raw) if reason_raw else None,
+                ),
+                "active": i == slot_idx,
+                "banned_until": banned_until,
+                "reason": _reason_human(str(reason_raw)) if reason_raw else None,
+                "strikes": f"{strikes_n}/{_STRIKES_TO_BAN}",
+                "_url": url,
+            }
+        )
+    return {
+        "id": group_id,
+        "title": title,
+        "active_slot": slot_idx + 1,
+        "slots": slots,
+    }
+
+
+def list_ui_groups() -> list[dict[str, Any]]:
+    """Exchange proxy groups for /ops/."""
+    fl_urls = _parse_proxy_list("FL_PROXY_URLS", "FL_PROXY_URL") or _primary_exchange_pool()
+    kw_urls = _parse_proxy_list("KWORK_PROXY_URLS", "KWORK_PROXY_URL") or _primary_exchange_pool()
+    pool_urls = _secondary_exchange_pool()
+    return [
+        _exchange_ui_group(
+            group_id="exchange-fl",
+            title="FL",
+            pool_key="fl",
+            source="fl",
+            urls=fl_urls,
+        ),
+        _exchange_ui_group(
+            group_id="exchange-kwork",
+            title="Kwork",
+            pool_key="kwork",
+            source="kwork",
+            urls=kw_urls,
+        ),
+        _exchange_ui_group(
+            group_id="exchange-pool",
+            title="Общий pool",
+            pool_key="youdo",
+            source="youdo",
+            urls=pool_urls,
+        ),
+    ]
+
+
+def set_active_slot_manual(group_id: str, slot_1based: int) -> tuple[bool, str]:
+    """Manual switch for exchange pools (1-based), без restart radar."""
+    mapping = {
+        "exchange-fl": ("fl", "fl", _parse_proxy_list("FL_PROXY_URLS", "FL_PROXY_URL") or _primary_exchange_pool()),
+        "exchange-kwork": (
+            "kwork",
+            "kwork",
+            _parse_proxy_list("KWORK_PROXY_URLS", "KWORK_PROXY_URL") or _primary_exchange_pool(),
+        ),
+        "exchange-pool": ("youdo", "youdo", _secondary_exchange_pool()),
+    }
+    entry = mapping.get((group_id or "").strip().lower())
+    if not entry:
+        return False, f"Неизвестная группа: {group_id}"
+    pool_key, source, urls = entry
+    if not urls:
+        return False, "Пул пуст"
+    idx = int(slot_1based) - 1
+    if idx < 0 or idx >= len(urls):
+        return False, f"Слот {slot_1based} не существует"
+    if _is_banned(urls[idx], source):
+        return False, f"Слот {slot_1based} забанен"
+    old_idx = _active_slot.get(pool_key, 0) % len(urls)
+    _apply_active_slot(
+        pool_key,
+        urls,
+        idx,
+        old_idx=old_idx,
+        reason="manual_ops",
+        notify=False,
+    )
+    return True, f"Активен слот {slot_1based} ({_hint_from_url(urls[idx])})"
+
+
+def clear_all_bans() -> int:
+    """Clear exchange proxy bans/strikes in SQLite (ops /ops/ clear-bans)."""
+    _ensure_loaded()
+    n = len(_banned_until) + len(_strike_count)
+    _banned_until.clear()
+    _ban_meta.clear()
+    _strike_count.clear()
+    _persist_bans()
+    return n
 
 
 def reset_cascade_state_for_tests() -> None:
