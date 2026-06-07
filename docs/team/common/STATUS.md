@@ -18,6 +18,7 @@
 | **Бот prod** | @rawlead_bot · O120 TG failover · **O105 pay ✅** (WP 1.18.3+ · `premium_pay.py`) |
 | **Админка** | `/ops/` w2 · **w2b** timeout 90s в коде ✅ · deploy/smoke owner |
 | **TG acc2** | **6/6 done** · listen **6 чатов** на VPS ✅ · CSV v2 синхронизирован |
+| **TG proxy acc1** | **45.152** мёртв (TLS) · **временно 38.154** (acc2 spare) · VPS ✅ local script |
 
 **Judge freeze:** [`preprod_ai_prod_audit_judge_o72e_a_freeze.md`](../../data/preprod_ai_prod_audit_judge_o72e_a_freeze.md) · r12 [`…_r12.md`](../../data/preprod_ai_prod_audit_judge_o72e_a_r12.md)
 
@@ -67,7 +68,7 @@
 | **6b** | **O129 stress v2** | **→ @coder** |
 | 7 | stress sign-off · ads | после 6b |
 
-**Owner фон:** acc1 прокси `45.152.197.25` — починить у провайдера (сейчас acc2).
+**Owner фон:** **45.152.197.25** — починить/заменить у провайдера (сейчас acc1+бот на **38.154** spare).
 
 ---
 

@@ -32,6 +32,40 @@
 
 ## § O129-STRESS-V2 — полная симуляция наплыва (**→ Coder**)
 
+### Copy-paste для @coder
+
+```
+@coder O129-STRESS-V2
+
+Wave 1 ✅ 2026-06-07 (commits 4d8caf3, 63b63a1). Prod theme 1.18.34, O110-B на VPS.
+Спека: docs/team/architect/CODER_PROMPT.md § O129-STRESS-V2
+Runbook: docs/ops/PREPROD_STRESS_RUN.md § Wave 2
+
+Контекст infra (не трогать env):
+- TG acc1/bot proxy: 45.152 мёртв → временно 38.154 (acc2 spare), VPS+local ✅
+- FL proxy O110-B deployed, S4 green
+
+Задача: scripts/preprod_stress_v2.py — один orchestrator Wave 2.
+
+Deliverables:
+1. scripts/preprod_stress_v2.py → data/preprod_stress_v2.json + .md
+2. Тиры: anon · free JWT · trial · premium (preprod_mint_token.py)
+3. Reuse preprod_load_feed.py (ramp → 50 VU), ux_journey.py J1–J11
+4. Draft burst DRAFT_BURST_MAX=20 (optional preprod_draft_burst.py)
+5. Timings: feed · expand · tools · L2 · L3 · TZ · total (ms table in md)
+6. TZ: 3–5 lead_id с [TZ attachment — assert detail fetch
+7. Parser snapshot из radar_site.log (exchange_health + health:*)
+8. S1-b: preprod_ai_matrix.py --scenario skills_mismatch
+9. Minimal tests (timing parser / tier matrix)
+10. PREPROD_STRESS_RUN.md § Wave 2
+
+Pass: p95 feed <2s @50 VU · draft 0% 5xx p95<90s · TZ ≥2/3 · J1–J11 0 critical · parsers not all red.
+
+Не: mass regen, judge, Sonnet, новый VPS, правки .env/proxy.
+
+Baseline W1: preprod_ux_audit_{anon,free,premium}.json 24/24 · load p95 1846ms · AI 96%.
+```
+
 **Запрос владельца 2026-06-07:** stress «максимально хороший» — все тиры подписки, поток пользователей, draft+tools+TZ, **тайминги** по этапам, UX, парсеры «сломан vs тишина».
 
 **Mechanic сначала — нет.** Mechanic = инцидент «сломалось». Сначала **Wave 1** (готовые скрипты, owner) → **Wave 2** (этот §).
