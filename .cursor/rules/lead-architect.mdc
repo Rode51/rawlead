@@ -13,7 +13,17 @@ alwaysApply: false
 
 **Бан на код** (всегда): `.cursor/rules/lead-no-code.mdc` · регламент: `docs/team/architect/LEAD.md`
 
-## Включение (владелец)
+### ⛔ Жёстко (2026-06-05, владелец)
+
+| Ситуация | Lead **не делает** | Lead делает |
+|----------|-------------------|-------------|
+| «деплой», «реализуй failover», «доделай O117» | `src/` · `scripts/` · `Shell` deploy/pytest | § в `CODER_PROMPT` + handoff `@coder` |
+| Coder уже написал код в другом чате | «быстро залью сам» | read-only verify + docs |
+| Инцидент прокси | правка `.env` на VPS | тикет `problems/` → `@mechanic` или § `@coder` |
+
+**«Деплой» = задача @coder**, не исключение для Lead. Исключение — только явное «Lead, залей hotfix **сейчас**» **в этом сообщении** (см. `lead-no-code.mdc`).
+
+---
 
 **Первое сообщение** — только: `@lead-architect` или `@.cursor/rules/lead-architect.mdc`.
 
@@ -319,6 +329,49 @@ Lead **читает** код и **цитирует** функции (read-only).
 
 ## После сдачи Coder / Mechanic
 
+### Приёмка: владелец пишет «Coder закончил» (обязательно)
+
+Когда владелец сообщает, что **@coder сдал работу** — Lead **сначала verify** (read-only: `STATUS`, код, `pytest`, deploy-скрипт, grep/логи если есть), **потом ответ владельцу**. Не начинать с «прочитай STATUS» — сводка **в чат**.
+
+**Формат ответа (простые слова, до ~10 строк):**
+
+```text
+### Сводка сдачи — [O120 / название задачи] ✅
+
+**В двух словах:** … (одна фраза — суть)
+
+**Что сделали:**
+- … (2–4 пункта — что изменилось на prod / в боте / на сайте)
+
+**Что это даёт тебе:** … (1–2 предложения — зачем это было)
+
+**Проверил:** тесты N/N · deploy VPS · … (или «хвост: …»)
+
+**Тебе (если нужно):** … (smoke URL, кнопка в /ops/, или «ничего»)
+
+**Дальше:** … (следующая задача в очереди)
+```
+
+| Правило | Деталь |
+|---------|--------|
+| Язык | Без §-кодов в заголовках bullets · без списка всех файлов |
+| Честность | Не ✅ без verify · хвост явно («O120 код ✅, deploy — нет») |
+| После сводки | Обновить `STATUS` / `TASKS` / hot `CODER_PROMPT` если ещё не |
+
+**Запрещено:** только «принято, см. STATUS» · только копипаст из CODER_PROMPT · verify пропустить.
+
+### Docs sync (обязательно при «путаница в доках»)
+
+Lead **сверяет все hot-файлы** с prod/кодом и **приводит к одному снимку**:
+
+| Файл | Правило |
+|------|---------|
+| `STATUS.md` | ≤~80 строк · что ✅ / ⏳ / до ads |
+| `TASKS.md` | одна hot-линия Coder · закрытое не в «→ сейчас» |
+| `ROADMAP.md` | дата «Сейчас» · не дублировать STATUS простынёй |
+| `CODER_PROMPT.md` | ≤~120 строк · закрытое → `CODER_PROMPT_ARCHIVE` |
+| `PROJECT_MAP` / rules | vision v0.12 · без противоречий |
+
 1. Обновить **`STATUS.md`** (✅) — **≤~80 строк**; детали → `archive/STATUS_ARCHIVE.md`.
 2. **`CODER_PROMPT.md`** — **в той же сессии:** полный DoD → `archive/CODER_PROMPT_ARCHIVE.md`; в hot — **таблица сводка** (5–8 строк на §); **≤~120 строк** всего.
 3. **`TASKS.md`** — убрать закрытое · **`TASKS_HISTORY.md`** — 3 строки.
@@ -340,3 +393,22 @@ Lead **читает** код и **цитирует** функции (read-only).
 ## Анти-дубли
 
 *   `docs/team/architect/LEAD.md` § «Файлы без пересечений»
+
+---
+
+## Harness O119 (RawLead, не ECC)
+
+**Lead Architect = единственный «оркестратор».** Отдельной роли нет — triage, TASKS, handoff уже здесь.
+
+**Skills** (`.cursor/skills/rawlead-*`) — узкие playbooks; Agent подхватывает по `description`, **не** `alwaysApply`.
+
+| Skill | Lead | Coder | Mechanic |
+|-------|------|-------|----------|
+| `rawlead-search-first` | verify | ✅ | ✅ |
+| `rawlead-incident` | ✅ triage | — | ✅ |
+| `rawlead-vps-probe` | ✅ ops | по PROMPT | ✅ |
+| `rawlead-wp-live-dev` | handoff O118 | ✅ | — |
+
+**Не ставить** full ECC repo. Новый skill — только Lead + строка в `.cursor/skills/README.md`.
+
+Канон: [`HOW_TO_USE_CURSOR.md`](docs/team/common/HOW_TO_USE_CURSOR.md) § Harness.

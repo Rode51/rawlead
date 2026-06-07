@@ -52,11 +52,27 @@ _JSON_BLOCK = re.compile(r"\{[\s\S]*\}", re.MULTILINE)
 # «ИИ» — только отдельное слово; не ловить «…ии» в «вентиляции», «автоматизации»
 _WORD_EDGE = r"(?<![а-яёА-ЯЁa-zA-Z0-9])"
 _WORD_EDGE_END = r"(?![а-яёА-ЯЁa-zA-Z0-9])"
-_FORBIDDEN_REPLY_RE = re.compile(
-    rf"cursor|{_WORD_EDGE}ии{_WORD_EDGE_END}|нейросет|chatgpt|gemini|\bai\b|"
+_FORBIDDEN_REPLY_ALWAYS_RE = re.compile(
+    rf"cursor|нейросет|chatgpt|gemini|\bai\b|"
     rf"{_WORD_EDGE}агент{_WORD_EDGE_END}|промпт",
     re.IGNORECASE,
 )
+_FORBIDDEN_REPLY_II_RE = re.compile(
+    rf"{_WORD_EDGE}ии{_WORD_EDGE_END}",
+    re.IGNORECASE,
+)
+_FORBIDDEN_REPLY_AI_METHOD_RE = re.compile(
+    r"(?:через|с\s+помощью|при\s+помощи)\s+ии|"
+    r"(?:сделаю|делаю|реализую|использую|применю)\s+(?:через\s+)?ии|"
+    r"(?:мы|я)\s+делаем?\s+через\s+ии",
+    re.IGNORECASE,
+)
+_CUSTOMER_II_TERM_RE = re.compile(
+    rf"{_WORD_EDGE}ии{_WORD_EDGE_END}(?:\s*[-–]?\s*бот)?|"
+    rf"{_WORD_EDGE}ии[\s-]?бота{_WORD_EDGE_END}|нейробот",
+    re.IGNORECASE,
+)
+_reply_validate_lead_ctx: tuple[str, str] = ("", "")
 _FORBIDDEN_REPLY_GREETING_RE = re.compile(
     r"здравствуйте.*готов\s+реализовать|"
     r"готов\s+взяться|готов\s+реализовать|готов\s+заменить|"
@@ -75,7 +91,10 @@ _REPLY_DRAFT_CLICHE_RE = re.compile(
     r"готов\s+взять|готов\s+выполнить|полностью\s+погружусь|"
     r"могу\s+адаптировать|готов\s+адаптировать|"
     r"имею\s+опыт|большой\s+опыт|качественно\s+и\s+в\s+срок|"
-    r"беру\s+(?:задачу\s+)?в\s+работу",
+    r"беру\s+(?:задачу\s+)?в\s+работу|"
+    # O128-B: portfolio-claims и вопросы-подстройки
+    r"делал\s+похожее|делал\s+похожи|уже\s+делал|я\s+эксперт|"
+    r"предпочтение\s+по\s+стеку|какой\s+стек\s+предпоч|какой\s+язык\s+предпоч",
     re.IGNORECASE,
 )
 _REPLY_DRAFT_VAGUE_RE = re.compile(
@@ -406,10 +425,45 @@ def _count_sentences(text: str) -> int:
     return len([c for c in chunks if c.strip()]) or 1
 
 
-def _validate_reply_draft_base(text: str, *, forbid_bureaucratic_greeting: bool) -> str:
-    draft = text.strip()
-    if _FORBIDDEN_REPLY_RE.search(draft):
+def set_reply_validate_lead_context(
+    title: str = "",
+    description: str = "",
+) -> None:
+    """Контекст ТЗ для allowlist «ИИ»/«ИИ-бот» (regen повторно валидирует в том же потоке)."""
+    global _reply_validate_lead_ctx
+    _reply_validate_lead_ctx = (title.strip(), description.strip())
+
+
+def _customer_ii_terms_in_lead(title: str, description: str) -> bool:
+    hay = f"{title}\n{description}"
+    return bool(_CUSTOMER_II_TERM_RE.search(hay))
+
+
+def _check_forbidden_reply_words(
+    draft: str,
+    *,
+    title: str = "",
+    description: str = "",
+) -> None:
+    t = title.strip() or _reply_validate_lead_ctx[0]
+    d = description.strip() or _reply_validate_lead_ctx[1]
+    if _FORBIDDEN_REPLY_ALWAYS_RE.search(draft):
         raise AiAnalyzeError("reply_draft: запрещённые слова (ИИ/Cursor/…)")
+    if _FORBIDDEN_REPLY_AI_METHOD_RE.search(draft):
+        raise AiAnalyzeError("reply_draft: запрещённые слова (ИИ/Cursor/…)")
+    if _FORBIDDEN_REPLY_II_RE.search(draft) and not _customer_ii_terms_in_lead(t, d):
+        raise AiAnalyzeError("reply_draft: запрещённые слова (ИИ/Cursor/…)")
+
+
+def _validate_reply_draft_base(
+    text: str,
+    *,
+    forbid_bureaucratic_greeting: bool,
+    title: str = "",
+    description: str = "",
+) -> str:
+    draft = text.strip()
+    _check_forbidden_reply_words(draft, title=title, description=description)
     if forbid_bureaucratic_greeting and _REPLY_DRAFT_BAD_START_RE.search(draft):
         raise AiAnalyzeError("reply_draft: запрещённое начало «Готов…»")
     if forbid_bureaucratic_greeting and _FORBIDDEN_REPLY_GREETING_RE.search(draft):
@@ -462,16 +516,36 @@ def _validate_reply_draft_opener(draft: str) -> None:
         raise AiAnalyzeError("reply_draft: канцелярит «беру в работу»")
 
 
-def _validate_reply_draft_take(text: str) -> str:
-    draft = _validate_reply_draft_base(text, forbid_bureaucratic_greeting=True)
+def _validate_reply_draft_take(
+    text: str,
+    *,
+    title: str = "",
+    description: str = "",
+) -> str:
+    draft = _validate_reply_draft_base(
+        text,
+        forbid_bureaucratic_greeting=True,
+        title=title,
+        description=description,
+    )
     if not draft:
         raise AiAnalyzeError("reply_draft пустой при вердикте Брать")
     _validate_reply_draft_opener(draft)
     return draft
 
 
-def _validate_reply_draft_maybe(text: str) -> str:
-    draft = _validate_reply_draft_base(text, forbid_bureaucratic_greeting=True)
+def _validate_reply_draft_maybe(
+    text: str,
+    *,
+    title: str = "",
+    description: str = "",
+) -> str:
+    draft = _validate_reply_draft_base(
+        text,
+        forbid_bureaucratic_greeting=True,
+        title=title,
+        description=description,
+    )
     if not draft:
         raise AiAnalyzeError("reply_draft пустой при вердикте Сомнительно")
     _validate_reply_draft_opener(draft)
@@ -1726,13 +1800,17 @@ def analyze_premium(
 
 _TOOLS_ONLY_SYSTEM = """Ты извлекаешь инструменты/стек из фриланс-заказа для блока «Инструменты» на RawLead (premium quality).
 
-Верни JSON без markdown: tools_required — массив **ровно 2–5** slug lowercase **только из ТЗ**.
+Верни JSON без markdown: tools_required — массив **ровно 2–5** slug lowercase **только из whitelist ниже**.
 
-Whitelist (выбирай подходящие, не выдумывай):
-wordpress_dev, figma, python, php, javascript, telegram_bot_dev, google_apps_script, google_sheets_api, rhino, elementor, wp_rocket, photoshop, illustrator, mysql, postgresql, telegram, email_marketing, seo, smm, web_scraping, after_effects, premiere_pro, powerpoint, excel, woocommerce, tilda, mailwizz, consulting, blender, cinema_4d
+Whitelist (только эти slug — не выдумывай другие, не кириллица):
+wordpress_dev, figma, python, php, javascript, html_css, telegram_bot_dev, google_apps_script, google_sheets_api, rhino, elementor, wp_rocket, photoshop, illustrator, mysql, postgresql, telegram, email_marketing, seo, smm, web_scraping, after_effects, premiere_pro, powerpoint, excel, woocommerce, tilda, mailwizz, consulting, blender, cinema_4d
 
 Правила:
-- GAS/Rhino/google-таблица → javascript, google_apps_script, rhino, google_sheets_api (не python без ТЗ)
+- **Whitelist-only:** slug вне списка выше запрещён. html/css → javascript или html_css.
+- **consulting** — ТОЛЬКО если в ТЗ явно консультация, аудит, сопровождение, «нужна консультация», работа без исполнителя. Иначе — предметные slug (seo, wordpress_dev, photoshop, javascript…).
+- **rhino** — ТОЛЬКО при 3D-моделировании, Rhino, Grasshopper, CAD в тексте. НЕ для ботов, GAS, Google Таблиц, скриптов.
+- Google Apps Script / GAS → google_apps_script, javascript (не rhino, не python без ТЗ).
+- Google Таблицы / Sheets → google_sheets_api.
 - WordPress/Elementor/WooCommerce → wordpress_dev, elementor, php
 - Telegram-бот → telegram_bot_dev или telegram
 - Photoshop/Illustrator → photoshop, illustrator (не adobe_photoshop)
@@ -1754,7 +1832,7 @@ def analyze_lead_tools(
     log_prefix: str = "",
     max_retries: int = 2,
 ) -> tuple[str, ...] | None:
-    """L2 tools-only (Sonnet/premium): заполнить tools_required без полного premium."""
+    """L2 tools-only on draft click / optional backlog (premium model)."""
     if not cfg.ai_active or cfg.ai_provider != "openrouter":
         return None
     desc, truncated = _truncate_description(description)
@@ -1909,6 +1987,7 @@ def analyze_shared_reply_draft(
     if not (lite.task_summary or "").strip():
         return None
 
+    set_reply_validate_lead_context(title, description)
     budget_for_prompt = display_budget_text(budget_text, is_telegram=False)
     tools = [str(t).strip() for t in (tools_required or []) if str(t).strip()]
     user = _build_shared_reply_user(
@@ -1948,7 +2027,11 @@ def analyze_shared_reply_draft(
                 raise AiAnalyzeError("OpenRouter: пустой ответ")
             data = _extract_json_object(raw)
             draft = strip_reply_draft_price_deadline(
-                _validate_reply_draft_take(str(data.get("reply_draft", "")).strip())
+                _validate_reply_draft_take(
+                    str(data.get("reply_draft", "")).strip(),
+                    title=title,
+                    description=description,
+                )
             )
             vague = _shared_draft_too_vague(draft)
             if vague:

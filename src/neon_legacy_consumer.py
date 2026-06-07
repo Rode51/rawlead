@@ -34,7 +34,7 @@ from storage import ProjectStorage, storage_from_config
 
 from bot_poll import try_poll_commands
 from health_check import run_health_check
-from telegram_control import send_control_panel
+from telegram_control import ensure_bot_polling_mode, send_control_panel
 
 
 def _consumer_lock_path() -> Path:
@@ -123,7 +123,10 @@ def _save_cursor(last_id: int) -> None:
 
 def _poll_tg_commands(cfg: Config, storage: ProjectStorage) -> None:
     try:
-        try_poll_commands(cfg, storage)
+        for line in try_poll_commands(cfg, storage):
+            ts = radar_timestamp()
+            echo = "тг:бот:" in line or line.startswith("тг:команда:")
+            _append_log_line(cfg.radar_log_path, f"{ts} {line}", echo=echo)
     except Exception as exc:
         _append_log_line(
             cfg.radar_log_path,
@@ -248,6 +251,9 @@ def main() -> None:
     ts0 = radar_timestamp()
     reset_neon_consumer_session(storage)
     _append_log_line(cfg.radar_log_path, f"{ts0} neon:старт", echo=True)
+
+    for line in ensure_bot_polling_mode(cfg):
+        _append_log_line(cfg.radar_log_path, f"{radar_timestamp()} {line}")
 
     try:
         send_control_panel(cfg)

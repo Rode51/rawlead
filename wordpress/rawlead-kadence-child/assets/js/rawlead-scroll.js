@@ -32,7 +32,7 @@
       '<span class="rl-niche-icon rl-niche-icon--' +
       escapeHtml(c) +
       '" aria-hidden="true">' +
-      NICHE_ICONS[c] +
+      escapeHtml(NICHE_ICONS[c]) +
       "</span>"
     );
   }

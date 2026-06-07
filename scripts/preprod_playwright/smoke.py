@@ -24,6 +24,9 @@ for _stream in (sys.stdout, sys.stderr):
             pass
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
+_PLAYWRIGHT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(_PLAYWRIGHT_DIR))
+import feed_ui  # noqa: E402
 
 
 def _scenario(name: str, fn) -> dict:
@@ -60,7 +63,7 @@ def run_smoke(base_url: str, headless: bool, timeout_ms: int) -> list[dict]:
                 raise RuntimeError(f"feed error banner: {err.inner_text()[:200]}")
             # карточки или empty — оба ок
             page.wait_for_selector(
-                "#rl-feed-list .rl-lead-card, #rl-feed-list .rl-feed-empty, #rl-feed-count",
+                feed_ui.FEED_READY,
                 timeout=timeout_ms,
             )
 
@@ -70,9 +73,11 @@ def run_smoke(base_url: str, headless: bool, timeout_ms: int) -> list[dict]:
             before = page.locator("#rl-feed-list .rl-lead-card").count()
             page.locator("#filter-category-design input").check(force=True)
             page.wait_for_timeout(800)
-            count_el = page.locator("#rl-feed-count")
-            count_el.wait_for(state="visible")
-            text = count_el.inner_text()
+            meta = page.locator(feed_ui.FEED_META)
+            if meta.count():
+                text = meta.inner_text()
+            else:
+                text = ""
             if "ошиб" in text.casefold():
                 raise RuntimeError(f"count after category: {text}")
             # сеть могла вернуть 0 — допустимо, главное без error banner
@@ -83,12 +88,12 @@ def run_smoke(base_url: str, headless: bool, timeout_ms: int) -> list[dict]:
 
         def s3_skills_apply() -> None:
             page.goto(f"{base}/lenta/", wait_until="domcontentloaded")
-            page.locator("#rl-feed-skills-trigger").click()
-            page.wait_for_selector("#rl-feed-skills-panel", state="visible")
-            chip = page.locator("#rl-feed-skills .rl-chip, #rl-feed-skills button").first
-            chip.wait_for(state="visible", timeout=timeout_ms)
-            chip.click()
-            page.locator("#rl-feed-skills-apply").click()
+            page.wait_for_selector(feed_ui.FEED_READY, timeout=timeout_ms)
+            if feed_ui.is_filter_locked(page, "skills"):
+                return  # anon: locked — ожидаемо
+            feed_ui.open_skills_modal(page)
+            feed_ui.pick_first_skill_chip(page)
+            feed_ui.apply_skills_modal(page)
             page.wait_for_timeout(1000)
             err = page.locator("#rl-feed-error:not([hidden])")
             if err.count() and err.is_visible():

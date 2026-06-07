@@ -59,6 +59,39 @@ class TestToolsCatalogO98(unittest.TestCase):
         out = normalize_tools_required(("adobe_photoshop", "figma"))
         self.assertEqual(out, ("photoshop", "figma"))
 
+    def test_consulting_stripped_without_consultation_markers(self) -> None:
+        out = finalize_tools_for_lead(
+            ("consulting", "seo", "excel"),
+            title="Продвижение на Яндекс маркете",
+            snippet="Настроить рекламу и карточки товаров.",
+            task_summary="SEO и продвижение на маркетплейсе",
+        )
+        self.assertNotIn("consulting", out)
+        self.assertGreaterEqual(len(out), 2)
+        self.assertTrue(all(is_known_tool(t) for t in out))
+
+    def test_rhino_stripped_on_chat_bot_gas(self) -> None:
+        out = finalize_tools_for_lead(
+            ("javascript", "google_apps_script", "rhino", "google_sheets_api"),
+            title="Разработать чат бот, форма тренажер",
+            snippet="Бот в Telegram, форма на Google Apps Script и таблица.",
+            task_summary="Чат-бот + GAS + Google Таблица",
+        )
+        self.assertNotIn("rhino", out)
+        self.assertIn("javascript", out)
+        self.assertIn("google_apps_script", out)
+
+    def test_cyrillic_slugs_dropped(self) -> None:
+        out = normalize_tools_required(["макс", "массовая_рассылка", "javascript"])
+        self.assertEqual(out, ("javascript",))
+
+    def test_html_css_alias_to_javascript(self) -> None:
+        out = normalize_tools_required(["html", "css", "php"])
+        self.assertIn("javascript", out)
+        self.assertIn("php", out)
+        self.assertNotIn("html", out)
+        self.assertNotIn("css", out)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -49,6 +49,10 @@ alwaysApply: false
 
 После фикса в **том же** тикете: **Решение**, **Изменённые файлы**, **Как проверить**, **Статус: решено** → Lead Architect коммитит.
 
+## Skills (O119)
+
+Инцидент / VPS — **Read** skill `rawlead-incident` или `rawlead-vps-probe` (Agent сам). Владелец даёт только `@mechanic` + тикет.
+
 ## Разрешено
 
 - `src/`, `tests/`, `requirements.txt` — только по тикету

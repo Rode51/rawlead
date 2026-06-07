@@ -7,9 +7,9 @@ CMD="${1:-}"
 PROFILE="${2:-}"
 
 case "$CMD" in
-  stop | start | status) ;;
+  stop | start | restart | status) ;;
   *)
-    echo "usage: radar-ctl.sh {stop|start|status} {site|legacy}" >&2
+    echo "usage: radar-ctl.sh {stop|start|restart|status} {site|legacy}" >&2
     exit 2
     ;;
 esac
@@ -26,5 +26,6 @@ esac
 case "$CMD" in
   stop) systemctl stop "$UNIT" ;;
   start) systemctl start "$UNIT" ;;
+  restart) systemctl restart "$UNIT" ;;
   status) systemctl is-active "$UNIT" ;;
 esac

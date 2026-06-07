@@ -118,7 +118,7 @@ Lead **не** «помогает быстро» править Python/JS/PHP —
 5. ТЗ для Coder → **`team/architect/CODER_PROMPT.md`** (один файл, см. ниже)
 6. UI/UX → план у **Lead Designer** → **`CODER_PROMPT.md`**
 7. Тикеты → `problems/*.md` → Mechanic
-8. Ревью сдачи Coder → [`SCALE.md`](../common/SCALE.md)
+8. Ревью сдачи Coder → [`SCALE.md`](../common/SCALE.md) · **ответ владельцу** — сводка простыми словами (см. `lead-architect.mdc` § «Coder закончил»)
 9. **`KAK_ETO_RABOTAET.md`** после сдачи Coder
 10. **`PROJECT_MAP.md`** — зоны и процессы
 11. **Регламент docs** → [`DOCS_ARCHITECTURE.md`](../common/DOCS_ARCHITECTURE.md)
@@ -132,6 +132,7 @@ Lead **не** «помогает быстро» править Python/JS/PHP —
 | Новая задача | Удалить предыдущий `CODER_PROMPT.md` → написать новый |
 | TASKS.md | Одна строка «Coder: …» → ссылка на `CODER_PROMPT.md` |
 | После сдачи | Удалить промпт; факт — в `STATUS.md` + строка в `archive/TASKS_HISTORY.md` |
+| Docs drift | Владелец «путаница в доках» → Lead сверяет STATUS/TASKS/ROADMAP/CODER_PROMPT hot одним снимком |
 | Запрещено | Несколько `CODER_PROMPT_TG_*.md`, дубли ТЗ в TASKS/FOR_YOU |
 
 **Переход завершён (2026-05-23):** только `CODER_PROMPT.md`; старые `CODER_PROMPT_TG_*.md` удалены.

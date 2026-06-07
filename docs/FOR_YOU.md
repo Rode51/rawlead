@@ -65,6 +65,8 @@ Deploy: `scripts/deploy-youdo-browser-vps.py` · диагностика: `script
 
 **Прокси:** пуши только в чат **@FLPARSINGBOT** (не @rawlead_bot). Если видишь «FLPARSING · прокси» в чате RawLead — на VPS в `.env.legacy` был чужой токен; код теперь проверяет getMe. Проверка: `python scripts/verify-vps-bot-identity.py` → legacy=@FLPARSINGBOT, site=@rawlead_bot.
 
+**TG Bot API failover (O120):** пул из `TG_PROXY_URL` + `TELETHON_PROXY_ACC1/2/3` (или явный `TG_PROXY_URLS`). При смерти слота бот сам переключается — **не нужно** править `.env`. В @FLPARSINGBOT придёт **`FLPARSING · TG Bot API прокси`**: какой слот забанен, причина (таймаут/прокси), на какой переключились, «свободно N из M». Опц. `TG_PROXY_DIRECT=1` — последний fallback direct с VPS. Состояние: `data/tg_proxy_pool.json`.
+
 **Проверка:** `/status` в @FLPARSINGBOT → блоки FL (primary) и secondary.
 
 ## Биржи: датчики O104 ✅ на VPS

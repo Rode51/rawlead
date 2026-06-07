@@ -1196,4 +1196,502 @@ Coder: `CODER_PROMPT.md` § PRE-LAUNCH-UX + § CABINET-INBOX-O23 — после 
 
 ---
 
+## 9. O127 — UI Unify: Filter Bar System v2 + Lead Card v3
+
+**Статус:** Lead Design ✅ 2026-06-07 · → Coder **O127-WP** одной волной  
+**Supersedes (filter bar):** §2.2 · §7.7 · §7.6 filter bar  
+**Supersedes (card):** §3.1 · §4.3 · §4.8 (O96-D)  
+**NEO канон:** `REFERENCE.md` §2 · `DESIGN_SYSTEM.md` § WP NEO-BRUTALIST  
+**Источник решений:** [`LEAD_DESIGN_PROMPT.md`](../../team/design/LEAD_DESIGN_PROMPT.md) § O127-D
+
+---
+
+### 9.1 Filter Bar System v2 — единый chrome
+
+**Принцип:** один chrome (одна высота, один border, одинаковая структура) для всех трёх тиров. Различия — только в состоянии правой группы кнопок.
+
+#### Chrome — неизменная часть (все тиры)
+
+```
+Desktop (≥768px) — height 52px, sticky top:56px:
+┌──────────────────────────────────────────────────────────────────────┐
+│  [Все✓] [</> Разр.] [✦ Дизайн] [◎ Маркет.] [Aa Тексты]  │ [A▾] [Б▾] │
+└──────────────────────────────────────────────────────────────────────┘
+  ← left group: flex, overflow-x auto, flex:1 →   ← right: flex-shrink:0 →
+
+Mobile 390px — height 48px, sticky top:52px:
+┌─────────────────────────────────────────────────────────┐
+│  [Все] [</>] [✦] [◎] [Aa]  ← горизонт. scroll           │
+│                             [A▾]  [Б▾]  ← sticky right   │
+└─────────────────────────────────────────────────────────┘
+```
+
+**CSS layout:**
+
+```css
+.rl-filter-bar {
+  display: flex;
+  align-items: center;
+  height: 52px; /* mobile: 48px */
+  padding: 0 16px;
+  background: #FFFFFF;
+  border-bottom: 2px solid #0A0A0A;
+  position: sticky;
+  top: 56px; /* mobile: top: 52px */
+  z-index: 100;
+  gap: 8px;
+}
+.rl-filter-bar__chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  flex: 1;
+  min-width: 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.rl-filter-bar__chips::-webkit-scrollbar { display: none; }
+.rl-filter-bar__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-left: 8px;
+  background: #FFFFFF; /* перекрывает скролящиеся chips */
+}
+```
+
+**Category chips (одинаковы для всех тиров):**
+
+| Состояние | Стиль |
+|-----------|-------|
+| Active | bg `#0A0A0A` · text `#FFFFFF` · border `2px solid #0A0A0A` |
+| Inactive | bg `#FFFFFF` · text `#0A0A0A` · border `2px solid #0A0A0A` |
+| Height | 36px desktop / 32px mobile |
+| Padding | `6px 12px` desktop / `5px 10px` mobile |
+| Иконки | всегда видны; текст скрыт на mobile `< 375px` (только иконка) |
+
+---
+
+#### 9.1a Tier states — правая группа кнопок
+
+**Anon (`data-tier="anon"`):**
+
+```
+[Навыки ▾ 🔒]  [Сортировка ▾ 🔒]
+```
+
+| Атрибут | Значение |
+|---------|----------|
+| bg | `#F5F5F0` |
+| border | `2px solid #D4D4D4` |
+| text | `#A3A3A3` |
+| cursor | `pointer` |
+| CSS class | `.rl-filter-btn--locked` |
+
+**Клик на locked кнопку** → показать inline hint под filter bar:
+
+```css
+.rl-filter-hint {
+  position: absolute; top: 100%; left: 0; right: 0;
+  background: #FAFAF8;
+  border-bottom: 2px solid #D4D4D4;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #525252;
+  z-index: 99;
+}
+.rl-filter-hint a { color: #0A0A0A; font-weight: 700; text-decoration: underline; }
+```
+
+Copy: `«Войди чтобы настраивать подбор по навыкам → [Войти в кабинет]»`  
+Закрыть: tap outside / `setTimeout(4000)` → `display:none`.
+
+**Важно:** кнопки **не скрываются** у анона — они занимают то же место что у auth. Один chrome.
+
+---
+
+**Free TG (`data-tier="free"`):**
+
+```
+[Навыки ▾ (N)]  [Свежие ▾]
+```
+
+| Кнопка | Стиль default | Стиль выбрано |
+|--------|--------------|---------------|
+| [Навыки ▾] | border `2px solid #0A0A0A` · bg `#FFFFFF` | + shadow `2px 2px 0 #0A0A0A` + badge `N` |
+| [Свежие ▾] | border `2px solid #0A0A0A` · bg `#FFFFFF` | + shadow `2px 2px 0 #0A0A0A` |
+
+Badge `N` (число выбранных навыков): Manrope 11px/700 · bg `#0A0A0A` · text `#FFFFFF` · radius `2px` · padding `1px 5px` · inline после метки.
+
+Dropdown сортировки (Free — без мин. %):
+
+```
+┌─ Сортировка ──────────────┐
+│  (●) Свежие               │
+│  ( ) По совместимости      │
+│                            │
+│            [Применить →]   │
+└────────────────────────────┘
+```
+
+---
+
+**Premium (`data-tier="premium"`):**
+
+```
+[Навыки N ▾]  [Совм. 80% ▾]
+```
+
+Те же стили что Free. Dropdown сортировки расширен:
+
+```
+┌─ Сортировка ──────────────────┐
+│  (●) Свежие                   │
+│  ( ) По совместимости          │
+│  ─────────────────────────    │
+│  МИН. СОВМЕСТИМОСТЬ:           │
+│  [ 60% ] [ 70% ] [✓80%] [ 90% ]│
+│                                │
+│              [Применить →]     │
+└────────────────────────────────┘
+```
+
+Кнопка отображает текущее значение: «Свежие ▾» или «Совм. 80% ▾».
+
+---
+
+#### 9.1b CSS delta для tier states
+
+```css
+/* Базовая кнопка фильтра */
+.rl-filter-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 36px; /* mobile: 44px для thumb-zone */
+  padding: 0 12px;
+  border: 2px solid #0A0A0A;
+  background: #FFFFFF;
+  color: #0A0A0A;
+  font-family: var(--rl-font); font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  border-radius: 0;
+  white-space: nowrap;
+}
+.rl-filter-btn--active { box-shadow: 2px 2px 0 #0A0A0A; }
+.rl-filter-btn--locked {
+  border-color: #D4D4D4; background: #F5F5F0; color: #A3A3A3;
+}
+.rl-filter-btn__badge {
+  display: inline-block;
+  background: #0A0A0A; color: #FFFFFF;
+  font-size: 11px; font-weight: 700;
+  padding: 1px 5px; border-radius: 2px; margin-left: 2px;
+}
+
+/* Mobile: увеличить tap target */
+@media (max-width: 767px) {
+  .rl-filter-btn { height: 44px; min-width: 44px; }
+}
+
+/* Tier-conditional visibility */
+[data-tier="anon"] .rl-filter-btn { /* locked by default via class */ }
+```
+
+---
+
+#### 9.1c Mobile 390px — filter bar
+
+```
+┌────────────────────────────────────────────┐  ← 48px sticky
+│ [Все] [</>] [✦] [◎] [Aa]  ←scroll→        │
+│                   [Навыки▾][Сорт▾]  sticky │
+└────────────────────────────────────────────┘
+```
+
+- Правые кнопки: `position: sticky; right: 0` внутри flex контейнера (реализовать через `flex-shrink:0` + background:white)
+- Категории scroll: `overflow-x: auto; scroll-snap-type: x mandatory`
+- Иконки на mobile: `[</>]` `[✦]` `[◎]` `[Aa]` (текст скрыт `< 375px`)
+
+#### Acceptance 9.1
+
+| # | Критерий | Блокирует |
+|---|----------|-----------|
+| AC-1 | Filter bar всех трёх тиров: одна высота (52/48px) · один border-bottom | Да |
+| AC-2 | Правые кнопки присутствуют у всех тиров (muted у anon, active у auth) — одна позиция | Да |
+| AC-3 | Anon click на locked → inline hint (не modal), ссылка `/cabinet/` | Да |
+| AC-4 | Free: [Навыки ▾] открывает существующий skills sheet · [Сорт ▾] без min% | Да |
+| AC-5 | Premium: [Сорт ▾] включает 4 варианта min% | Да |
+| AC-6 | Mobile: правые кнопки sticky справа при горизонтальном scroll chips | Да |
+| AC-7 | Category icon видна на mobile ≥ 320px | Да |
+| AC-8 | `data-tier` атрибут на filter bar контейнере — проставляется PHP на сервере | Да |
+
+---
+
+### 9.2 Lead Card v3 — unified component
+
+**Принцип:** один класс `.rl-lead-card` для `/lenta/` + `/cabinet/` + главная (live preview). Tier управляется через `data-tier="anon|free|premium"` на самой карточке или родительском контейнере.
+
+**Tier-specific rows** скрыты CSS:
+
+```css
+/* Строки видны только auth (free + premium) */
+[data-tier="anon"] .rl-row--auth-only { display: none; }
+
+/* Строки только premium */
+[data-tier="anon"] .rl-row--paid-only,
+[data-tier="free"] .rl-row--paid-only { display: none; }
+```
+
+---
+
+#### 9.2a Структура collapsed (F-pattern)
+
+Порядок строк следует F-pattern: строки 1–2 читаются полностью (слева→право), строки 3–7 сканируются быстро.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  ① HEAD (flex, space-between):                                    │
+│     left: [niche icon]  [●Source]  [ИДЕАЛЬНО ✦]                  │
+│     right: 👁 N  ·  X мин                                        │
+├──────────────────────────────────────────────────────────────────┤
+│  ② TITLE: Заголовок заказа                                       │
+│           desktop: 1 line ellipsis · mobile: 2 lines             │
+├──────────────────────────────────────────────────────────────────┤
+│  ③ BUDGET: N ₽  /  до N ₽  /  «Бюджет не указан»                │
+├──────────────────────────────────────────────────────────────────┤
+│  ④ MATCH ROW [rl-row--auth-only]:                                │
+│     ▓▓▓▓▓▓▓░  N%  Совместимость                                   │
+├──────────────────────────────────────────────────────────────────┤
+│  ⑤ SLOT ROW [rl-row--paid-only]:                                 │
+│     Осталось N из 10  ⓘ                      muted               │
+│     N=1: «Последний черновик на этот заказ»   amber #F59E0B      │
+├──────────────────────────────────────────────────────────────────┤
+│  ⑥ TAGS: [tag1] [tag2]  +3→                  max 2 desktop/1 mob │
+├──────────────────────────────────────────────────────────────────┤
+│  ⑦ CTA (один primary action, min-height 48px):                   │
+│     — tier-specific, см. 9.2b                                    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Карточка desktop:** `min-height: 220px` (не обрезать при малом кол-ве строк).  
+**Карточка mobile 390px:** padding `16px 18px` · title 2 строки · tags max 1 + `+N→`.
+
+---
+
+#### 9.2b CTA по tier — ОДИН на карточку
+
+| Tier / Surface | CTA текст | Стиль | Действие |
+|---------------|-----------|-------|----------|
+| **Anon** | `Войди и проверь совместимость →` | ghost: border `2px solid #D4D4D4` · bg `#FFFFFF` · text `#A3A3A3` | → `/cabinet/` |
+| **Free / lenta** | `Написать отклик →` | locked: bg `#F5F5F0` · border `2px dashed #D4D4D4` · text `#A3A3A3` | → inline upsell (9.2c) |
+| **Premium / lenta** | `Написать отклик →` | primary: bg `#0A0A0A` · border `2px solid #0A0A0A` · text `#FACC15` | → draft flow |
+| **Cabinet / paid** | `▼ Черновик` / `▲ Скрыть` | secondary accordion | → expand inline |
+
+**Правило «один CTA»:** не добавлять вторые кнопки (Брать/Сомнительно/Паузить). CSS-гарантия:
+
+```css
+/* Только первый .rl-card-cta видим */
+.rl-lead-card .rl-card-cta + .rl-card-cta { display: none; }
+```
+
+**CTA min-height mobile:**
+
+```css
+.rl-card-cta { min-height: 48px; width: 100%; }
+```
+
+---
+
+#### 9.2c Inline upsell (Free locked CTA)
+
+При клике на locked CTA у Free — не редирект, а inline подсказка под кнопкой:
+
+```
+┌─ .rl-card-upsell ──────────────────────────────────────┐
+│  ✍️  Черновик ИИ — только Premium                       │
+│  → [Подключить Premium 790 ₽]  или  [Попробовать 3 дня] │
+└─────────────────────────────────────────────────────────┘
+```
+
+```css
+.rl-card-upsell {
+  display: none;
+  background: #FAFAF8; border: 1px solid #D4D4D4; border-radius: 2px;
+  padding: 10px 14px; margin-top: 8px;
+  font-size: 12px; color: #525252;
+}
+.rl-card-upsell.is-visible { display: block; }
+.rl-card-upsell a { color: #0A0A0A; font-weight: 700; }
+```
+
+Закрыть: повторный клик на CTA / клик вне карточки.
+
+---
+
+#### 9.2d Expanded state
+
+Тап по карточке (или ▼) → раскрыть:
+
+```
+├── .rl-card-expand ────────────────────────────────────────── (анимация grid 0fr→1fr, 280ms)
+│
+│   Суть: (task_summary из L1)         Manrope 14px/400 · #1A1A1A
+│
+│   Сложность: 🟡 Проект               [rl-row--paid-only]
+│   (tooltip: «Типовой проект · ясное ТЗ»)
+│
+│   Совпало: N из M тегов заказа       [rl-row--auth-only] Manrope 12px · #525252
+│
+│   [Читать на бирже ↗]                rl-link-arrow · underline hover
+│
+│   [--- только cabinet ---]
+│   Черновик отклика:                  accordion ← вместо generic CTA
+│   «Здравствуйте...»                  Manrope 13px/400
+│   [Скопировать текст]  [Удалить × из ЛК]
+└──────────────────────────────────────────────────────────────────
+```
+
+**Сложность O97 (paid only, expanded only):**
+
+| N | Badge | Tooltip |
+|---|-------|---------|
+| 1 | `🟢 Один вечер` | «Скрипт, один файл, понятное ТЗ» |
+| 2 | `🟡 Проект` | «Типовой — FastAPI, лендинг, бот» |
+| 3 | `🟠 Система` | «Несколько компонентов, нормальное ТЗ» |
+| 4 | `🔴 Без норм ТЗ` | «"Сделайте красиво" — риск на тебе» |
+
+---
+
+#### 9.2e /cabinet/ delta
+
+В `/cabinet/` карточка идентична лентовой, но:
+- **Нет** CTA «Написать отклик» (только accordion черновик в expand)
+- **Есть** `[Удалить из ЛК ×]` — ghost · text `#DC2626` · confirm inline «Удалить?»
+- **HEAD**: нет slot row (они уже использовали черновик — в inbox)
+
+```
+[▼ Черновик отклика]   ← accordion trigger, вместо CTA строки
+  «Текст черновика...»
+  [Скопировать текст]  [Удалить ×]
+```
+
+---
+
+#### 9.2f Визуальные состояния
+
+| Состояние | Визуал |
+|-----------|--------|
+| Default | shadow `4px 4px 0 #0A0A0A` · border: none |
+| Hover | shadow `6px 6px 0 #0A0A0A` · translate `(-2px,-2px)` · 150ms |
+| 100% match | border `2px solid #FACC15` · shadow `4px 4px 0 #FACC15` · pulse 700ms |
+| Expanded | shadow без изменений |
+| CTA locked | bg `#F5F5F0` на CTA zone · dashed border |
+
+---
+
+#### 9.2g CSS классы (новые / обновлённые для O127)
+
+```css
+/* Tier data attribute — ставить на .rl-lead-card */
+/* PHP: data-tier="<?= $tier ?>" (anon|free|premium) */
+
+/* Auth-only rows */
+.rl-lead-card[data-tier="anon"] .rl-row--auth-only { display: none; }
+
+/* Paid-only rows */
+.rl-lead-card[data-tier="anon"] .rl-row--paid-only,
+.rl-lead-card[data-tier="free"] .rl-row--paid-only { display: none; }
+
+/* Slot row N=1 amber */
+.rl-slot-row--last { color: #F59E0B; font-weight: 700; }
+
+/* One CTA rule */
+.rl-lead-card .rl-card-cta + .rl-card-cta { display: none; }
+
+/* CTA variants */
+.rl-card-cta--anon {
+  border: 2px solid #D4D4D4; background: #FFFFFF; color: #A3A3A3;
+}
+.rl-card-cta--locked {
+  background: #F5F5F0; border: 2px dashed #D4D4D4; color: #A3A3A3;
+}
+/* .rl-card-cta--primary — уже есть (bg #0A0A0A text #FACC15) */
+
+/* Mobile thumb-zone */
+@media (max-width: 767px) {
+  .rl-card-cta { min-height: 48px; }
+}
+```
+
+---
+
+#### 9.2h Acceptance O127-CARD
+
+| # | Критерий | Блокирует |
+|---|----------|-----------|
+| AC-1 | Один CSS-класс `.rl-lead-card` на всех поверхностях | Да |
+| AC-2 | `data-tier` атрибут проставляется на карточку из PHP | Да |
+| AC-3 | MATCH ROW скрыт для `data-tier="anon"` | Да |
+| AC-4 | SLOT ROW показан только `data-tier="premium"` | Да |
+| AC-5 | Ровно один `.rl-card-cta` видим (CSS rule обеспечивает) | Да |
+| AC-6 | Anon CTA → `/cabinet/` | Да |
+| AC-7 | Free CTA → inline upsell (не редирект страницы) | Да |
+| AC-8 | Premium CTA → draft flow | Да |
+| AC-9 | Cabinet: accordion `[▼ Черновик]` вместо generic CTA | Да |
+| AC-10 | Сложность O97 — только premium, только в expanded | Да |
+| AC-11 | `«Брать»`/`«Сомнительно»` chips не рендерятся нигде | Да |
+| AC-12 | Mobile 390px: CTA `min-height: 48px` · title 2 строки | Да |
+
+---
+
+### 9.3 Heuristic / Clarity pass — итоговые правила
+
+**F-pattern (зафиксировано для Coder — не отступать):**
+
+| Строка | Приоритет | Правило |
+|--------|-----------|---------|
+| HEAD (source + badge) | Highest | Слева: niche icon + source dot. Справа: views + time. Не переносить. |
+| TITLE | Highest | Самый крупный текст карточки. Desktop: одна строка ellipsis. Mobile: 2 строки. |
+| BUDGET | High | Под title сразу — без разрыва. |
+| MATCH BAR | Medium | Только если auth. Визуальный якорь для взгляда. |
+| CTA | Critical | Последняя строка collapsed. Один элемент. Thumb-zone 48px. |
+
+**Thumb-zone правила (390×844):**
+
+| Зона | px от верха | Элементы | Требование |
+|------|-------------|----------|------------|
+| Stretch | 0–152 | header + filter bar | min-height 44px |
+| Comfort scroll | 152–600 | контент ленты | любой размер |
+| Natural thumb | 600–844 | CTA карточек при чтении | 48px |
+
+Filter bar правые кнопки: sticky, видны при любом положении скролла. Chips: scroll, не обрезают правые кнопки.
+
+**Один primary CTA — правило:**
+- Максимум один `.rl-card-cta` per карточка в collapsed view
+- Anon: ghost (не primary — не акцентировать до входа)
+- Free: muted locked (сигнализирует о возможности, не призывает к действию)
+- Premium: full primary `#0A0A0A / #FACC15`
+- Cabinet: accordion (не CTA-кнопка в collapsed)
+
+---
+
+### 9.4 Файлы Coder (O127-WP)
+
+```
+wordpress/rawlead-kadence-child/
+  template-parts/rawlead/
+    feed-filter-bar.php    ← unified chrome, data-tier, locked state
+    feed-card.php          ← data-tier attribute, tier rows, CTA by tier
+    cabinet-card.php       ← delta: accordion черновик вместо CTA
+  assets/css/rawlead.css   ← §9.1b + §9.2g классы
+  assets/js/rawlead-feed.js ← inline hint (anon locked click), upsell toggle
+```
+
+PHP: `$tier` = `'anon'` | `'free'` | `'premium'` — определять из JWT/session в шаблоне.
+
+---
+
+_Lead Designer · O127 UI Unify · 2026-06-07_
+
+---
+
 _Lead Designer · NEO-BRUTALIST + O23 + C1 · 2026-05-29_ · _Lead Product · O92 Skill Tree AC · 2026-06-02_

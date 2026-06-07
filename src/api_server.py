@@ -51,7 +51,7 @@ from src.public_feed import (
 )
 from src.jwt_auth import decode_access_token, issue_access_token
 from src.telegram_login import login_bot_token, verify_telegram_login
-from src.feed_social import display_views
+from src.feed_social import display_replies, display_views
 from src.rank import (
     final_rank,
     keyword_match,
@@ -89,6 +89,23 @@ from src.owner_admin import (
     record_pageview,
     run_ops_control,
 )
+from src.support_tickets import (
+    admin_list_tickets,
+    admin_reply,
+    create_user_ticket,
+    get_unread_count,
+    get_user_thread,
+    normalize_guest_token,
+)
+from src.trial_subscription import (
+    TrialStartError,
+    expire_stale_trials,
+    fetch_subscription_row,
+    notify_trial_started,
+    resolve_subscription_status,
+    start_trial,
+    subscription_extra_fields,
+)
 
 # /cabinet/ login and /v1/me/* are site-product endpoints.
 # Force site profile to avoid accidental legacy token verification
@@ -106,6 +123,8 @@ _SKILLS_CATALOG_DAYS = 30
 _FEED_DELAY_MINUTES = 15
 _HOT_MAX_AGE_SEC = 300
 _DRAFT_RETRY_AFTER_SEC = 5
+_FEED_PREFS_SORT = frozenset({"time", "match"})
+_FEED_PREFS_MIN_MATCH = frozenset({0, 50, 60, 70, 80, 90})
 
 
 def _lead_is_hot(created_at: Any) -> bool:
@@ -200,6 +219,7 @@ def _row_to_item(
     if isinstance(tools_required, list):
         tools = list(normalize_tools_required(tools_required))
     rd = strip_reply_draft_price_deadline((reply_draft or "").strip())
+    dv = display_views(lead_id, created_at, feed_delayed=feed_delayed)
     return {
         "id": lead_id,
         "source": source,
@@ -222,7 +242,8 @@ def _row_to_item(
         "tools_required": tools,
         "reply_draft": rd,
         "tz_attachment": tz_attachment,
-        "display_views": display_views(lead_id, created_at, feed_delayed=feed_delayed),
+        "display_views": dv,
+        "display_replies": display_replies(lead_id, dv),
     }
 
 
@@ -289,9 +310,19 @@ _INBOX_SELECT_COLS = """
 
 
 def _category_sql(categories: list[str]) -> tuple[str, list[Any]]:
+    """Legacy SQL filter — O126: category фильтруется по resolve_lead_category в Python."""
+    return "", []
+
+
+def _row_resolved_category(row: tuple[Any, ...]) -> str:
+    tags = _canonical_lead_tags(row[8])
+    return resolve_lead_category(row[11], row[2] or "", row[3] or "", tags)
+
+
+def _passes_category_filter(row: tuple[Any, ...], categories: list[str]) -> bool:
     if not categories:
-        return "", []
-    return " AND category = ANY(%s::text[])", [categories]
+        return True
+    return _row_resolved_category(row) in categories
 
 
 def _load_user_tags(cur: Any, user_id: str) -> dict[str, float]:
@@ -359,9 +390,13 @@ def _rank_feed_rows(
     sort: str,
     min_match: int | None = None,
     feed_delayed: bool = False,
+    categories: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     ranked: list[dict[str, Any]] = []
+    cat_filter = categories or []
     for row in rows:
+        if cat_filter and not _passes_category_filter(row, cat_filter):
+            continue
         tags = _canonical_lead_tags(row[8])
         category = resolve_lead_category(row[11], row[2] or "", row[3] or "", tags)
         km = keyword_match(tags, tag_weights) if tag_weights else 0
@@ -398,25 +433,42 @@ def _feed_today_count(
 ) -> int:
     """Leads created today (Europe/Moscow) with same visibility/category/skills/delay as feed."""
     feed_where, feed_params = _feed_where_sql(apply_delay=apply_delay)
-    cat_sql, cat_params = _category_sql(categories)
     skills_sql, skills_params = _skills_sql(skills)
     today_sql = (
         " AND (created_at AT TIME ZONE 'Europe/Moscow')::date"
         " = (NOW() AT TIME ZONE 'Europe/Moscow')::date"
     )
+    if not categories:
+        cur.execute(
+            f"""
+            SELECT COUNT(*)::int
+            FROM leads
+            WHERE {feed_where}
+              {skills_sql}
+              {today_sql}
+            """,
+            (*feed_params, *skills_params),
+        )
+        row = cur.fetchone()
+        return int(row[0] or 0) if row else 0
+
     cur.execute(
         f"""
-        SELECT COUNT(*)::int
+        SELECT title, body, lead_tags, category
         FROM leads
         WHERE {feed_where}
-          {cat_sql}
           {skills_sql}
           {today_sql}
         """,
-        (*feed_params, *cat_params, *skills_params),
+        (*feed_params, *skills_params),
     )
-    row = cur.fetchone()
-    return int(row[0] or 0) if row else 0
+    count = 0
+    for title, body, lead_tags, stored_category in cur.fetchall():
+        tags = _canonical_lead_tags(lead_tags)
+        resolved = resolve_lead_category(stored_category, title or "", body or "", tags)
+        if resolved in categories:
+            count += 1
+    return count
 
 
 def _feed_page_time(
@@ -430,12 +482,14 @@ def _feed_page_time(
     tag_weights: dict[str, float],
     apply_delay: bool = False,
     user_id: str | None = None,
+    min_match: int | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     cat_sql, cat_params = _category_sql(categories)
     sql_min = min_score
     if min_score >= 70:
         sql_min = effective_feed_min_score(min_score, "text")
     feed_where, feed_params = _feed_where_sql(apply_delay=apply_delay)
+    scan_limit = _ME_FEED_SCAN_LIMIT if categories else limit + offset
     cur.execute(
         f"""
         SELECT {_SELECT_COLS}
@@ -444,13 +498,29 @@ def _feed_page_time(
           AND (ai_score IS NULL OR ai_score >= %s)
           {cat_sql}
         ORDER BY created_at DESC
-        LIMIT %s OFFSET %s
+        LIMIT %s
         """,
-        (*feed_params, sql_min, *cat_params, limit, offset),
+        (*feed_params, sql_min, *cat_params, scan_limit),
     )
     rows = cur.fetchall()
+    if min_match and tag_weights:
+        ranked = _rank_feed_rows(
+            rows,
+            tag_weights,
+            min_score=min_score,
+            sort="time",
+            min_match=min_match,
+            feed_delayed=apply_delay,
+            categories=categories,
+        )
+        ranked.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        page = ranked[offset : offset + limit]
+        _finalize_feed_items(cur, page, user_id=user_id)
+        return page, len(page)
     items: list[dict[str, Any]] = []
     for r in rows:
+        if categories and not _passes_category_filter(r, categories):
+            continue
         tags = _canonical_lead_tags(r[8])
         category = resolve_lead_category(r[11], r[2] or "", r[3] or "", tags)
         km = keyword_match(tags, tag_weights) if tag_weights else 0
@@ -466,8 +536,12 @@ def _feed_page_time(
                 feed_delayed=apply_delay,
             )
         )
-    _finalize_feed_items(cur, items, user_id=user_id)
-    return items, len(items)
+    if categories:
+        page = items[offset : offset + limit]
+    else:
+        page = items
+    _finalize_feed_items(cur, page, user_id=user_id)
+    return page, len(page)
 
 
 def _feed_page_match(
@@ -481,6 +555,7 @@ def _feed_page_match(
     tag_weights: dict[str, float],
     apply_delay: bool = False,
     user_id: str | None = None,
+    min_match: int | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     cat_sql, cat_params = _category_sql(categories)
     feed_where, feed_params = _feed_where_sql(apply_delay=apply_delay)
@@ -500,7 +575,9 @@ def _feed_page_match(
         tag_weights,
         min_score=min_score,
         sort="match",
+        min_match=min_match,
         feed_delayed=apply_delay,
+        categories=categories,
     )
     page = ranked[offset : offset + limit]
     _finalize_feed_items(cur, page, user_id=user_id)
@@ -541,6 +618,8 @@ def _personal_feed_page(
     if sort == "time":
         ranked: list[dict[str, Any]] = []
         for row in rows:
+            if categories and not _passes_category_filter(row, categories):
+                continue
             tags = _canonical_lead_tags(row[8])
             if has_profile:
                 km = keyword_match(tags, user_tags)
@@ -561,6 +640,7 @@ def _personal_feed_page(
             sort="match",
             min_match=min_match,
             feed_delayed=False,
+            categories=categories,
         )
     page = ranked[offset : offset + limit]
     _finalize_feed_items(cur, page, user_id=user_id)
@@ -702,8 +782,12 @@ def _try_user_from_bearer(authorization: str) -> str | None:
 
 
 def _user_effective_access(cur: Any, user_id: str) -> bool:
-    plan, is_active, active_until, paused_until = _ensure_subscription(cur, user_id)
-    payload = _subscription_payload(plan, is_active, active_until, paused_until)
+    plan, is_active, active_until, paused_until, trial_used_at = _ensure_subscription(
+        cur, user_id
+    )
+    payload = _subscription_payload(
+        plan, is_active, active_until, paused_until, trial_used_at
+    )
     return bool(payload["effective_access"])
 
 
@@ -928,6 +1012,43 @@ def health() -> dict[str, Any]:
     return out
 
 
+def _public_leads_week_count() -> int:
+    """Visible leads ingested in the last 7 days (marketing ticker)."""
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)::int
+                    FROM leads
+                    WHERE is_visible = TRUE
+                      AND created_at >= NOW() - INTERVAL '7 days'
+                    """
+                )
+                row = cur.fetchone()
+                return int(row[0]) if row else 0
+    except Exception as exc:
+        logger.warning("site-stats: %s", exc)
+        return 0
+
+
+def _leads_week_display(n: int) -> int:
+    """Round down to tens for «N+ лидов в неделю» strip."""
+    if n < 10:
+        return max(n, 0)
+    return (n // 10) * 10
+
+
+@app.get("/v1/public/site-stats")
+def public_site_stats() -> dict[str, Any]:
+    leads_week = _public_leads_week_count()
+    return {
+        "radar_online": True,
+        "leads_week": leads_week,
+        "leads_week_display": _leads_week_display(leads_week),
+    }
+
+
 # 3c2 ─────────────────────────────────────────────────────────────────────────
 
 
@@ -1002,14 +1123,17 @@ def feed(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     min_score: int = Query(default=0, ge=0, le=100),
+    min_match: int = Query(default=0, ge=0, le=100),
     skills: str = Query(default=""),
     category: str = Query(default=""),
     sort: str = Query(default="time"),
     authorization: str = Header(default="", alias="Authorization"),
 ) -> dict[str, Any]:
-    """Лента: is_visible=true; anon/free → delay 15m; paid JWT → instant."""
+    """Лента: is_visible=true; anon → delay 15m; any valid JWT → instant."""
     if sort not in ("time", "match"):
         raise HTTPException(status_code=400, detail="sort must be time or match")
+    if min_match not in _FEED_PREFS_MIN_MATCH:
+        raise HTTPException(status_code=400, detail="min_match must be 0, 50, 60, 70, 80, or 90")
     skill_list = _parse_skills_param(skills)
     category_list = parse_category_param(category)
     tag_weights = tags_as_weights(skill_list)
@@ -1017,18 +1141,24 @@ def feed(
     user_id = _try_user_from_bearer(authorization)
     feed_user_id: str | None = None
     if user_id:
-        try:
-            with psycopg.connect(_db_url()) as conn:
-                with conn.cursor() as cur:
-                    if _user_effective_access(cur, user_id):
-                        apply_delay = False
-                        feed_user_id = user_id
-        except Exception as exc:
-            logger.warning("feed: effective_access check failed: %s", exc)
+        apply_delay = False
+        feed_user_id = user_id
     try:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
-                if sort == "match":
+                if user_id and not skill_list:
+                    items, count = _personal_feed_page(
+                        cur,
+                        user_id,
+                        limit=limit,
+                        offset=offset,
+                        min_score=min_score,
+                        min_match=min_match,
+                        skills=skill_list,
+                        categories=category_list,
+                        sort=sort,
+                    )
+                elif sort == "match":
                     items, count = _feed_page_match(
                         cur,
                         limit=limit,
@@ -1039,6 +1169,7 @@ def feed(
                         tag_weights=tag_weights,
                         apply_delay=apply_delay,
                         user_id=feed_user_id,
+                        min_match=min_match if min_match > 0 else None,
                     )
                 else:
                     items, count = _feed_page_time(
@@ -1051,6 +1182,7 @@ def feed(
                         tag_weights=tag_weights,
                         apply_delay=apply_delay,
                         user_id=feed_user_id,
+                        min_match=min_match if min_match > 0 else None,
                     )
                 today_count = _feed_today_count(
                     cur,
@@ -1068,6 +1200,7 @@ def feed(
         "count": count,
         "today_count": today_count,
         "sort": sort,
+        "min_match": min_match,
         "skills": skill_list,
         "category": category_list,
         "feed_delayed": apply_delay,
@@ -1147,6 +1280,104 @@ def me_tags_put(
     return {"tags": tags}
 
 
+def _default_feed_prefs() -> dict[str, Any]:
+    return {"sort": "time", "min_match": 80, "category": "", "updated_at": None}
+
+
+def _normalize_feed_prefs(raw: Any) -> dict[str, Any]:
+    base = _default_feed_prefs()
+    if not isinstance(raw, dict):
+        return base
+    sort = str(raw.get("sort") or "time").strip()
+    if sort not in _FEED_PREFS_SORT:
+        sort = "time"
+    try:
+        min_match = int(raw.get("min_match", 80))
+    except (TypeError, ValueError):
+        min_match = 80
+    if min_match not in _FEED_PREFS_MIN_MATCH:
+        min_match = 80
+    category = str(raw.get("category") or "").strip()
+    updated_at = raw.get("updated_at")
+    if updated_at is not None:
+        updated_at = str(updated_at)
+    return {
+        "sort": sort,
+        "min_match": min_match,
+        "category": category,
+        "updated_at": updated_at,
+    }
+
+
+def _load_feed_prefs(cur: Any, user_id: str) -> dict[str, Any]:
+    cur.execute(
+        "SELECT feed_prefs FROM users WHERE id = %s::uuid",
+        (user_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        return _default_feed_prefs()
+    return _normalize_feed_prefs(row[0])
+
+
+def _save_feed_prefs(cur: Any, user_id: str, prefs: dict[str, Any]) -> dict[str, Any]:
+    from datetime import datetime, timezone
+
+    normalized = _normalize_feed_prefs(prefs)
+    normalized["updated_at"] = datetime.now(timezone.utc).isoformat()
+    cur.execute(
+        "UPDATE users SET feed_prefs = %s::jsonb WHERE id = %s::uuid",
+        (json.dumps(normalized, ensure_ascii=False), user_id),
+    )
+    return normalized
+
+
+class FeedPrefsPayload(BaseModel):
+    sort: str | None = None
+    min_match: int | None = None
+    category: str | None = None
+
+
+@app.get("/v1/me/feed-prefs")
+def me_feed_prefs_get(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                return _load_feed_prefs(cur, user_id)
+    except Exception as exc:
+        logger.error("me_feed_prefs_get: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+@app.put("/v1/me/feed-prefs")
+def me_feed_prefs_put(
+    payload: FeedPrefsPayload,
+    user_id: str = Depends(_resolve_user_id),
+) -> dict[str, Any]:
+    if payload.min_match is not None and payload.min_match not in _FEED_PREFS_MIN_MATCH:
+        raise HTTPException(status_code=400, detail="min_match must be 0, 50, 60, 70, 80, or 90")
+    if payload.sort is not None and payload.sort not in _FEED_PREFS_SORT:
+        raise HTTPException(status_code=400, detail="sort must be time or match")
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                current = _load_feed_prefs(cur, user_id)
+                if payload.sort is not None:
+                    current["sort"] = payload.sort
+                if payload.min_match is not None:
+                    current["min_match"] = payload.min_match
+                if payload.category is not None:
+                    current["category"] = str(payload.category).strip()
+                saved = _save_feed_prefs(cur, user_id, current)
+            conn.commit()
+        return saved
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("me_feed_prefs_put: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
 @app.get("/v1/me/feed")
 def me_feed(
     user_id: str = Depends(_resolve_user_id),
@@ -1156,7 +1387,7 @@ def me_feed(
     min_match: int = Query(default=0, ge=0, le=100),
     skills: str = Query(default=""),
     category: str = Query(default=""),
-    sort: str = Query(default="match"),
+    sort: str = Query(default="time"),
 ) -> dict[str, Any]:
     """Персональная лента: user_tags, is_visible=true; sort=time|match; min_match on keyword_match."""
     if sort not in ("time", "match"):
@@ -1189,6 +1420,7 @@ def me_feed(
         "min_match": min_match,
         "skills": skill_list,
         "category": category_list,
+        "feed_delayed": False,
     }
 
 
@@ -1436,44 +1668,24 @@ def _as_utc(dt: datetime | None) -> datetime | None:
     return dt.astimezone(timezone.utc)
 
 
-def _ensure_subscription(cur: Any, user_id: str) -> tuple[str, bool, datetime | None, datetime | None]:
-    cur.execute(
-        """
-        SELECT plan, is_active, active_until, paused_until
-        FROM subscriptions
-        WHERE user_id = %s::uuid
-        """,
-        (user_id,),
+def _ensure_subscription(
+    cur: Any, user_id: str
+) -> tuple[str, bool, datetime | None, datetime | None, datetime | None]:
+    plan, is_active, active_until, paused_until, trial_used_at = fetch_subscription_row(
+        cur, user_id
     )
-    row = cur.fetchone()
-    if row:
-        return row[0], bool(row[1]), _as_utc(row[2]), _as_utc(row[3])
+    if plan != "free" or is_active or active_until or paused_until or trial_used_at:
+        return plan, is_active, active_until, paused_until, trial_used_at
 
     cur.execute(
         """
         INSERT INTO subscriptions (user_id, plan, is_active)
         VALUES (%s::uuid, 'free', FALSE)
         ON CONFLICT (user_id) DO NOTHING
-        RETURNING plan, is_active, active_until, paused_until
         """,
         (user_id,),
     )
-    inserted = cur.fetchone()
-    if inserted:
-        return inserted[0], bool(inserted[1]), _as_utc(inserted[2]), _as_utc(inserted[3])
-
-    cur.execute(
-        """
-        SELECT plan, is_active, active_until, paused_until
-        FROM subscriptions
-        WHERE user_id = %s::uuid
-        """,
-        (user_id,),
-    )
-    row = cur.fetchone()
-    if not row:
-        return "free", False, None, None
-    return row[0], bool(row[1]), _as_utc(row[2]), _as_utc(row[3])
+    return fetch_subscription_row(cur, user_id)
 
 
 def _subscription_payload(
@@ -1481,41 +1693,32 @@ def _subscription_payload(
     is_active: bool,
     active_until: datetime | None,
     paused_until: datetime | None,
+    trial_used_at: datetime | None = None,
 ) -> dict[str, Any]:
     now = _utc_now()
-    paused = paused_until is not None and paused_until > now
-    if paused_until is not None and paused_until <= now:
+    pu = _as_utc(paused_until)
+    if pu is not None and pu <= now:
         paused_until = None
+        pu = None
 
-    paid_plan = plan not in ("free", "", "owner")
-    expired = (
-        paid_plan
-        and is_active
-        and active_until is not None
-        and active_until <= now
+    status, effective_access = resolve_subscription_status(
+        plan or "free",
+        is_active,
+        _as_utc(active_until),
+        pu,
+        now=now,
     )
-
-    if plan == "owner":
-        status: Literal["free", "active", "paused", "expired", "beta"] = "beta"
-    elif paused:
-        status = "paused"
-    elif expired:
-        status = "expired"
-    elif is_active:
-        status = "active"
-    else:
-        status = "free"
-
-    effective_access = status in ("active", "beta") and not paused
+    paused = status == "paused"
 
     plan_labels = {
         "owner": "ИИ-агент (владелец)",
         "agent": "ИИ-агент",
         "pro": "ИИ-агент",
+        "trial": "Trial Premium",
         "free": "ИИ-агент",
     }
 
-    return {
+    payload: dict[str, Any] = {
         "plan": plan or "free",
         "plan_label": plan_labels.get(plan, "ИИ-агент"),
         "is_active": is_active,
@@ -1526,6 +1729,16 @@ def _subscription_payload(
         "can_pause": is_active and not paused and status == "active",
         "stars_available": stars_available(load_config()),
     }
+    payload.update(
+        subscription_extra_fields(
+            plan or "free",
+            is_active,
+            _as_utc(active_until),
+            _as_utc(trial_used_at),
+            now=now,
+        )
+    )
+    return payload
 
 
 @app.get("/v1/me/subscription")
@@ -1533,7 +1746,10 @@ def me_subscription(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     try:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
-                plan, is_active, active_until, paused_until = _ensure_subscription(cur, user_id)
+                expire_stale_trials(cur)
+                plan, is_active, active_until, paused_until, trial_used_at = (
+                    _ensure_subscription(cur, user_id)
+                )
                 if paused_until is not None and paused_until <= _utc_now():
                     cur.execute(
                         """
@@ -1545,12 +1761,45 @@ def me_subscription(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
                         (user_id,),
                     )
                     paused_until = None
-                    conn.commit()
-                return _subscription_payload(plan, is_active, active_until, paused_until)
+                conn.commit()
+                plan, is_active, active_until, paused_until, trial_used_at = (
+                    fetch_subscription_row(cur, user_id)
+                )
+                return _subscription_payload(
+                    plan, is_active, active_until, paused_until, trial_used_at
+                )
     except HTTPException:
         raise
     except Exception as exc:
         logger.error("me_subscription: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+@app.post("/v1/me/subscription/trial-start")
+def me_subscription_trial_start(
+    user_id: str = Depends(_resolve_user_id),
+) -> dict[str, Any]:
+    try:
+        cfg = load_config()
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                expire_stale_trials(cur)
+                try:
+                    start_trial(cur, user_id)
+                except TrialStartError as exc:
+                    raise HTTPException(status_code=409, detail=exc.detail) from exc
+                notify_trial_started(cfg, cur, user_id)
+                conn.commit()
+                plan, is_active, active_until, paused_until, trial_used_at = (
+                    fetch_subscription_row(cur, user_id)
+                )
+                return _subscription_payload(
+                    plan, is_active, active_until, paused_until, trial_used_at
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("me_subscription_trial_start: %s", exc)
         raise HTTPException(status_code=500, detail="db error") from exc
 
 
@@ -1567,7 +1816,9 @@ def me_subscription_pause(
     try:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
-                plan, is_active, active_until, paused_until = _ensure_subscription(cur, user_id)
+                plan, is_active, active_until, paused_until, trial_used_at = (
+                    _ensure_subscription(cur, user_id)
+                )
                 if payload.resume:
                     cur.execute(
                         """
@@ -1578,9 +1829,11 @@ def me_subscription_pause(
                         (user_id,),
                     )
                     conn.commit()
-                    return _subscription_payload(plan, is_active, active_until, None)
+                    return _subscription_payload(
+                        plan, is_active, active_until, None, trial_used_at
+                    )
 
-                if not is_active or plan in ("free", ""):
+                if not is_active or plan in ("free", "", "trial"):
                     raise HTTPException(status_code=403, detail="subscription not active")
 
                 days = payload.days if payload.days is not None else 14
@@ -1597,7 +1850,9 @@ def me_subscription_pause(
                     (until, user_id),
                 )
                 conn.commit()
-                return _subscription_payload(plan, is_active, active_until, until)
+                return _subscription_payload(
+                    plan, is_active, active_until, until, trial_used_at
+                )
     except HTTPException:
         raise
     except Exception as exc:
@@ -1677,6 +1932,79 @@ def me_notification_settings_patch(
         raise
     except Exception as exc:
         logger.error("me_notification_settings_patch: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+class SupportTicketPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    message: str
+    url: str = ""
+    source: str = "fab"
+    contact_name: str = ""
+
+
+def _resolve_support_actor(
+    authorization: str = Header(default="", alias="Authorization"),
+    x_rawlead_guest: str = Header(default="", alias="X-RawLead-Guest-Token"),
+) -> tuple[str | None, str | None]:
+    user_id = _try_user_from_bearer(authorization)
+    if user_id:
+        return user_id, None
+    guest = normalize_guest_token(x_rawlead_guest)
+    if guest:
+        return None, guest
+    raise HTTPException(
+        status_code=400,
+        detail="X-RawLead-Guest-Token required when not logged in",
+    )
+
+
+@app.post("/v1/support/ticket")
+def support_ticket_create(
+    payload: SupportTicketPayload,
+    actor: tuple[str | None, str | None] = Depends(_resolve_support_actor),
+) -> dict[str, Any]:
+    user_id, guest_token = actor
+    try:
+        return create_user_ticket(
+            _db_url(),
+            user_id=user_id,
+            guest_token=guest_token,
+            source=payload.source,
+            page_url=(payload.url or "").strip(),
+            body=payload.message,
+            contact_name=payload.contact_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("support_ticket_create: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+@app.get("/v1/support/thread")
+def support_thread_get(
+    actor: tuple[str | None, str | None] = Depends(_resolve_support_actor),
+) -> dict[str, Any]:
+    user_id, guest_token = actor
+    try:
+        return get_user_thread(_db_url(), user_id=user_id, guest_token=guest_token)
+    except Exception as exc:
+        logger.error("support_thread_get: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+@app.get("/v1/support/unread")
+def support_unread_get(
+    actor: tuple[str | None, str | None] = Depends(_resolve_support_actor),
+) -> dict[str, int]:
+    user_id, guest_token = actor
+    try:
+        count = get_unread_count(_db_url(), user_id=user_id, guest_token=guest_token)
+        return {"unread": count}
+    except Exception as exc:
+        logger.error("support_unread_get: %s", exc)
         raise HTTPException(status_code=500, detail="db error") from exc
 
 
@@ -1798,6 +2126,16 @@ def admin_pageview_beacon(payload: PageviewPayload, request: Request) -> Respons
 class OpsControlPayload(BaseModel):
     target: str
     action: str
+    group: str | None = None
+    slot: int | None = None
+
+
+@app.get("/v1/admin/proxies")
+def admin_proxies(_owner: str = Depends(_require_owner_user)) -> dict[str, Any]:
+    del _owner
+    from src.proxy_ops import collect_proxies_payload, strip_internal_urls
+
+    return strip_internal_urls(collect_proxies_payload())
 
 
 @app.post("/v1/admin/control")
@@ -1806,10 +2144,61 @@ def admin_control(
     _owner: str = Depends(_require_owner_user),
 ) -> dict[str, Any]:
     del _owner
-    result = run_ops_control(target=payload.target, action=payload.action)
+    if (payload.target or "").strip().lower() == "proxy":
+        result = run_ops_control(
+            target=payload.target,
+            action=payload.action,
+            group=payload.group or "",
+            slot=payload.slot,
+        )
+        if not result.get("ok"):
+            raise HTTPException(status_code=400, detail=result.get("message", "control failed"))
+        return result
+    result = run_ops_control(
+        target=payload.target,
+        action=payload.action,
+        group=payload.group or "",
+        slot=payload.slot,
+    )
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("message", "control failed"))
     return result
+
+
+class SupportAdminReplyPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    message: str
+
+
+@app.get("/v1/admin/support/tickets")
+def admin_support_tickets_list(
+    limit: int = Query(default=30, ge=1, le=100),
+    _owner: str = Depends(_require_owner_user),
+) -> dict[str, Any]:
+    del _owner
+    try:
+        tickets = admin_list_tickets(_db_url(), limit=limit)
+        return {"tickets": tickets}
+    except Exception as exc:
+        logger.error("admin_support_tickets_list: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+@app.post("/v1/admin/support/tickets/{ticket_id}/reply")
+def admin_support_ticket_reply(
+    ticket_id: int,
+    payload: SupportAdminReplyPayload,
+    _owner: str = Depends(_require_owner_user),
+) -> dict[str, Any]:
+    del _owner
+    try:
+        return admin_reply(_db_url(), ticket_id=ticket_id, body=payload.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("admin_support_ticket_reply: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
 
 
 # 3c4 ─────────────────────────────────────────────────────────────────────────

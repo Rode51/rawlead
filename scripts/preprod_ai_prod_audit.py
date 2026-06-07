@@ -8,6 +8,8 @@
   .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --judge --judge-limit 71 --judge-l1 --judge-l1-limit 71
   .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --judge --judge-l1 --judge-l3 --judge-l3-limit 25 --judge-since 2026-06-01
   .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --lead-ids 7051,7019
+  O115 TG pilot (10 ids, не смешивать с FL):
+  .venv\\Scripts\\python.exe scripts\\preprod_ai_prod_audit.py --profile site --source-like tg:%% --limit 10 --judge --judge-limit 10 --judge-l1 --judge-l1-limit 10
 """
 
 from __future__ import annotations
@@ -286,6 +288,13 @@ def _fetch_leads_by_ids(conn: psycopg.Connection, lead_ids: list[int]) -> list[d
     return out
 
 
+def _source_like_sql(source_like: str) -> tuple[str, list[Any]]:
+    text = (source_like or "").strip()
+    if not text:
+        return "", []
+    return " AND source LIKE %s ", [text]
+
+
 def _fetch_empty_l1(
     conn: psycopg.Connection,
     *,
@@ -294,20 +303,27 @@ def _fetch_empty_l1(
     src_params: list[Any],
     since_sql: str = "",
     since_params: list[Any] | None = None,
+    source_like_sql: str = "",
+    source_like_params: list[Any] | None = None,
 ) -> list[dict]:
     since_params = since_params or []
+    source_like_params = source_like_params or []
     sql = f"""
         SELECT {_SELECT_COLS}
         FROM leads
         WHERE is_visible = TRUE
           {src_sql}
+          {source_like_sql}
           {since_sql}
           AND COALESCE(NULLIF(TRIM(task_summary), ''), '') = ''
         ORDER BY id DESC
         LIMIT %s
     """
     with conn.cursor() as cur:
-        cur.execute(sql, [*src_params, *since_params, limit])
+        cur.execute(
+            sql,
+            [*src_params, *source_like_params, *since_params, limit],
+        )
         rows = cur.fetchall()
     out = [_row_to_lead(r) for r in rows]
     for lead in out:
@@ -354,20 +370,27 @@ def _stratified_sample(
     pool_size: int = 2500,
     since_sql: str = "",
     since_params: list[Any] | None = None,
+    source_like_sql: str = "",
+    source_like_params: list[Any] | None = None,
 ) -> list[dict]:
     since_params = since_params or []
+    source_like_params = source_like_params or []
     sql = f"""
         SELECT {_SELECT_COLS}
         FROM leads
         WHERE is_visible = TRUE
           {src_sql}
+          {source_like_sql}
           {since_sql}
           AND COALESCE(NULLIF(TRIM(reply_draft), ''), '') <> ''
         ORDER BY id DESC
         LIMIT %s
     """
     with conn.cursor() as cur:
-        cur.execute(sql, [*src_params, *since_params, pool_size])
+        cur.execute(
+            sql,
+            [*src_params, *source_like_params, *since_params, pool_size],
+        )
         rows = cur.fetchall()
 
     pool = [_row_to_lead(r) for r in rows]
@@ -1332,6 +1355,11 @@ def main() -> int:
     )
     parser.add_argument("--lead-ids", default="", help="comma lead_id for owner root-cause")
     parser.add_argument(
+        "--source-like",
+        default="",
+        help="O115: filter sample/judge pool, e.g. tg:%% for TG-only pilot",
+    )
+    parser.add_argument(
         "--json-out",
         type=Path,
         default=_ROOT / "data" / "preprod_ai_prod_audit.json",
@@ -1358,6 +1386,7 @@ def main() -> int:
 
     owner_ids = [int(x.strip()) for x in args.lead_ids.split(",") if x.strip().isdigit()]
     src_sql, src_params = public_feed_source_sql()
+    source_like_sql, source_like_params = _source_like_sql(args.source_like)
     need_judge = args.judge or args.judge_l1 or args.judge_l3
     judge_since: datetime | None = None
     since_sql = ""
@@ -1378,6 +1407,8 @@ def main() -> int:
             src_params=src_params,
             since_sql=since_sql,
             since_params=since_params,
+            source_like_sql=source_like_sql,
+            source_like_params=source_like_params,
         )
         empty_l1 = _fetch_empty_l1(
             conn,
@@ -1386,6 +1417,8 @@ def main() -> int:
             src_params=src_params,
             since_sql=since_sql,
             since_params=since_params,
+            source_like_sql=source_like_sql,
+            source_like_params=source_like_params,
         )
         owner_leads = _fetch_leads_by_ids(conn, owner_ids)
 

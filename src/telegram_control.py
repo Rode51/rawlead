@@ -10,14 +10,20 @@ import time
 
 import requests
 
-from config import Config, _PROJECT_ROOT, telegram_requests_proxies
+from config import Config, _PROJECT_ROOT
+from tg_proxy_pool import tg_http_request
 from radar_status import format_status_message
 from storage import ProjectStorage
 from match_push import handle_tg_draft_callback, upsert_subscriber_chat_id
+from premium_pay import (
+    handle_owner_pay_callback,
+    handle_user_pay_callback,
+    pay_available,
+    send_pay_method,
+)
 from stars_billing import (
     answer_pre_checkout,
     handle_successful_payment,
-    send_stars_invoice,
     stars_available,
 )
 from tg_chain_log import log_relay_api_call
@@ -183,22 +189,22 @@ def relay_message_to_owner_chat(
     if was_message_relayed(key_from, key_msg):
         return True
 
-    proxies = telegram_requests_proxies(cfg)
     owner_chat_id = cfg.telegram_chat_id.strip()
     api_url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/forwardMessage"
 
     try:
         session = requests.Session()
         session.trust_env = False
-        resp = session.post(
+        resp = tg_http_request(
+            "POST",
             api_url,
+            session=session,
             data={
                 "chat_id": owner_chat_id,
                 "from_chat_id": str(key_from),
                 "message_id": str(key_msg),
             },
             timeout=timeout_sec,
-            proxies=proxies,
         )
     except requests.RequestException as exc:
         if errors is not None:
@@ -290,7 +296,6 @@ def _send_to_chat(
     reply_markup: str | None = None,
     timeout_sec: float = 20.0,
 ) -> None:
-    proxies = telegram_requests_proxies(cfg)
     api_url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/sendMessage"
     data: dict[str, str | bool] = {
         "chat_id": str(chat_id).strip(),
@@ -305,11 +310,12 @@ def _send_to_chat(
     try:
         session = requests.Session()
         session.trust_env = False
-        resp = session.post(
+        resp = tg_http_request(
+            "POST",
             api_url,
+            session=session,
             data=data,
             timeout=timeout_sec,
-            proxies=proxies,
         )
     except requests.RequestException as exc:
         raise TelegramControlError(
@@ -597,21 +603,39 @@ def _handle_bot_auth_start(
     return True
 
 
-def _send_stars_invoice_reply(
+def _resolve_pay_start_payload(payload: str) -> str:
+    """start=pay_sbp|pay_crypto|pay_stars|pay|stars → method key."""
+    p = payload.strip().casefold()
+    if p in ("pay_sbp", "sbp"):
+        return "sbp"
+    if p in ("pay_crypto", "crypto"):
+        return "crypto"
+    if p in ("pay_stars", "stars"):
+        return "stars"
+    if p in ("pay", ""):
+        return "menu"
+    return ""
+
+
+def _send_pay_flow(
     cfg: Config,
     chat_id: int,
     user_id: int,
     errors: list[str],
+    *,
+    method: str = "menu",
 ) -> None:
-    ok, detail = send_stars_invoice(cfg, int(chat_id), tg_user_id=int(user_id))
-    if ok:
-        errors.append(f"stars:invoice tg={user_id}")
+    """O105: меню или конкретный способ (deep link с сайта)."""
+    if pay_available(cfg) or method == "stars" or cfg.stars_enabled:
+        send_pay_method(cfg, int(chat_id), int(user_id), method, errors)
         return
-    hint = detail or "Не удалось выставить счёт Stars."
-    if "STARS" in hint.upper() or "PAYMENT" in hint.upper():
-        hint += "\n\nBotFather → @rawlead_bot → Payments → включите Telegram Stars."
     try:
-        _send_to_chat(cfg, chat_id, hint, remove_keyboard=True)
+        _send_to_chat(
+            cfg,
+            chat_id,
+            "Оплата Premium временно недоступна. Напишите в поддержку.",
+            remove_keyboard=True,
+        )
     except TelegramControlError:
         pass
 
@@ -668,16 +692,20 @@ def _handle_subscriber_message(
                     user_id=int(user_id),
                     errors=errors,
                 )
-            elif payload in ("pay", "stars"):
-                _send_stars_invoice_reply(cfg, chat_id, int(user_id), errors)
+            elif payload.startswith("pay") or payload == "stars":
+                pay_method = _resolve_pay_start_payload(payload)
+                _send_pay_flow(cfg, chat_id, int(user_id), errors, method=pay_method or "menu")
             else:
                 _send_to_chat(cfg, chat_id, _WELCOME_SUBSCRIBER, remove_keyboard=True)
         except TelegramControlError:
             pass
         return True
 
-    if cmd in ("/pay", "/stars"):
-        _send_stars_invoice_reply(cfg, chat_id, int(user_id), errors)
+    if cmd == "/pay":
+        _send_pay_flow(cfg, chat_id, int(user_id), errors, method="menu")
+        return True
+    if cmd == "/stars":
+        _send_pay_flow(cfg, chat_id, int(user_id), errors, method="stars")
         return True
 
     payment = message.get("successful_payment")
@@ -726,15 +754,15 @@ def ensure_bot_polling_mode(cfg: Config) -> list[str]:
         lines.append("тг:webhook:skip no_token")
         return lines
 
-    proxies = telegram_requests_proxies(cfg)
     base = f"https://api.telegram.org/bot{token}/"
     try:
         session = requests.Session()
         session.trust_env = False
-        info_resp = session.get(
+        info_resp = tg_http_request(
+            "GET",
             base + "getWebhookInfo",
+            session=session,
             timeout=15.0,
-            proxies=proxies,
         )
         if info_resp.status_code != 200:
             lines.append(f"тг:webhook:info HTTP {info_resp.status_code}")
@@ -747,11 +775,12 @@ def ensure_bot_polling_mode(cfg: Config) -> list[str]:
         if not url:
             lines.append("тг:webhook:none")
             return lines
-        del_resp = session.post(
+        del_resp = tg_http_request(
+            "POST",
             base + "deleteWebhook",
+            session=session,
             data={"drop_pending_updates": "false"},
             timeout=15.0,
-            proxies=proxies,
         )
         if del_resp.status_code == 200 and del_resp.json().get("ok"):
             lines.append("тг:webhook:deleted")
@@ -771,30 +800,22 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
     bot_token = cfg.telegram_bot_token.strip()
     offset_initialized = storage.has_tg_update_offset_key(bot_token)
     offset = storage.get_tg_update_offset(bot_token=bot_token)
-    proxies = telegram_requests_proxies(cfg)
     api_url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/getUpdates"
 
     try:
         session = requests.Session()
         session.trust_env = False
-        resp = None
-        for attempt in range(3):
-            try:
-                resp = session.get(
-                    api_url,
-                    params={
-                        "offset": offset,
-                        "timeout": 0,
-                        "allowed_updates": '["message","callback_query","pre_checkout_query"]',
-                    },
-                    timeout=25.0,
-                    proxies=proxies,
-                )
-                break
-            except (requests.ConnectionError, ConnectionResetError) as exc:
-                if attempt >= 2:
-                    raise exc
-                time.sleep(0.5 * (attempt + 1))
+        resp = tg_http_request(
+            "GET",
+            api_url,
+            session=session,
+            params={
+                "offset": offset,
+                "timeout": 0,
+                "allowed_updates": '["message","callback_query","pre_checkout_query"]',
+            },
+            timeout=25.0,
+        )
     except requests.RequestException as exc:
         errors.append(f"тг:бот:{_mask_token(type(exc).__name__ + ': ' + str(exc))[:200]}")
         return errors
@@ -843,6 +864,14 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
         callback_query = upd.get("callback_query")
         if isinstance(callback_query, dict):
             if handle_tg_draft_callback(cfg, callback_query, errors):
+                if isinstance(update_id, int):
+                    next_offset = max(next_offset, update_id + 1)
+                continue
+            if handle_user_pay_callback(cfg, callback_query, errors):
+                if isinstance(update_id, int):
+                    next_offset = max(next_offset, update_id + 1)
+                continue
+            if handle_owner_pay_callback(cfg, callback_query, errors):
                 if isinstance(update_id, int):
                     next_offset = max(next_offset, update_id + 1)
                 continue

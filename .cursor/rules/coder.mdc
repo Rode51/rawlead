@@ -54,7 +54,9 @@ alwaysApply: false
 
 **Первый ответ:** `Прочитал: CODER_PROMPT, STATUS` → что делаешь по § промпта. Без vision/roadmap в чате.
 
+## Skills (O119)
 
+Перед правкой кода — **Read/grep** (skill `rawlead-search-first`, подхватывается сам). WP/CSS live — `rawlead-wp-live-dev` если в PROMPT или Local/BrowserSync. **Не** @ skill в чате — владелец не обязан.
 
 ## Структура кода (жёстко)
 

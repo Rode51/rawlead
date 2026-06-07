@@ -47,8 +47,9 @@ from public_feed import public_feed_sources
 from vc_ru_parser import VcRuListingError, fetch_listing_projects as fetch_vc_ru_listing
 
 from l1_pool import L1Pool
-from delist_checker import run_delist_batch
+from delist_checker import delist_interval_sec, maybe_run_delist_batch
 from feed_retention import run_feed_retention_batch
+from trial_subscription import run_trial_maintenance
 from exchange_health import (
     GREEN_MAX_MIN,
     append_health_log,
@@ -80,8 +81,6 @@ from telegram_control import send_control_panel
 
 # Опрос getUpdates между циклами и во время run_cycle (не ждать POLL_INTERVAL).
 _TG_POLL_INTERVAL_SEC = 2
-_DELIST_INTERVAL_SEC = 3600
-_DELIST_LAST_RUN_KEY = "delist_last_run_epoch"
 _FEED_RETENTION_LAST_RUN_KEY = "feed_retention_last_run_epoch"
 
 _LISTING_ERRORS = (
@@ -483,7 +482,7 @@ def run_cycle(
 
     tools_batch = int(os.getenv("TOOLS_BATCH_PER_CYCLE", "8") or "8")
     if (
-        os.getenv("TOOLS_BACKLOG_DRAIN", "1").strip().lower() in ("1", "true", "yes")
+        os.getenv("TOOLS_BACKLOG_DRAIN", "0").strip().lower() in ("1", "true", "yes")
         and pg is not None
         and cfg.ai_active
         and cfg.radar_profile == "site"
@@ -498,6 +497,7 @@ def run_cycle(
 
     _maybe_run_delist_batch(cfg, pg, storage, errors)
     _maybe_run_feed_retention_batch(cfg, pg, storage, errors)
+    _maybe_run_trial_maintenance(cfg, storage, errors)
 
     _collect_misc_errors(errors, summary)
     summary.sync_neon_from_globals()
@@ -577,25 +577,28 @@ def _tg_poll_if_due(
         state["last"] = now
 
 
+def _maybe_run_trial_maintenance(
+    cfg: Config,
+    storage: ProjectStorage,
+    errors: list[str],
+) -> None:
+    stats = run_trial_maintenance(cfg, storage, errors=errors)
+    if stats.get("expired") or stats.get("reminders"):
+        _append_log_line(
+            cfg.radar_log_path,
+            f"trial: expired={stats.get('expired', 0)} reminders={stats.get('reminders', 0)}",
+            echo=True,
+        )
+
+
 def _maybe_run_delist_batch(
     cfg: Config,
     pg: NeonLeadStorage | None,
     storage: ProjectStorage,
     errors: list[str],
 ) -> None:
-    if cfg.radar_profile != "site" or pg is None or not pg.enabled:
-        return
-    now = time.time()
-    raw = storage.get_setting(_DELIST_LAST_RUN_KEY, "0").strip()
-    try:
-        last = float(raw)
-    except ValueError:
-        last = 0.0
-    if now - last < _DELIST_INTERVAL_SEC:
-        return
-    stats = run_delist_batch(cfg, pg, errors=errors)
-    storage.set_setting(_DELIST_LAST_RUN_KEY, str(now))
-    if stats["checked"] or stats["delisted"]:
+    stats = maybe_run_delist_batch(cfg, pg, storage, errors)
+    if stats and (stats["checked"] or stats["delisted"]):
         _append_log_line(
             cfg.radar_log_path,
             f"delist: checked={stats['checked']} delisted={stats['delisted']} "
@@ -618,7 +621,7 @@ def _maybe_run_feed_retention_batch(
         last = float(raw)
     except ValueError:
         last = 0.0
-    if now - last < _DELIST_INTERVAL_SEC:
+    if now - last < delist_interval_sec():
         return
     stats = run_feed_retention_batch(pg, errors=errors)
     storage.set_setting(_FEED_RETENTION_LAST_RUN_KEY, str(now))

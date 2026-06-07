@@ -18,7 +18,7 @@ import requests
 
 from ai_analyze import (
     AiLiteAnalysis,
-    analyze_premium,
+    analyze_lead_tools,
     rephrase_reply_draft_per_user,
     analyze_shared_reply_draft,
     note_draft_request,
@@ -146,20 +146,33 @@ def merge_chat_id_on_login(cur: Any, *, tg_user_id: int, tg_chat_id: int | None 
     )
 
 
-def _user_push_eligible(plan: str, is_active: bool, paused_until: datetime | None, now: datetime) -> bool:
+def _user_push_eligible(
+    plan: str,
+    is_active: bool,
+    paused_until: datetime | None,
+    now: datetime,
+    *,
+    active_until: datetime | None = None,
+) -> bool:
     if paused_until is not None and paused_until > now:
         return False
     if plan == "owner":
         return True
-    if plan in ("agent", "pro", "beta") and is_active:
+    au = active_until
+    if au is not None and au.tzinfo is None:
+        au = au.replace(tzinfo=timezone.utc)
+    if plan == "trial" and is_active and au is not None and au > now:
         return True
+    if plan in ("agent", "pro", "beta") and is_active:
+        if au is None or au > now:
+            return True
     return False
 
 
 def _user_effective_access(cur: Any, user_id: str) -> bool:
     cur.execute(
         """
-        SELECT plan, is_active, paused_until
+        SELECT plan, is_active, paused_until, active_until
         FROM subscriptions
         WHERE user_id = %s::uuid
         """,
@@ -168,17 +181,20 @@ def _user_effective_access(cur: Any, user_id: str) -> bool:
     row = cur.fetchone()
     if not row:
         return False
-    plan, is_active, paused_until = row[0], bool(row[1]), row[2]
+    plan, is_active, paused_until, active_until = (
+        row[0],
+        bool(row[1]),
+        row[2],
+        row[3],
+    )
     now = datetime.now(timezone.utc)
-    if paused_until is not None:
-        pu = paused_until
-        if pu.tzinfo is None:
-            pu = pu.replace(tzinfo=timezone.utc)
-        if pu > now:
-            return False
-    if plan == "owner":
-        return True
-    return plan in ("agent", "pro", "beta") and is_active
+    return _user_push_eligible(
+        str(plan or "free"),
+        is_active,
+        paused_until,
+        now,
+        active_until=active_until,
+    )
 
 
 def _feed_where_sql() -> tuple[str, list[Any]]:
@@ -250,6 +266,35 @@ def _lite_from_lead_row(row: tuple[Any, ...]) -> AiLiteAnalysis:
     )
 
 
+def _ondemand_lead_tools(
+    cfg: Config,
+    row: tuple[Any, ...],
+    *,
+    ai_errors: list[str],
+    log_prefix: str,
+    max_retries: int = 2,
+) -> list[str]:
+    """O57/O125: tools-only L2 on draft click — not radar backlog, not full premium."""
+    tools = _parse_tools_required(row[13])
+    if tools:
+        return tools
+    lite = _lite_from_lead_row(row)
+    snippet = (row[3] or lite.task_summary or "").strip()
+    result = analyze_lead_tools(
+        cfg,
+        title=row[2] or "",
+        budget_text=row[5] or "",
+        description=snippet,
+        lite=lite,
+        errors=ai_errors,
+        log_prefix=log_prefix,
+        max_retries=max(1, min(int(max_retries), 2)),
+    )
+    if not result:
+        return []
+    return [str(t).strip() for t in result if str(t).strip()]
+
+
 def _backfill_lead_tools_if_empty(
     cur: Any,
     cfg: Config,
@@ -260,24 +305,13 @@ def _backfill_lead_tools_if_empty(
     max_retries: int = 2,
 ) -> list[str]:
     """O37b: on-demand / cache-hit — заполнить tools_required, если колонка пуста."""
-    tools = _parse_tools_required(row[13])
-    if tools:
-        return tools
-    lite = _lite_from_lead_row(row)
-    premium = analyze_premium(
+    tools = _ondemand_lead_tools(
         cfg,
-        title=row[2] or "",
-        budget_text=row[5] or "",
-        description=row[3] or "",
-        url=row[4] or "",
-        lite=lite,
-        errors=ai_errors,
+        row,
+        ai_errors=ai_errors,
         log_prefix=log_prefix,
-        max_retries=max(1, min(int(max_retries), 2)),
+        max_retries=max_retries,
     )
-    if not premium:
-        return []
-    tools = [str(t).strip() for t in premium.tools_required if str(t).strip()]
     if tools:
         _persist_lead_tools_required(cur, int(row[0]), tools)
     return tools
@@ -615,64 +649,42 @@ def generate_and_store_lead_draft(
                 return _draft_result_from_row(cur, user_id, row, reply)
 
             lite = _lite_from_lead_row(row)
-            tools_existing = _parse_tools_required(row[13])
-            if not tools_existing:
-                premium = analyze_premium(
+            tools = _parse_tools_required(row[13])
+            if not tools:
+                tools = _ondemand_lead_tools(
                     cfg,
-                    title=row[2] or "",
-                    budget_text=row[5] or "",
-                    description=row[3] or "",
-                    url=row[4] or "",
-                    lite=lite,
-                    errors=ai_errors,
-                    log_prefix=prefix,
-                    max_retries=max(1, min(int(max_retries), 2)),
-                )
-                if not premium or not (premium.reply_draft or "").strip():
-                    note_draft_request(False)
-                    detail = "; ".join(ai_errors) if ai_errors else "draft generation failed"
-                    logger.warning("%sfail %s", prefix, detail)
-                    raise DraftError("ai_fail", detail)
-                reply = strip_reply_draft_price_deadline(premium.reply_draft.strip())
-                tools = [
-                    str(t).strip() for t in premium.tools_required if str(t).strip()
-                ]
-                _persist_lead_tools_required(cur, lead_id, tools)
-                cur.execute(
-                    """
-                    UPDATE leads
-                    SET reply_draft = COALESCE(NULLIF(%s, ''), reply_draft)
-                    WHERE id = %s
-                    """,
-                    (reply, lead_id),
-                )
-            else:
-                reply_raw = _analyze_shared_ondemand(
-                    cfg,
-                    title=row[2] or "",
-                    budget_text=row[5] or "",
-                    description=row[3] or "",
-                    lite=lite,
-                    tools_required=tools_existing,
+                    row,
                     ai_errors=ai_errors,
                     log_prefix=prefix,
                     max_retries=max_retries,
                 )
-                if not reply_raw:
-                    note_draft_request(False)
-                    detail = "; ".join(ai_errors) if ai_errors else "draft generation failed"
-                    logger.warning("%sfail %s", prefix, detail)
-                    raise DraftError("ai_fail", detail)
-                reply = strip_reply_draft_price_deadline(reply_raw.strip())
-                cur.execute(
-                    """
-                    UPDATE leads
-                    SET reply_draft = COALESCE(NULLIF(%s, ''), reply_draft)
-                    WHERE id = %s
-                    """,
-                    (reply, lead_id),
-                )
-                tools = tools_existing
+                if tools:
+                    _persist_lead_tools_required(cur, lead_id, tools)
+            reply_raw = _analyze_shared_ondemand(
+                cfg,
+                title=row[2] or "",
+                budget_text=row[5] or "",
+                description=row[3] or "",
+                lite=lite,
+                tools_required=tools,
+                ai_errors=ai_errors,
+                log_prefix=prefix,
+                max_retries=max_retries,
+            )
+            if not reply_raw:
+                note_draft_request(False)
+                detail = "; ".join(ai_errors) if ai_errors else "draft generation failed"
+                logger.warning("%sfail %s", prefix, detail)
+                raise DraftError("ai_fail", detail)
+            reply = strip_reply_draft_price_deadline(reply_raw.strip())
+            cur.execute(
+                """
+                UPDATE leads
+                SET reply_draft = COALESCE(NULLIF(%s, ''), reply_draft)
+                WHERE id = %s
+                """,
+                (reply, lead_id),
+            )
             # Shared L2 remains in leads.reply_draft; each user gets unique cached variant.
             reply_personal, fallback_shared = _build_personalized_reply(
                 cfg,
@@ -931,6 +943,7 @@ def push_match_for_lead(
                 cur.execute(
                     """
                     SELECT u.id, u.tg_chat_id, s.plan, s.is_active, s.paused_until,
+                           s.active_until,
                            COALESCE(u.push_min_match, %s),
                            COALESCE(u.push_enabled, TRUE)
                     FROM users u
@@ -945,6 +958,7 @@ def push_match_for_lead(
                     plan,
                     is_active,
                     paused_until,
+                    active_until,
                     push_min_match,
                     push_enabled,
                 ) in cur.fetchall():
@@ -954,7 +968,13 @@ def push_match_for_lead(
                         continue
                     plan_str = str(plan or "free")
                     is_act = bool(is_active)
-                    if not _user_push_eligible(plan_str, is_act, paused_until, now):
+                    if not _user_push_eligible(
+                        plan_str,
+                        is_act,
+                        paused_until,
+                        now,
+                        active_until=active_until,
+                    ):
                         continue
                     user_tags = _load_user_tags(cur, str(user_id))
                     if not user_tags:

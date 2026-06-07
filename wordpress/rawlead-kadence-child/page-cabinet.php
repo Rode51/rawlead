@@ -70,23 +70,14 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 				<h2 class="rl-cabinet-sub__title" id="rl-cabinet-sub-title"><?php esc_html_e('RawLead Premium', 'rawlead-kadence-child'); ?></h2>
 				<span class="rl-cabinet-sub__badge" id="rl-cabinet-sub-badge" aria-live="polite"></span>
 			</div>
-			<p class="rl-cabinet-sub__price" id="rl-cabinet-sub-price"><?php esc_html_e('790 ₽/мес · или 300 ⭐ Stars', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-cabinet-sub__price" id="rl-cabinet-sub-price"><?php esc_html_e('790 ₽/мес · или 600 ⭐ Stars', 'rawlead-kadence-child'); ?></p>
 			<p class="rl-cabinet-sub__detail" id="rl-cabinet-sub-detail"></p>
 			<div class="rl-cabinet-sub__actions">
-				<a class="rl-btn rl-btn--primary rl-cabinet-sub__trial" id="rl-cabinet-sub-trial" href="<?php echo esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=trial'); ?>" target="_blank" rel="noopener" hidden>
+				<button type="button" class="rl-btn rl-btn--primary rl-cabinet-sub__trial" id="rl-cabinet-sub-trial" hidden>
 					<?php esc_html_e('Попробовать 3 дня бесплатно', 'rawlead-kadence-child'); ?>
-				</a>
-				<a class="rl-btn rl-btn--ghost rl-cabinet-sub__pay" id="rl-cabinet-sub-pay" href="<?php echo esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay'); ?>" target="_blank" rel="noopener">
+				</button>
+				<a class="rl-btn rl-btn--primary rl-cabinet-sub__pay" id="rl-cabinet-sub-pay" href="<?php echo esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay'); ?>" target="_blank" rel="noopener">
 					<?php esc_html_e('Подключить Premium →', 'rawlead-kadence-child'); ?>
-				</a>
-				<button type="button" class="rl-btn rl-btn--ghost rl-cabinet-sub__pause" id="rl-cabinet-sub-pause" hidden disabled>
-					<?php esc_html_e('Пауза', 'rawlead-kadence-child'); ?>
-				</button>
-				<button type="button" class="rl-btn rl-btn--ghost rl-cabinet-sub__resume" id="rl-cabinet-sub-resume" hidden>
-					<?php esc_html_e('Возобновить', 'rawlead-kadence-child'); ?>
-				</button>
-				<a class="rl-btn rl-btn--ghost rl-cabinet-sub__billing" id="rl-cabinet-sub-billing" href="<?php echo esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay'); ?>" target="_blank" rel="noopener" hidden>
-					<?php esc_html_e('Оплата', 'rawlead-kadence-child'); ?>
 				</a>
 			</div>
 			<p class="rl-cabinet-sub__note" id="rl-cabinet-sub-note" hidden></p>
@@ -127,7 +118,9 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 				</p>
 			</header>
 			<header class="rl-feed-head rl-cabinet-feed-head">
-				<p class="rl-feed-head__count" id="rl-cabinet-count" aria-live="polite"></p>
+				<div class="rl-feed-head__meta">
+					<p class="rl-feed-head__count" id="rl-cabinet-count" aria-live="polite"></p>
+				</div>
 			</header>
 			<div class="rl-feed-banner" id="rl-cabinet-error" role="alert" hidden></div>
 			<div class="rl-cabinet-empty rl-cabinet-empty--no-tags" id="rl-cabinet-no-tags" hidden>

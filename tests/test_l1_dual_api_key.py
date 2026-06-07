@@ -49,6 +49,16 @@ def _cfg(*, b: str = "") -> Config:
         stars_enabled=False,
         stars_price_xtr=1,
         stars_subscription_days=30,
+        pay_premium_rub=790,
+        pay_sbp_phone="",
+        pay_sbp_bank="T-Bank",
+        pay_btc_address="",
+        pay_eth_address="",
+        pay_usdt_trc20_address="",
+        pay_usdt_erc20_address="",
+        pay_ton_address="",
+        pay_crypto_memo_prefix="RL",
+        pay_approve_bot="legacy",
     )
 
 

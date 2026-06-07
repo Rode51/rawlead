@@ -50,6 +50,38 @@ class _MonitorSession:
     chat_ids: set[int]
 
 
+def _needs_join_bootstrap(
+    *,
+    pending: int,
+    join_in_main: bool,
+    file_chat_ids: list[int],
+    listen_ids: list[int] | None = None,
+) -> bool:
+    """Join-only сессия: pending>0 и (нет id в файле или 0 listen после v2 filter)."""
+    if not join_in_main or pending <= 0:
+        return False
+    if not file_chat_ids:
+        return True
+    return listen_ids is not None and not listen_ids
+
+
+def _append_join_bootstrap(
+    acfg,
+    client: object,
+    pend: int,
+    reason: str,
+    *,
+    log_path: Path,
+    join_bootstrap: list[_MonitorSession],
+) -> None:
+    join_bootstrap.append(_MonitorSession(acfg.account, client, set()))
+    _append_log(
+        log_path,
+        f"{radar_timestamp()} тг:монитор:{acfg.account}: "
+        f"join-bootstrap pending={pend} ({reason})",
+    )
+
+
 def _append_log(log_path: Path, line: str) -> None:
     log_path = Path(log_path)
     parent = log_path.parent
@@ -350,9 +382,14 @@ async def run_monitor() -> None:
     sessions: list[_MonitorSession] = []
     join_bootstrap: list[_MonitorSession] = []
     for acfg in tg_cfg.accounts:
+        account_key = acfg.account.strip().lower()
+        pend = int(pending_join.get(account_key, 0))
         if not acfg.chat_ids:
-            pend = int(pending_join.get(acfg.account.strip().lower(), 0))
-            if join_in_main and pend > 0:
+            if _needs_join_bootstrap(
+                pending=pend,
+                join_in_main=join_in_main,
+                file_chat_ids=[],
+            ):
                 client = await connect_client(acfg.account)
                 await ensure_bot_started(
                     client,
@@ -361,13 +398,13 @@ async def run_monitor() -> None:
                         log_path, f"{radar_timestamp()} {msg}"
                     ),
                 )
-                join_bootstrap.append(
-                    _MonitorSession(acfg.account, client, set())
-                )
-                _append_log(
-                    log_path,
-                    f"{radar_timestamp()} тг:монитор:{acfg.account}: "
-                    f"join-bootstrap pending={pend} (нет chat_ids)",
+                _append_join_bootstrap(
+                    acfg,
+                    client,
+                    pend,
+                    "нет chat_ids",
+                    log_path=log_path,
+                    join_bootstrap=join_bootstrap,
                 )
             else:
                 _append_log(
@@ -391,6 +428,21 @@ async def run_monitor() -> None:
                 f"{radar_timestamp()} тг:монитор:{acfg.account}: "
                 f"P1 listen filter: {len(listen_ids)} из {len(acfg.chat_ids)} чатов",
             )
+        if _needs_join_bootstrap(
+            pending=pend,
+            join_in_main=join_in_main,
+            file_chat_ids=list(acfg.chat_ids),
+            listen_ids=listen_ids,
+        ):
+            _append_join_bootstrap(
+                acfg,
+                client,
+                pend,
+                "0 listen после filter",
+                log_path=log_path,
+                join_bootstrap=join_bootstrap,
+            )
+            continue
         chat_ids: set[int] = set()
         await _add_monitor_peers(
             client,

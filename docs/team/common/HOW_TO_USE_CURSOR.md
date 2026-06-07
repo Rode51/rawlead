@@ -48,6 +48,32 @@
 
 ---
 
+## Harness O119 — гибрид без ECC
+
+**Оркестратор отдельно не нужен:** triage, очередь и handoff — это **Lead Architect** (`STATUS`, `TASKS`, `CODER_PROMPT`, `problems/`). Роль не дублируем.
+
+**Что добавилось:** 4 project-skills в `.cursor/skills/rawlead-*` — короткие сценарии (поиск до кода, инцидент, VPS, WP live dev). Agent включает skill **когда задача подходит**, не грузит всё в каждый чат.
+
+| Skill | Зачем |
+|-------|--------|
+| `rawlead-search-first` | grep/read до правок — меньше регрессов и токенов |
+| `rawlead-incident` | «всё сломалось» → тикет → Mechanic |
+| `rawlead-vps-probe` | proxy, systemd, `probe_all_proxies.py` |
+| `rawlead-wp-live-dev` | Local + BrowserSync (O118) |
+
+**Что не меняется:**
+
+- `@coder` / `@mechanic` / `@lead-designer` — как раньше
+- `economy.mdc` — hot STATUS/TASKS
+- Lead **не кодит** · commit — Lead по просьбе
+- Новые `.md` в docs — только с твоим «да»
+
+**Запрещено:** `./install.ps1 --profile full` из [ECC](https://github.com/affaan-m/ecc) — конфликт rules и раздувание контекста.
+
+**Тебе по ходу:** когда Lead вводит новый skill или меняет harness — объяснит в чате одним абзацем «новое правило».
+
+---
+
 ## Отдельный чат на роль
 
 Стартовые фразы — в **`.cursor/rules/*.mdc`**.
@@ -86,7 +112,7 @@
 | Ошибка: последние 15 строк консоли | Скрин + простыня переписки |
 | Правки FILTERS/PROFILE — файл на диске | «Запомни 20 слов навсегда» |
 | Lead / Coder / Mechanic: **Agent** | Ask для правок кода |
-| Модель **Auto** | Max без причины |
+| Модель **Auto** на всё подряд (есть отдельная квота **Auto+Composer**) | Max без причины |
 | Итог сессии в `STATUS.md` | «Напомни что мы делали вчера» в новом чате |
 | Факты только из файлов repo | AI «помнит» то, чего нет в docs |
 
@@ -137,3 +163,151 @@
 | Ваш открытый Chrome + логин | Chrome (`claude --chrome` в Claude Code) |
 
 Если tools MCP в чате **нет** — агент должен попросить владельца включить сервер, а не «притворяться», что сходил на сайт.
+
+---
+
+## Квоты Cursor Pro (два счётчика)
+
+В **Usage** два отдельных прогресса (не «Auto бесплатный навсегда»):
+
+| Счётчик | Что ест | Перелив |
+|---------|---------|---------|
+| **Auto + Composer** | Режим **Auto**, Composer | сверх лимита → **API-квота** или on-demand |
+| **API** | Встроенные модели (Sonnet…), ~**$20** в плане | on-demand |
+
+**Вывод:** длинный **Lead на Auto** всё равно **тратит подписку** (сначала Auto+Composer %, потом API). **Lead на свой API at-cost** (Google **или** OpenRouter) — не копит счётчики Cursor, если в чате выбрана **именно** эта модель, не Auto.
+
+**Только OpenRouter (нет Google key):** Lead → **Agent** + OR Flash; Coder → **Auto** + Agent; при `Tool ''` на Lead — резерв Agent **Auto**.
+
+---
+
+## OpenRouter в Cursor (BYOK) — модели по ролям
+
+**Зачем:** вынести часть запросов на **свой API** (Google BYOK и т.д.), чтобы не съедать квоты Cursor. **Lead** — основной кандидат (длинный чат, много docs).
+
+### Один раз в Cursor Settings → Models
+
+| Шаг | Значение |
+|-----|----------|
+| OpenAI API Key | Включить · ключ **OpenRouter** (`sk-or-…`) |
+| Override OpenAI Base URL | `https://openrouter.ai/api/v1` |
+| Verify | Нажать **Verify** у OpenAI key |
+| + Add model | Каждый ID из таблицы ниже — **отдельной строкой**, Enter |
+
+На [openrouter.ai/models](https://openrouter.ai/models) фильтр **tools** — иначе Agent в Cursor может не работать.
+
+### Что добавить (+ Add model) — копипаст ID
+
+| Имя в UI (как назовёте) | Model ID | Когда |
+|-------------------------|----------|--------|
+| OR Flash daily | `google/gemini-2.5-flash` | **Coder / Designer** — основной день |
+| OR DeepSeek cheap | `deepseek/deepseek-chat-v3-0324` | мелкие правки, черновой код |
+| OR Haiku fast | `anthropic/claude-3.5-haiku` | короткие задачи, docs-правки |
+| OR Sonnet release | `anthropic/claude-sonnet-4` | **перед релизом**, узкие правки (вместо встроенной Sonnet) |
+| OR Sonnet cheap | `anthropic/claude-sonnet-4:floor` | то же, дешевле, медленнее |
+| OR Gemini Pro | `google/gemini-2.5-pro` | **только @mechanic** + тикет |
+| OR Sonnet fast | `anthropic/claude-sonnet-4:nitro` | если `:floor` тормозит на дедлайне |
+
+Если Cursor пишет «model not found» — скопируйте ID с карточки модели на OpenRouter (кнопка clipboard), не с памяти.
+
+### Какой чат — какая модель
+
+| Чат | Модель в селекторе | Платит |
+|-----|-------------------|--------|
+| **Lead Architect** (один долгий) | **Agent** + **OR** `google/gemini-2.5-flash` · резерв **Auto** | OR → OpenRouter · Auto → **Auto+Composer** |
+| **Coder** (новый на задачу) | `google/gemini-2.5-flash` или DeepSeek | OpenRouter |
+| **Designer** | Flash | OpenRouter |
+| **Mechanic** | `google/gemini-2.5-pro` | OpenRouter |
+| Узкая правка перед релизом | `anthropic/claude-sonnet-4:floor` | OpenRouter · **не** встроенная Sonnet |
+
+**Не трогать встроенную Sonnet/Max** в селекторе — они едят **пул Pro**. Перед релизом — OR Sonnet из таблицы.
+
+**Tab** (автодополнение) всегда на Cursor — OR на это не влияет.
+
+### Лимит OpenRouter
+
+В [openrouter.ai/settings/credits](https://openrouter.ai/settings/credits) — потолок **$30–50/мес**, алерт 80%. Смотреть расход: Activity → фильтр по model id.
+
+### Если Agent падает на OR-модели
+
+1. Verify key ещё раз  
+2. Base URL именно с `/v1`  
+3. Взять другую модель с **tools** (Flash / Sonnet)  
+4. Chat иногда стабильнее Agent на BYOK — для плана достаточно, для кода — Agent + Flash
+
+### Ошибка `Tool '' not found in provided tools` (Request ID в попапе)
+
+**Смысл:** Agent отправил вызов инструмента с **пустым именем** — Google / Bedrock / Anthropic отклоняют запрос. В metadata часто **`is_byok: false`** → запрос идёт **через бэкенд Cursor**, а не на ваш OpenRouter.
+
+**Частые причины:**
+
+| # | Причина | Что сделать |
+|---|---------|-------------|
+| 1 | **Agent + OpenRouter** — у Cursor ограниченная поддержка; Agent часто **не** ходит на Override URL | См. обходы ниже |
+| 2 | Включены **MCP** (Playwright, Firecrawl, Neon…) + Agent | **Settings → Tools & MCP** — выключить все → **новый чат** → тест. Потом включать по одному |
+| 3 | Выбрана **встроенная** Sonnet/Gemini, не OR-модель из списка | В селекторе — только добавленные `google/gemini-2.5-flash` и т.д. |
+| 4 | Режим **Agent** при BYOK | Попробовать **Ask** на той же OR-модели (без полного Agent) |
+
+**Рабочая схема для uisness (2026-06):**
+
+| Роль | Режим Cursor | Модель | Платит |
+|------|--------------|--------|--------|
+| Lead | **Agent** | **OR** `google/gemini-2.5-flash` | OpenRouter |
+| Coder — обычный день | **Agent** | **Auto** | Auto+Composer (MCP) |
+| Coder — перед релиз | **Agent** | **Anthropic BYOK** Sonnet (ключ Anthropic, не OR) **или** встроенная Sonnet (пул Pro) | API / Pro |
+| Coder — эксперимент OR | **Ask** (не Agent) | OR Flash | OpenRouter |
+| Mechanic | Agent | **Google BYOK** Gemini 2.5 **или** OR Gemini Pro | API / OR |
+| L1/L2/regen в Python | — | OpenRouter в `.env` | OR (как сейчас) |
+
+**OpenRouter + Agent** на Coder — ненадёжно (держать **Auto**). На **Lead** OR+Agent пробовать Flash; скрипты — OR в `.env`.
+
+**Быстрый тест после ошибки:** MCP off → новый чат → модель **Auto** → Agent → «прочитай STATUS.md». Ок → включать MCP по одному. Не ок → **Help → HTTP Compatibility Mode → HTTP/1.1**, перезапуск Cursor.
+
+### Anthropic BYOK + MCP — часто ломается (2026-06)
+
+**Симптом:** только Claude (свой ключ Anthropic или OR→Claude): `Tool '' not found` / `missing field type` в Agent **с включённым MCP**. GPT / Gemini / **Auto** при тех же MCP обычно ок.
+
+**MCP отключать надолго не нужно.** Сначала **настройки**, не серверы:
+
+| Проверка | Действие |
+|----------|----------|
+| Конфликт ключей | **Либо** Anthropic BYOK, **либо** OpenRouter (Override URL). Не оба сразу. Для Anthropic: Override OpenAI Base URL = **Off**, OpenAI key (OR) = **Off** |
+| Релиз без Anthropic API | **Встроенная** Sonnet (пул Pro) + MCP on — не свой ключ Anthropic |
+| Дешёвый API + MCP | **Google BYOK** → Gemini 2.5 Flash/Pro (официальный слот Google в Models) |
+| Прокси в Cursor | `settings.json` → `http.proxy` может ронять **только** Anthropic API — тест: временно proxy off, новый чат, Sonnet BYOK |
+| MCP «залип» | Settings → Tools & MCP: toggle **off/on** всех → **новый** чат (не старый тред) |
+
+**Рабочий стек с MCP (uisness):**
+
+| Роль | Модель | MCP |
+|------|--------|-----|
+| Lead | **OR Flash** (Agent) | MCP по задаче; OR падает → Agent **Auto** |
+| Coder день | **Auto** | Playwright / Firecrawl / Neon по нужде |
+| Coder релиз | **встроенная Sonnet** (не Anthropic BYOK) | да |
+| Альтернатива Sonnet | **Google BYOK** `gemini-2.5-pro` | да |
+| Mechanic | Google BYOK Gemini 2.5 Pro | по тикету |
+| Скрипты L1/L2 | OpenRouter в `.env` | — |
+
+Anthropic ключ в Cursor — **отложить**, пока Agent+Claude+MCP не починят в вашей версии; OR→Claude в Agent — та же история.
+
+### Только OpenRouter (нет Google AI Studio)
+
+| Шаг | Settings → Models |
+|-----|-------------------|
+| 1 | **OpenAI API Key** On → ключ `sk-or-…` |
+| 2 | **Override Base URL** → `https://openrouter.ai/api/v1` |
+| 3 | **Anthropic / Google** BYOK в Cursor — **Off** (конфликт) |
+| 4 | **+ Add model:** `google/gemini-2.5-flash`, `anthropic/claude-3.5-haiku`, `deepseek/deepseek-chat-v3-0324` |
+| 5 | Лимит на [openrouter.ai/settings/credits](https://openrouter.ai/settings/credits) |
+
+| Роль | Режим | Модель |
+|------|-------|--------|
+| **Lead** | **Agent** (следит за `docs/`, TASKS, PROMPT) | `google/gemini-2.5-flash` |
+| **Lead MCP** | только по задаче (Neon/Firecrawl…), не держать Playwright «всегда» | — |
+| **Lead резерв** | Agent | **Auto**, если OR даёт `Tool ''` |
+| **Coder** | Agent + MCP | **Auto** |
+| **Релиз** | Agent | **встроенная Sonnet**, не OR Claude |
+
+**Не на Lead OR:** `claude-sonnet-*`. **Ask** — только если Agent временно сломан; для Lead по регламенту нужен **Agent**.
+
+**Экономия без Ask:** черновики в **Gemini в браузере** → 5–10 строк в чат Lead → один Agent-ход правит файлы (меньше OR-токенов).

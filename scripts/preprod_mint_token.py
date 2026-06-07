@@ -62,6 +62,7 @@ def _upsert_preprod_user(
     tg_user_id: int,
     username: str | None,
     first_name: str | None,
+    plan: str = "agent",
 ) -> str:
     cur.execute("SELECT id FROM users WHERE tg_user_id = %s", (tg_user_id,))
     row = cur.fetchone()
@@ -85,15 +86,26 @@ def _upsert_preprod_user(
             (user_id, tg_user_id, username, first_name),
         )
 
-    cur.execute(
-        """
-        INSERT INTO subscriptions (user_id, plan, is_active)
-        VALUES (%s::uuid, 'agent', TRUE)
-        ON CONFLICT (user_id) DO UPDATE
-        SET plan = 'agent', is_active = TRUE, paused_until = NULL
-        """,
-        (user_id,),
-    )
+    if plan == "free":
+        cur.execute(
+            """
+            INSERT INTO subscriptions (user_id, plan, is_active)
+            VALUES (%s::uuid, 'free', FALSE)
+            ON CONFLICT (user_id) DO UPDATE
+            SET plan = 'free', is_active = FALSE, active_until = NULL, paused_until = NULL
+            """,
+            (user_id,),
+        )
+    else:
+        cur.execute(
+            """
+            INSERT INTO subscriptions (user_id, plan, is_active)
+            VALUES (%s::uuid, 'agent', TRUE)
+            ON CONFLICT (user_id) DO UPDATE
+            SET plan = 'agent', is_active = TRUE, paused_until = NULL
+            """,
+            (user_id,),
+        )
     return user_id
 
 
@@ -117,9 +129,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="O37c-a: mint preprod JWT for Telethon acc")
     parser.add_argument("--account", default="acc1", choices=("acc1", "acc2", "acc3"))
     parser.add_argument(
+        "--plan",
+        default="agent",
+        choices=("free", "agent"),
+        help="free = logged-in без premium; agent = premium (default)",
+    )
+    parser.add_argument(
         "--write-env-site",
         action="store_true",
-        help=f"Write {_TOKEN_KEY} to .env.site",
+        help="Write token to .env.site under --env-key",
+    )
+    parser.add_argument(
+        "--env-key",
+        default="RAWLEAD_PREPROD_ACCESS_TOKEN",
+        help="Key in .env.site when --write-env-site",
     )
     args = parser.parse_args()
 
@@ -152,6 +175,7 @@ def main() -> int:
                     tg_user_id=tg_user_id,
                     username=username,
                     first_name=first_name,
+                    plan=args.plan,
                 )
             conn.commit()
     except Exception as exc:
@@ -173,10 +197,11 @@ def main() -> int:
         return 1
 
     if args.write_env_site:
-        _write_env_site(_ENV_SITE, _TOKEN_KEY, token)
-        print(f"token written → {_ENV_SITE.name}")
+        _write_env_site(_ENV_SITE, args.env_key, token)
+        print(f"token written → {_ENV_SITE.name} ({args.env_key})")
 
     print(f"account={args.account}")
+    print(f"plan={args.plan}")
     print(f"tg_user_id={tg_user_id}")
     print(f"user_id={user_id}")
     if username:

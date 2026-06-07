@@ -89,6 +89,20 @@
 
 ---
 
+## Harness O119 (skills, не ECC)
+
+| Что | Где |
+|-----|-----|
+| Каталог | [`.cursor/skills/README.md`](../../.cursor/skills/README.md) |
+| Правила ролей | **без изменений** — `.mdc` как раньше |
+| Оркестратор | **только `@lead-architect`** — отдельной роли нет |
+
+Skills подхватываются Agent **по задаче** (дешевле, чем 251 skill ECC). Full ECC в repo **не ставим**.
+
+Владельцу: [`HOW_TO_USE_CURSOR.md`](../../docs/team/common/HOW_TO_USE_CURSOR.md) § Harness.
+
+---
+
 ## Быстрый старт владельца
 
 1. **Settings → Rules** — Project Rules включены.

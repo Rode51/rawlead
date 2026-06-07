@@ -71,11 +71,11 @@
 | S1 | Матрица ИИ: по каждой из 4 category есть ≥3 примера в отчёте, без пустых `reply_draft` на «нормальном» лиде |
 | S2 | UX-audit: 0 critical; отчёт `data/preprod_ux_audit.md` |
 | S3 | Smoke pass (`preprod_playwright/smoke.py`) |
-| S4 | k6: p95 &lt; 2 с, 0% 5xx за 5 мин |
-| S5 | Site ▶: цикл FL+Kwork без лавины ошибок |
-| S6 | Владелец 15 мин глазами + L2 в `/cabinet/` |
+| S4 | k6/load: p95 < 2 с, 0% 5xx **после S3-pre** (Neon pooler / ramp) |
+| S5 | Site ▶: 2–4 цикла · **S4-pre** — нет runaway proxy cascade |
+| S6 | Владелец S5–S6 + **S6-b** skills_mismatch |
 
-**Красные флаги (стоп трафика):** 429/timeout OpenRouter на каждом лиде; API 5xx под 20 VU; CORS блокирует WP; лента пустая при живом радаре.
+**Красные флаги (стоп трафика):** 429 OpenRouter; API 5xx под load; **Postgres `53300`**; CORS; лента пустая при живом радаре; **proxy cascade exhausted** каждый цикл.
 
 **MCP:** Playwright — [`MCP_POOL.md`](../common/MCP_POOL.md). Нет tools — Coder пишет скрипты в `scripts/`, владелец включает MCP позже.
 

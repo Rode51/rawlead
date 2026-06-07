@@ -13,10 +13,20 @@
   if (!root || !window.rawleadFeed) {
     return;
   }
+  root.classList.add("rl-feed-shell--pending");
 
   var cfg = window.rawleadFeed;
   var TOKEN_KEY = "rawlead_access_token";
+  var PREFS_KEY = "rawlead_feed_prefs";
   var TAGS_SYNC_KEY = "rawlead_user_tags_rev";
+  var MIN_MATCH_OPTIONS = [50, 60, 70, 80, 90];
+  var SLOT_TOOLTIP =
+    "На один заказ — до 10 персональных черновиков. Когда места заняты — кнопка отклика серая, заказ остаётся в ленте.";
+  var HUMAN_VIEWS_KEY = "rawlead_card_human_views";
+  var INFO_ICON_SVG =
+    '<svg class="rl-feed-card__slot-info-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>' +
+    '<path fill="currentColor" d="M11 10h2v8h-2zm0-4h2v2h-2z"/></svg>';
   var AUTH_COOKIE = "rl_access";
   var AUTH_COOKIE_MAX_AGE = 7 * 24 * 3600;
   var MAX_USER_TAGS = 12;
@@ -78,6 +88,7 @@
     },
   };
   var listEl = document.getElementById("rl-feed-list");
+  var toolbarEl = document.getElementById("rl-feed-toolbar");
   var countEl = document.getElementById("rl-feed-count");
   var paginationEl = document.getElementById("rl-feed-pagination");
   var loadMoreBtn = document.getElementById("rl-feed-load-more");
@@ -95,7 +106,6 @@
   var skillsHintEl = document.getElementById("rl-feed-skill-tree-hint");
   var skillsApplyBtn = document.getElementById("rl-feed-skills-apply");
   var skillsClearBtn = document.getElementById("rl-feed-skills-clear");
-  var tagsEditBtn = document.getElementById("rl-feed-tags-edit");
   var skillsTriggerEl = document.getElementById("rl-feed-skills-trigger-label");
   var skillsTriggerBtn = document.getElementById("rl-feed-skills-trigger");
   var skillsModalEl = document.getElementById("rl-feed-skills-modal");
@@ -104,6 +114,11 @@
   var skillTreeCounterEl = document.getElementById("rl-feed-skill-tree-counter");
   var skillTreeLimitEl = document.getElementById("rl-feed-skill-tree-limit");
   var sidebarScroll = document.getElementById("rl-feed-sidebar-scroll");
+  var filterHintEl = document.getElementById("rl-filter-hint");
+  var sortPanelEl = document.getElementById("rl-feed-sort-panel");
+  var sortTriggerLabelEl = document.getElementById("rl-feed-sort-trigger-label");
+  var sortDdEl = document.getElementById("rl-feed-sort-dd");
+  var filterHintTimer = null;
 
   var state = {
     offset: 0,
@@ -112,6 +127,7 @@
     draftCategories: [],
     appliedCategories: [],
     sort: "time",
+    min_match: 80,
     draftTags: [],
     appliedTags: [],
     catalog: [],
@@ -203,7 +219,140 @@
   }
 
   function feedApiBase() {
-    return isLoggedIn() && cfg.restMeFeed ? cfg.restMeFeed : cfg.restFeed;
+    return cfg.restFeed;
+  }
+
+  function readLocalFeedPrefs() {
+    try {
+      var raw = localStorage.getItem(PREFS_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeLocalFeedPrefs(prefs) {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs || {}));
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function prefsTimestamp(prefs) {
+    if (!prefs || !prefs.updated_at) {
+      return 0;
+    }
+    var t = Date.parse(prefs.updated_at);
+    return isNaN(t) ? 0 : t;
+  }
+
+  function normalizeFeedPrefs(prefs) {
+    var out = {
+      sort: "time",
+      min_match: 80,
+      category: "",
+      updated_at: prefs && prefs.updated_at ? prefs.updated_at : null,
+    };
+    if (!prefs) {
+      return out;
+    }
+    if (prefs.sort === "match" || prefs.sort === "time") {
+      out.sort = prefs.sort;
+    }
+    var mm = parseInt(String(prefs.min_match), 10);
+    if (MIN_MATCH_OPTIONS.indexOf(mm) >= 0) {
+      out.min_match = mm;
+    }
+    if (typeof prefs.category === "string") {
+      out.category = prefs.category;
+    }
+    return out;
+  }
+
+  function applyFeedPrefsToState(prefs) {
+    var p = normalizeFeedPrefs(prefs);
+    state.sort = p.sort;
+    state.min_match = p.min_match;
+    if (p.category) {
+      var cats = p.category.split(",").filter(Boolean);
+      if (cats.length) {
+        state.appliedCategories = cats;
+        state.draftCategories = cats.slice();
+      }
+    }
+  }
+
+  function currentFeedPrefsPayload() {
+    return {
+      sort: state.sort,
+      min_match: state.min_match,
+      category: state.appliedCategories.join(","),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  function persistFeedPrefs() {
+    var payload = currentFeedPrefsPayload();
+    writeLocalFeedPrefs(payload);
+    if (!isLoggedIn() || !cfg.restFeedPrefs) {
+      return Promise.resolve(payload);
+    }
+    return fetch(cfg.restFeedPrefs, {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+      body: JSON.stringify({
+        sort: payload.sort,
+        min_match: payload.min_match,
+        category: payload.category,
+      }),
+    })
+      .then(function (res) {
+        if (res.status === 401) {
+          handleTagsAuthFailure();
+          throw new Error("HTTP 401");
+        }
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status);
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        writeLocalFeedPrefs(data);
+        return data;
+      });
+  }
+
+  function mergeFeedPrefsOnLogin() {
+    var local = normalizeFeedPrefs(readLocalFeedPrefs());
+    if (!isLoggedIn() || !cfg.restFeedPrefs) {
+      applyFeedPrefsToState(local);
+      return Promise.resolve();
+    }
+    return fetch(cfg.restFeedPrefs, {
+      credentials: "same-origin",
+      headers: authHeaders(),
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status);
+        }
+        return res.json();
+      })
+      .then(function (server) {
+        var remote = normalizeFeedPrefs(server);
+        var winner =
+          prefsTimestamp(remote) >= prefsTimestamp(local) ? remote : local;
+        applyFeedPrefsToState(winner);
+        writeLocalFeedPrefs(winner);
+        if (prefsTimestamp(winner) > prefsTimestamp(remote)) {
+          return persistFeedPrefs();
+        }
+      })
+      .catch(function () {
+        applyFeedPrefsToState(local);
+      });
   }
 
   function apiUrl(params) {
@@ -265,6 +414,119 @@
 
   function hasPaidAccess() {
     return !!(subscriptionState && subscriptionState.effective_access);
+  }
+
+  function getFeedTier() {
+    if (!isLoggedIn()) {
+      return "anon";
+    }
+    if (hasPaidAccess()) {
+      return "premium";
+    }
+    return "free";
+  }
+
+  function hideFilterHint() {
+    if (filterHintEl) {
+      filterHintEl.hidden = true;
+    }
+    if (filterHintTimer) {
+      clearTimeout(filterHintTimer);
+      filterHintTimer = null;
+    }
+  }
+
+  function showFilterHint() {
+    if (!filterHintEl || getFeedTier() !== "anon") {
+      return;
+    }
+    filterHintEl.hidden = false;
+    if (filterHintTimer) {
+      clearTimeout(filterHintTimer);
+    }
+    filterHintTimer = window.setTimeout(hideFilterHint, 4000);
+  }
+
+  function updateSortTriggerLabel() {
+    if (!sortTriggerLabelEl) {
+      return;
+    }
+    sortTriggerLabelEl.textContent = "Сортировка";
+    var sortTrigger = document.getElementById("rl-feed-sort-trigger");
+    if (sortTrigger) {
+      var tier = getFeedTier();
+      var active =
+        tier === "premium" &&
+        (state.sort === "match" || state.min_match !== 80);
+      sortTrigger.classList.toggle("rl-filter-btn--active", active);
+    }
+  }
+
+  function renderSortPanel() {
+    if (!sortPanelEl) {
+      return;
+    }
+    var tier = getFeedTier();
+    if (tier === "anon") {
+      sortPanelEl.innerHTML = "";
+      return;
+    }
+    sortPanelEl.innerHTML = buildSortOptionsHtml("rl-feed-sort", true);
+    updateSortPanelPctVisibility();
+  }
+
+  function updateSortPanelPctVisibility() {
+    if (!sortPanelEl) {
+      return;
+    }
+    var wrap = sortPanelEl.querySelector(".rl-sort-panel__pct-wrap");
+    if (!wrap) {
+      return;
+    }
+    var picked = sortPanelEl.querySelector('input[name="rl-feed-sort"]:checked');
+    wrap.hidden = !hasPaidAccess() || !picked || picked.value !== "match";
+  }
+
+  function enforceFeedSortTier() {
+    if (!hasPaidAccess() && state.sort === "match") {
+      state.sort = "time";
+    }
+  }
+
+  function applyFeedTierUi() {
+    var tier = getFeedTier();
+    if (sidebar) {
+      sidebar.setAttribute("data-tier", tier);
+    }
+    root.setAttribute("data-feed-tier", tier);
+    var locked = tier === "anon";
+    var sortTrigger = document.getElementById("rl-feed-sort-trigger");
+    [skillsTriggerBtn, sortTrigger].forEach(function (btn) {
+      if (!btn) {
+        return;
+      }
+      btn.classList.toggle("rl-filter-btn--locked", locked);
+      if (locked) {
+        btn.setAttribute(
+          "data-filter-locked",
+          btn.id === "rl-feed-skills-trigger" ? "skills" : "sort"
+        );
+      } else {
+        btn.removeAttribute("data-filter-locked");
+      }
+    });
+    if (skillsTriggerBtn) {
+      skillsTriggerBtn.classList.toggle(
+        "rl-filter-btn--active",
+        !locked && state.appliedTags.length > 0
+      );
+    }
+    if (sortDdEl && locked) {
+      sortDdEl.open = false;
+    }
+    enforceFeedSortTier();
+    renderSortPanel();
+    updateSortTriggerLabel();
   }
 
   function loadSubscription() {
@@ -377,6 +639,19 @@
       });
   }
 
+  function updateFeedStrip() {
+    var strip = document.getElementById("rl-feed-strip");
+    if (!strip) {
+      return;
+    }
+    if (isLoggedIn()) {
+      strip.hidden = true;
+      return;
+    }
+    strip.hidden = false;
+    strip.classList.remove("rl-feed-strip--free");
+  }
+
   function applyFeedShellMode() {
     try {
       localStorage.removeItem("rawlead_lenta_skills");
@@ -384,15 +659,12 @@
       /* ignore */
     }
     var loggedIn = isLoggedIn();
+    root.classList.remove("rl-feed-shell--pending");
     root.classList.toggle("rl-app--feed-logged-in", loggedIn);
     root.classList.toggle("rl-app--feed-anon", !loggedIn);
-    var anonStrip = document.getElementById("rl-feed-anon-strip");
-    if (anonStrip) {
-      anonStrip.hidden = loggedIn;
-    }
-    if (tagsEditBtn) {
-      tagsEditBtn.hidden = !loggedIn;
-    }
+    updateFeedStrip();
+    applyFeedTierUi();
+    syncFeedCabinetLink();
     if (loggedIn) {
       state.appliedCategories = [];
       state.draftCategories = [];
@@ -429,6 +701,7 @@
     if (!state.appliedTags.length && state.sort === "match") {
       state.sort = "time";
     }
+    enforceFeedSortTier();
     if (options.setSortMatch) {
       setSortMatch();
     }
@@ -649,29 +922,6 @@
     if (diff) {
       html += diff;
     }
-    if (isLoggedIn() && hasUserSkills() && showSkillMatchUi(item)) {
-      var km = item.keyword_match != null ? item.keyword_match : 0;
-      if (km > 0) {
-        html +=
-          '<div class="rl-match-breakdown rl-match-breakdown--expanded">' +
-          escapeHtml("Навыки: " + km + "%") +
-          "</div>";
-      }
-    }
-    var tags =
-      (item && item.lead_tag_labels && item.lead_tag_labels.length
-        ? item.lead_tag_labels
-        : item && item.lead_tags) || [];
-    if (tags.length > 2) {
-      html +=
-        '<div class="rl-chips rl-chips--expanded">' +
-        tags
-          .map(function (t) {
-            return '<span class="rl-chip">' + escapeHtml(prepForDisplay(t, true)) + "</span>";
-          })
-          .join("") +
-        "</div>";
-    }
     if (hasPaidAccess() && !prepForDisplay(item.reply_draft || "", false).trim()) {
       html +=
         '<p class="rl-feed-card__cta-note rl-feed-card__cta-note--expanded">ИИ напишет формулировку под тебя — не как у остальных</p>';
@@ -727,6 +977,12 @@
           })
           .join("") +
         "</ul></div>";
+    } else if (reply && isLoggedIn()) {
+      html +=
+        '<div class="rl-feed-card__section">' +
+        '<h4 class="rl-feed-card__section-title">Инструменты</h4>' +
+        '<p class="rl-feed-card__text rl-feed-card__muted">ИИ не выделил отдельный список инструментов для этого заказа.</p>' +
+        "</div>";
     }
     if (reply) {
       html +=
@@ -749,56 +1005,157 @@
 
   var SLOT_MAX = 10;
 
+  function readHumanViewBumps() {
+    try {
+      var raw = sessionStorage.getItem(HUMAN_VIEWS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeHumanViewBumps(map) {
+    try {
+      sessionStorage.setItem(HUMAN_VIEWS_KEY, JSON.stringify(map));
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function bumpHumanView(leadId) {
+    var id = parseInt(leadId, 10);
+    if (!id) {
+      return 0;
+    }
+    var map = readHumanViewBumps();
+    if (map[id]) {
+      return map[id];
+    }
+    map[id] = 1;
+    writeHumanViewBumps(map);
+    return 1;
+  }
+
+  function humanViewBump(leadId) {
+    return readHumanViewBumps()[parseInt(leadId, 10)] || 0;
+  }
+
+  function effectiveDisplayViews(item) {
+    var base = parseInt(item.display_views, 10) || 0;
+    return base + humanViewBump(item.id);
+  }
+
+  function syntheticDisplayReplies(leadId, views) {
+    var id = parseInt(leadId, 10) || 0;
+    var v = parseInt(views, 10) || 0;
+    if (v < 8 || v > 15) {
+      return 0;
+    }
+    var threshold = id % 2 === 0 ? 8 : 10;
+    if (v < threshold) {
+      return 0;
+    }
+    return 1;
+  }
+
+  function effectiveDisplayReplies(item) {
+    if (!item) {
+      return 0;
+    }
+    var fakeViews = parseInt(item.display_views, 10) || 0;
+    return syntheticDisplayReplies(item.id, fakeViews);
+  }
+
   function replySlotsRemaining(item) {
     if (!item) {
       return SLOT_MAX;
     }
-    if (item.reply_slots_remaining != null && item.reply_slots_remaining !== "") {
-      var n = parseInt(String(item.reply_slots_remaining), 10);
-      return isNaN(n) ? SLOT_MAX : Math.max(0, Math.min(SLOT_MAX, n));
+    var taken = effectiveDisplayReplies(item);
+    if (isLoggedIn()) {
+      var reply = prepForDisplay(item.reply_draft || "", false).trim();
+      if (reply) {
+        taken += 1;
+      }
     }
-    return SLOT_MAX;
+    return Math.max(0, SLOT_MAX - taken);
   }
 
   function renderSlotLine(item) {
-    if (!isLoggedIn()) {
+    if (getFeedTier() !== "premium") {
       return "";
     }
     var n = replySlotsRemaining(item);
     if (n <= 0) {
-      return "";
+      return (
+        '<div class="rl-row rl-row--paid-only rl-slot-row rl-slot-row--full" title="' +
+        escapeHtml(SLOT_TOOLTIP) +
+        '">' +
+        escapeHtml("Все места заняты") +
+        ' <span class="rl-feed-card__slot-info" title="' +
+        escapeHtml(SLOT_TOOLTIP) +
+        '">' +
+        INFO_ICON_SVG +
+        "</span></div>"
+      );
     }
+    var lastClass = n === 1 ? " rl-slot-row--last" : "";
     var text =
-      n === 1 ? "Последний черновик на этот заказ" : "Осталось " + n + " из " + SLOT_MAX;
-    var cls =
-      "rl-feed-card__slot-line" + (n === 1 ? " rl-feed-card__slot-line--last" : "");
+      n === 1
+        ? "Последний черновик на этот заказ"
+        : "Осталось " + n + " из " + SLOT_MAX;
     return (
-      '<p class="' +
-      cls +
-      '" title="До 10 уникальных откликов на заказ — без толпы ботов">' +
+      '<div class="rl-row rl-row--paid-only rl-slot-row' +
+      lastClass +
+      '" title="' +
+      escapeHtml(SLOT_TOOLTIP) +
+      '">' +
       escapeHtml(text) +
-      ' <span class="rl-feed-card__slot-info" aria-hidden="true">ⓘ</span></p>' +
-      '<p class="rl-slot-hint">Разные тексты — не шаблон → нет бана на бирже</p>'
+      ' <span class="rl-feed-card__slot-info" title="' +
+      escapeHtml(SLOT_TOOLTIP) +
+      '">' +
+      INFO_ICON_SVG +
+      "</span></div>"
     );
   }
 
-  function renderTagChips(item) {
+  function renderTagChips(item, maxVisible) {
     var tags =
       (item && item.lead_tag_labels && item.lead_tag_labels.length
         ? item.lead_tag_labels
         : item && item.lead_tags) || [];
-    var max = 2;
+    var showAll = maxVisible == null;
+    var max = showAll ? tags.length : maxVisible;
     var html = [];
     var i;
     for (i = 0; i < tags.length && i < max; i++) {
       html.push(
-        '<span class="rl-chip">' + escapeHtml(prepForDisplay(tags[i], true)) + "</span>"
+        '<span class="rl-chip ' +
+        tagChipClass(tags[i], item) +
+        '">' +
+        escapeHtml(prepForDisplay(tags[i], true)) +
+        "</span>"
       );
     }
-    if (tags.length > max) {
-      html.push('<span class="rl-chip rl-chip--more">+' + (tags.length - max) + "</span>");
+    if (!showAll && tags.length > max) {
+      html.push(
+        '<span class="rl-chip rl-chip--more" title="Раскрой карточку — увидишь все навыки">+' +
+          (tags.length - max) +
+          "</span>"
+      );
     }
     return html.join("");
+  }
+
+  function syncCardChips(card, item, expanded) {
+    if (!card || !item) {
+      return;
+    }
+    var chips = card.querySelector(".rl-feed-card__face--front > .rl-chips");
+    if (!chips) {
+      return;
+    }
+    chips.innerHTML = renderTagChips(item, expanded ? null : 2);
+    chips.classList.toggle("rl-chips--expanded-visible", !!expanded);
   }
 
   function leadTagKeys(item) {
@@ -847,9 +1204,25 @@
     return hasUserSkills() || (isLoggedIn() && cardHasSkillMatch(item));
   }
 
-  function isPerfectMatch(item) {
+  function isIdealMatch(item) {
     var km = item.keyword_match != null ? item.keyword_match : 0;
-    return km >= 100 && hasUserSkills() && leadTagKeys(item).length >= 2;
+    return km >= 90 && hasUserSkills() && leadTagKeys(item).length >= 2;
+  }
+
+  function isPerfectMatch(item) {
+    return isIdealMatch(item);
+  }
+
+  function tagChipClass(tag, item) {
+    var userTags = (state.appliedTags || []).map(function (t) {
+      return String(t).trim().toLowerCase().replace(/^#/, "");
+    });
+    var key = String(tag).trim().toLowerCase().replace(/^#/, "");
+    if (userTags.indexOf(key) >= 0) {
+      var km = item.keyword_match != null ? item.keyword_match : 0;
+      return km >= 80 ? "rl-chip--match-high" : "rl-chip--match-mid";
+    }
+    return "rl-chip--missing";
   }
 
   function renderPerfectBadge(perfect) {
@@ -909,7 +1282,7 @@
       '<span class="rl-niche-icon rl-niche-icon--' +
       escapeHtml(c) +
       '" aria-hidden="true">' +
-      NICHE_ICONS[c] +
+      escapeHtml(NICHE_ICONS[c]) +
       "</span>"
     );
   }
@@ -919,7 +1292,7 @@
   }
 
   function renderDifficultyRow(item) {
-    if (!isLoggedIn()) {
+    if (!hasPaidAccess()) {
       return "";
     }
     var d = item.difficulty;
@@ -954,18 +1327,7 @@
         "</button></div>"
       );
     }
-    if (!showSkillMatchUi(item)) {
-      return "";
-    }
-    var km = item.keyword_match != null ? item.keyword_match : 0;
-    if (km <= 0) {
-      return "";
-    }
-    return (
-      '<div class="rl-match-breakdown">' +
-      escapeHtml("Навыки: " + km + "%") +
-      "</div>"
-    );
+    return "";
   }
 
   function renderCompatMatchBar(item) {
@@ -984,6 +1346,8 @@
       '" aria-valuemin="0" aria-valuemax="100">' +
       '<span class="rl-match__fill" style="--match-value:' +
       km +
+      "%;width:" +
+      km +
       '%"></span>' +
       "</div>" +
       renderMatchBreakdown(item) +
@@ -991,17 +1355,33 @@
     );
   }
 
+  function renderFreeLockedMatchBar() {
+    return (
+      '<div class="rl-match rl-match--free-locked">' +
+      '<div class="rl-match__label"><span title="Точный % совместимости — в Premium">Совместимость</span></div>' +
+      '<div class="rl-match__bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Совместимость — Premium">' +
+      '<span class="rl-match__fill"></span>' +
+      MATCH_LOCK_HTML +
+      "</div>" +
+      "</div>"
+    );
+  }
+
   function renderMatchBlock(item) {
-    if (!isLoggedIn()) {
+    if (getFeedTier() === "anon") {
       return "";
     }
-    if (!hasUserSkills()) {
+    if (getFeedTier() === "free") {
+      return '<div class="rl-row rl-row--auth-only">' + renderFreeLockedMatchBar() + "</div>";
+    }
+    if (!hasUserSkills() && !cardHasSkillMatch(item)) {
       return "";
     }
     if (!showSkillMatchUi(item)) {
       return "";
     }
-    return renderCompatMatchBar(item);
+    var inner = renderCompatMatchBar(item);
+    return '<div class="rl-row rl-row--auth-only">' + inner + "</div>";
   }
 
   function syncExpandedL1FromDraft() {
@@ -1025,18 +1405,31 @@
       return;
     }
     skillsModalEl.hidden = true;
+    skillsModalEl.removeAttribute("data-stack-sheet");
     document.body.classList.remove("rl-skill-tree-open");
-    closeSkillsDropdown();
+    if (sheet && !sheet.hidden) {
+      document.body.classList.add("rl-feed-sheet-open");
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
   }
 
-  function openFeedSkillsModal() {
+  function openFeedSkillsModal(options) {
+    options = options || {};
     if (!skillsModalEl) {
       openSheet();
       return;
     }
     syncExpandedL1FromDraft();
     skillsModalEl.hidden = false;
+    if (options.fromSheet || (sheet && !sheet.hidden)) {
+      skillsModalEl.setAttribute("data-stack-sheet", "1");
+    } else {
+      skillsModalEl.removeAttribute("data-stack-sheet");
+    }
     document.body.classList.add("rl-skill-tree-open");
+    document.body.style.overflow = "hidden";
     function afterCatalog() {
       rebuildFeedCatalogIndex();
       renderSkillsCatalog();
@@ -1061,21 +1454,97 @@
     '<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z"/>' +
     "</svg>";
 
+  var MATCH_LOCK_HTML =
+    '<span class="rl-match__lock" aria-hidden="true">' +
+    '<svg class="rl-match__lock-icon" width="10" height="10" viewBox="0 0 24 24" focusable="false">' +
+    '<path fill="currentColor" d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-7 8a2 2 0 112 0 2 2 0 01-2 0zm3.1-8H9.9V6a3.1 3.1 0 016.2 0v2z"/>' +
+    "</svg></span>";
+
+  function cardUpsellHtml() {
+    var pricing = cfg.pricingUrl || "/pricing/";
+    var cabinet = cfg.cabinetUrl || "/cabinet/";
+    return (
+      '<div class="rl-card-upsell" data-card-upsell>' +
+      '<span class="rl-card-upsell__lead" aria-hidden="true">✍️</span> ' +
+      "Черновик ИИ — только Premium<br>" +
+      "→ <a href=\"" +
+      escapeHtml(pricing) +
+      '" onclick="event.stopPropagation()">Подключить Premium 790 ₽</a> ' +
+      "или <a href=\"" +
+      escapeHtml(cabinet) +
+      '" onclick="event.stopPropagation()">Попробовать 3 дня</a>' +
+      "</div>"
+    );
+  }
+
+  function cardCtaHtml(item) {
+    var tier = getFeedTier();
+    var reply = "";
+    if (isLoggedIn()) {
+      reply = prepForDisplay(item.reply_draft || "", false).trim();
+    }
+    if (reply) {
+      return (
+        '<div class="rl-card-cta-zone">' +
+        '<span class="rl-badge rl-badge--replied rl-card-cta--replied-slot">Отклик ✓</span>' +
+        "</div>"
+      );
+    }
+    if (tier === "anon") {
+      return (
+        '<a href="' +
+        escapeHtml(cabinetLoginUrl) +
+        '" class="rl-card-cta rl-card-cta--anon" onclick="event.stopPropagation()">Войди и проверь совместимость →</a>'
+      );
+    }
+    if (tier === "free") {
+      return (
+        '<div class="rl-card-cta-zone">' +
+        '<button type="button" class="rl-card-cta rl-card-cta--primary rl-feed-card__reply-btn" data-free-reply-lock>Написать отклик →</button>' +
+        "</div>"
+      );
+    }
+    if (replySlotsRemaining(item) <= 0) {
+      return (
+        '<div class="rl-card-cta-zone">' +
+        '<button type="button" class="rl-card-cta rl-card-cta--primary rl-card-cta--exhausted rl-feed-card__reply-btn" disabled>Написать отклик →</button>' +
+        "</div>"
+      );
+    }
+    return (
+      '<div class="rl-card-cta-zone">' +
+      '<button type="button" class="rl-card-cta rl-card-cta--primary rl-feed-card__reply-btn">Написать отклик →</button>' +
+      "</div>"
+    );
+  }
+
   function viewsHeadHtml(item) {
-    var v = item.display_views;
-    if (v == null || v <= 0) {
+    var v = effectiveDisplayViews(item);
+    var replies = effectiveDisplayReplies(item);
+    if ((v == null || v <= 0) && (!replies || replies <= 0)) {
       return "";
     }
-    var n = escapeHtml(String(v));
-    return (
-      '<span class="rl-feed-card__views" aria-label="' +
-      n +
-      ' просмотров">' +
-      VIEWS_EYE_SVG +
-      '<span class="rl-feed-card__views-count">' +
-      n +
-      "</span></span>"
-    );
+    var html = "";
+    if (replies > 0) {
+      html +=
+        '<span class="rl-feed-card__replies" aria-label="' +
+        replies +
+        ' откликов">' +
+        escapeHtml(String(replies)) +
+        " откл.</span>";
+    }
+    if (v != null && v > 0) {
+      var n = escapeHtml(String(v));
+      html +=
+        '<span class="rl-feed-card__views" aria-label="' +
+        n +
+        ' просмотров">' +
+        VIEWS_EYE_SVG +
+        '<span class="rl-feed-card__views-count">' +
+        n +
+        "</span></span>";
+    }
+    return html;
   }
 
   function repliedBadgeHtml() {
@@ -1083,23 +1552,13 @@
   }
 
   function replyCtaHtml(item) {
-    var inner = "";
-    var reply = "";
-    if (isLoggedIn()) {
-      reply = prepForDisplay(item.reply_draft || "", false).trim();
-    }
-    if (reply) {
-      inner = repliedBadgeHtml();
-    } else if (hasPaidAccess()) {
-      inner =
-        '<button type="button" class="rl-btn rl-btn--primary rl-feed-card__reply-btn">Написать отклик</button>';
-    }
-    return '<div class="rl-feed-card__cta">' + inner + "</div>";
+    return cardCtaHtml(item);
   }
 
   function headBadgesHtml(item, perfect) {
     var src = sourceLabel(item.source);
     return (
+      '<div class="rl-feed-card__badge-stack">' +
       nicheIconHtmlForItem(item) +
       '<span class="rl-feed-card__source rl-feed-card__source--' +
       src.cls +
@@ -1107,25 +1566,32 @@
       escapeHtml(src.label) +
       "</span>" +
       renderPerfectBadge(perfect) +
-      hotBadgeHtml(item)
+      hotBadgeHtml(item) +
+      "</div>"
     );
   }
 
   function renderCard(item, isNew) {
-    var perfect = isPerfectMatch(item);
+    var perfect = isIdealMatch(item);
     var budget = formatBudgetDisplay(item.budget_text || "—");
     var titleText = prepForDisplay(item.title || "Без названия", true);
     var titleHtml = escapeHtml(titleText);
     var expanded = state.expandedId === item.id;
+    var tier = getFeedTier();
 
     return (
       '<article class="rl-lead-card' +
       (isNew ? " is-new" : "") +
       (expanded ? " is-expanded" : "") +
-      (perfect ? " rl-lead-card--perfect-match" : "") +
+      (perfect ? " rl-lead-card--ideal rl-lead-card--perfect-match" : "") +
       '" data-id="' +
       item.id +
-      '" tabindex="0" role="button">' +
+      '" data-tier="' +
+      tier +
+      '" tabindex="0" role="button" aria-label="Карточка заказа">' +
+      '<div class="rl-feed-card__flip">' +
+      '<div class="rl-feed-card__flip-inner">' +
+      '<div class="rl-feed-card__face rl-feed-card__face--front">' +
       '<div class="rl-feed-card__head">' +
       '<div class="rl-feed-card__head-start">' +
       headBadgesHtml(item, perfect) +
@@ -1149,13 +1615,21 @@
       "</p>" +
       renderMatchBlock(item) +
       renderSlotLine(item) +
-      '<div class="rl-chips">' +
-      renderTagChips(item) +
+      '<div class="rl-chips' +
+      (expanded ? " rl-chips--expanded-visible" : "") +
+      '">' +
+      renderTagChips(item, expanded ? null : 2) +
       "</div>" +
       replyCtaHtml(item) +
       '<div class="rl-feed-card__body">' +
       '<div class="rl-feed-card__body-inner">' +
       renderExpandedBody(item) +
+      "</div></div>" +
+      "</div>" +
+      '<div class="rl-feed-card__face rl-feed-card__face--back">' +
+      '<div class="rl-feed-card__body-inner">' +
+      renderExpandedBody(item) +
+      "</div></div>" +
       "</div></div>" +
       "</article>"
     );
@@ -1243,82 +1717,91 @@
     return err;
   }
 
-  function updateDelayNotice() {
-    var el = document.getElementById("rl-feed-delay-notice");
-    if (!el) {
+  function renderFeedToolbar() {
+    if (!toolbarEl) {
+      updatePagination();
       return;
     }
-    if (hasPaidAccess() || !isLoggedIn()) {
-      el.hidden = true;
-      return;
+    var html = "";
+    if (state.totalShown > 0) {
+      html +=
+        '<p class="rl-feed-toolbar__meta">' +
+        escapeHtml(state.totalShown + " заказов") +
+        (state.todayCount != null
+          ? " · " + state.todayCount + " новых сегодня"
+          : "") +
+        "</p>";
     }
-    var pricing = (cfg.pricingUrl || "/pricing/").replace(/\/?$/, "/");
-    el.innerHTML =
-      "⏱ Лента с задержкой 15 мин · " +
-      '<a href="' +
-      escapeHtml(pricing) +
-      '">Premium — сразу, от 790 ₽ →</a>';
-    el.hidden = false;
-  }
-
-  function feedSortLabel() {
-    return state.sort === "match" ? "По совместимости ↓" : "По дате ↓";
-  }
-
-  function feedSortControlHtml() {
-    var label = escapeHtml(feedSortLabel());
-    if (!isLoggedIn() || !hasUserSkills()) {
-      return '<span class="rl-feed-sort-label">' + label + "</span>";
-    }
-    return (
-      '<button type="button" class="rl-feed-sort-toggle" data-sort-toggle aria-pressed="' +
-      (state.sort === "match" ? "true" : "false") +
-      '">' +
-      label +
-      "</button>"
-    );
+    toolbarEl.innerHTML = html;
+    updatePagination();
   }
 
   function setFeedSort(next) {
     if (next !== "time" && next !== "match") {
       return;
     }
-    if (next === "match" && (!isLoggedIn() || !hasUserSkills())) {
+    if (next === "match" && !hasPaidAccess()) {
       return;
     }
     if (state.sort === next) {
       return;
     }
     state.sort = next;
-    updateFilterBarUi();
-    resetAndLoad();
+    persistFeedPrefs().finally(function () {
+      updateFilterBarUi();
+      renderFeedToolbar();
+      renderSortPanel();
+      resetAndLoad();
+    });
+  }
+
+  function setFeedMinMatch(pct) {
+    var n = parseInt(String(pct), 10);
+    if (MIN_MATCH_OPTIONS.indexOf(n) < 0 || state.min_match === n) {
+      return;
+    }
+    state.min_match = n;
+    if (state.sort !== "match") {
+      state.sort = "match";
+    }
+    persistFeedPrefs().finally(function () {
+      updateFilterBarUi();
+      renderFeedToolbar();
+      renderSortPanel();
+      resetAndLoad();
+    });
+  }
+
+  function applySortPanelDraft() {
+    if (!sortPanelEl) {
+      return;
+    }
+    var picked = sortPanelEl.querySelector('input[name="rl-feed-sort"]:checked');
+    var nextSort = picked ? picked.value : state.sort;
+    if (nextSort === "match" && !hasPaidAccess()) {
+      nextSort = "time";
+    }
+    state.sort = nextSort === "match" ? "match" : "time";
+    var activePct = sortPanelEl.querySelector(".rl-sort-panel__pct-btn.is-active");
+    if (activePct) {
+      var pctVal = parseInt(activePct.getAttribute("data-feed-min-match"), 10);
+      if (MIN_MATCH_OPTIONS.indexOf(pctVal) >= 0) {
+        state.min_match = pctVal;
+      }
+    }
+    if (sortDdEl) {
+      sortDdEl.open = false;
+    }
+    persistFeedPrefs().finally(function () {
+      updateFilterBarUi();
+      renderFeedToolbar();
+      renderSortPanel();
+      resetAndLoad();
+    });
   }
 
   function updateCount() {
-    if (!countEl) {
-      return;
-    }
-    if (isLoggedIn()) {
-      var profilePart =
-        state.totalShown > 0
-          ? state.totalShown + " заказов под профиль"
-          : "0 заказов под профиль";
-      var sortPart = feedSortControlHtml();
-      countEl.innerHTML = profilePart + " · " + sortPart;
-      updatePagination();
-      return;
-    }
-    if (state.totalShown <= 0) {
-      countEl.textContent = "";
-      return;
-    }
-    var anonParts = [state.totalShown + " заказов"];
-    if (state.todayCount != null) {
-      anonParts.push(state.todayCount + " новых сегодня");
-    }
-    anonParts.push(feedSortControlHtml());
-    countEl.innerHTML = anonParts.join(" · ");
-    updatePagination();
+    renderFeedToolbar();
   }
 
   function categoryEmptyMessage() {
@@ -1365,21 +1848,140 @@
 
   function populatedSheetBody() {
     var body = document.getElementById("rl-feed-sheet-body");
-    return body && body.querySelector(".rl-feed-skills") ? body : null;
+    return body && body.querySelector(".rl-sheet-block") ? body : null;
+  }
+
+  function buildSortOptionsHtml(radioName, includeApply) {
+    var html =
+      '<label class="rl-sort-option' +
+      (state.sort === "time" ? " is-active" : "") +
+      '"><input type="radio" name="' +
+      radioName +
+      '" value="time"' +
+      (state.sort === "time" ? " checked" : "") +
+      "> По дате</label>";
+    if (hasPaidAccess()) {
+      html +=
+        '<label class="rl-sort-option' +
+        (state.sort === "match" ? " is-active" : "") +
+        '"><input type="radio" name="' +
+        radioName +
+        '" value="match"' +
+        (state.sort === "match" ? " checked" : "") +
+        "> По совместимости</label>";
+      html +=
+        '<div class="rl-sort-panel__pct-wrap' +
+        (state.sort === "match" ? "" : " hidden") +
+        '"><p class="rl-sort-panel__divider">МИН. СОВМЕСТИМОСТЬ:</p><div class="rl-sort-panel__pct">';
+      var mi;
+      for (mi = 0; mi < MIN_MATCH_OPTIONS.length; mi++) {
+        var pct = MIN_MATCH_OPTIONS[mi];
+        html +=
+          '<button type="button" class="rl-sort-panel__pct-btn' +
+          (state.min_match === pct ? " is-active" : "") +
+          '" data-feed-min-match="' +
+          pct +
+          '">' +
+          pct +
+          "%</button>";
+      }
+      html += "</div></div>";
+    }
+    if (includeApply) {
+      html +=
+        '<button type="button" class="rl-btn rl-btn--primary rl-sort-panel__apply" id="rl-feed-sort-apply">Применить \u2192</button>';
+    }
+    return html;
+  }
+
+  function renderSheetSortPanel() {
+    var el = document.getElementById("rl-feed-sheet-sort");
+    if (!el) {
+      return;
+    }
+    if (!isLoggedIn()) {
+      el.innerHTML = "";
+      return;
+    }
+    el.innerHTML = buildSortOptionsHtml("rl-sheet-sort", false);
+    updateSheetSortPctVisibility();
+  }
+
+  function updateSheetSortPctVisibility() {
+    if (!sheetBody) {
+      return;
+    }
+    var wrap = sheetBody.querySelector(".rl-sheet-block--sort .rl-sort-panel__pct-wrap");
+    if (!wrap) {
+      return;
+    }
+    var picked = sheetBody.querySelector('input[name="rl-sheet-sort"]:checked');
+    wrap.hidden = !hasPaidAccess() || !picked || picked.value !== "match";
+  }
+
+  function applySheetSortDraft() {
+    if (!sheetBody || !isLoggedIn()) {
+      return;
+    }
+    var picked = sheetBody.querySelector('input[name="rl-sheet-sort"]:checked');
+    var nextSort = picked ? picked.value : state.sort;
+    if (nextSort === "match" && !hasPaidAccess()) {
+      nextSort = "time";
+    }
+    state.sort = nextSort === "match" ? "match" : "time";
+    var activePct = sheetBody.querySelector(
+      ".rl-sheet-block--sort .rl-sort-panel__pct-btn.is-active"
+    );
+    if (activePct && state.sort === "match") {
+      var pctVal = parseInt(activePct.getAttribute("data-feed-min-match"), 10);
+      if (MIN_MATCH_OPTIONS.indexOf(pctVal) >= 0) {
+        state.min_match = pctVal;
+      }
+    }
+    enforceFeedSortTier();
+    renderSortPanel();
+    updateSortTriggerLabel();
+  }
+
+  function syncMobileFilterChrome() {
+    var btn = document.getElementById("rl-feed-filters-open");
+    if (!btn) {
+      return;
+    }
+    var mobile =
+      window.matchMedia && window.matchMedia("(max-width: 767px)").matches;
+    var filterCount =
+      state.appliedTags.length + (state.appliedCategories.length ? 1 : 0);
+    var labelEl = btn.querySelector(".rl-filter-mobile-trigger__label");
+    var labelText = filterCount > 0 ? "Фильтр · " + filterCount : "Фильтр";
+    if (labelEl) {
+      labelEl.textContent = labelText;
+    } else {
+      btn.textContent = labelText;
+    }
+    btn.classList.toggle(
+      "has-selection",
+      filterCount > 0 || state.source !== "" || state.sort !== "time"
+    );
+    btn.hidden = !mobile;
   }
 
   function updateFilterBarUi() {
     if (skillsTriggerEl) {
       var skillsLabel =
         state.appliedTags.length > 0
-          ? "Навыки · " + state.appliedTags.length
+          ? "Навыки"
           : "Навыки";
       skillsTriggerEl.textContent = skillsLabel;
-      var triggerWrap = document.getElementById("rl-feed-skills-trigger");
-      if (triggerWrap) {
-        triggerWrap.classList.toggle("has-selection", state.appliedTags.length > 0);
-      }
     }
+    if (skillsTriggerBtn) {
+      skillsTriggerBtn.classList.toggle(
+        "rl-filter-btn--active",
+        getFeedTier() !== "anon" && state.appliedTags.length > 0
+      );
+    }
+    updateSkillsBadge();
+    updateSortTriggerLabel();
     var sheetRoot = populatedSheetBody();
     if (sheetRoot) {
       applySkillsSectionText(
@@ -1387,20 +1989,8 @@
         state.draftCategories
       );
     }
-    var mobileFilterBtn = document.getElementById("rl-feed-filters-open");
-    if (mobileFilterBtn) {
-      var filterCount =
-        state.appliedTags.length +
-        (state.appliedCategories.length ? 1 : 0);
-      mobileFilterBtn.textContent =
-        filterCount > 0 ? "Фильтр · " + filterCount : "Фильтр";
-      mobileFilterBtn.classList.toggle(
-        "has-selection",
-        filterCount > 0 ||
-          state.source !== "" ||
-          state.sort !== "time"
-      );
-    }
+    syncMobileFilterChrome();
+    renderSheetSortPanel();
   }
 
   function readCategoriesFrom(root) {
@@ -1436,6 +2026,7 @@
       state.appliedCategories.length > 0 ||
       state.appliedTags.length > 0 ||
       state.sort !== "time" ||
+      state.min_match !== 80 ||
       !categoriesEqual(state.draftCategories, state.appliedCategories);
     if (resetBtn) {
       resetBtn.hidden = !dirty;
@@ -2169,9 +2760,7 @@
           state.draftTags = cloneTags(tags);
         }
         state.tagsSyncRev = readTagsSyncRev();
-        if (tags.length) {
-          state.sort = "match";
-        } else if (state.sort === "match") {
+        if (!tags.length && state.sort === "match" && !hasUserSkills()) {
           state.sort = "time";
         }
       })
@@ -2282,16 +2871,15 @@
         endEl.hidden = true;
       }
     }
-    if (isLoggedIn() && !hasUserSkills()) {
-      state.sort = "time";
-    }
+    enforceFeedSortTier();
     var params = {
       limit: state.limit,
       offset: state.offset,
       min_score: 0,
       sort: state.sort,
+      min_match: hasPaidAccess() && state.sort === "match" ? state.min_match : 0,
     };
-    if (state.appliedTags.length && !(isLoggedIn() && cfg.restMeFeed)) {
+    if (state.appliedTags.length && !isLoggedIn()) {
       params.skills = state.appliedTags.join(",");
     }
     if (state.appliedCategories.length) {
@@ -2389,32 +2977,166 @@
       });
   }
 
-  function updateCardDraft(card, item) {
-    var bodyInner = card.querySelector(".rl-feed-card__body-inner");
-    if (bodyInner) {
-      bodyInner.innerHTML = renderExpandedBody(item);
+  function syncFlipHeight(card) {
+    if (!card || !listEl || !listEl.contains(card)) {
+      return;
     }
-    var headStart = card.querySelector(".rl-feed-card__head-start");
-    if (headStart) {
-      headStart.innerHTML = headBadgesHtml(item, isPerfectMatch(item));
+    if (!card.classList.contains("rl-lead-card--draft-flip")) {
+      var innerReset = card.querySelector(".rl-feed-card__flip-inner");
+      if (innerReset) {
+        innerReset.style.minHeight = "";
+      }
+      return;
     }
-    var ctaHtml = replyCtaHtml(item);
-    var cta = card.querySelector(".rl-feed-card__cta");
-    if (cta) {
-      cta.outerHTML = ctaHtml;
-    } else {
-      var body = card.querySelector(".rl-feed-card__body");
-      if (body) {
-        body.insertAdjacentHTML("beforebegin", ctaHtml);
+    var inner = card.querySelector(".rl-feed-card__flip-inner");
+    var front = card.querySelector(".rl-feed-card__face--front");
+    var back = card.querySelector(".rl-feed-card__face--back");
+    if (!inner || !front || !back) {
+      return;
+    }
+    if (!card.classList.contains("is-expanded")) {
+      inner.style.minHeight = "";
+      return;
+    }
+    if (
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      inner.style.minHeight = "";
+      return;
+    }
+    window.requestAnimationFrame(function () {
+      var h = Math.max(front.offsetHeight, back.scrollHeight);
+      inner.style.minHeight = h > 0 ? h + "px" : "";
+    });
+  }
+
+  function refreshCardSocialMeta(card, item) {
+    if (!card || !item) {
+      return;
+    }
+    var meta = card.querySelector(".rl-feed-card__head-meta");
+    if (meta) {
+      var timeEl = meta.querySelector(".rl-feed-card__time");
+      var timeHtml = timeEl
+        ? timeEl.outerHTML
+        : '<span class="rl-feed-card__time">' + formatTime(item.created_at) + "</span>";
+      meta.innerHTML = viewsHeadHtml(item) + timeHtml;
+    }
+    var front = card.querySelector(".rl-feed-card__face--front");
+    if (!front) {
+      return;
+    }
+    var slotRow = front.querySelector(".rl-slot-row");
+    var slotHtml = renderSlotLine(item);
+    if (slotRow) {
+      if (slotHtml) {
+        slotRow.outerHTML = slotHtml;
+      } else {
+        slotRow.remove();
+      }
+    } else if (slotHtml) {
+      var chips = front.querySelector(".rl-chips");
+      if (chips) {
+        chips.insertAdjacentHTML("beforebegin", slotHtml);
       }
     }
-    var id = parseInt(card.getAttribute("data-id"), 10) || item.id;
+    var ctaZone = front.querySelector(".rl-card-cta-zone, .rl-card-cta");
+    var ctaHtml = cardCtaHtml(item);
+    if (ctaZone) {
+      ctaZone.outerHTML = ctaHtml;
+    } else {
+      var bodyEl = front.querySelector(".rl-feed-card__body");
+      if (bodyEl) {
+        bodyEl.insertAdjacentHTML("beforebegin", ctaHtml);
+      }
+    }
+  }
+
+  function expandCard(card) {
+    if (!card) {
+      return;
+    }
+    var id = parseInt(card.getAttribute("data-id"), 10);
+    if (!id) {
+      return;
+    }
+    listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
+      if (c !== card) {
+        c.classList.remove("is-expanded", "rl-lead-card--draft-flip");
+        var otherId = parseInt(c.getAttribute("data-id"), 10);
+        if (otherId && state.itemsById[otherId]) {
+          syncCardChips(c, state.itemsById[otherId], false);
+        }
+        syncFlipHeight(c);
+      }
+    });
     state.expandedId = id;
     card.classList.add("is-expanded");
+    if (state.itemsById[id]) {
+      syncCardChips(card, state.itemsById[id], true);
+    }
+    syncFlipHeight(card);
+  }
+
+  function setCardBodyHtml(card, html) {
+    card.querySelectorAll(".rl-feed-card__body-inner").forEach(function (el) {
+      el.innerHTML = html;
+    });
+  }
+
+  function finishDraftFlip(card) {
+    card.classList.remove("rl-lead-card--draft-flip");
+    syncFlipHeight(card);
     var replyEl = card.querySelector("[data-reply-text]");
     if (replyEl) {
       replyEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
+  }
+
+  function flipCardOnce(card) {
+    if (!card) {
+      return;
+    }
+    var inner = card.querySelector(".rl-feed-card__flip-inner");
+    var reduceMotion =
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    expandCard(card);
+    card.classList.add("rl-lead-card--draft-flip");
+    syncFlipHeight(card);
+    if (!inner || reduceMotion) {
+      window.setTimeout(function () {
+        finishDraftFlip(card);
+      }, 32);
+      return;
+    }
+    function onFlipEnd(e) {
+      if (e.propertyName !== "transform") {
+        return;
+      }
+      inner.removeEventListener("transitionend", onFlipEnd);
+      finishDraftFlip(card);
+    }
+    inner.addEventListener("transitionend", onFlipEnd);
+    window.setTimeout(function () {
+      if (card.classList.contains("rl-lead-card--draft-flip")) {
+        inner.removeEventListener("transitionend", onFlipEnd);
+        finishDraftFlip(card);
+      }
+    }, 700);
+  }
+
+  function updateCardDraft(card, item) {
+    var bodyHtml = renderExpandedBody(item);
+    setCardBodyHtml(card, bodyHtml);
+    var headStart = card.querySelector(".rl-feed-card__head-start");
+    if (headStart) {
+      headStart.innerHTML = headBadgesHtml(item, isIdealMatch(item));
+    }
+    refreshCardSocialMeta(card, item);
+    card.classList.add("rl-lead-card--draft-ready");
+    flipCardOnce(card);
   }
 
   function parseFocusLeadId() {
@@ -2449,11 +3171,6 @@
     }
     var card = listEl.querySelector('.rl-lead-card[data-id="' + leadId + '"]');
     if (card) {
-      listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
-        c.classList.remove("is-expanded");
-      });
-      state.expandedId = leadId;
-      card.classList.add("is-expanded");
       card.scrollIntoView({ behavior: "smooth", block: "center" });
       pulseFocusCard(card);
       return Promise.resolve();
@@ -2479,8 +3196,6 @@
         if (!newCard) {
           return;
         }
-        state.expandedId = leadId;
-        newCard.classList.add("is-expanded");
         bindCards();
         newCard.scrollIntoView({ behavior: "smooth", block: "center" });
         pulseFocusCard(newCard);
@@ -2496,13 +3211,33 @@
     var id = parseInt(card.getAttribute("data-id"), 10);
     if (state.expandedId === id) {
       state.expandedId = null;
-      card.classList.remove("is-expanded");
+      card.classList.remove("is-expanded", "rl-lead-card--draft-flip");
+      if (state.itemsById[id]) {
+        syncCardChips(card, state.itemsById[id], false);
+      }
+      syncFlipHeight(card);
     } else {
-      listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
-        c.classList.remove("is-expanded");
+      if (state.itemsById[id]) {
+        bumpHumanView(id);
+        refreshCardSocialMeta(card, state.itemsById[id]);
+      }
+      expandCard(card);
+    }
+  }
+
+  function toggleCardUpsell(card) {
+    var upsell = card.querySelector("[data-card-upsell]");
+    if (!upsell) {
+      return;
+    }
+    var show = !upsell.classList.contains("is-visible");
+    if (listEl) {
+      listEl.querySelectorAll(".rl-card-upsell.is-visible").forEach(function (el) {
+        el.classList.remove("is-visible");
       });
-      state.expandedId = id;
-      card.classList.add("is-expanded");
+    }
+    if (show) {
+      upsell.classList.add("is-visible");
     }
   }
 
@@ -2511,19 +3246,34 @@
       return;
     }
     var id = parseInt(card.getAttribute("data-id"), 10);
+    var baseItem = state.itemsById[id];
+    if (baseItem && replySlotsRemaining(baseItem) <= 0) {
+      return;
+    }
     listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
-      c.classList.remove("is-expanded");
+      c.classList.remove("is-expanded", "rl-lead-card--draft-flip");
+      var collapsedId = parseInt(c.getAttribute("data-id"), 10);
+      if (collapsedId && state.itemsById[collapsedId]) {
+        syncCardChips(c, state.itemsById[collapsedId], false);
+      }
+      syncFlipHeight(c);
     });
-    state.expandedId = id;
-    card.classList.add("is-expanded");
+    state.expandedId = null;
+    card.classList.remove("is-expanded", "rl-lead-card--draft-ready", "rl-lead-card--draft-flip");
+    if (state.itemsById[id]) {
+      syncCardChips(card, state.itemsById[id], false);
+    }
+    syncFlipHeight(card);
     var replyEl = card.querySelector("[data-reply-text]");
     if (replyEl && replyEl.textContent.trim()) {
+      expandCard(card);
       replyEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
       return;
     }
     var prevLabel = replyBtn.textContent;
     replyBtn.disabled = true;
     replyBtn.textContent = "Генерируем…";
+    card.classList.add("rl-lead-card--draft-pending");
     fetchDraft(id)
       .then(function (data) {
         var base = state.itemsById[id] || { id: id };
@@ -2532,9 +3282,12 @@
           tools_required: data.tools_required || base.tools_required || [],
         });
         state.itemsById[id] = merged;
+        card.classList.remove("rl-lead-card--draft-pending");
+        card.classList.add("rl-lead-card--draft-ready");
         updateCardDraft(card, merged);
       })
       .catch(function (err) {
+        card.classList.remove("rl-lead-card--draft-pending");
         if (err && err.status === 403) {
           showError(err.detail || "Нет доступа");
           return;
@@ -2564,14 +3317,39 @@
       });
   }
 
+  function triggerFreeReplyShake(card, btn) {
+    var pricing = cfg.pricingUrl || "/pricing/";
+    if (btn.getAttribute("data-free-premium-step") === "1") {
+      window.location.href = pricing;
+      return;
+    }
+    btn.blur();
+    card.classList.add("rl-lead-card--shake-cta");
+    window.setTimeout(function () {
+      card.classList.remove("rl-lead-card--shake-cta");
+    }, 500);
+    btn.textContent = "Купить Premium →";
+    btn.classList.add("rl-card-cta--buy-premium");
+    btn.setAttribute("data-free-premium-step", "1");
+  }
+
   function onFeedListClick(e) {
     var card = e.target.closest(".rl-lead-card");
     if (!card || !listEl || !listEl.contains(card)) {
       return;
     }
-    var replyBtn = e.target.closest(".rl-feed-card__reply-btn");
+    var replyBtn = e.target.closest(
+      ".rl-feed-card__reply-btn, .rl-card-cta[data-free-reply-lock], .rl-card-cta--primary"
+    );
     if (replyBtn && card.contains(replyBtn)) {
       e.stopPropagation();
+      if (
+        replyBtn.hasAttribute("data-free-reply-lock") ||
+        replyBtn.getAttribute("data-free-premium-step") === "1"
+      ) {
+        triggerFreeReplyShake(card, replyBtn);
+        return;
+      }
       runDraftFetchForCard(card, replyBtn);
       return;
     }
@@ -2600,7 +3378,9 @@
       return;
     }
     if (
-      e.target.closest(".rl-feed-card__link, a, button, input, textarea, select")
+      e.target.closest(
+        ".rl-feed-card__link, .rl-card-upsell a, a.rl-card-cta--anon, a, button, input, textarea, select"
+      )
     ) {
       return;
     }
@@ -2632,13 +3412,28 @@
       if (e.target.closest(".rl-lead-card")) {
         return;
       }
-      if (!listEl) {
+      if (listEl) {
+        listEl.querySelectorAll(".rl-card-upsell.is-visible").forEach(function (el) {
+          el.classList.remove("is-visible");
+        });
+        listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
+          c.classList.remove("is-expanded", "rl-lead-card--draft-flip");
+          syncFlipHeight(c);
+        });
+        state.expandedId = null;
+      }
+      if (!e.target.closest("#rl-feed-sidebar, .rl-filter-hint")) {
+        hideFilterHint();
+      }
+    });
+    listEl.addEventListener("transitionend", function (e) {
+      if (!e.target.classList.contains("rl-feed-card__flip-inner")) {
         return;
       }
-      listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
-        c.classList.remove("is-expanded");
-      });
-      state.expandedId = null;
+      var card = e.target.closest(".rl-lead-card");
+      if (card && card.classList.contains("rl-lead-card--draft-flip")) {
+        syncFlipHeight(card);
+      }
     });
   }
 
@@ -2685,14 +3480,108 @@
   if (skillsTriggerBtn) {
     skillsTriggerBtn.addEventListener("click", function (e) {
       e.preventDefault();
+      if (getFeedTier() === "anon") {
+        showFilterHint();
+        return;
+      }
       openSkillsUi();
     });
   }
+  if (sortDdEl) {
+    sortDdEl.addEventListener("toggle", function () {
+      if (getFeedTier() === "anon" && sortDdEl.open) {
+        sortDdEl.open = false;
+        showFilterHint();
+        return;
+      }
+      if (!sortDdEl.open) {
+        renderSortPanel();
+      }
+    });
+    sortDdEl.addEventListener("change", function (e) {
+      if (
+        e.target &&
+        e.target.name === "rl-feed-sort" &&
+        sortPanelEl &&
+        sortPanelEl.contains(e.target)
+      ) {
+        sortPanelEl.querySelectorAll(".rl-sort-option").forEach(function (opt) {
+          var inp = opt.querySelector("input");
+          opt.classList.toggle("is-active", inp && inp.checked);
+        });
+        updateSortPanelPctVisibility();
+      }
+    });
+    sortDdEl.addEventListener("click", function (e) {
+      var sortOpt = e.target.closest(".rl-sort-option");
+      if (sortOpt && sortPanelEl && sortPanelEl.contains(sortOpt)) {
+        var sortInp = sortOpt.querySelector('input[name="rl-feed-sort"]');
+        if (sortInp) {
+          sortInp.checked = true;
+          sortPanelEl.querySelectorAll(".rl-sort-option").forEach(function (opt) {
+            var inp = opt.querySelector("input");
+            opt.classList.toggle("is-active", inp && inp.checked);
+          });
+          updateSortPanelPctVisibility();
+        }
+      }
+      var pctBtn = e.target.closest("[data-feed-min-match]");
+      if (pctBtn && sortPanelEl && sortPanelEl.contains(pctBtn)) {
+        e.preventDefault();
+        var pct = parseInt(pctBtn.getAttribute("data-feed-min-match"), 10);
+        sortPanelEl.querySelectorAll(".rl-sort-panel__pct-btn").forEach(function (btn) {
+          btn.classList.toggle(
+            "is-active",
+            parseInt(btn.getAttribute("data-feed-min-match"), 10) === pct
+          );
+        });
+        state.min_match = pct;
+        var matchRadio = sortPanelEl.querySelector('input[value="match"]');
+        if (matchRadio) {
+          matchRadio.checked = true;
+        }
+        state.sort = "match";
+        sortPanelEl.querySelectorAll(".rl-sort-option").forEach(function (opt) {
+          var inp = opt.querySelector("input");
+          opt.classList.toggle("is-active", inp && inp.value === "match");
+        });
+        updateSortPanelPctVisibility();
+        return;
+      }
+      var applyBtn = e.target.closest("#rl-feed-sort-apply");
+      if (applyBtn && sortPanelEl && sortPanelEl.contains(applyBtn)) {
+        e.preventDefault();
+        applySortPanelDraft();
+        return;
+      }
+      if (
+        getFeedTier() === "anon" &&
+        e.target.closest("#rl-feed-sort-trigger, summary")
+      ) {
+        e.preventDefault();
+        showFilterHint();
+      }
+    });
+    document.addEventListener("click", function (e) {
+      if (!sortDdEl || !sortDdEl.open) {
+        return;
+      }
+      if (e.target.closest("#rl-feed-sort-panel, #rl-feed-sort-trigger")) {
+        return;
+      }
+      sortDdEl.open = false;
+    });
+  }
+  function onSkillsModalDismiss(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeFeedSkillsModal();
+  }
   if (skillsOverlayEl) {
-    skillsOverlayEl.addEventListener("click", closeFeedSkillsModal);
+    skillsOverlayEl.addEventListener("click", onSkillsModalDismiss);
   }
   if (skillsCloseBtn) {
-    skillsCloseBtn.addEventListener("click", closeFeedSkillsModal);
+    skillsCloseBtn.addEventListener("click", onSkillsModalDismiss);
   }
   if (skillsApplyBtn) {
     skillsApplyBtn.addEventListener("click", applyDraftTags);
@@ -2700,22 +3589,17 @@
   if (skillsClearBtn) {
     skillsClearBtn.addEventListener("click", clearSkills);
   }
-  if (tagsEditBtn) {
-    tagsEditBtn.addEventListener("click", function (e) {
-      e.preventDefault();
-      openSkillsUi();
-    });
-  }
-  if (countEl) {
-    countEl.addEventListener("click", function (e) {
-      var btn = e.target.closest("[data-sort-toggle]");
-      if (!btn || !countEl.contains(btn)) {
+  if (toolbarEl) {
+    toolbarEl.addEventListener("click", function (e) {
+      var sortBtn = e.target.closest("[data-feed-sort]");
+      if (sortBtn && toolbarEl.contains(sortBtn)) {
+        setFeedSort(sortBtn.getAttribute("data-feed-sort"));
         return;
       }
-      if (!isLoggedIn() || !hasUserSkills()) {
-        return;
+      var matchBtn = e.target.closest("[data-feed-min-match]");
+      if (matchBtn && toolbarEl.contains(matchBtn)) {
+        setFeedMinMatch(matchBtn.getAttribute("data-feed-min-match"));
       }
-      setFeedSort(state.sort === "match" ? "time" : "match");
     });
   }
 
@@ -2832,16 +3716,43 @@
   var openBtn = document.getElementById("rl-feed-filters-open");
   var sheetCloseBtn = document.getElementById("rl-feed-sheet-close");
   var sheetOverlayEl = document.getElementById("rl-feed-sheet-overlay");
+  var sheetSuppressOpenUntil = 0;
 
   function closeSheet() {
-    if (!sheet) {
+    if (!sheet || sheet.hidden) {
       return;
     }
+    if (isSkillsModalOpen()) {
+      skillsModalEl.hidden = true;
+      skillsModalEl.removeAttribute("data-stack-sheet");
+      document.body.classList.remove("rl-skill-tree-open");
+    }
     sheet.hidden = true;
+    sheet.setAttribute("aria-hidden", "true");
     if (openBtn) {
       openBtn.setAttribute("aria-expanded", "false");
     }
     document.body.style.overflow = "";
+    document.body.classList.remove("rl-feed-sheet-open");
+    sheetSuppressOpenUntil = Date.now() + 450;
+  }
+
+  function onSheetDismiss(e) {
+    if (!sheet || sheet.hidden) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    closeSheet();
+  }
+
+  if (sheet) {
+    if (sheetOverlayEl) {
+      sheetOverlayEl.addEventListener("click", onSheetDismiss);
+    }
+    if (sheetCloseBtn) {
+      sheetCloseBtn.addEventListener("click", onSheetDismiss);
+    }
   }
 
   function onSheetCategoryChange(changedInp) {
@@ -2875,10 +3786,20 @@
         return;
       }
       var inp = e.target;
-      if (!inp || inp.name !== "category" || !sheetBody.contains(inp)) {
+      if (!inp || !sheetBody.contains(inp)) {
         return;
       }
-      onSheetCategoryChange(inp);
+      if (inp.name === "category") {
+        onSheetCategoryChange(inp);
+        return;
+      }
+      if (inp.name === "rl-sheet-sort") {
+        sheetBody.querySelectorAll(".rl-sheet-block--sort .rl-sort-option").forEach(function (opt) {
+          var radio = opt.querySelector("input");
+          opt.classList.toggle("is-active", radio && radio.checked);
+        });
+        updateSheetSortPctVisibility();
+      }
     });
     sheetBody.addEventListener("click", function (e) {
       if (!sheet || sheet.hidden) {
@@ -2919,11 +3840,43 @@
         clearSkills();
         return;
       }
+      var sortOpt = e.target.closest(".rl-sheet-block--sort .rl-sort-option");
+      if (sortOpt && sheetBody.contains(sortOpt)) {
+        var sortInp = sortOpt.querySelector('input[name="rl-sheet-sort"]');
+        if (sortInp) {
+          sortInp.checked = true;
+          sheetBody.querySelectorAll(".rl-sheet-block--sort .rl-sort-option").forEach(function (opt) {
+            var radio = opt.querySelector("input");
+            opt.classList.toggle("is-active", radio && radio.checked);
+          });
+          updateSheetSortPctVisibility();
+        }
+      }
+      var pctBtn = e.target.closest(".rl-sheet-block--sort [data-feed-min-match]");
+      if (pctBtn && sheetBody.contains(pctBtn)) {
+        e.preventDefault();
+        var pct = parseInt(pctBtn.getAttribute("data-feed-min-match"), 10);
+        sheetBody.querySelectorAll(".rl-sheet-block--sort .rl-sort-panel__pct-btn").forEach(function (btn) {
+          btn.classList.toggle(
+            "is-active",
+            parseInt(btn.getAttribute("data-feed-min-match"), 10) === pct
+          );
+        });
+        var matchRadio = sheetBody.querySelector('input[name="rl-sheet-sort"][value="match"]');
+        if (matchRadio) {
+          matchRadio.checked = true;
+        }
+        sheetBody.querySelectorAll(".rl-sheet-block--sort .rl-sort-option").forEach(function (opt) {
+          var radio = opt.querySelector("input");
+          opt.classList.toggle("is-active", radio && radio.value === "match");
+        });
+        updateSheetSortPctVisibility();
+        return;
+      }
       var sheetSkillsOpen = e.target.closest("#rl-sheet-skills-open, .rl-sheet-skills-open");
       if (sheetSkillsOpen && sheetBody.contains(sheetSkillsOpen)) {
         e.preventDefault();
-        closeSheet();
-        openFeedSkillsModal();
+        openFeedSkillsModal({ fromSheet: true });
         return;
       }
       var chip = e.target.closest(".rl-feed-chip");
@@ -2947,15 +3900,45 @@
 
   function buildSheetContent() {
     sheetBody.innerHTML = "";
-    if (!isLoggedIn()) {
-      var catField = sidebar.querySelector(".rl-feed-filter--category");
-      if (catField) {
-        var catBlock = document.createElement("section");
-        catBlock.className = "rl-sheet-block rl-sheet-block--cats";
-        catBlock.innerHTML = '<p class="rl-sheet-block__label">Специализация</p>';
-        catBlock.appendChild(catField.cloneNode(true));
-        sheetBody.appendChild(catBlock);
-      }
+    var catField = sidebar.querySelector(".rl-feed-filter--category");
+    if (catField) {
+      var catBlock = document.createElement("section");
+      catBlock.className = "rl-sheet-block rl-sheet-block--cats";
+      catBlock.innerHTML =
+        '<p class="rl-sheet-block__label">Специализация</p>';
+      catBlock.appendChild(catField.cloneNode(true));
+      sheetBody.appendChild(catBlock);
+    }
+    if (isLoggedIn()) {
+      var skillsBlock = document.createElement("section");
+      skillsBlock.className = "rl-sheet-block rl-sheet-block--skills";
+      var skillN = state.appliedTags.length;
+      skillsBlock.innerHTML =
+        '<p class="rl-sheet-block__label">Навыки</p>' +
+        '<button type="button" class="rl-sheet-text-btn rl-sheet-skills-open" id="rl-sheet-skills-open">' +
+        '<span class="rl-sheet-text-btn__label">' +
+        (skillN > 0
+          ? "Выбрано " + skillN + " · изменить →"
+          : "Настроить навыки →") +
+        "</span></button>";
+      sheetBody.appendChild(skillsBlock);
+      var sortBlock = document.createElement("section");
+      sortBlock.className = "rl-sheet-block rl-sheet-block--sort";
+      sortBlock.innerHTML =
+        '<p class="rl-sheet-block__label">Сортировка</p>' +
+        '<div class="rl-sheet-sort-panel" id="rl-feed-sheet-sort"></div>';
+      sheetBody.appendChild(sortBlock);
+      renderSheetSortPanel();
+    } else {
+      var loginBlock = document.createElement("section");
+      loginBlock.className = "rl-sheet-block rl-sheet-block--login";
+      loginBlock.innerHTML =
+        '<p class="rl-sheet-block__label">Навыки и сортировка</p>' +
+        '<p class="rl-sheet-block__hint">Войди через Telegram — настрой подбор по навыкам и сортировку.</p>' +
+        '<a class="rl-btn rl-btn--secondary rl-sheet-login-btn" href="' +
+        escapeHtml(cabinetLoginUrl) +
+        '">Войти в кабинет →</a>';
+      sheetBody.appendChild(loginBlock);
     }
     sheetBody.querySelectorAll("input").forEach(function (inp) {
       var name = inp.getAttribute("name");
@@ -2986,28 +3969,27 @@
       });
     }
     sheet.hidden = false;
+    sheet.setAttribute("aria-hidden", "false");
     if (openBtn) {
       openBtn.setAttribute("aria-expanded", "true");
     }
     document.body.style.overflow = "hidden";
+    document.body.classList.add("rl-feed-sheet-open");
     updateSkillsBadge();
     updateSkillsDraftUi();
   }
 
   if (sheet && sheetBody && sidebar && openBtn) {
-    openBtn.addEventListener("click", openSheet);
-    if (sheetOverlayEl) {
-      sheetOverlayEl.addEventListener("click", function () {
-        closeSkillsDropdown();
-        closeSheet();
-      });
-    }
-    if (sheetCloseBtn) {
-      sheetCloseBtn.addEventListener("click", function () {
-        closeSkillsDropdown();
-        closeSheet();
-      });
-    }
+    openBtn.addEventListener("click", function (e) {
+      if (Date.now() < sheetSuppressOpenUntil) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      openSheet();
+    });
     document.addEventListener("keydown", function (e) {
       if (e.key !== "Escape") {
         return;
@@ -3021,27 +4003,29 @@
       }
     });
     document.getElementById("rl-feed-sheet-apply").addEventListener("click", function () {
-      sheetBody.querySelectorAll("input").forEach(function (inp) {
-        var name = inp.getAttribute("name");
+      sheetBody.querySelectorAll('input[name="category"]').forEach(function (inp) {
         var val = inp.getAttribute("value");
         var live = sidebar.querySelector(
-          'input[name="' + name + '"][value="' + val + '"]'
+          'input[name="category"][value="' + val + '"]'
         );
         if (live) {
           live.checked = inp.checked;
         }
       });
+      applySheetSortDraft();
       state.draftCategories = readCategoriesFrom(sidebar);
+      state.appliedCategories = cloneCategories(state.draftCategories);
       syncChips();
       readFilters();
       updateFilterBarUi();
       closeSheet();
-      state.appliedCategories = cloneCategories(state.draftCategories);
-      if (!tagsEqual(state.draftTags, state.appliedTags)) {
-        persistTags(cloneTags(state.draftTags), { setSortMatch: true, reload: true });
-        return;
-      }
-      resetAndLoad();
+      persistFeedPrefs().finally(function () {
+        if (!tagsEqual(state.draftTags, state.appliedTags)) {
+          persistTags(cloneTags(state.draftTags), { setSortMatch: true, reload: true });
+          return;
+        }
+        resetAndLoad();
+      });
     });
     document.getElementById("rl-feed-sheet-reset").addEventListener("click", function () {
       if (resetBtn) {
@@ -3061,30 +4045,46 @@
   }
 
   ensureCardDelegation();
+  syncMobileFilterChrome();
+  if (window.matchMedia) {
+    window.matchMedia("(max-width: 767px)").addEventListener("change", syncMobileFilterChrome);
+  }
 
   state.focusLeadId = parseFocusLeadId();
 
   if (getToken()) {
     syncAuthCookie(getToken());
+  } else {
+    applyFeedPrefsToState(readLocalFeedPrefs());
   }
 
-  loadSubscription().then(function () {
-    applyFeedShellMode();
-    updateDelayNotice();
-    return Promise.all([loadTags(), loadCatalog()]);
-  }).then(function () {
+  loadSubscription()
+    .then(function () {
+      applyFeedShellMode();
+      return mergeFeedPrefsOnLogin();
+    })
+    .then(function () {
+      return Promise.all([loadTags(), loadCatalog()]);
+    })
+    .then(function () {
     if (!isLoggedIn()) {
       state.draftCategories = readCategoriesFrom();
       state.appliedCategories = cloneCategories(state.draftCategories);
       state.sort = "time";
     }
+    applyFeedTierUi();
     renderSkillsCatalog();
     syncChips();
     readFilters();
     updateFilterBarUi();
     updateCount();
     resetAndLoad();
-  });
+  })
+    .catch(function () {
+      applyFeedShellMode();
+      applyFeedTierUi();
+      resetAndLoad();
+    });
 
   var siteHeader = document.querySelector(".rl-header");
   if (siteHeader) {
@@ -3096,6 +4096,21 @@
       { passive: true }
     );
   }
+
+  function syncFeedCabinetLink() {
+    var link = document.getElementById("rl-feed-cabinet-link");
+    if (!link) {
+      return;
+    }
+    link.textContent = isLoggedIn() ? "Кабинет →" : "Войти в кабинет →";
+    link.setAttribute(
+      "href",
+      isLoggedIn() ? cfg.cabinetUrl || "/cabinet/" : cabinetLoginUrl
+    );
+  }
+
+  syncFeedCabinetLink();
+  window.addEventListener("rawlead-auth-changed", syncFeedCabinetLink);
 
   if (window.rawleadSyncHeader) {
     window.rawleadSyncHeader();

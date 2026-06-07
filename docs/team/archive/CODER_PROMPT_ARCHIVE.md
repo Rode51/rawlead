@@ -4699,4 +4699,19 @@ Ctrl+F5 на `http://radarzakaz.local/lenta/` (uvicorn :18766).
 
 ---
 
-_Lead Architect · 2026-05-25 · W2 разблокирован_
+---
+
+## § 2026-06-05 — hot slim (O117 · O120 · O121-w0 · O116 · O72e)
+
+Перенесено из hot **2026-06-05**. Активное: [CODER_PROMPT.md](../architect/CODER_PROMPT.md).
+
+| § | Итог |
+|---|------|
+| **O117-deploy** | `deploy-o117-vps.py` · wall-clock 120s · allowlist ИИ · restart radar/bot/api |
+| **O120-deploy** | `tg_proxy_pool.py` · HTTPS probe · failover Bot API · `deploy-o120-vps.py` |
+| **O121-w0** | `owner_admin.py` Bot restart · `deploy-o121-w0-vps.py` |
+| **O116-*** | theme 1.18.15 · support · flip · cabinet |
+| **O72e-regen-tail** | #9909 allowlist · 28/28 |
+
+---
+

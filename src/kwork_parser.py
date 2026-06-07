@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 from urllib.parse import urlparse
 
 import requests
 
 from config import Config
-from exchange_browser_fetch import fetch_listing_html_browser, listing_browser_enabled
+from exchange_browser_fetch import (
+    fetch_listing_html_browser_wall_clock,
+    listing_browser_enabled,
+)
 from exchange_proxy import exchange_fetch_begin, exchange_fetch_end, exchange_get, proxy_log_hint
 from html_fetch import HtmlFetchError
 from lead_category import category_from_kwork_listing_url, category_from_kwork_want
@@ -146,6 +151,14 @@ def _guess_blocked_or_changed(html: str) -> str | None:
     return None
 
 
+def _kwork_listing_wall_clock_sec() -> float:
+    raw = os.getenv("KWORK_LISTING_TIMEOUT_SEC", "120").strip()
+    try:
+        return max(float(raw), 10.0)
+    except ValueError:
+        return 120.0
+
+
 def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[ListingProject]:
     """GET `cfg.kwork_projects_url`, первая страница (без пагинации в MVP)."""
     url = cfg.kwork_projects_url
@@ -154,15 +167,26 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
     try:
         html: str | None = None
         if listing_browser_enabled():
+            wall = _kwork_listing_wall_clock_sec()
             try:
-                html = fetch_listing_html_browser(
+                html = fetch_listing_html_browser_wall_clock(
                     "kwork",
                     url,
                     user_agent=cfg.http_user_agent,
-                    timeout_sec=timeout_sec,
+                    timeout_sec=min(timeout_sec, wall),
+                    wall_clock_sec=wall,
                 )
             except HtmlFetchError as exc:
-                logger.warning("kwork_listing: Playwright failed (%s) — httpx fallback", exc)
+                if "timeout" in str(exc).lower():
+                    logger.warning(
+                        "kwork_listing: timeout after %ss — httpx fallback",
+                        int(wall),
+                    )
+                else:
+                    logger.warning(
+                        "kwork_listing: Playwright failed (%s) — httpx fallback",
+                        exc,
+                    )
         if html is None:
             headers = {"User-Agent": cfg.http_user_agent}
             try:
@@ -209,9 +233,29 @@ _KWORK_GONE_MARKERS = (
     "заказ закрыт",
     "проект закрыт",
     "исполнитель выбран",
+    "исполнитель уже выбран",
     "страница не найдена",
     "want not found",
+    "в архиве",
+    "закрыт для откликов",
+    "отклики не принимаются",
+    "прием откликов закрыт",
+    "приём откликов закрыт",
 )
+
+_KWORK_PROJECT_ID_RE = re.compile(r"/projects/(\d+)", re.I)
+
+
+def _kwork_redirected_away(original: str, final: str) -> bool:
+    orig = (original or "").strip()
+    fin = final.strip() if isinstance(final, str) else ""
+    if not orig or not fin or orig.casefold() == fin.casefold():
+        return False
+    m = _KWORK_PROJECT_ID_RE.search(orig)
+    if not m:
+        return False
+    pid = m.group(1)
+    return f"/projects/{pid}" not in fin.casefold()
 
 
 def _parse_kwork_detail_html(html: str, *, fallback_snippet: str = "") -> str:
@@ -305,6 +349,11 @@ def check_project_page_gone(
         return True
     if resp.status_code != 200:
         return None
+
+    raw_final = getattr(resp, "url", None)
+    final_url = raw_final.strip() if isinstance(raw_final, str) and raw_final.strip() else url
+    if _kwork_redirected_away(url, final_url):
+        return True
 
     encoding = resp.encoding or "utf-8"
     html = resp.content.decode(encoding, errors="replace").casefold()

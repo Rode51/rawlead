@@ -46,6 +46,8 @@
       "; secure; samesite=lax";
   }
   var SORT_KEY = "rawlead_cabinet_sort";
+  var MIN_MATCH_KEY = "rawlead_cabinet_min_match";
+  var MIN_MATCH_OPTIONS = [70, 80, 90];
   var USER_META_KEY = "rawlead_user_meta";
   var GUEST_SKILLS_KEYS = ["rawlead_lenta_skills", "rawlead_guest_skills"];
   var MAX_USER_TAGS = 12;
@@ -815,14 +817,12 @@
   var userAvatarEl = document.getElementById("rl-cabinet-user-avatar");
   var logoutBtn = document.getElementById("rl-cabinet-logout");
   var subEl = document.getElementById("rl-cabinet-sub");
+  var subTitleEl = document.getElementById("rl-cabinet-sub-title");
   var subBadgeEl = document.getElementById("rl-cabinet-sub-badge");
   var subPriceEl = document.getElementById("rl-cabinet-sub-price");
   var subDetailEl = document.getElementById("rl-cabinet-sub-detail");
-  var subTrialEl = document.getElementById("rl-cabinet-sub-trial");
   var subPayEl = document.getElementById("rl-cabinet-sub-pay");
-  var subBillingEl = document.getElementById("rl-cabinet-sub-billing");
-  var subPauseEl = document.getElementById("rl-cabinet-sub-pause");
-  var subResumeEl = document.getElementById("rl-cabinet-sub-resume");
+  var subTrialEl = document.getElementById("rl-cabinet-sub-trial");
   var subNoteEl = document.getElementById("rl-cabinet-sub-note");
   var subscriptionState = null;
 
@@ -900,15 +900,15 @@
 
   function subscriptionStatusLabel(status, data) {
     if (status === "trial" && data && data.trial_days_left != null) {
-      return "Trial · " + data.trial_days_left + " дн.";
+      return "Trial · осталось " + data.trial_days_left + " дн.";
     }
     var map = {
       beta: "PREMIUM",
-      free: "",
+      free: "FREE",
       active: "PREMIUM",
       trial: "Trial",
-      paused: "Пауза",
       expired: "Истекла",
+      paused: "Пауза",
     };
     return map[status] || status || "";
   }
@@ -931,7 +931,31 @@
     }
     subscriptionState = data || null;
     if (!data) {
-      subEl.hidden = true;
+      subEl.hidden = false;
+      if (subTitleEl) {
+        subTitleEl.textContent = "Подписка";
+      }
+      if (subBadgeEl) {
+        subBadgeEl.textContent = "—";
+        subBadgeEl.hidden = false;
+        subBadgeEl.className = "rl-cabinet-sub__badge rl-cabinet-sub__badge--free";
+      }
+      if (subPriceEl) {
+        subPriceEl.hidden = true;
+      }
+      if (subDetailEl) {
+        subDetailEl.textContent =
+          "Не удалось загрузить статус. Обновите страницу или войдите снова.";
+      }
+      if (subTrialEl) {
+        subTrialEl.hidden = true;
+      }
+      if (subPayEl) {
+        subPayEl.hidden = true;
+      }
+      if (subNoteEl) {
+        subNoteEl.hidden = true;
+      }
       return;
     }
     subEl.hidden = false;
@@ -947,34 +971,49 @@
       status = "trial";
       isTrial = true;
     }
-    if (status === "active" || status === "beta" || status === "paused") {
+    if (status === "paused") {
+      status = "expired";
+    }
+    if (status === "active" || status === "beta") {
       isTrial = false;
+    }
+    var hadPaidPlan = data.plan && data.plan !== "free" && data.plan !== "owner";
+    if (hadPaidPlan && (status === "active" || status === "expired")) {
+      isTrial = false;
+    }
+
+    if (subTitleEl) {
+      if (status === "free") {
+        subTitleEl.textContent = "RawLead Free";
+      } else if (status === "active" || status === "beta" || isTrial) {
+        subTitleEl.textContent = "RawLead Premium";
+      } else {
+        subTitleEl.textContent = "Подписка";
+      }
     }
 
     if (subBadgeEl) {
       var badgeText = subscriptionStatusLabel(status, data);
       subBadgeEl.textContent = badgeText;
-      subBadgeEl.hidden = badgeText === "";
+      subBadgeEl.hidden = !badgeText;
       subBadgeEl.className =
         "rl-cabinet-sub__badge rl-cabinet-sub__badge--" + (isTrial ? "trial" : status);
     }
 
     if (subPriceEl) {
-      subPriceEl.hidden = status === "active" || status === "trial" || status === "paused" || status === "beta";
+      subPriceEl.hidden = status === "active" || status === "trial" || status === "beta";
     }
 
     if (subDetailEl) {
       var detail = "";
       if (isTrial && data.active_until) {
         detail = "Premium активен до " + formatSubDate(data.active_until);
-      } else if (status === "paused" && data.paused_until) {
-        detail = "На паузе до " + formatSubDate(data.paused_until);
       } else if (status === "active" && data.active_until) {
         detail = "✅ Premium активен до " + formatSubDate(data.active_until);
       } else if (status === "beta") {
         detail = "Полный доступ в режиме beta";
       } else if (status === "free") {
-        detail = "Лента с задержкой 15 мин · Premium — без задержки и уникальные черновики";
+        detail = "Лента без задержки · Premium — черновики отклика и push в Telegram";
       } else if (status === "expired") {
         detail = "Подписка истекла — продлите через @rawlead_bot /pay";
       }
@@ -982,7 +1021,6 @@
     }
 
     var payUrl = cfg.botPayUrl || botDeepLink("pay");
-    var trialUrl = botDeepLink("trial");
 
     var subActionsEl = subEl.querySelector(".rl-cabinet-sub__actions");
     if (subActionsEl) {
@@ -1019,19 +1057,34 @@
     }
 
     if (subTrialEl) {
-      var showTrial = status === "free" && !data.is_active && !data.effective_access;
-      subTrialEl.hidden = !showTrial;
-      if (showTrial) {
-        setSubLink(subTrialEl, trialUrl, "Попробовать 3 дня →");
-        setSubActionClass(subTrialEl, "primary");
-      }
+      var showTrialCta =
+        status === "free" && !data.trial_used && !data.effective_access;
+      subTrialEl.hidden = !showTrialCta;
+      subTrialEl.disabled = false;
+      subTrialEl.classList.remove("is-disabled");
     }
 
     if (subPayEl) {
-      if (status === "free") {
+      if (status === "active" || status === "beta") {
         subPayEl.hidden = false;
-        setSubLink(subPayEl, payUrl, "Подключить Premium →");
-        setSubActionClass(subPayEl, "secondary");
+        setSubLink(subPayEl, payUrl, "Продлить");
+        setSubActionClass(subPayEl, "primary");
+      } else if (status === "expired") {
+        subPayEl.hidden = false;
+        setSubLink(subPayEl, payUrl, "Возобновить");
+        setSubActionClass(subPayEl, "primary");
+      } else if (status === "free") {
+        subPayEl.hidden = false;
+        setSubLink(
+          subPayEl,
+          payUrl,
+          data.trial_used ? "Подключить Premium →" : "Подключить Premium →"
+        );
+        if (subTrialEl && !subTrialEl.hidden) {
+          setSubActionClass(subPayEl, "secondary");
+        } else {
+          setSubActionClass(subPayEl, "primary");
+        }
       } else if (isTrial) {
         subPayEl.hidden = false;
         setSubLink(subPayEl, payUrl, "Оплатить 790 ₽ →");
@@ -1039,37 +1092,6 @@
       } else {
         subPayEl.hidden = true;
         setSubActionClass(subPayEl, "");
-      }
-    }
-
-    if (subBillingEl) {
-      if (status === "active" || status === "beta") {
-        subBillingEl.hidden = false;
-        setSubLink(subBillingEl, payUrl, "Оплата");
-        setSubActionClass(subBillingEl, "secondary");
-      } else {
-        subBillingEl.hidden = true;
-        setSubActionClass(subBillingEl, "");
-      }
-    }
-
-    if (subPauseEl) {
-      var showPause = data.can_pause || isTrial || status === "active" || status === "beta";
-      subPauseEl.hidden = !showPause || status === "free" || status === "expired";
-      subPauseEl.disabled = !data.can_pause && !isTrial;
-      subPauseEl.textContent = "Пауза";
-      if (status === "active" || status === "beta") {
-        setSubActionClass(subPauseEl, "secondary");
-      } else if (isTrial) {
-        setSubActionClass(subPauseEl, "secondary");
-      } else {
-        setSubActionClass(subPauseEl, "");
-      }
-    }
-    if (subResumeEl) {
-      subResumeEl.hidden = status !== "paused";
-      if (status === "paused") {
-        setSubActionClass(subResumeEl, "primary");
       }
     }
     if (subNoteEl) {
@@ -1105,23 +1127,53 @@
       });
   }
 
-  function postSubscriptionPause(body) {
-    if (!cfg.restSubscription) {
-      return Promise.reject(new Error("no endpoint"));
+  function startTrial() {
+    if (!cfg.restTrialStart || !getToken() || !subTrialEl) {
+      return Promise.resolve(null);
     }
-    return fetch(cfg.restSubscription, {
+    subTrialEl.disabled = true;
+    subTrialEl.classList.add("is-disabled");
+    var headers = authHeaders();
+    headers["Content-Type"] = "application/json";
+    return fetch(cfg.restTrialStart, {
       method: "POST",
       credentials: "same-origin",
-      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-      body: JSON.stringify(body || {}),
-    }).then(function (res) {
-      return res.json().then(function (data) {
-        if (!res.ok) {
-          throw new Error((data && data.message) || "pause failed");
-        }
+      headers: headers,
+      body: "{}",
+    })
+      .then(function (res) {
+        return res.json().then(function (data) {
+          if (!res.ok) {
+            var msg =
+              (data && data.message) ||
+              (data && data.detail) ||
+              "Не удалось активировать trial";
+            throw new Error(msg);
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
         renderSubscription(data);
         return data;
+      })
+      .catch(function (err) {
+        if (subNoteEl) {
+          subNoteEl.hidden = false;
+          subNoteEl.textContent =
+            (err && err.message) || "Trial недоступен. Попробуйте позже.";
+        }
+        if (subTrialEl) {
+          subTrialEl.disabled = false;
+          subTrialEl.classList.remove("is-disabled");
+        }
+        return null;
       });
+  }
+
+  if (subTrialEl) {
+    subTrialEl.addEventListener("click", function () {
+      startTrial();
     });
   }
 
@@ -1273,35 +1325,6 @@
     notifEnabledEl.addEventListener("click", function () {
       var current = notifEnabledEl.getAttribute("aria-checked") === "true";
       patchNotificationSettings({ push_enabled: !current });
-    });
-  }
-
-  if (subPauseEl) {
-    subPauseEl.addEventListener("click", function () {
-      subPauseEl.disabled = true;
-      postSubscriptionPause({ days: 14 })
-        .catch(function () {
-          if (subPauseEl) {
-            subPauseEl.disabled = false;
-          }
-        });
-    });
-  }
-
-  if (subResumeEl) {
-    subResumeEl.addEventListener("click", function () {
-      subResumeEl.disabled = true;
-      postSubscriptionPause({ resume: true })
-        .catch(function () {
-          if (subResumeEl) {
-            subResumeEl.disabled = false;
-          }
-        })
-        .finally(function () {
-          if (subResumeEl) {
-            subResumeEl.disabled = false;
-          }
-        });
     });
   }
 
@@ -1630,6 +1653,7 @@
 
   var listEl = document.getElementById("rl-cabinet-list");
 
+  var toolbarEl = document.getElementById("rl-cabinet-toolbar");
   var countEl = document.getElementById("rl-cabinet-count");
 
   var paginationEl = document.getElementById("rl-cabinet-pagination");
@@ -1649,10 +1673,6 @@
 
   var noMatchEl = document.getElementById("rl-cabinet-no-match");
   var noMatchFreeEl = document.getElementById("rl-cabinet-no-match-free");
-
-  var sidebar = document.getElementById("rl-cabinet-sidebar");
-
-  var resetBtn = sidebar ? sidebar.querySelector(".rl-feed-reset") : null;
 
   var skillsModalEl = document.getElementById("rl-cabinet-skills-modal");
   var skillsOverlayEl = document.getElementById("rl-cabinet-skills-modal-overlay");
@@ -1699,15 +1719,9 @@
 
     limit: 20,
 
-    minMatch: 0,
+    minMatch: 80,
 
-    sort: "match",
-
-    source: "",
-
-    draftCategories: [],
-
-    appliedCategories: [],
+    sort: "time",
 
     loading: false,
 
@@ -3762,7 +3776,7 @@
 
   function isPerfectMatch(item) {
     var km = item.keyword_match != null ? item.keyword_match : 0;
-    return km >= 100 && hasUserSkills() && leadTagKeys(item).length >= 2;
+    return km >= 90 && hasUserSkills() && leadTagKeys(item).length >= 2;
   }
 
   function renderPerfectBadge(perfect) {
@@ -3822,7 +3836,7 @@
       '<span class="rl-niche-icon rl-niche-icon--' +
       escapeHtml(c) +
       '" aria-hidden="true">' +
-      NICHE_ICONS[c] +
+      escapeHtml(NICHE_ICONS[c]) +
       "</span>"
     );
   }
@@ -3861,15 +3875,7 @@
         "</button></div>"
       );
     }
-    var km = item.keyword_match != null ? item.keyword_match : 0;
-    if (km <= 0) {
-      return "";
-    }
-    return (
-      '<div class="rl-match-breakdown">' +
-      escapeHtml("Навыки: " + km + "%") +
-      "</div>"
-    );
+    return "";
   }
 
   function renderCompatMatchBar(item) {
@@ -4156,114 +4162,143 @@
 
 
 
-  function updateCount() {
-
-    if (!countEl) {
-
-      return;
-
-    }
-
-    countEl.textContent =
-
-      state.totalShown > 0
-
-        ? state.totalShown + " откликов"
-
-        : "";
-
-    updatePagination();
-
+  function inboxMatchPct(item) {
+    var km = item && item.keyword_match != null ? item.keyword_match : 0;
+    return parseInt(String(km), 10) || 0;
   }
 
-
-
-  function readCategoriesFrom(root) {
-
-    var box = root || sidebar;
-
-    if (!box) {
-
-      return [];
-
+  function inboxTimeMs(item) {
+    var iso = (item && (item.replied_at || item.created_at)) || "";
+    if (!iso) {
+      return 0;
     }
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  }
 
-    var cats = [];
+  function passesInboxMinMatch(item) {
+    if (!hasUserSkills() || !state.minMatch) {
+      return true;
+    }
+    return inboxMatchPct(item) >= state.minMatch;
+  }
 
-    box.querySelectorAll('input[name="category"]:checked').forEach(function (inp) {
+  function sortInboxItems(items) {
+    var list = items.slice();
+    if (state.sort === "match" && hasUserSkills()) {
+      list.sort(function (a, b) {
+        var dm = inboxMatchPct(b) - inboxMatchPct(a);
+        if (dm !== 0) {
+          return dm;
+        }
+        return inboxTimeMs(b) - inboxTimeMs(a);
+      });
+    } else {
+      list.sort(function (a, b) {
+        return inboxTimeMs(b) - inboxTimeMs(a);
+      });
+    }
+    return list;
+  }
 
-      if (inp.value) {
+  function processInboxItems(items) {
+    return sortInboxItems(items.filter(passesInboxMinMatch));
+  }
 
-        cats.push(inp.value);
+  function inboxItemsFromState() {
+    return Object.keys(state.itemsById).map(function (k) {
+      return state.itemsById[k];
+    });
+  }
 
+  function renderCabinetToolbar() {
+    if (toolbarEl) {
+      toolbarEl.innerHTML = "";
+      toolbarEl.hidden = true;
+    }
+  }
+
+  function setCabinetSort(next) {
+    if (next !== "time" && next !== "match") {
+      return;
+    }
+    if (next === "match" && !hasUserSkills()) {
+      return;
+    }
+    if (state.sort === next) {
+      return;
+    }
+    state.sort = next;
+    try {
+      sessionStorage.setItem(SORT_KEY, state.sort);
+    } catch (err) {
+      // ignore
+    }
+    renderCabinetToolbar();
+    resetAndLoad();
+  }
+
+  function setCabinetMinMatch(pct) {
+    var n = parseInt(String(pct), 10);
+    if (MIN_MATCH_OPTIONS.indexOf(n) < 0 || state.minMatch === n) {
+      return;
+    }
+    state.minMatch = n;
+    try {
+      sessionStorage.setItem(MIN_MATCH_KEY, String(n));
+    } catch (err) {
+      // ignore
+    }
+    renderCabinetToolbar();
+    resetAndLoad();
+  }
+
+  function rerenderInboxList() {
+    if (!listEl) {
+      return;
+    }
+    var items = processInboxItems(inboxItemsFromState());
+    state.totalShown = items.length;
+    if (items.length === 0) {
+      listEl.innerHTML = "";
+      if (Object.keys(state.itemsById).length === 0) {
+        showInboxEmpty();
+      } else {
+        listEl.hidden = false;
+        listEl.innerHTML =
+          '<p class="rl-feed-empty">Нет откликов с совместимостью от ' +
+          state.minMatch +
+          "%</p>";
       }
-
-    });
-
-    return cats;
-
+      updateCount();
+      return;
+    }
+    listEl.hidden = false;
+    if (noMatchEl) {
+      noMatchEl.hidden = true;
+    }
+    if (noMatchFreeEl) {
+      noMatchFreeEl.hidden = true;
+    }
+    listEl.innerHTML = items
+      .map(function (item) {
+        return renderCard(item, false);
+      })
+      .join("");
+    bindCards();
+    observeInboxCards(listEl);
+    updateCount();
   }
 
-
-
-  function readFilters() {
-
-    if (!sidebar) {
-
+  function updateCount() {
+    if (!countEl) {
+      updatePagination();
       return;
-
     }
-
-    var src = sidebar.querySelector('input[name="source"]:checked');
-
-    var matchInp = sidebar.querySelector('input[name="min_match"]:checked');
-
-    var sortInp = sidebar.querySelector('input[name="sort"]:checked');
-
-    state.source = src ? src.value : "";
-
-    state.appliedCategories = readCategoriesFrom();
-
-    state.minMatch = matchInp ? parseInt(matchInp.value, 10) || 0 : 0;
-
-    state.sort = sortInp ? sortInp.value : "match";
-
-    var dirty =
-
-      state.source !== "" ||
-
-      state.appliedCategories.length > 0 ||
-
-      state.minMatch !== 0 ||
-
-      state.sort !== "match";
-
-    if (resetBtn) {
-
-      resetBtn.hidden = !dirty;
-
-    }
-
-  }
-
-
-
-  function syncChips() {
-
-    if (!sidebar) {
-
-      return;
-
-    }
-
-    sidebar.querySelectorAll(".rl-feed-chip").forEach(function (label) {
-
-      var input = label.querySelector("input");
-
-      label.classList.toggle("is-active", input && input.checked);
-
-    });
-
+    var total = state.total > 0 ? state.total : state.totalShown;
+    countEl.textContent = total > 0 ? total + " откликов" : "";
+    renderCabinetToolbar();
+    updatePagination();
   }
 
 
@@ -4398,45 +4433,21 @@
           });
         }
 
-        if (replace && listEl) {
-
-          listEl.innerHTML = "";
-
+        if (replace) {
+          state.itemsById = {};
         }
 
-        if (items.length === 0 && state.offset === 0) {
+        items.forEach(function (item) {
+          state.itemsById[item.id] = item;
+        });
 
-          listEl.innerHTML = "";
-
+        if (items.length === 0 && state.offset === 0 && inboxItemsFromState().length === 0) {
+          if (listEl) {
+            listEl.innerHTML = "";
+          }
           showInboxEmpty();
-
         } else {
-
-          listEl.hidden = false;
-
-          if (noMatchEl) {
-            noMatchEl.hidden = true;
-          }
-          if (noMatchFreeEl) {
-            noMatchFreeEl.hidden = true;
-          }
-
-          var frag = items
-            .map(function (item) {
-              return renderCard(item, !replace);
-            })
-            .join("");
-
-          listEl.insertAdjacentHTML("beforeend", frag);
-
-          items.forEach(function (item) {
-
-            state.itemsById[item.id] = item;
-
-          });
-
-          state.totalShown += items.length;
-
+          rerenderInboxList();
         }
 
         state.offset += data.count != null ? data.count : items.length;
@@ -4671,13 +4682,13 @@
           window.setTimeout(function () {
             card.remove();
             delete state.itemsById[id];
-            state.totalShown = Math.max(0, state.totalShown - 1);
             if (state.total > 0) {
               state.total = Math.max(0, state.total - 1);
             }
-            updateCount();
-            if (state.totalShown === 0) {
+            if (inboxItemsFromState().length === 0) {
               showInboxEmpty();
+            } else {
+              rerenderInboxList();
             }
           }, 200);
         })
@@ -4774,151 +4785,19 @@
 
 
 
-  function bindCategoryFilters(root) {
-
-    if (!root) {
-
-      return;
-
-    }
-
-    var allInp = root.querySelector('input[name="category"][value=""]');
-
-    root.querySelectorAll('input[name="category"]').forEach(function (inp) {
-
-      inp.addEventListener("change", function () {
-
-        if (inp.value === "" && inp.checked) {
-
-          root.querySelectorAll('input[name="category"]').forEach(function (other) {
-
-            if (other !== inp && other.value) {
-
-              other.checked = false;
-
-            }
-
-          });
-
-        } else if (inp.value && inp.checked && allInp) {
-
-          allInp.checked = false;
-
-        }
-
-        state.draftCategories = readCategoriesFrom(root);
-
-        syncChips();
-
-      });
-
-    });
-
-  }
-
-
-
-  if (sidebar) {
-
-    bindCategoryFilters(sidebar);
-
-    sidebar.addEventListener("change", function (e) {
-
-      var name = e.target && e.target.getAttribute("name");
-
-      if (name === "category") {
-
-        state.appliedCategories = readCategoriesFrom();
-
-        syncChips();
-
-        readFilters();
-
-        resetAndLoad();
-
+  if (toolbarEl) {
+    toolbarEl.addEventListener("click", function (e) {
+      var sortBtn = e.target.closest("[data-cabinet-sort]");
+      if (sortBtn) {
+        setCabinetSort(sortBtn.getAttribute("data-cabinet-sort"));
         return;
-
       }
-
-      if (name === "sort") {
-
-        syncChips();
-
-        readFilters();
-
-        try {
-
-          sessionStorage.setItem(SORT_KEY, state.sort);
-
-        } catch (err) {
-
-          // ignore
-
-        }
-
-        resetAndLoad();
-
-        return;
-
+      var mmBtn = e.target.closest("[data-cabinet-min-match]");
+      if (mmBtn) {
+        setCabinetMinMatch(mmBtn.getAttribute("data-cabinet-min-match"));
       }
-
-      syncChips();
-
-      readFilters();
-
-      resetAndLoad();
-
     });
-
-    if (resetBtn) {
-
-      resetBtn.addEventListener("click", function () {
-
-        sidebar.querySelector('input[name="source"][value=""]').checked = true;
-
-        sidebar.querySelectorAll('input[name="category"]').forEach(function (inp) {
-
-          inp.checked = inp.value === "";
-
-        });
-
-        sidebar.querySelector('input[name="min_match"][value="0"]').checked = true;
-
-        var sortMatch = sidebar.querySelector('input[name="sort"][value="match"]');
-
-        if (sortMatch) {
-
-          sortMatch.checked = true;
-
-        }
-
-        try {
-
-          sessionStorage.removeItem(SORT_KEY);
-
-        } catch (e) {
-
-          // ignore
-
-        }
-
-        state.draftCategories = [];
-
-        state.appliedCategories = [];
-
-        syncChips();
-
-        readFilters();
-
-        resetAndLoad();
-
-      });
-
-    }
-
   }
-
-
 
   var addFirst = document.getElementById("rl-cabinet-add-first");
 
@@ -4962,9 +4841,19 @@
 
   }
 
+  function onCabinetSkillsOverlayDismiss(e) {
+
+    e.preventDefault();
+
+    e.stopPropagation();
+
+    closeSkillsPicker();
+
+  }
+
   if (skillsOverlayEl) {
 
-    skillsOverlayEl.addEventListener("click", closeSkillsPicker);
+    skillsOverlayEl.addEventListener("click", onCabinetSkillsOverlayDismiss);
 
   }
 
@@ -5007,80 +4896,6 @@
     }
 
   });
-
-
-
-  /* Mobile bottom sheet */
-
-  var sheet = document.getElementById("rl-cabinet-sheet");
-
-  var sheetBody = document.getElementById("rl-cabinet-sheet-body");
-
-  var openBtn = document.getElementById("rl-cabinet-filters-open");
-
-  if (sheet && sheetBody && sidebar && openBtn) {
-
-    openBtn.addEventListener("click", function () {
-
-      sheetBody.innerHTML = sidebar.innerHTML;
-
-      sheet.hidden = false;
-
-      openBtn.setAttribute("aria-expanded", "true");
-
-    });
-
-    document.getElementById("rl-cabinet-sheet-overlay").addEventListener("click", closeSheet);
-
-    document.getElementById("rl-cabinet-sheet-apply").addEventListener("click", function () {
-
-      sheetBody.querySelectorAll("input").forEach(function (inp) {
-
-        var name = inp.getAttribute("name");
-
-        var val = inp.getAttribute("value");
-
-        var live = sidebar.querySelector('input[name="' + name + '"][value="' + val + '"]');
-
-        if (live) {
-
-          live.checked = inp.checked;
-
-        }
-
-      });
-
-      syncChips();
-
-      readFilters();
-
-      closeSheet();
-
-      resetAndLoad();
-
-    });
-
-    document.getElementById("rl-cabinet-sheet-reset").addEventListener("click", function () {
-
-      if (resetBtn) {
-
-        resetBtn.click();
-
-      }
-
-      closeSheet();
-
-    });
-
-    function closeSheet() {
-
-      sheet.hidden = true;
-
-      openBtn.setAttribute("aria-expanded", "false");
-
-    }
-
-  }
 
 
 
@@ -5146,11 +4961,33 @@
 
 
 
+  function loadCabinetToolbarPrefs() {
+    try {
+      var savedSort = sessionStorage.getItem(SORT_KEY);
+      if (savedSort === "time" || savedSort === "match") {
+        state.sort = savedSort;
+      }
+      var savedMm = sessionStorage.getItem(MIN_MATCH_KEY);
+      if (savedMm) {
+        var mm = parseInt(savedMm, 10);
+        if (MIN_MATCH_OPTIONS.indexOf(mm) >= 0) {
+          state.minMatch = mm;
+        }
+      }
+    } catch (err) {
+      // ignore
+    }
+  }
+
   function bootCabinet() {
+
+    loadCabinetToolbarPrefs();
 
     state.tagsStripSkeleton = true;
 
     renderTags();
+
+    renderCabinetToolbar();
 
     loadSubscription();
 

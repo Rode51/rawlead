@@ -78,7 +78,30 @@ WP Admin → **Плагины** → **RawLead Landing** → Активирова
 
 ---
 
-## 6. Готово, когда
+## 6. Live dev O118 (CSS в реальном времени)
+
+**Junction** (репо = Local, правки в Cursor сразу на сайте):
+
+```powershell
+cd C:\Users\hramo\uisness
+.venv\Scripts\python.exe scripts\wp_link_theme_local.py --force
+```
+
+**BrowserSync** (прокси + inject CSS без F5):
+
+```powershell
+cd wordpress\rawlead-kadence-child
+npm install   # один раз
+npm run dev   # http://localhost:3000 → radarzakaz.local
+```
+
+Local: **radarzakaz** → Start. Браузер слева, Cursor справа. Деплой: `scripts/deploy-wp-theme-vps.py`.
+
+Skill: [`.cursor/skills/rawlead-wp-live-dev/SKILL.md`](../../.cursor/skills/rawlead-wp-live-dev/SKILL.md)
+
+---
+
+## 7. Готово, когда
 
 - [ ] Папка `app\public` в workspace Cursor.
 - [ ] Плагин `rawlead-landing` активен.

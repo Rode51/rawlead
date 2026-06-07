@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 _INVOICE_TITLE = "RawLead — ИИ-агент"
 _INVOICE_DESC_TEMPLATE = (
     "Персональная лента, L2-черновики и push match в Telegram на 30 дней. "
-    "Оплата: {stars} Telegram Stars (~400–720 ₽ при покупке Stars)."
+    "Оплата: {stars} Telegram Stars (~800–1440 ₽ при покупке Stars)."
 )
 
 

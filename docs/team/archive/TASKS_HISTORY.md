@@ -1,10 +1,19 @@
-﻿# TASKS — архив
+# TASKS — архив
 
 Краткие записи после сдачи Coder (Lead).
 
 ---
 
-## 2026-06-04 — O109 ✅ + Lead rules A+B+C
+## 2026-06-05 — Docs sync + infra hot closed
+
+**Закрыто:** O117-deploy · O120-deploy · O121-w0 · O116 full · O72e gate.
+
+**Hot Coder:** O105-w1-r3 verify → O107 trial → O122 delist.
+
+**Урок:** STATUS был 236 строк и противоречил TASKS (O117 «→ сейчас» при ✅). Lead slim + ROADMAP дата 2026-06-05.
+
+---
+
 
 **Сделано:** Kwork delist false-positive · bot «Лента» → `/lenta/?lead={id}` · theme **1.18.6** · STATUS/TASKS hot slim · `lead-no-code` + wordpress ban.
 

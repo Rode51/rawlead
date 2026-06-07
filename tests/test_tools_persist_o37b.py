@@ -1,4 +1,4 @@
-"""O37b: tools_required persist on on-demand draft."""
+"""O37b/O125: tools_required persist on on-demand draft (tools-only + shared draft)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "src"))
 
-from ai_analyze import AiAnalysis  # noqa: E402
 from match_push import generate_and_store_lead_draft  # noqa: E402
 
 
@@ -37,25 +36,15 @@ def _lead_row(*, tools=None, shared=""):
 
 class TestToolsPersistO37b(unittest.TestCase):
     @patch("match_push.note_draft_request")
+    @patch("match_push._build_personalized_reply", return_value=("Hello draft", False))
+    @patch("match_push._analyze_shared_ondemand", return_value="Hello draft")
+    @patch("match_push.analyze_lead_tools", return_value=("python", "fastapi"))
     @patch("match_push._user_effective_access", return_value=True)
     @patch("match_push._fetch_saved_draft", return_value=None)
-    @patch("match_push.analyze_premium")
     @patch("match_push.psycopg.connect")
-    def test_empty_tools_uses_premium_and_updates_neon(
-        self, mock_connect, mock_premium, *_mocks
+    def test_empty_tools_uses_tools_only_then_shared_draft(
+        self, mock_connect, *_mocks
     ) -> None:
-        mock_premium.return_value = AiAnalysis(
-            verdict="Брать",
-            work_summary="w",
-            tools_required=("python", "fastapi"),
-            difficulty="mid",
-            approach="a; b",
-            time_for_client="1d",
-            money="m",
-            reply_draft="Hello draft",
-            risks="r",
-            lead_tags=("python",),
-        )
         mock_cur = MagicMock()
         mock_cur.fetchone.side_effect = [
             _lead_row(tools=None, shared=""),

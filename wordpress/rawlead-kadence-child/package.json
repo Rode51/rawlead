@@ -1,0 +1,12 @@
+{
+  "name": "rawlead-kadence-child",
+  "private": true,
+  "description": "O118 live dev — BrowserSync proxy to Local WP",
+  "scripts": {
+    "dev": "browser-sync start --proxy http://radarzakaz.local --files \"assets/css/**/*.css,assets/js/**/*.js,**/*.php\" --no-open --port 3000",
+    "dev:open": "browser-sync start --proxy http://radarzakaz.local --files \"assets/css/**/*.css,assets/js/**/*.js,**/*.php\" --port 3000"
+  },
+  "devDependencies": {
+    "browser-sync": "^3.0.4"
+  }
+}

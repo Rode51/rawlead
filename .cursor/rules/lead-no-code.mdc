@@ -16,6 +16,7 @@ alwaysApply: true
 - `.env`, `data/`, сессии, lock-файлы
 - `Shell` для запуска радара, pip, pytest, deploy на VPS
 - «Быстро сделаю сам» / «пока Lead поправлю» / «доделаю из summary» — **нет**
+- **«деплой на VPS»** от владельца — **не** Shell Lead'а → § `CODER_PROMPT` + `@coder` (или owner вручную по `FOR_YOU.md`)
 
 ## Summary / handoff — не повод кодить
 

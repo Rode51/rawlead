@@ -41,6 +41,13 @@ alwaysApply: true
 
 Карта правил: [`.cursor/rules/README.md`](.cursor/rules/README.md)
 
+## Skills O119 (`.cursor/skills/rawlead-*`)
+
+- **Владелец skills не вызывает** — пишет `@lead-architect` / `@coder` / `@mechanic` как раньше.
+- **Agent читает skill сам**, когда задача подходит (инцидент, VPS, CSS live dev, правка кода).
+- **Явно:** `@.cursor/skills/rawlead-wp-live-dev/SKILL.md` — только если хочешь принудительно.
+- Каталог: [`.cursor/skills/README.md`](.cursor/skills/README.md) · канон: [`HOW_TO_USE_CURSOR.md`](docs/team/common/HOW_TO_USE_CURSOR.md) § Harness.
+
 - Отвечай кратко, по делу; русский язык, если пользователь пишет по-русски
 - Не пересказывай весь репозиторий; один шаг за раз на больших задачах
 - **Не утверждай факты** без файла в repo (STATUS, CSV, код) — иначе галлюцинация

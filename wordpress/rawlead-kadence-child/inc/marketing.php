@@ -90,7 +90,7 @@ function rawlead_inner_page_lead(string $slug): string {
         'how'     => __('Пять шагов: от биржи до твоего отклика', 'rawlead-kadence-child'),
         'pricing' => __('Один тариф. Всё включено.', 'rawlead-kadence-child'),
         'faq'     => __('Коротко о RawLead для любой ниши фриланса', 'rawlead-kadence-child'),
-        'contact' => __('Telegram или email — без формы', 'rawlead-kadence-child'),
+        'contact' => __('Напишите нам — ответим в окне поддержки', 'rawlead-kadence-child'),
         'lenta'   => __('Открытый рынок заказов с бирж и Telegram', 'rawlead-kadence-child'),
         'cabinet' => __('Inbox откликов, навыки и статус подписки', 'rawlead-kadence-child'),
         default   => '',
@@ -113,7 +113,74 @@ function rawlead_format_inner_content(string $content, string $slug): string {
         return $content;
     }
 
+    if ($slug === 'contact') {
+        return $content . rawlead_contact_form_html();
+    }
+
     return $content;
+}
+
+/** O116-W4 — форма на /contact/ (тот же API, что FAB). */
+function rawlead_contact_form_html(): string {
+    return '<form class="rl-contact-form" id="rl-contact-form" novalidate>'
+        . '<label class="rl-support-modal__label" for="rl-contact-name">'
+        . esc_html__('Имя (необязательно)', 'rawlead-kadence-child')
+        . '</label>'
+        . '<input class="rl-contact-form__input" type="text" id="rl-contact-name" name="name" autocomplete="name" />'
+        . '<label class="rl-support-modal__label" for="rl-contact-message">'
+        . esc_html__('Сообщение', 'rawlead-kadence-child')
+        . '</label>'
+        . '<textarea class="rl-support-modal__input rl-contact-form__textarea" id="rl-contact-message" name="message" rows="5" required '
+        . 'placeholder="' . esc_attr__('Опиши вопрос или проблему', 'rawlead-kadence-child') . '"></textarea>'
+        . '<button type="submit" class="rl-btn rl-support-modal__submit" id="rl-contact-submit">'
+        . esc_html__('Отправить →', 'rawlead-kadence-child')
+        . '</button>'
+        . '<p class="rl-contact-form__success" id="rl-contact-success" hidden>'
+        . esc_html__('Спасибо. Ответ появится в «Поддержка» на сайте.', 'rawlead-kadence-child')
+        . '</p>'
+        . '</form>';
+}
+
+/** O116 Z4 — FAQ три группы + Q10. */
+function rawlead_faq_groups_html(string $lenta, string $cabinet): string {
+    $pricing = esc_url(rawlead_page_url('pricing'));
+
+    return '<div class="rl-faq-groups">' .
+        '<div class="rl-faq-group is-open" data-index="0">' .
+        '<button type="button" class="rl-faq-group__header">' . esc_html__('Начало', 'rawlead-kadence-child') . '</button>' .
+        '<div class="rl-faq-group__body">' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Как начать пользоваться?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>Открой <a href="' . $lenta . '">ленту заказов</a> — регистрация не нужна. Чтобы настроить навыки и получать черновики откликов, войди через Telegram в <a href="' . $cabinet . '">кабинете</a>.</p></details>' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Это автоматическая рассылка заказчикам?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>Нет. RawLead только находит заказы и присылает тебе уведомление. Писать заказчикам — сам, в удобное время. Никакого автоспама.</p></details>' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Нужен ли мой основной аккаунт Telegram?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>Да, авторизация на сайте происходит через официальный безопасный виджет Telegram. Сервер получает только твой публичный ID и юзернейм. RawLead физически не имеет доступа к твоим личным перепискам, контактам или паролям — всё полностью безопасно.</p></details>' .
+        '</div></div>' .
+        '<div class="rl-faq-group" data-index="1">' .
+        '<button type="button" class="rl-faq-group__header">' . esc_html__('Как работает', 'rawlead-kadence-child') . '</button>' .
+        '<div class="rl-faq-group__body">' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Подходит ли для нетехнических специалистов?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>Да. RawLead работает с четырьмя нишами: разработка, дизайн, маркетинг, тексты. Добавь свои навыки — ИИ найдёт подходящие заказы под твой профиль.</p></details>' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Какие источники поддерживаются?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>FL.ru, Kwork, YouDo, Freelance.ru, FreelanceJob, Пчёл.нет, Telegram-каналы. База расширяется.</p></details>' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Не получу ли бан на бирже?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>Нет. Отклики пишешь ты — своими словами, в своё время. RawLead только подбирает заказы и черновик. Автоспама с твоего аккаунта нет.</p></details>' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Почему лимит 10 откликов в час?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>Чтобы защитить твой аккаунт от спам-фильтров бирж, система ограничивает интенсивность: не более <strong>10 откликов в час</strong>. Это сохраняет качество и не даёт твоим предложениям теряться в спаме.</p></details>' .
+        '</div></div>' .
+        '<div class="rl-faq-group" data-index="2">' .
+        '<button type="button" class="rl-faq-group__header">' . esc_html__('Premium', 'rawlead-kadence-child') . '</button>' .
+        '<div class="rl-faq-group__body">' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Сервис платный?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>Лента открыта бесплатно — с задержкой 15 мин. Для авторизованных и Premium пользователей (<strong>790 ₽/мес</strong> или 600 ⭐) — без задержки, уникальные черновики, push. <a href="' . $pricing . '">Тарифы →</a></p></details>' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Есть пробный период?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>Да — 3 дня полного Premium один раз после входа через Telegram. Без карты и скрытых условий. Потом — <strong>790 ₽/мес</strong> или 600 ⭐ в @rawlead_bot /pay. <a href="' . $pricing . '">Тарифы →</a></p></details>' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Зачем Premium, если лента и так без задержки после входа?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>После входа через Telegram — лента сразу. Это бесплатно. Premium даёт: уникальный черновик отклика под твой профиль · push в Telegram при матче · inbox с черновиками · умный лимит <strong>10 откликов в час</strong>.</p></details>' .
+        '<details class="rl-faq-item"><summary><h2>' . esc_html__('Почему лимит 10 черновиков на один заказ?', 'rawlead-kadence-child') . '</h2></summary>' .
+        '<p>Чтобы на один hot-заказ не съехалась толпа одинаковых ботов — каждый отклик свой. Когда места заняты, кнопка «Написать отклик» становится серой, но заказ остаётся в ленте — можно посмотреть детали и взять другой матч.</p></details>' .
+        '</div></div>' .
+        '</div>';
 }
 
 /**
@@ -126,7 +193,7 @@ function rawlead_inner_page_html(string $slug): ?string {
 
     return match ($slug) {
         'pricing' => '<h2>ИИ-агент</h2>
-<p><strong>300 ⭐ Stars в месяц</strong> — примерно <strong>400–720 ₽</strong> при покупке в Telegram.</p>
+<p><strong>600 ⭐ Stars в месяц</strong> — оплата в Telegram.</p>
 <p>Для любой ниши — дизайн, тексты, код, маркетинг. ИИ знает твои теги.</p>
 <ul>
 <li>Лента только с заказами под твой стек</li>
@@ -135,8 +202,8 @@ function rawlead_inner_page_html(string $slug): ?string {
 </ul>
 <h2>Оплата</h2>
 <p>Оплата через Telegram Stars — @rawlead_bot /pay или кнопка «Оплатить Stars» в кабинете.</p>
-<p><a href="' . $cabinet . '">Вход в кабинет →</a> · <a href="' . $lenta . '">Смотреть ленту →</a></p>
-<p><a class="rl-btn rl-btn--primary" href="' . $bot_pay . '">Подключить — 300 ⭐ в Telegram →</a></p>',
+<p><a href="' . $cabinet . '">Вход в кабинет →</a> · <a href="' . $lenta . '">Продолжить с ограничениями (Free) →</a></p>
+<p><a class="rl-btn rl-btn--primary" href="' . $bot_pay . '">Подключить — 600 ⭐ в Telegram →</a></p>',
         'how'     => '<h2>1. Указываешь навыки</h2>
 <p>Выбери нишу и добавь теги — дизайн, разработка, маркетинг, тексты. Чем точнее профиль, тем лучше совместимость.</p>
 <h2>2. Настраиваешь профиль</h2>
@@ -147,26 +214,11 @@ function rawlead_inner_page_html(string $slug): ?string {
 <p>Система понимает задачу, решает, что нужно для её выполнения, и сверяет с твоим стеком.</p>
 <h2>5. Ты откликаешься сам</h2>
 <p>Черновик уже готов — для тебя написан отдельно, не скопирован с чужого отклика. Поправь детали и отправь. Мы не пишем заказчикам за тебя.</p>
-<p><strong>Один поток вместо десятка вкладок.</strong> Premium с лентой без задержки и push — от <strong>790 ₽/мес</strong> или 300 ⭐.</p>
-<p><a class="rl-btn rl-btn--primary" href="' . $lenta . '">Смотреть ленту →</a> · <a href="' . esc_url(rawlead_page_url('pricing')) . '">Тариф 790 ₽ →</a> · <a href="' . $cabinet . '">Войти в кабинет →</a></p>',
-        'faq'     => '<details class="rl-faq-item"><summary><h2>Это автоматическая рассылка заказчикам?</h2></summary>
-<p>Нет. RawLead только находит заказы и присылает тебе уведомление. Писать заказчикам — сам, в удобное время. Никакого автоспама.</p></details>
-<details class="rl-faq-item"><summary><h2>Подходит ли для нетехнических специалистов?</h2></summary>
-<p>Да. RawLead работает с четырьмя нишами: разработка, дизайн, маркетинг, тексты. Добавь свои навыки — ИИ найдёт подходящие заказы под твой профиль.</p></details>
-<details class="rl-faq-item"><summary><h2>Какие источники поддерживаются?</h2></summary>
-<p>FL.ru, Kwork, YouDo, Freelance.ru, FreelanceJob, Пчёл.нет, Telegram-каналы. База расширяется.</p></details>
-<details class="rl-faq-item"><summary><h2>Нужен ли мой основной аккаунт Telegram?</h2></summary>
-<p>Да — для входа через кнопку на сайте или команду /login в @rawlead_bot. Аккаунт нужен только для авторизации, ничего без твоего ведома не отправляется.</p></details>
-<details class="rl-faq-item"><summary><h2>Не получу ли бан на бирже?</h2></summary>
-<p>Нет. Отклики пишешь ты — своими словами, в своё время. RawLead только подбирает заказы и черновик. Автоспама с твоего аккаунта нет.</p></details>
-<details class="rl-faq-item"><summary><h2>Как начать пользоваться?</h2></summary>
-<p>Открой <a href="' . $lenta . '">ленту заказов</a> — регистрация не нужна. Чтобы настроить навыки и получать черновики откликов, войди через Telegram в <a href="' . $cabinet . '">кабинете</a>.</p></details>
-<details class="rl-faq-item"><summary><h2>Сервис платный?</h2></summary>
-<p>Лента открыта бесплатно — с задержкой 15 мин. Premium (<strong>790 ₽/мес</strong> или 300 ⭐) — без задержки, уникальные черновики, push. <a href="' . esc_url(rawlead_page_url('pricing')) . '">Тарифы →</a></p></details>
-<details class="rl-faq-item"><summary><h2>Почему лимит 10 откликов на заказ?</h2></summary>
-<p>Чтобы на один hot-заказ не съехалась толпа одинаковых ботов. Каждый отклик — свой. Когда слоты кончились, заказ исчезает из ленты — бери другой матч.</p></details>
-<details class="rl-faq-item"><summary><h2>Есть пробный период?</h2></summary>
-<p>Да — 3 дня полного Premium один раз после входа. Без карты. Потом — <strong>790 ₽/мес</strong> или Stars. <a href="' . $cabinet . '">Кабинет →</a></p></details>',
+<h2>Защита от спама</h2>
+<p>Система жёстко контролирует нагрузку: умный лимит — <strong>10 откликов в час</strong>. Мы защищаем твой аккаунт от спам-фильтров бирж и гарантируем заказчикам качество.</p>
+<p><strong>Один поток вместо десятка вкладок.</strong> Premium с лентой без задержки и push — от <strong>790 ₽/мес</strong> или 600 ⭐.</p>
+<p><a class="rl-btn rl-btn--primary" href="' . $cabinet . '">Войти в кабинет →</a></p>',
+        'faq'     => rawlead_faq_groups_html($lenta, $cabinet),
         default   => null,
     };
 }

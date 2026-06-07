@@ -15,6 +15,7 @@ from l3_human_style import (  # noqa: E402
     l3_ai_smell_reason,
     l3_too_similar,
     l3_voice_hint,
+    reply_retry_user_suffix,
 )
 
 
@@ -244,6 +245,98 @@ class TestL3HumanStyle(unittest.TestCase):
         self.assertIn("Конфликт tools_required vs Описание", body)
         self.assertIn("GOOD (#12148)", body)
         self.assertIn("webhook handlers", body)
+
+    def test_shared_l2_r11_customer_stack_from_tz(self) -> None:
+        """O72e-L2-r11: стек из ТЗ — основной + вспомогательный, не дефолты модели."""
+        body = build_shared_l2_system()
+        self.assertIn("Стек заказчика", body)
+        self.assertIn("вспомогательный", body)
+        self.assertIn("не сужай", body)
+        self.assertIn("Приоритет", body)
+
+    def test_shared_l2_r12_freeze_depth_tos(self) -> None:
+        """O72e-L2-r12: freeze FAIL — ToS-safe #9843, depth CRM/API/SMM."""
+        body = build_shared_l2_system()
+        self.assertIn("ToS-safe", body)
+        self.assertIn("группы-посредники", body)
+        self.assertIn("GOOD (#9843 GAS)", body)
+        self.assertIn("GOOD (#8915)", body)
+        self.assertIn("GOOD (#8774)", body)
+        self.assertIn("GOOD (#9316)", body)
+        self.assertIn("GOOD (#9861)", body)
+        self.assertNotIn("групп-посредников. Опыт с TG-инвайтингом", body)
+
+    # --- O128-L2-VOICE ---
+
+    def test_o128_smell_imeyu_opyt(self) -> None:
+        """O128: «имею опыт» → smell/retry."""
+        self.assertIsNotNone(l3_ai_smell_reason("Имею опыт разработки Telegram-ботов."))
+
+    def test_o128_smell_ya_ekspert(self) -> None:
+        """O128: «я эксперт» → smell/retry."""
+        self.assertIsNotNone(l3_ai_smell_reason("Я эксперт в сфере автоматизации."))
+
+    def test_o128_smell_delal_pokhozhee(self) -> None:
+        """O128: «делал похожее» → smell/retry."""
+        self.assertIsNotNone(l3_ai_smell_reason("Делал похожее для другого интернет-магазина."))
+
+    def test_o128_smell_stack_pref_question(self) -> None:
+        """O128: «предпочтение по стеку» → smell/retry."""
+        self.assertIsNotNone(
+            l3_ai_smell_reason("Подскажите, предпочтение по стеку?")
+        )
+
+    def test_o128_smell_stack_choice_question(self) -> None:
+        """O128: «какой стек предпочитаете» → smell/retry."""
+        self.assertIsNotNone(
+            l3_ai_smell_reason("Подскажите, какой стек предпочитаете использовать?")
+        )
+
+    def test_o128_good_plan_from_tz_no_smell(self) -> None:
+        """O128: план по ТЗ без portfolio-claims → no smell."""
+        self.assertIsNone(
+            l3_ai_smell_reason(
+                "Здравствуйте! По ТЗ — webhook AmoCRM: заявка с формы → сделка, "
+                "тест на тестовом аккаунте. REST API Amo, как в описании. "
+                "Подскажите, одна воронка или разные по источнику?"
+            )
+        )
+
+    def test_o128_shared_l2_no_delal_pokhozhee(self) -> None:
+        """O128: «Делал похожее» убран из allowed-patterns."""
+        body = build_shared_l2_system()
+        self.assertNotIn("«Делал похожее", body)
+
+    def test_o128_shared_l2_poziciya_ispolnitelya(self) -> None:
+        """O128: блок «Позиция исполнителя» присутствует в shared-промпте."""
+        body = build_shared_l2_system()
+        self.assertIn("Позиция исполнителя", body)
+
+    def test_o128_shared_l2_plan_vocabulary(self) -> None:
+        """O128: словарь O128-B — запрет portfolio-claims, разрешение плана."""
+        body = build_shared_l2_system()
+        self.assertIn("план по ТЗ", body)
+        self.assertIn("делал похожее", body.casefold())
+
+    def test_o128_uniquify_a_plan_not_experience(self) -> None:
+        """O128: каркас (A) uniquify — план→шаги→вопрос, без «личного опыта»."""
+        body = build_uniquify_system(voice_hint="тест")
+        self.assertIn("план→шаги→вопрос", body)
+        self.assertNotIn("личного опыта или кейса", body)
+
+    def test_o128_retry_suffix_no_experience_hint(self) -> None:
+        """O128: retry suffix «similar» не предлагает «начни с опыта»."""
+        suffix = reply_retry_user_suffix(reason="similar", attempt=1, layer="L3")
+        self.assertNotIn("начни с опыта", suffix)
+        self.assertIn("план→шаги→вопрос", suffix)
+
+    def test_o128_8752_good_no_stack_pref(self) -> None:
+        """O128: GOOD #8752 (нет TG) — без «предпочтение по стеку»."""
+        body = build_shared_l2_system()
+        idx = body.find("GOOD (#8752 нет TG")
+        self.assertGreater(idx, 0)
+        good_section = body[idx : idx + 300]
+        self.assertNotIn("предпочтение по стеку", good_section)
 
 
 if __name__ == "__main__":

@@ -1,17 +1,660 @@
 # Lead Designer — активный план
 
-**Обновлено:** 2026-05-29 · **Регламент:** [`LEAD_DESIGN.md`](LEAD_DESIGN.md) — **кто какой файл читает**
+**Обновлено:** 2026-06-07 · **Регламент:** [`LEAD_DESIGN.md`](LEAD_DESIGN.md) — **кто какой файл читает**
 
 | | |
 |--|--|
-| **→ Сейчас** | idle · **§ O105-D — ✅ Lead verify 2026-06-03 · → @coder** (CODER_PROMPT § O105-WP · O106) |
+| **→ Сейчас** | — (idle) |
+| **O127-D** | ✅ Filter Bar v2 + Lead Card v3 · **2026-06-07** → **@coder O127-WP** |
+| **O121-D** | ✅ wireframes `/ops/` прокси + IA · **2026-06-05** → **@lead-architect** → Coder **O121-w1** |
+| **O116-D** | ✅ Lead Design 2026-06-04 |
+| **PRE-RELEASE-AUDIT** | ✅ Coder **1.18.4** · Lead verify ✅ |
 | **D-O81** | **✅ Design 2026-06-01** (канвас v9 · спека § O81-w1) |
-| **D-O82b** | Match v2 breakdown — **⏸** (достаточно § O81-w1 card + OWNER_INTENT для Coder w1b) |
+| **D-O82b** | Match v2 breakdown — **⏸** |
 | **D-O40** | **✅ Lead verify 2026-05-30** |
 | **O96-D ф2** | **✅ спеки сданы 2026-06-02** → @lead-architect → @coder |
+| **O105-D** | **✅ Lead verify 2026-06-03 · → @coder** (CODER_PROMPT § O105-WP · O106) |
 | **Vision** | [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.12** |
 
-**Gate:** O37c audit → fixes → **S6** · stress load после green UX.
+**Gate:** O127-D → O127-WP → owner BrowserSync → E2E/stress → ads.
+
+---
+
+## § O127-D — Финальный UI unify: Filter Bar + Lead Card (**✅ Lead Design 2026-06-07 · → Coder O127-WP**)
+
+**Запрос владельца:** функции ок, **вид не устраивает** — фильтры anon/free/premium выглядят по-разному; карточки не доведены; mobile 390px. Не ребренд NEO.
+
+**Канон продукта:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md) § O127 · очередь [`TASKS.md`](../common/TASKS.md) шаг **9b**.
+
+**Детальная спека (Coder-handoff):** [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) **§9 O127**.
+
+---
+
+### Решения (канон, не менять без нового слова владельца)
+
+| # | Вопрос | Решение |
+|---|--------|---------|
+| Q1 | Три layout фильтра → один? | **Один chrome** — одна высота, один border. Правые кнопки присутствуют у всех тиров: у anon — locked-состояние (muted), у auth — active. |
+| Q2 | Locked кнопки у anon — скрыть или muted? | **Muted + клик** → inline hint под баром «Войди чтобы настраивать» + ссылка `/cabinet/`. Не скрывать — chrome должен быть одинаковым. |
+| Q3 | Sorting для Free vs Premium | **Free:** Свежие / По совм. (без min%). **Premium:** + выбор мин.% (60/70/80/90). Один компонент, разные опции по tier. |
+| Q4 | Одна карточка для /lenta/ + /cabinet/? | **Да** — `.rl-lead-card` единый. Tier-rows `[data-tier]` + CSS управляют видимостью match row (auth only) и slot row (paid only). |
+| Q5 | CTA на карточке — сколько? | **Ровно один** на карточку. Anon → ghost CTA /cabinet/. Free → locked CTA (inline upsell). Premium/lenta → primary CTA. Cabinet → accordion черновик. |
+| Q6 | «Брать»/«Сомнительно» чипы | **Убраны** (O82/O96 — уже решено). Проверить что не рендерятся нигде. |
+| Q7 | Mobile thumb-zone CTA | **min-height 48px** для CTA на карточке. Filter bar кнопки — 44px. |
+
+---
+
+### О127-А — Filter Bar System: capability matrix
+
+| Capability | Anon | Free TG | Premium |
+|-----------|------|---------|---------| 
+| Категории (chips) | ✅ | ✅ | ✅ |
+| [Навыки ▾] | 🔒 muted | ✅ (badge если есть) | ✅ (число badge) |
+| [Сортировка ▾] | 🔒 muted | ✅ Свежие/По совм. | ✅ + мин. % |
+| Match bar на карточке | ❌ | ✅ | ✅ |
+| CTA «Написать отклик» | ghost → /cabinet/ | 🔒 muted → upsell | ✅ primary |
+| Slot line «Осталось N» | ❌ | ❌ | ✅ |
+| Сложность (expanded) | ❌ | ❌ | ✅ |
+
+**Chrome (одинаковый):** height 52px desktop / 48px mobile · bg `#FFFFFF` · border-bottom `2px solid #0A0A0A` · sticky под header.
+
+**Locked кнопки (anon):** bg `#F5F5F0` · border `2px solid #D4D4D4` · text `#A3A3A3` · cursor pointer.  
+**Клик на locked** → inline hint под баром (full-width, `position:absolute; top:100%`): «Войди чтобы настраивать подбор по навыкам → [Войти в кабинет]». Закрывается по tap outside / 4с.
+
+---
+
+### O127-B — Lead Card v3: F-pattern + thumb-zone
+
+**F-pattern (читает сверху вниз, слева→право на первых строках):**
+
+```
+① HEAD:  [niche icon] [●Source] [ИДЕАЛЬНО✦/badge]        👁N · Xмин
+② TITLE: Заголовок заказа (2 строки)
+③ BUDGET: N ₽
+④ MATCH ROW (auth only): ▓▓▓▓▓▓░  N%  Совместимость
+⑤ SLOT ROW (paid only):  Осталось N из 10 ⓘ  (muted)
+⑥ TAGS:  [tag1] [tag2]  +3→
+⑦ CTA:   [один primary action — 48px min-height]
+```
+
+**Expanded (tap):**
+```
+Суть: (L1 summary)
+Сложность: 🟡 Проект  (paid only)
+Совпало: N из M тегов
+[Читать на бирже ↗]
+[черновик accordion — только cabinet/paid]
+```
+
+---
+
+### DoD Design O127-D
+
+- [x] Capability matrix Filter Bar (Q1–Q3) зафиксирована
+- [x] Unified chrome spec (52/48px, locked state) в feed-cabinet-mvp.md §9
+- [x] Lead Card v3 (F-pattern, один CTA, tier rows) в feed-cabinet-mvp.md §9
+- [x] Mobile 390px thumb-zone (48px CTA, 44px filter buttons) — в §9
+- [x] Heuristic pass (F-pattern, one primary CTA) — задокументирован
+- [x] Handoff → @lead-architect одной строкой
+
+---
+
+### Handoff → @lead-architect
+
+> **O127-D готово → Coder O127-WP:** единый filter bar chrome (locked для anon, active для auth) + Lead Card v3 (data-tier rows, один CTA, 48px mobile) · детальная спека: `feed-cabinet-mvp.md` §9 · деплой одной волной.
+
+---
+
+## § O121-D — `/ops/` админка: прокси + IA (**✅ Lead Design 2026-06-05 · → Coder O121-w1**)
+
+**Решение владельца:** админка **до рекламы** · каждый день ломается FL/прокси — без панели владелец не чинит сам · **не Tauri**, только web `/ops/`.
+
+**Канон продукта:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md) § O121 · очередь [`TASKS.md`](../common/TASKS.md) шаг **6**.
+
+**Scope этой волны (Design):** wireframes + CSS-спека **только** для расширения `/ops/` — секция **«Прокси»**, навигация по блокам, mobile 390px. **Не** публичный сайт, **не** NEO-brutalist лендинг.
+
+**Coder после spec:** § **O121-w1** в [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md).
+
+---
+
+### Контекст — что уже есть на `/ops/` (не ломать)
+
+Тёмная ops-тема (`owner_admin.py`): `#0f1419` bg · карточки `#1a2332` · статусы 🟢🟡🔴.
+
+| Секция (сверху вниз) | Статус |
+|----------------------|--------|
+| Сводка (сайт · radar · feed · bots · problems 24h) | ✅ |
+| **Боты** — @rawlead_bot · @FLPARSINGBOT · restart | ✅ O121-w0b/c |
+| **Биржи и скорость** — FL · Kwork · задержка ленты | ✅ read |
+| **Управление** — radar pause/restart · site · delist | ✅ |
+| Последние заказы · посещения · поддержка | ✅ |
+
+**Добавить:** секция **«Прокси»** — **между** «Биржи» и «Управление».
+
+---
+
+### Решения (канон, не менять без нового слова владельца)
+
+| # | Вопрос | Решение |
+|---|--------|---------|
+| Q1 | Стиль `/ops/` | **Оставить тёмный ops-UI** — не переносить NEO-brutalist с лендинга |
+| Q2 | Layout | **Одна длинная страница** + якоря/mini-nav (как сейчас), не отдельный SPA |
+| Q3 | Пароли прокси | **Никогда plaintext** — только mask `{scheme}://{user}:***@{host}:{port}` (как `probe_all_proxies.mask()`) |
+| Q4 | Группы слотов | **3 группы:** TG Bot API · Telethon acc1–3 · Биржи (FL / Kwork / pool) |
+| Q5 | Действия w1 | **Проверить** (probe) · **Переключить** (manual active) · **Сбросить бан** — в w2, в wireframe заложить место |
+| Q6 | Auto-failover | **Read-only badge** в w1: «Авто: вкл/выкл» · toggle — w2 |
+| Q7 | Mobile | **Обязательно 390px** — владелец чинит с телефона; таблица → **карточки-строки** |
+| Q8 | Ошибки действий | Тот же паттерн что «Боты»: строка статуса под кнопками + текст ошибки (не alert) |
+| Q9 | TG acc / Neon ingest | **Не в этой волне** — placeholder-секция «Скоро» или якорь без wireframe |
+| Q10 | Mini-nav по секциям | **Да** — sticky chips под header; на mobile горизонтальный scroll; **в той же волне w1**, что и секция «Прокси» |
+
+---
+
+### IA — порядок секций (финал)
+
+```
+[Header] Пульт RawLead · статус строка
+
+[Mini-nav sticky] → #ops-summary · #ops-bots · #ops-exchanges · #ops-proxies · #ops-controls · #ops-leads
+  └ mobile: overflow-x scroll · chips не переносятся
+
+1. #ops-summary   Сводка (cards grid)              — KEEP + id
+2. #ops-bots      Боты                             — KEEP + id
+3. #ops-exchanges Биржи и скорость                 — KEEP + id
+4. #ops-proxies   Прокси                    ← NEW § O121-D
+5. #ops-controls  Управление (radar · delist · …)  — KEEP + id
+6. #ops-leads     Последние заказы                 — KEEP + id
+7. Посещения · Поддержка                           — KEEP (без chip — редко нужны)
+```
+
+**Mini-nav (Q10 = да):** только `/ops/` · muted chips · active = `border-color: var(--ok)` + dot `var(--ok)` · tap → `scrollIntoView({ behavior: 'smooth', block: 'start' })` · **не** менять порядок существующих секций.
+
+---
+
+### O121-P0 — Mini-nav (desktop + mobile)
+
+```
+┌─ sticky под «Пульт RawLead» ────────────────────────────────────────┐
+│ [ Сводка ] [ Боты ] [ Биржи ] [ Прокси ● ] [ Управление ] [ Лиды ] │
+└─────────────────────────────────────────────────────────────────────┘
+  ● = текущая секция в viewport (IntersectionObserver) или last tap
+
+Mobile 390px — тот же ряд, overflow-x: auto, padding .5rem 0:
+  Сводка · Боты · Биржи · Прокси · Управление · Лиды
+  (tap target chip ≥ 36px height · padding .35rem .6rem)
+```
+
+**Не в nav:** Посещения · Поддержка — длинный хвост, владелец до них скроллит.
+
+---
+
+### O121-P1 — Desktop wireframe: секция «Прокси» (1440)
+
+```
+<section id="ops-proxies">
+  <h3>Прокси</h3>
+  <p class="sub">Слоты VPS · без паролей · переключение без SSH</p>
+
+  ┌─ Toolbar ─────────────────────────────────────────────────────────┐
+  │  [ Проверить все ]     Авто-переключение: ● Вкл   (read w1)      │
+  │  Active TG: слот 2 · 45.152.x.x:8080 (masked)                    │
+  └──────────────────────────────────────────────────────────────────┘
+
+  ── TG Bot API ─────────────────────────────────────────────────────
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ Слот │ Адрес (mask)      │ Статус │ Бан до    │ Действия        │
+  ├──────┼───────────────────┼────────┼───────────┼─────────────────┤
+  │  1   │ user:***@45…:8080 │ 🟢     │ —         │ [Проверить] [→] │
+  │  2 ● │ user:***@91…:8080 │ 🟢 ACTIVE │ —       │ [Проверить]     │
+  │  3   │ user:***@12…:8080 │ 🔴     │ 6ч · probe│ [Проверить] [→] │
+  └──────────────────────────────────────────────────────────────────┘
+  ● = active row highlight: border-left 3px var(--ok) · bg #1e2a22
+
+  ── Telethon (парсинг TG) ──────────────────────────────────────────
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ acc1 │ … │ 🟡 │ strikes 2/3 │ [Проверить] [→]                    │
+  │ acc2 │ … │ 🟢 ACTIVE │ —   │ [Проверить]                        │
+  │ acc3 │ … │ 🟢 │ —         │ [Проверить] [→]                    │
+  └──────────────────────────────────────────────────────────────────┘
+
+  ── Биржи (FL / Kwork / pool) ──────────────────────────────────────
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ FL pool │ slot 1 │ … │ 🟢 │ [Проверить]                        │
+  │ Kwork   │ slot 1 │ … │ 🟡 │ HTTP 403 · [Проверить] [→]         │
+  │ Общий   │ slot 2 │ … │ 🟢 ACTIVE │ [Проверить]                │
+  └──────────────────────────────────────────────────────────────────┘
+
+  <p class="sub ctl-hint">Последняя проверка: 2 мин назад · probe: Telegram + FL + Kwork</p>
+  <div id="rl-ops-proxy-status" class="ctl-status"><span class="dot"></span><span>Ожидание</span></div>
+</section>
+```
+
+**Probe раскрыт (пример строки 3, см. O121-P3):**
+
+```
+│  3   │ http://user:***@12…:8080 │ 🔴 │ до 18:00 │ [Проверить] [→] │
+  └─ .ops-proxy-probe (под tr / внутри card на mobile)
+       TCP api.telegram.org      🟢 120 ms
+       HTTPS api.telegram.org    🟢 340 ms
+       HTTPS www.fl.ru           🔴 timeout
+```
+
+**Колонки таблицы (минимум):**
+
+| Колонка | Содержание |
+|---------|------------|
+| Слот / acc | `слот 1` · `acc2` · `FL pool` |
+| Адрес | masked URL only |
+| Статус | 🟢 ok · 🟡 degraded · 🔴 banned/down |
+| Бан / причина | «до 14:30» · `probe_fail` → human: «HTTPS probe fail» |
+| Действия | `[Проверить]` · `[→ Активировать]` (не «Switch» по-английски) |
+
+**Кнопка `[→]`:** secondary `.btn` · не primary — опасное действие только по явному клику.
+
+---
+
+### O121-P2 — Mobile 390px: прокси-карточки
+
+Таблица **не** горизонтальный скролл — **stack карточек**:
+
+```
+┌─────────────────────────────────────┐
+│ TG Bot API · слот 2        ● ACTIVE │
+│ user:***@91.152.x.x:8080            │
+│ 🟢 Работает                         │
+│ [ Проверить ]  [ Сделать активным ] │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ TG Bot API · слот 1                 │
+│ 🔴 Забанен до 18:00                 │
+│ probe_fail                          │
+│ [ Проверить ]  [ Сделать активным ] │
+└─────────────────────────────────────┘
+```
+
+- Кнопки **full-width** на mobile, min-height **44px**
+- Группа = muted label над карточками: `TG BOT API` · `TELETHON` · `БИРЖИ`
+- Toolbar «Проверить все» — sticky **под** header ops или первым элементом секции
+
+---
+
+### O121-P3 — Probe result (inline, не modal)
+
+После «Проверить» — **раскрытие под строкой** (accordion 1 уровень):
+
+```
+  TCP api.telegram.org     🟢 120ms
+  HTTPS api.telegram.org   🟢 340ms
+  HTTPS fl.ru/projects     🔴 timeout
+```
+
+Цвета: ok `var(--ok)` · fail `var(--bad)` · muted latency.
+
+**Не:** отдельное модальное окно · не toast без деталей.
+
+---
+
+### O121-P4 — Состояния и copy (RU, для владельца)
+
+| Статус | Текст в UI |
+|--------|------------|
+| active | «Сейчас используется» |
+| banned | «Забанен до {time}» |
+| probe_ok | «Проверка ок» |
+| probe_fail | «Не отвечает — {причина}» |
+| switching | «Переключаем…» (кнопки disabled) |
+| auto_on | «Авто-переключение: вкл» |
+| auto_off | «Авто-переключение: выкл — только вручную» |
+
+Голос: **коротко, без жаргона** — владелец не devops. «Слот», не «endpoint».
+
+---
+
+### O121-P5 — CSS delta (ops-тема, не лендинг)
+
+Добавить к существующим классам `owner_admin.py`:
+
+```css
+.ops-proxy-toolbar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin-bottom:.75rem }
+.ops-proxy-group { margin:1rem 0 }
+.ops-proxy-group__title { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:.5rem 0 }
+.ops-proxy-table { width:100%; font-size:.82rem }
+.ops-proxy-table tr.is-active { border-left:3px solid var(--ok); background:#1a2820 }
+.ops-proxy-card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:.85rem; margin-bottom:.5rem }
+.ops-proxy-card.is-active { border-color:var(--ok) }
+.ops-proxy-probe { font-size:.78rem; color:var(--muted); padding:.35rem 0 .35rem .5rem; border-left:2px solid var(--line) }
+.ops-mini-nav { display:flex; gap:.35rem; overflow-x:auto; padding:.5rem 0; margin-bottom:.75rem }
+.ops-mini-nav a { font-size:.75rem; padding:.35rem .6rem; border-radius:6px; border:1px solid var(--line); color:var(--muted); white-space:nowrap }
+.ops-mini-nav a.is-active { color:var(--txt); border-color:var(--ok) }
+.ops-mini-nav a.is-active::before { content:''; display:inline-block; width:.4rem; height:.4rem; border-radius:50%; background:var(--ok); margin-right:.25rem }
+@media (min-width:768px) { .ops-proxy-card { display:none } }
+@media (max-width:767px) { .ops-proxy-table { display:none } }
+```
+
+**HTML-вставка (между «Биржи» и «Управление»):**
+
+```html
+<nav class="ops-mini-nav" aria-label="Разделы пульта">…chips…</nav>
+<!-- существующие section: добавить id="ops-summary" | ops-bots | ops-exchanges | ops-controls | ops-leads -->
+
+<section id="ops-proxies">
+  <h3>Прокси</h3>
+  <p class="sub">Слоты VPS · без паролей · переключение без SSH</p>
+  <div class="ops-proxy-toolbar">…</div>
+  <div class="ops-proxy-group" data-group="tg-bot">…table desktop / cards mobile…</div>
+  <div class="ops-proxy-group" data-group="telethon">…</div>
+  <div class="ops-proxy-group" data-group="exchanges">…</div>
+  <p class="sub ctl-hint" id="rl-ops-proxy-hint">Последняя проверка: —</p>
+  <div id="rl-ops-proxy-status" class="ctl-status">…</div>
+</section>
+```
+
+**Probe targets по группе (для inline-результата):**
+
+| Группа | HTTPS checks |
+|--------|----------------|
+| TG Bot API | `api.telegram.org` |
+| Telethon accN | `api.telegram.org` (тот же probe, другой слот) |
+| Биржи FL | `www.fl.ru` |
+| Биржи Kwork | `kwork.ru` |
+| Общий pool | FL + Kwork (как `probe_all_proxies.py`) |
+
+**w2 placeholder в toolbar:** кнопка «Сбросить бан» — **disabled** в w1 · `title="Скоро"` · не прятать (владелец видит roadmap).
+
+**Файлы Coder:** `src/owner_admin.py` · `tg_proxy_pool.py` · `exchange_proxy.py` · `scripts/probe_all_proxies.py` (reuse mask/probe) · API `GET /ops/proxies` · `POST /ops/control` (`proxy-probe` · `proxy-switch` · имена — по бэку).
+
+---
+
+### Не в scope O121-D (w1)
+
+| Исключено | Когда |
+|-----------|-------|
+| CRUD новых URL прокси | O121-w4 |
+| TG acc join / список чатов | O121-w3 |
+| Neon ingest dashboard | O121-w3 |
+| История переключений (timeline) | w2+ |
+| Публичный URL без auth | никогда |
+
+---
+
+### DoD Design O121-D
+
+- [x] Wireframe desktop **O121-P1** + mobile **O121-P2** зафиксированы в этом файле
+- [x] IA + **O121-P0** mini-nav — **да**, section ids + sticky chips
+- [x] Probe inline **O121-P3** — accordion под строкой, не modal
+- [x] CSS delta **O121-P5** — классы названы
+- [x] Mask credentials — Q3 · формат `probe_all_proxies.mask()`
+- [x] Handoff `@lead-architect` — см. ниже
+
+---
+
+### Handoff → @lead-architect
+
+> **O121-D готово → Coder O121-w1:** `/ops/` секция `#ops-proxies` между «Биржи» и «Управление» · mini-nav **O121-P0** · 3 группы слотов · mask · probe inline · mobile cards · `ctl-status` как у ботов.
+
+---
+
+## § O116-D — TWO-SPEEDS update: anon strip + FAQ 3 групп + pricing F1 (**W2 @lead-designer · 2026-06-04**)
+
+**PM approve:** [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § O116-COPY — R1+R2+R3 ✅ владелец 2026-06-04.
+
+**Scope:** Z2 (anon strip hook → TG login) · Z3 (pricing F1/F2 swap) · Z4 (FAQ accordion 3 групп)
+
+---
+
+### Решения (канон, не менять без нового слова владельца)
+
+| # | Вопрос | Решение |
+|---|--------|---------|
+| Q1 | Free TG login strip — показывать или скрыть? | **Показывать upsell:** «✅ Лента без задержки · [Черновики — Premium →]» → `/pricing/` |
+| Q2 | FAQ group header стиль | **Manrope 700 · bg `#F3F3EF` · border-bottom `1px solid #E4E4E7`** · padding 16px 20px · весь header кликабельный |
+| Q3 | FAQ: открытая по умолчанию группа | **«Начало»** — desktop + mobile. Остальные closed. |
+| Q4 | FAQ Q10 позиция | **Последний в группе «Premium»** (после Q9) |
+
+---
+
+### Z2 — `/lenta/` strip: три состояния (замена O105-Z5)
+
+| Состояние пользователя | Текст strip | CTA target |
+|------------------------|-------------|------------|
+| **Anon** (нет TG-входа) | `⏱ Лента с задержкой 15 мин · [Войди — сразу →]` | `/cabinet/` (TG login) |
+| **Free** (TG вход, нет Premium) | `✅ Лента без задержки · [Черновики — Premium →]` | `/pricing/` |
+| **Paid** (Premium активен) | strip скрыт | — |
+
+**CSS delta:**
+- Anon strip: структура без изменений · только copy + ссылка `/cabinet/` вместо `/pricing/`
+- Free strip (NEW · класс `.rl-feed-strip--free`): `background: #F0FDF4` · «✅» цвет `#15803D` · текст остальной — `var(--rl-text-primary)` · inline link `font-weight: 700`
+- Mobile 390px: обе версии — одна строка, помещаются без wrap
+
+**Файлы Coder:**
+- `template-parts/rawlead/feed-strip.php` (или аналог) — conditional по `$user_state` (anon / free / paid)
+- `rawlead.css` — `.rl-feed-strip--free`
+
+---
+
+### Z3 — `/pricing/` + `#pricing-preview`: bullets F1/F2 swap
+
+| Позиция | Было (O105, live) | Стало (O116-Z3) |
+|---------|-------------------|-----------------|
+| **Feature 1** | «Лента без задержки — заказы под твой стек сразу» | **«Уникальный черновик отклика — ИИ пишет под тебя, ты отправляешь сам»** |
+| **Feature 2** | «Уникальный черновик отклика — ИИ пишет под тебя, не копирует с соседа» | **«Лента без задержки и push — заказы появляются сразу при match»** |
+| Feature 3–5 | KEEP | KEEP |
+
+**Применяется:** `/pricing/` (D3) · `#pricing-preview` на главной (D2).
+
+**Не менять:** заголовок карточки · цена · payment block · CTA · compare line.
+
+**Файлы Coder:** `pricing-card.php` · `pricing-preview.php`
+
+---
+
+### Z4 — `/faq/` accordion 3 уровня
+
+**Структура (порядок показа по PM-канону):**
+
+```
+▼ Начало                          ← GROUP 1, OPEN by default · bg #F3F3EF
+  │  Q6  Как начать?
+  │  Q1  Это автоспам?
+  └  Q4  Нужен TG?
+
+▶ Как работает                    ← GROUP 2, closed
+  │  Q2  Нетехнические специалисты?
+  │  Q3  Источники
+  │  Q5  Не получу бан?
+  └  Q8  Почему лимит 10 откликов?
+
+▶ Premium                         ← GROUP 3, closed
+  │  Q7  Сервис платный?
+  │  Q9  Есть trial?
+  └  Q10 Зачем Premium, если лента без задержки? ← NEW
+```
+
+**Спека group header:**
+```css
+.rl-faq-group__header {
+  font-family: var(--rl-font); font-weight: 700; font-size: 16px;
+  background: #F3F3EF;
+  border: 2px solid #0A0A0A;
+  padding: 16px 20px;
+  cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center;
+  min-height: 44px; /* tap target */
+}
+.rl-faq-group__header::after { content: '▶'; transition: transform 200ms ease-out; }
+.rl-faq-group.is-open .rl-faq-group__header::after { transform: rotate(90deg); }
+```
+
+**Sub-accordion:** текущий стиль FAQ-аккордеона без изменений — просто вложен под group header.
+
+**Default JS state:** group `data-index="0"` (Начало) → `is-open` класс при init; остальные — закрыты.
+
+**Mobile 390px:** аналогичное поведение; весь group header — tap zone 44px.
+
+**Q10 copy (R1 принят):**
+- **Q:** «Зачем Premium, если лента и так без задержки после входа?»
+- **A:** «После входа через Telegram — лента сразу. Это бесплатно. Premium даёт: уникальный черновик отклика под твой профиль · push в Telegram при матче · inbox с черновиками · до 10 слотов на горячий заказ.»
+
+**Файлы Coder:** `page-faq.php` (перегруппировать Q + добавить Q10) · `rawlead.css` (`.rl-faq-group`) · `rawlead-feed.js` или отдельный `rawlead-faq.js` (group toggle)
+
+---
+
+### Найденные ошибки дизайна (Design Audit O116)
+
+| # | Поверхность | Проблема | Fix |
+|---|-------------|----------|-----|
+| **E1** | D3 + D2 wireframe (этот файл § O105-D) | Feature 1 буллет устарел — «Лента без задержки» (O116-Z3 принят, порядок поменялся) | → **обновлено в D3 ниже** |
+| **E2** | `/lenta/` strip — Free TG login | Нет дизайн-спеки для нового состояния (3-й state, O116-Z1) | → **закрыт выше в Z2** |
+| **E3** | `/faq/` | Q10 не существует в спеке; 3-групп accordion — новый компонент без CSS-спеки | → **закрыт выше в Z4** |
+| **E4** | `§ TWO-SPEEDS-UI` (архив этого файла) | Старая спека strip ссылается anon → `/pricing/`; теперь anon → `/cabinet/` | → архивная секция, Coder ориентируется на **O116-D Z2** |
+| **E5** | BUG-4 риск регрессии | PRE-RELEASE-AUDIT BUG-4 фикс (paid → скрыть trial CTA) теперь требует 4-й логики: free-TG-login ≠ paid; убедиться что free strip не показывается premium-пользователям | → Coder проверяет в smoke |
+
+---
+
+### DoD Design O116
+
+- [ ] Z2: `/lenta/` strip — 3 состояния spec передана Coder · free strip `.rl-feed-strip--free`
+- [ ] Z3: `/pricing/` + `#pricing-preview` — F1/F2 swap · copy строго из O116-Z3 (PM approve)
+- [ ] Z4: `/faq/` — 3 групп + Q10 · group header spec · default open «Начало»
+- [ ] Нет O100-механик (аукцион, FOMO) в copy
+- [ ] BUG-4 регрессия-проверка: premium-пользователь не видит free-strip и не видит trial CTA
+- [ ] Handoff `@lead-architect` одной строкой в чат
+
+---
+
+## § PRE-RELEASE-AUDIT — UX/UI аудит перед релизом (**→ @lead-architect 2026-06-04**)
+
+**Источник:** Playwright-обход rawlead.ru · desktop 1440 + mobile 390 · анон + залогиненный.
+
+**Handoff:** ✅ Lead Architect → `CODER_PROMPT` § PRE-RELEASE-AUDIT (2026-06-04).
+
+---
+
+### P0 — Блокеры релиза (5 багов)
+
+| # | Файл | Симптом | Fix |
+|---|------|---------|-----|
+| **BUG-1** | `template-parts/rawlead/pricing.php` + `rawlead.css` | `/pricing/` — страница пустая. Контент в DOM (карточка, буллеты, оплата, CTA) есть, но не рендерится визуально. Пустой белый прямоугольник между hero и footer | Найти CSS-правило скрывающее `.rl-pricing-*` или WP-article контейнер (`display:none` / `height:0` / `visibility:hidden` / `opacity:0`) · убрать |
+| **BUG-2** | `rawlead.css` | Иконки ниши (`</>` · `Aa` · `◎` · `✦`) **присутствуют** на preview-карточках главной и в анимации flow-секции, но **отсутствуют** на реальных карточках `/lenta/` · Класс `.rl-feed-card__niche-icon` или аналог не добавляется в PHP-шаблоне карточки ленты | Добавить иконку ниши в `template-parts/rawlead/feed-card.php` в head-строку, рядом с source-бейджем · CSS уже есть |
+| **BUG-3** | `rawlead.css` или `how.php` | На `/how/` текст шагов (шаги 2–3) покрашен в синий/оранжевый — цвет ссылок. Это обычный `<p>`, не `<a>`, но стиль наследует `a { color }` | Добавить явный `color: var(--rl-text-primary)` на `.rl-how-step p` / `.rl-how-steps__body` |
+| **BUG-4** | `rawlead-cabinet.js` или `cabinet.php` | Блок подписки в ЛК: у пользователя с активным PREMIUM отображается кнопка **«Попробовать 3 дня бесплатно»** — логика состояний не учитывает уже активный статус | Если `is_active === true` — скрыть trial CTA; показывать только статус + «Пауза» / «Оплата» |
+| **BUG-5** | `rawlead.css` | Буллеты в тарифной карточке (на главной `#pricing-preview` и на `/pricing/`) покрашены в синий (`:link` / `a li` стиль) | Добавить `.rl-pricing-card li { color: var(--rl-text-primary); }` |
+
+---
+
+### P1 — UX-улучшения (одна волна с P0)
+
+#### P1-A · Поведенческая психология: объяснение лимита откликов
+
+**Проблема:** Пользователь видит «Осталось 10 из 10 ⓘ» и не понимает зачем это. Лимит воспринимается как ограничение, а не как защита.
+
+**Решение — добавить подпись под slot line на карточке:**
+
+```
+Осталось 10 из 10  ⓘ
+(muted 11px, под slot-line):  «Разные тексты — не шаблон → нет бана на бирже»
+```
+
+Только для залогиненных пользователей. Цвет: `var(--rl-text-muted)` · 11px · одна строка.
+
+**Файл:** `template-parts/rawlead/feed-card.php` + `rawlead.css` · класс `.rl-slot-hint`
+
+---
+
+#### P1-B · Hero главной на mobile: hint о контенте ниже
+
+**Проблема:** На mobile (390px) hero занимает весь экран. Пользователь не знает что скроллить.
+
+**Решение:** Уменьшить min-height hero с `100vh` до `88vh` — нижняя часть следующей секции (live feed) будет «подглядывать» на ~60px. Без дополнительных элементов.
+
+**Файл:** `rawlead.css` · `.rl-hero` `min-height`
+
+---
+
+#### P1-C · ЛК: упорядочить action-ссылки подписки
+
+**Проблема:** «Подключить Premium →», «Пауза», «Возобновить», «Оплата» стоят друг под другом как plain text. Нет иерархии — непонятно что важнее.
+
+**Решение — по состоянию:**
+
+| Состояние | Primary (кнопка) | Secondary (muted link) |
+|-----------|-----------------|------------------------|
+| Free | «Попробовать 3 дня →» | «Подключить Premium →» |
+| Trial active | «Оплатить 790 ₽ →» | «Пауза» |
+| Paid active | — | «Пауза» · «Оплата» |
+
+Убрать «Возобновить» из default-вида — показывать только если подписка на паузе.
+
+**Файл:** `rawlead-cabinet.js` + CSS · блок `.rl-premium-block__actions`
+
+---
+
+#### P1-D · ЛК: компактные уведомления
+
+**Проблема:** 8 кнопок % (30%–100%) занимают слишком много места на mobile.
+
+**Решение:** Оставить 5 значимых порогов + текстовые метки:
+
+```
+[ 30% · Все ]  [ 60% · Средний ]  [ 80% · Хороший ✓ ]  [ 90% ]  [ 100% · Только идеальные ]
+```
+
+Или упростить до 3: «Все подходящие (60%+)» · «Хорошие (80%+)» · «Только идеальные (100%)»
+
+**Файл:** `cabinet.php` + `rawlead-cabinet.js`
+
+---
+
+#### P1-E · Footer: заменить личный хэндл
+
+**Проблема:** В footer — «Telegram @rcnn43» (личный хэндл владельца).
+
+**Решение:** Заменить на «Telegram @rawlead_bot» → `https://t.me/rawlead_bot`
+
+**Файл:** `footer.php` или WP-настройки footer
+
+---
+
+#### P1-F · Hero mobile: скрыть preview-карточки
+
+**Проблема:** Preview-карточки (FL.ru, Kwork, ИДЕАЛЬНО ✦) на hero позиционированы абсолютно вправо и уходят за экран на mobile — обрезаются или создают горизонтальный скролл.
+
+**Решение:** `@media (max-width: 767px) { .rl-hero__preview { display: none; } }` — скрыть на mobile, они и так не видны.
+
+**Файл:** `rawlead.css`
+
+---
+
+### Copy: что добавить на главной (P1-G)
+
+**Проблема (поведенческая психология):** Новый пользователь видит Hero → читает subtext → не понимает ценность лимита откликов → уходит на /pricing/ (которая сломана — BUG-1) → bounce.
+
+**После фикса BUG-1 — усилить trust strip на главной:**
+
+Текущий trust strip (есть): `[ Не один текст на всех ]  [ Не автоспам ]  [ Не бан за шаблон ]`
+
+Добавить 4-й chip или заменить один:
+
+```
+[ До 10 откликов на заказ — не шаблон, не бан ]
+```
+
+**Файл:** `template-parts/rawlead/features.php` · секция trust strip · класс `.rl-trust-strip`
+
+---
+
+### DoD (приёмка Coder)
+
+- [ ] `/pricing/` — карточка и весь контент видны на desktop 1440 и mobile 390
+- [ ] `/lenta/` — иконка ниши отображается на каждой карточке
+- [ ] `/how/` — текст шагов чёрный, не синий
+- [ ] ЛК — PREMIUM-пользователь не видит trial CTA
+- [ ] Буллеты тарифа — чёрный текст, не синий
+- [ ] Hero mobile — нет горизонтального скролла от preview-карточек
+- [ ] Footer — @rawlead_bot
+- [ ] ЛК slot-hint строка под «Осталось N из N»
+- [ ] Playwright smoke: `/pricing/` · `/lenta/` · `/cabinet/` · `/` — визуально ОК
 
 ---
 
@@ -55,9 +698,9 @@
   price:    790 ₽ / мес  (Manrope 800 · 42px desktop / 36px mobile)
   secondary: «или 300 ⭐ Stars (~400–720 ₽)»  (muted 14px)
   ─────────
-  bullets (Z2):
-    • Лента без задержки — заказы под твой стек сразу
-    • Уникальный черновик отклика — ИИ пишет под тебя, не копирует с соседа
+  bullets (Z3 · O116 · порядок обновлён):
+    • Уникальный черновик отклика — ИИ пишет под тебя, ты отправляешь сам  ← F1 NEW
+    • Лента без задержки и push — заказы появляются сразу при match          ← F2 NEW
     • Пуш в Telegram — только при хорошем совпадении
     • До 10 персональных откликов на заказ — без толпы одинаковых ботов
     ⁵ Лимит в час — защита от случайных кликов (anti-тык)
@@ -91,7 +734,10 @@
 
 ```
 [CARD] RawLead Premium · 790 ₽/мес · или 300 ⭐ (muted)
-  3 буллета (1–3, без 4 и 5)
+  3 буллета (1–3, без 4 и 5) — порядок O116-Z3:
+    • Уникальный черновик отклика — ИИ пишет под тебя, ты отправляешь сам
+    • Лента без задержки и push — заказы появляются сразу при match
+    • Пуш в Telegram — только при хорошем совпадении
   [CTA] «Подключить Premium →»
   [link] «Подробнее о тарифе →» → /pricing/
   compare FL.ru (muted · 1 строка)

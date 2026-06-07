@@ -29,12 +29,22 @@ $nav = [
 ];
 ?>
 <?php if (is_front_page()) : ?>
-<div class="rl-announcement" role="region" aria-label="<?php esc_attr_e('Объявление', 'rawlead-kadence-child'); ?>">
+<div class="rl-announcement rl-announcement--ticker" role="region" aria-label="<?php esc_attr_e('Объявление', 'rawlead-kadence-child'); ?>" data-rl-ticker>
 	<div class="rl-container rl-announcement__inner">
-		<p class="rl-announcement__text">
-			<span class="rl-announcement__text-full"><?php esc_html_e('Радар онлайн · 800+ лидов в неделю ·', 'rawlead-kadence-child'); ?></span>
-			<span class="rl-announcement__text-short"><?php esc_html_e('800+ лидов', 'rawlead-kadence-child'); ?></span>
-		</p>
+		<div class="rl-announcement__rotator" aria-live="polite">
+			<p class="rl-announcement__slide is-active" data-rl-ticker-slide="stats">
+				<span class="rl-announcement__text-full"><?php esc_html_e('Радар онлайн ·', 'rawlead-kadence-child'); ?> <span data-rl-leads-week>…</span> <?php esc_html_e('лидов в неделю ·', 'rawlead-kadence-child'); ?></span>
+				<span class="rl-announcement__text-short"><span data-rl-leads-week-short>…</span> <?php esc_html_e('лидов', 'rawlead-kadence-child'); ?></span>
+			</p>
+			<p class="rl-announcement__slide" data-rl-ticker-slide hidden>
+				<span class="rl-announcement__text-full"><?php esc_html_e('Агрегатор фриланс-бирж RawLead — все заказы на удалёнку в одном месте ·', 'rawlead-kadence-child'); ?></span>
+				<span class="rl-announcement__text-short"><?php esc_html_e('Все биржи в одном месте', 'rawlead-kadence-child'); ?></span>
+			</p>
+			<p class="rl-announcement__slide" data-rl-ticker-slide hidden>
+				<span class="rl-announcement__text-full"><?php esc_html_e('Поиск заказов для Python, FastAPI, WordPress, Design специалистов ·', 'rawlead-kadence-child'); ?></span>
+				<span class="rl-announcement__text-short"><?php esc_html_e('Python · WP · Design', 'rawlead-kadence-child'); ?></span>
+			</p>
+		</div>
 		<a class="rl-announcement__cta" href="<?php echo esc_url($feed); ?>">
 			<span class="rl-announcement__cta-full"><?php esc_html_e('Смотреть ленту →', 'rawlead-kadence-child'); ?></span>
 			<span class="rl-announcement__cta-short"><?php esc_html_e('Смотреть →', 'rawlead-kadence-child'); ?></span>
@@ -95,6 +105,10 @@ $nav = [
 		<div class="rl-nav-drawer__overlay" id="rl-nav-overlay"></div>
 		<nav class="rl-nav-drawer__panel" aria-label="<?php esc_attr_e('Мобильная навигация', 'rawlead-kadence-child'); ?>">
 			<button class="rl-nav-drawer__close" id="rl-nav-close" type="button" aria-label="<?php esc_attr_e('Закрыть меню', 'rawlead-kadence-child'); ?>">✕</button>
+			<?php $cabinet_active = $current === 'cabinet' ? ' is-active' : ''; ?>
+			<a class="rl-nav-drawer__link<?php echo esc_attr($cabinet_active); ?>" href="<?php echo esc_url($cabinet); ?>">
+				<?php esc_html_e('Кабинет', 'rawlead-kadence-child'); ?>
+			</a>
 			<?php foreach ($nav as $slug => $item) : ?>
 				<?php $active = $current === $slug ? ' is-active' : ''; ?>
 				<a class="rl-nav-drawer__link<?php echo esc_attr($active); ?>" href="<?php echo esc_url($item[1]); ?>">
@@ -186,6 +200,7 @@ $nav = [
 		if (burger) {
 			burger.setAttribute("aria-expanded", "true");
 		}
+		document.body.classList.add("rl-nav-open");
 		document.body.style.overflow = "hidden";
 	}
 
@@ -197,7 +212,10 @@ $nav = [
 		if (burger) {
 			burger.setAttribute("aria-expanded", "false");
 		}
-		document.body.style.overflow = "";
+		document.body.classList.remove("rl-nav-open");
+		if (!document.body.classList.contains("rl-feed-sheet-open") && !document.body.classList.contains("rl-skill-tree-open")) {
+			document.body.style.overflow = "";
+		}
 	}
 
 	if (burger) {

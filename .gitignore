@@ -76,3 +76,6 @@ scripts/backup.config.json
 desktop/node_modules/
 desktop/dist/
 desktop/src-tauri/target/
+
+# O118 WP live dev
+wordpress/rawlead-kadence-child/node_modules/

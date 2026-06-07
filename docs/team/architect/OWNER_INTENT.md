@@ -39,6 +39,7 @@
 | **O102-pay** | **ЮKassa/эквайринг отложен** — нет бюджета на подключение | Stars live · **→ O105** ручной СБП + crypto без эквайринга |
 | **O105** | **Premium 790 ₽** · СБП вручную + USDT/TON + Stars | § **O105** · бот @rawlead_bot · после E2E |
 | **O107** | **Trial 3 дня** — бесплатный Premium (1× на аккаунт) | § **O107** · PM + Coder с O105 |
+| **O116** | **Pre-ads copy: delay только anon + FAQ 3 уровня** | Free TG login = лента без задержки, без черновиков · FAQ accordion 3 группы · strip copy update | § **O116** · W1 PM → W2 Design → W3 Coder |
 | **O102-youdo** | **⏸ отменено** «выключить YouDo» — VPS-логи: **0 лидов** из-за 403/баны, не «площадка мёртва» | **→ O103** починить O63-парсеры + прокси YouDo |
 | **O103** | **O63 ingest repair** — YouDo + freelance.ru + Пчёл | § **O63-FIX** · другой чат Coder |
 | **O72e-10** | **L1/L2/L3 premium** · L3=`google/gemini-2.5-flash` · gate L2 send **≥70%** · judge экономно (pilot→full) | § **O72e-L2-r2** `CODER_PROMPT` |
@@ -185,7 +186,7 @@
 
 ## § O101 — Потолок черновиков на lead (**✅ владелец 2026-06-03**)
 
-**Суть:** на один заказ — **ограниченное число** персональных черновиков (L3). Когда лимит исчерпан — карточка **пропадает из ленты**. На карточке — строка **«осталось N слотов»** (не «N фрилансеров»). Без аукциона и токенов (≠ O100 ❌).
+**Суть:** на один заказ — **ограниченное число** персональных черновиков (L3). Когда лимит исчерпан — карточка **остаётся в ленте**, кнопка отклика **серая/disabled**. На карточке — строка **«осталось N из 10»** (не «N фрилансеров»). Без аукциона и токенов (≠ O100 ❌).
 
 **Число 10 — старт, не догма:** перед продом прогнать **judge** (синтетика: 1 base → 15–20 L3 с разными `user_id`) → среднее, с какого номера uniqueness/human_tone падают · зафиксировать **K** (может 8, может 12).
 
@@ -596,18 +597,136 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 ## Бэклог владельца (группы · приоритет Lead)
 
-**Правило:** запись в чат → сюда; **код** — когда этап активен в `ROADMAP` / шапке `CODER_PROMPT`. Срочно — только по слову «сейчас».
+**Правило:** запись в чат → сюда; **код** — когда этап активен в `ROADMAP` / шапка `CODER_PROMPT`. Срочно — только по слову «сейчас».
 
-### Сейчас по плану (после Legacy ✅)
+**→ Coder:** после O107 или параллельно w1 · § **O123** ниже
 
-| # | Этап | Что | Кто |
-|---|------|-----|-----|
-| 2 | **E-vps** | P5-E2-VPS — радары на сервер, ПК не 24/7 | **@coder** |
-| 3 | **E-polish** | Волны A → B → C ниже | @coder + @designer |
-| 4 | **E-3f** | ИИ-агент «Написать отклик» | **@coder** |
-| 5 | **E-stress** | PRE-PROD-STRESS | после polish |
+### § O127 — Финальный UI unify: лента + фильтры + карточка (**P0**, 2026-06-07)
 
-### Волна A — быстрый UX ленты (**E-polish**, P1)
+**Запрос владельца:** функции ок, **вид не устраивает** — фильтры у anon/free/premium **выглядят по-разному**; карточки не «красиво и понятно»; нужен **финальный прогон Design**, потом owner руками в BrowserSync.
+
+**Не:** полный ребренд NEO · не новый маркетинг-сайт.
+
+**Да:** одна **дизайн-система filter bar** (одинаковый chrome, разные **возможности** по tier) · одна **карточка** `/lenta/` = `/cabinet/` · mobile 390px · психология (F-pattern, thumb-zone, один primary CTA).
+
+**Тепловые карты:** на нулевом трафике — **эвристики + clarity review** (Design); после soft ads — Hotjar/MS Clarity опц. **O21 UX-audit** — после Coder-волны O127.
+
+| Волна | Кто | Артефакт |
+|-------|-----|----------|
+| **O127-D** | @lead-designer | ✅ **2026-06-07** · `feed-cabinet-mvp` §9 |
+| **O127-WP** | @coder | **→ сейчас** · одна волна CSS/JS/PHP |
+| **O127-owner** | владелец | BrowserSync хвост |
+
+**Порядок:** **O127-D** → **O127-WP** → owner tail → **O21** stress → ads. **O126** category (API) — параллельно, не блокирует Design.
+
+**Решение Lead:** точечный Coder (O124-w2) **не заменяет** Design-pass — копим регресс «три разных filter bar».
+
+### § O123 — UI/UX хвост O116 (**архив**, 2026-06-05)
+
+**Контекст:** владелец сверил длинный список правок — **~80% уже в prod (O116)**. O123 = **остаток** до E2E walkthrough.
+
+**w1 — быстрые (copy + мелкий WP, до trial):**
+
+| # | Что | Статус |
+|---|-----|--------|
+| 1 | How/FAQ: везде **«10 откликов в час»**, не «на заказ» | ⏳ |
+| 2 | Убрать **feed-strip** «15 мин / без задержки» для free на `/lenta/` | ⏳ |
+| 3 | `flow.php`: caption «Меньше вкладок…» **ниже** (отступ) | ⏳ |
+| 4 | ЛК: у **active Premium** — только «Продлить», без trial CTA; **expired** — «Возобновить» | ⏳ частично |
+| 5 | JS: убрать мёртвый **`paused`** UX (если API ещё отдаёт) | ⏳ |
+
+**w2 — после w1 (feed polish):**
+
+| # | Что |
+|---|-----|
+| 1 | Убрать или упростить **demo-карточки** в `flow.php` (анимация) |
+| 2 | Prefs: **merge localStorage ↔ Neon** надёжнее при login (не IP — device+browser ok) |
+| 3 | Badge stack / niche в шапке карточки — polish по макету |
+| 4 | Ticker CTA: опционально «Смотреть ленту» → как на pricing |
+
+**Не в O123:** O107 trial backend · O105 pay logic · O121 ops.
+
+**→ Coder:** § O123-w1 в `CODER_PROMPT` после O105 smoke
+
+### § O121 — Web-админка `/ops/` · TG · прокси · Neon (**план**, 2026-06-05)
+
+**Решение владельца (уточнение):** **не Tauri desktop** — всё в **админке на сайте** (`/ops/`), с браузера: поднять radar · сменить прокси · добавить TG-группу на acc · сколько чатов слушают · что уходит в Neon.
+
+**Tauri `desktop/`** — legacy ПК, **не** цель O121.
+
+| Блок | Функции |
+|------|---------|
+| **TG acc1/2/3** | Добавить группу/ссылку **на аккаунт** · список **куда вступили** · pending join · listen N чатов · статус ready/ошибка |
+| **Прокси** | CRUD слотов: Bot API · Telethon accN · FL/Kwork/YouDo pool · **не** светить пароли в UI (mask + rotate) |
+| **Probe** | Кнопка «Проверить» — TCP + **HTTPS** до Telegram / FL / Kwork (как `probe_all_proxies.py`) |
+| **Failover** | Видеть active slot · ручной switch · auto-failover on/off · история переключений · алерт |
+| **Радар** | pause/restart на `/ops/` · + bot-poll restart |
+
+**Где сейчас:** **`/ops/` на сайте** (`owner_admin.py` + WP proxy) — health, control, лиды, support. **Tauri** — legacy ПК. Join/proxy — CSV + `.env` + CLI.
+
+**Порядок (Lead, обновлено 2026-06-05 — решение владельца):**
+
+**Ads + portfolio — последние.** Админка **до** рекламы: без панели владелец не может чинить FL/прокси сам.
+
+| Волна | Что | Кто |
+|-------|-----|-----|
+| **spec** | Wireframes `/ops/`: сводка · боты · биржи · **прокси** · ingest | @lead-designer |
+| **w1** | Прокси **read-only**: таблица слотов · статус/бан · probe · **ручной switch** | @coder |
+| **w2** | Auto-failover **on/off** · clear ban · rotate (без plaintext в UI) | @coder |
+| **w3** | TG acc + Neon ingest | @coder |
+| **w4** | Proxy CRUD полный | позже |
+
+1. ~~O117 + O120~~ ✅
+2. **O121-spec** — **→ сейчас**
+3. **O121-w1** — после spec
+4. **O121-w2** — после w1
+
+**Не в v1:** публичный URL ops без auth · root shell из UI.
+
+**→ Coder:** после **O121-spec** от Design
+
+### § O122 — Delist / «мертвые» ссылки на ленте (**план**, 2026-06-05)
+
+**Боль владельца:** на `/lenta/` попадают заказы, по ссылке — **редirect на биржу**, карточки уже нет (сняли / нашли исполнителя).
+
+**Уже есть (O65, код):**
+
+| Механизм | Как работает | Ограничение |
+|----------|--------------|-------------|
+| **`delist_checker.py`** | Раз в **~1 ч** (`main.py`) · **20** visible лидов за проход · FL + Kwork GET · маркеры «заказ закрыт», «исполнитель найден», HTTP 404 | **Медленно** при большой ленте · **не** TG/YouDo |
+| **`feed_retention` (O75)** | Скрыть visible **старше 7 дней** | Не ловит свежие «мертвые» ссылки |
+| **O109** | Kwork: убран ложный маркер `"404"` в HTML | Были false positive; **false negative** (redirect без маркера) — возможны |
+| **`/ops/`** | Кнопка «Скрыть» у лида вручную | Не массовый recheck URL |
+
+**Grace:** первый recheck не раньше **6 ч** после L1 (`delist_checker`).
+
+**Пробелы (O122):**
+
+| # | Улучшение |
+|---|-----------|
+| 1 | **Чаще/больше batch** — env `DELIST_BATCH_LIMIT` / interval · приоритет **свежие** visible с `url` |
+| 2 | **Redirect** — если финальный URL ≠ карточка / нет body-маркеров «живой» страницы → `source_gone` |
+| 3 | **FL/Kwork** — расширить маркеры («архив», «закрыт для откликов»…) · лог `delist:lead=` |
+| 4 | **Web `/ops/` (O121)** — «Проверить ссылки» · last run · `checked/delisted` · ручной прогон |
+| 5 | **Опционально** cron на VPS отдельно от цикла бирж (если radar pause) |
+
+**Связь:** O121 W2 «Neon ingest» + кнопка delist · не дублировать O65 — **усилить** backend, UI в O121.
+
+**→ Coder:** после O117/O120 или параллельно w1 O121 · отдельный § когда согласуешь приоритет.
+
+### Сейчас по плану (**Launch path**, 2026-06-05)
+
+| # | Этап | Что | Статус |
+|---|------|-----|--------|
+| 1 | **Infra** | O117 Kwork timeout · O120 TG failover · O121-w0 ops | ✅ **2026-06-05** |
+| 2 | **Monetization** | O105-w1 pay smoke · O107 trial 3 дня | **→ @coder** |
+| 3 | **Quality** | O122 delist мёртвые ссылки | backlog P1 |
+| 4 | **Launch gate** | E2E owner · stress/vault | после pay/trial |
+| 5 | **GTM** | soft ads | после gate |
+
+**E-polish волны A/B/C** ниже — **архив** (большая часть закрыта O116). Новые UX — через O121/O122/O113, не дублировать D1/L1.
+
+### Сейчас по плану (архив E-polish, до O116)
 
 | ID | Задача | Этап | Кто | Заметка |
 |----|--------|------|-----|---------|
@@ -681,10 +800,97 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 ---
 
+## § O116 — UI/UX + copy перед рекламой (**2026-06-04 · владелец**)
+
+**Цель:** polish маркетинга + лента/ЛК/тариф/FAQ/how/contact · **не блокирует** L2 r11 (другие файлы).
+
+**Порядок Lead:** W1–b2 ✅ · **W4 код** ✅ · prod deploy **1.18.14** ⏸ · O116 закрыть после deploy+smoke.
+
+**Ops 2026-06-04:** `deploy-o116-mkt-vps.py` · `scripts/apply_neon_018.py` на VPS.
+
+**Handoff Coder (2026-06-04):** `CODER_PROMPT` § **O116-WP-Z234** · Design `LEAD_DESIGN_PROMPT` § O116-D · PM § O116-COPY.
+
+### Решения владельца (2026-06-04) — **✅ зафиксировано**
+
+| # | Вопрос | Решение |
+|---|--------|---------|
+| **R1** | Persist сортировки | **B)** `localStorage` + **Neon** `user_feed_prefs` (sync при login, merge с локальным) |
+| **R2** | Задержка 15 мин | **Только anon** без JWT. **Любой зарегистрированный** (TG-login, free/trial/expired) — **без задержки** в API и UI. Убрать баннер/strip/FAQ-строки про 15 мин для auth. **Уточнение O11** — см. ниже |
+| **R3** | Contact / support | **TG владельцу** (личный чат `TELEGRAM_CHAT_ID`): бот шлёт **«Тикет от пользователя N»** + текст. **Не email.** Ответ пользователю — по-прежнему окно «Поддержка» + admin (Neon threads), красный `!` |
+
+**O11 amend (решение владельца):** две скорости → **anon ~15 мин** · **registered instant** · **premium** = instant + черновики/push/слоты (без изменения paid-gate на draft).
+
+**Код сейчас:** `/v1/feed` снимает delay только при `_user_effective_access` (paid/trial) — **Coder:** при валидном `user_id` → `apply_delay=False` (personal match rank можно оставить только для paid, отдельно от delay).
+
+### W1 — Copy (→ `LEAD_PRODUCT_PROMPT` § O116-COPY)
+
+| # | Поверхность | Было → Стало |
+|---|-------------|--------------|
+| 1 | Hero | «Меньше вкладок…» — **отступ ниже** (design spacing) |
+| 2 | Home flow | **Убрать** 3 карточки под «один поток…» (Не один текст / Не автоспам / До 10 откликов…) |
+| 3 | Pricing | Убрать `(~800–1440 ₽)` · убрать «FL.ru PRO — 1 270 ₽… RawLead — подбор…» (везде) |
+| 4 | Pricing bullet | «До 10 персональных…» → **«Умный лимит (10 откликов в час) — защита от спам-фильтров бирж»** |
+| 5 | Pricing | Убрать «Каждая строка откроет @rawlead_bot…» |
+| 6 | Pricing CTA free | «Смотреть ленту» → **«Продолжить с ограничениями (Free) →»** |
+| 7 | How | **Добавить** блок «Защита от спама» (текст владельца) |
+| 8 | FAQ Q | **Anon:** 15 мин · **зарегистрированный:** без задержки (free) · Premium: черновики/push · лимит 10 / Telegram / trial — формулировки чат 2026-06-04 |
+| 9 | Feed slot | «Осталось 10 из 10 ⓘ» → **«написано 10 из 10 ⓘ»** · tooltip: «Только 10 пользователей…» |
+
+### W2 — Design spec (→ `LEAD_DESIGN_PROMPT` § O116-D)
+
+| # | UX | DoD |
+|---|-----|-----|
+| D1 | **Ticker** header | 3 фразы (факт + агрегатор + Python/FastAPI/…) · цикл **25–30 с** · **pause on hover** · mobile short variant |
+| D2 | **Факты ticker** | «Радар онлайн · N лидов…» — **живые** из API/status (не хардкод 800+) |
+| D3 | **Feed toolbar** | `Сортировка: Свежие \| Совместимость от: [80% ↓]` — без тяжёлых dropdown |
+| D4 | **Persist prefs** | **R1:** localStorage + Neon `user_feed_prefs` · merge on login |
+| D5 | **Карточка** | glow при draft → flip back · pulse «идеальный матч» · теги match/gray · `+n` раскрывается на flip |
+| D6 | **Бейдж биржи** | выше/левее · спец в кружке · **stack** для смежных |
+| D7 | **Free anon** | серая полоска совместимости + 🔒 · CTA «Написать отклик» бледный · shake → «открыть доступ» → `/pricing/` |
+| D8 | **Сложность** | только **paid** · только **задняя** сторона карты |
+| D9 | **ЛК** | карточки компактнее · **убрать** Пауза/Возобновить/Оплата · premium: «продлить» не trial |
+| D10 | **ⓘ icon** | нормальная иконка (не кривой символ) |
+
+### W3 — Coder (→ `CODER_PROMPT` § O116)
+
+| # | Backend / WP | Файлы (ориентир) |
+|---|--------------|------------------|
+| C1 | **Prefs persist** | **R1:** `rawlead_feed_prefs` localStorage · `PUT/GET /v1/me/feed-prefs` → Neon JSON `{sort,min_match,category}` · on login merge (server wins on conflict или newest ts — Coder) |
+| C2 | **Feed API** | `GET /v1/feed` — для **auth** те же query `sort`/`min_match` что anon · specialty sort как у anon |
+| C3 | **Toolbar** | заменить toggle на селектор Свежие \| % (default 80, шаги 70/80/90?) |
+| C4 | **Delay R2** | `api_server.py` `/v1/feed`: valid JWT → `apply_delay=False` (не только paid). UI: strip/banner `#rl-feed-delay-notice` · anon strip в `page-lenta.php` — **только anon** · cabinet copy без «15 мин» для auth |
+| C4b | **Убрать** | «20 заказов под профиль» |
+| C5 | **Теги** | match → brand green/yellow · missing profile → muted gray · `+n` on flip |
+| C6 | **Views fake** | «отклики» −1 от просмотров · rand 8–10 · не писать реальный draft |
+| C7 | **Hourly limit** | `DRAFT_HOURLY_LIMIT=10` prod · UI copy согласован · `draft_limits.py` уже есть |
+| C8 | **Pay deeplink** | pricing кнопки → bot tab crypto/sbp/stars (O109 pattern) |
+| C9 | **ЛК inbox** | total replies (не page count) · delete sync · **тот же** sort UI что лента |
+| C10 | **Cabinet states** | hide trial if premium/active · expired → «возобновить» без 3 дня |
+
+### W4 — Contact + support (**R3 · после W3**)
+
+| # | Что | DoD |
+|---|-----|-----|
+| I1 | **Inbound** | `/contact/` форма + FAB «Поддержка» → `POST /v1/support/ticket` · Neon thread |
+| I2 | **→ владелец TG** | @rawlead_bot → `TELEGRAM_CHAT_ID`: **«Тикет от пользователя {n}»** (@username, user_id, превью текста) · reuse `relay_message_to_owner_chat` / Bot API |
+| I3 | **Admin reply** | owner admin panel → ответ в thread → пользователь видит в modal «Поддержка» |
+| I4 | **Badge** | красный `!` на FAB/иконке при непрочитанном ответе |
+
+**Не в v1:** email · `mail()` на WP.
+
+---
+
 ## Журнал (хронология, кратко)
 
 | Дата | Мысль / запрос | Куда ушло |
 |------|----------------|-----------|
+| 2026-06-04 | **O116-W4** ✅ код · prod deploy ⏸ · email на contact — хвост R3 | **§ O116** W4 |
+| 2026-06-04 | **O116-b2** ✅ prod 1.18.13 · flip + `+n` · Lead verify | **§ O116** D5 |
+| 2026-06-04 | **O116 CABINET tail** ✅ 1.18.12 · R2 copy ЛК · FAQ trial без кнопки | **§ O116** R2 |
+| 2026-06-04 | **O116 CABINET** ✅ Lead verify+deploy · ЛК без паузы/trial · toolbar inbox · total counter | **§ O116** D9 · `deploy-o116-mkt-vps.py` |
+| 2026-06-04 | **O116 MKT** ✅ Lead verify · prod **1.18.11** · Neon 018 · ticker+FAQ | **§ O116** · `deploy-o116-mkt-vps.py` |
+| 2026-06-04 | **O116 R1–R3:** prefs Neon+local · delay только anon · support→TG владельцу «тикет N» | **§ O116** решения |
+| 2026-06-04 | **UI/UX pre-ads:** лента flip/glow, toolbar %, ticker, copy pricing/faq/how, ЛК без паузы, contact+support, hourly 10 | **§ O116** · TASKS · CODER после PM+Design |
 | 2026-05-28 | Довести сайт, stress потом | O1, ROADMAP, FOR_YOU |
 | 2026-05-28 | Убрать Freelancehunt | O3, § DROP-FREELANCEHUNT |
 | 2026-05-28 | Лента stale ~40 мин, очередь L1 ~1253 | O7–O8, BACKLOG-CLEAR, FEED-FRESHNESS |
@@ -809,6 +1015,11 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 | 2026-06-04 | **O72e budget** | **≤ ~$3/день** на judge+regen · pilot→full **один раз** · regen 71 / qa `--full` **запрещены** без «да» | § **O72e-L2-r6** |
 | 2026-06-04 | **O72e full judge ⏸** | Pilot r7 **PASS** (combined 4.3 / send 80%) · **full 71 и stress — когда придёт время**, не сейчас | § O72e · после E2E/vault |
 | 2026-06-04 | **VPS scale ⏸** | Playwright+radar на одном VPS — **ок до первых юзеров** · тогда **2-й VPS worker** или **апгрейд тарифа** (не сейчас) | § O110-worker backlog |
+| 2026-06-04 | **FL proxy bans ⏸** | FL банит DC IP **per-source** (Kwork на тех же IP жив) · сброс SQLite bans — **временно** · нужно: **FL-only IP** + 2×403→ban + опц. 1 residential в `FL_PROXY_URLS` (**не** merge с YouDo) | **O110-fl-proxy** · § O99 #4–5 · `TASKS.md` |
+| 2026-06-04 | **E2E S6** | Владелец прошёл первый обход ✅ · финальный UI/UX — после тестов | **→** launch wave |
+| 2026-06-04 | **Launch wave** | **O105-w1** pay · **O112-support** (FAB stub) · **O113-seo** | после финального UX · `TASKS.md` |
+| 2026-06-04 | **O114 вакансии** | **Не показывать** найм/штат — pre-filter + L1 + backfill Neon | **P0 @coder** · judge 63% частично из-за вакансий в выборке |
+| 2026-06-04 | **Фаза A — ИИ first** | L1/L2/L3 gate до stress/pay-code · owner параллельно pay/UI · stress после send ≥70% | `TASKS.md` O72e-A |
 | 2026-06-03 | **L1/L2/L3 premium** | Judge full: L1/L3 ✅ · L2 send **40.8%** FAIL | **O72e-10** r1 |
 | 2026-06-03 | **Датчики бирж O104** | Админка `/ops/` + `/status`/push **@FLPARSINGBOT**: кто жив, причина, lag биржа→Neon→лента · cooldown 30 мин | **→ @coder P0** · § O104 |
 
@@ -879,6 +1090,8 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 | 2026-06-04 | **O108 v1.1 B+C** | Лимиты по типу · маркер «файл есть, не прочитан» · красный chip на карточке | **✅ решение владельца** · § O108 · **→ Coder** |
 | 2026-06-04 | **TG в PUBLIC_FEED** | 21 канал allowlist + secondary биржи в `/lenta/` | **✅ решение владельца** · VPS `.env.site` |
+| 2026-06-04 | **O116 W1 triage** | delay только anon (R1) · FAQ три уровня (R2) · strip + pricing copy (R3) | **→ § O116** · `LEAD_PRODUCT_PROMPT` § O116-COPY |
+| 2026-06-04 | **O116 R1–R3 ✅** | R1 принят · R2 принят · R3 обязателен → **→ W2 @lead-designer** | § O116 · `LEAD_PRODUCT_PROMPT` § O116-COPY |
 
 ---
 
@@ -968,6 +1181,26 @@ _Заменено решением v1.1 B+C выше._
 
 ---
 
+## § O116 — Pre-ads copy: TWO-SPEEDS update + FAQ (**W1 PM · 2026-06-04**)
+
+**Контекст:** перед soft-ads. Три решения, которые напрямую влияют на конверсию холодного трафика из рекламы.
+
+**Волны:** W1 PM → W2 Design → W3 Coder.
+
+### Решения владельца R1–R3
+
+| # | Решение | Суть | Следствие |
+|---|---------|------|-----------|
+| **R1** | **Delay только anon** | Задержка 15 мин — **только без TG-входа**. Free TG login = лента **без задержки**, **без кнопки «Написать отклик»** | Новый funnel для рекламы: anon → TG login → Premium; hook «войди — без ожидания» |
+| **R2** | **FAQ три уровня** | Flat Q1–Q9 → три группы: «Начало» / «Как работает» / «Premium» + NEW Q10 (объяснение R1) | Навигатор для холодного трафика; на мобайл — аккордеон |
+| **R3** | **Strip + pricing copy update** | Anon strip → «⏱ Лента с задержкой · [Войди — сразу →]» · Free strip — убрать label задержки · Pricing Feature 1 → черновики главное (не «без задержки») | Честный UX под R1; value-prop Premium = черновики + push + inbox |
+
+**Принято владельцем 2026-06-04:** R1 ✅ · R2 ✅ · R3 ✅ (обязателен вслед за R1).
+
+**Copy + FAQ spec (полный):** [`LEAD_PRODUCT_PROMPT.md`](../../product/LEAD_PRODUCT_PROMPT.md) § **O116-COPY** (Z1–Z4).
+
+---
+
 ## Что Lead **не** делает (напоминание)
 
 - Не просить ▶ **Legacy на ПК** (O10).
@@ -977,4 +1210,23 @@ _Заменено решением v1.1 B+C выше._
 
 ---
 
-_Lead Architect · журнал владельца · 2026-05-28_
+## § O128 — L2 voice: процесс вместо «опыта» (**✅ B**, 2026-06-07 → Coder)
+
+**Боль:** отклик пишет «имею опыт / делал похожее» → заказчик просит кейсы, которых у random юзера RawLead нет.
+
+**Решение владельца — вариант B:**
+
+| # | Правило |
+|---|---------|
+| 1 | **Запрет:** «я эксперт», «имею опыт», «уже делал», «N проектов», «делал похожее» |
+| 2 | **✅ Можно:** «По ТЗ вижу…», «Для реализации [боль] выстрою: [шаги]» — план, не резюме |
+| 3 | **Запрет вопросов-подстройки:** «какой стек/язык предпочитаете?» — стек из ТЗ + обоснование |
+| 4 | **1–2 вопроса** по **бизнес-логике / edge case** из ТЗ |
+
+**→ Coder:** § **O128-L2-VOICE** в `CODER_PROMPT.md` · deploy L2 stack · **не** mass regen.
+
+---
+
+| 2026-06-05 | **O122 delist** | Мёртвые ссылки на ленте · усилить O65 + `/ops/` | § **O122** |
+| 2026-06-07 | **L2 voice O128 B** | план по ТЗ · без «опыта» · бизнес-вопросы | § **O128** → @coder |
+| 2026-06-07 | **Stress edge cases** | S3-pre Neon pool · S4-pre proxy cascade · S1-b skills_mismatch | `PREPROD_STRESS_RUN.md` |

@@ -36,6 +36,10 @@ for _stream in (sys.stdout, sys.stderr):
             pass
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
+_PLAYWRIGHT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(_PLAYWRIGHT_DIR))
+import feed_ui  # noqa: E402
+
 _DEFAULT_STORAGE = _ROOT / "data" / "preprod_playwright" / "storage_state.json"
 _ARTIFACT_DIR = _ROOT / "data" / "preprod_ux_journey"
 _DRAFT_TIMEOUT_MS = 120_000
@@ -275,27 +279,21 @@ def _screenshot(ctx: JourneyCtx, journey_id: str, phase: str) -> str:
     return str(path.relative_to(_ROOT))
 
 
+
 def _feed_error_visible(ctx: JourneyCtx) -> str | None:
-    err = ctx.page.locator("#rl-feed-error:not([hidden])")
-    if err.count() and err.is_visible():
-        return (err.inner_text() or "")[:300]
-    return None
+    return feed_ui.feed_error_visible(ctx.page)
+
+
+_FEED_READY = feed_ui.FEED_READY
+_FEED_META = feed_ui.FEED_META
 
 
 def _goto_lenta(ctx: JourneyCtx) -> None:
-    ctx.page.goto(f"{ctx.base}/lenta/", wait_until="domcontentloaded")
-    ctx.page.wait_for_selector('[data-rl-app="feed"]', state="visible")
-    ctx.page.wait_for_selector(
-        "#rl-feed-list .rl-lead-card, #rl-feed-list .rl-feed-empty, #rl-feed-count",
-        timeout=45_000,
-    )
+    feed_ui.goto_lenta(ctx.page, ctx.base)
 
 
 def _open_skills_panel(ctx: JourneyCtx) -> None:
-    dd = ctx.page.locator(".rl-feed-skills-dd")
-    if not dd.get_attribute("open"):
-        ctx.page.locator("#rl-feed-skills-trigger").click()
-    ctx.page.wait_for_selector("#rl-feed-skills-panel", state="visible")
+    feed_ui.open_skills_modal(ctx.page, is_mobile=False)
 
 
 def _has_feed_token(ctx: JourneyCtx) -> bool:
@@ -353,12 +351,8 @@ def _wait_effective_access(ctx: JourneyCtx) -> None:
 
 def _apply_skills_for_match(ctx: JourneyCtx) -> None:
     _open_skills_panel(ctx)
-    chip = ctx.page.locator(
-        "#rl-feed-skills .rl-feed-skill:not(.is-disabled), #rl-feed-skills .rl-chip"
-    ).first
-    chip.wait_for(state="visible", timeout=30_000)
-    chip.click()
-    ctx.page.locator("#rl-feed-skills-apply").click()
+    feed_ui.pick_first_skill_chip(ctx.page)
+    feed_ui.apply_skills_modal(ctx.page)
     ctx.page.wait_for_timeout(2000)
     if _feed_error_visible(ctx):
         raise RuntimeError("ошибка ленты после «Применить» навыки")
@@ -572,23 +566,23 @@ def j2_lenta_load(ctx: JourneyCtx) -> None:
     _goto_lenta(ctx)
     if _feed_error_visible(ctx):
         raise RuntimeError("error banner on load")
-    ctx.page.wait_for_selector("#rl-feed-count", state="visible")
+    ctx.page.wait_for_selector(f"{_FEED_META}, {_FEED_READY}", timeout=45_000)
 
 
 def j3_filters(ctx: JourneyCtx) -> None:
     _goto_lenta(ctx)
     ctx.page.locator("#filter-category-design input").check(force=True)
     ctx.page.wait_for_timeout(1200)
-    count_text = ctx.page.locator("#rl-feed-count").inner_text()
+    count_text = (
+        ctx.page.locator(_FEED_META).inner_text()
+        if ctx.page.locator(_FEED_META).count()
+        else ""
+    )
     if "ошиб" in count_text.casefold():
         raise RuntimeError(f"count error: {count_text}")
     _open_skills_panel(ctx)
-    chip = ctx.page.locator(
-        "#rl-feed-skills .rl-feed-skill:not(.is-disabled), #rl-feed-skills .rl-chip"
-    ).first
-    chip.wait_for(state="visible", timeout=30_000)
-    chip.click()
-    ctx.page.locator("#rl-feed-skills-apply").click()
+    feed_ui.pick_first_skill_chip(ctx.page)
+    feed_ui.apply_skills_modal(ctx.page)
     ctx.page.wait_for_timeout(1200)
     if _feed_error_visible(ctx):
         raise RuntimeError("error after skills apply")
@@ -600,8 +594,8 @@ def j4_card_expand(ctx: JourneyCtx) -> None:
     card.wait_for(state="visible")
     card.locator(".rl-lead-card__title").first.click()
     ctx.page.wait_for_timeout(600)
-    body = card.locator(".rl-feed-card__body-inner")
-    body.wait_for(state="visible", timeout=15_000)
+    body = card.locator(feed_ui.CARD_FRONT_BODY)
+    body.first.wait_for(state="visible", timeout=15_000)
     inner = body.inner_text().casefold()
     if "суть" not in inner and "задан" not in inner:
         raise RuntimeError("task_summary section missing in expanded card")
@@ -638,7 +632,7 @@ def j5_draft_twice(ctx: JourneyCtx) -> None:
     for idx, lid in enumerate(ids[:2]):
         card = ctx.page.locator(f'#rl-feed-list .rl-lead-card[data-id="{lid}"]').first
         card.scroll_into_view_if_needed()
-        if not card.locator(".rl-feed-card__body-inner").count():
+        if not card.locator(feed_ui.CARD_FRONT_BODY).count():
             card.locator(".rl-lead-card__title").first.click()
             ctx.page.wait_for_timeout(400)
         btn = card.locator(".rl-feed-card__reply-btn")
@@ -672,7 +666,7 @@ def j6_draft_collapse(ctx: JourneyCtx) -> None:
         raise RuntimeError("expected collapsed card before re-expand")
     card.locator(".rl-lead-card__title").first.click()
     ctx.page.wait_for_timeout(500)
-    card.locator(".rl-feed-card__body-inner").wait_for(state="visible", timeout=15_000)
+    card.locator(feed_ui.CARD_FRONT_BODY).first.wait_for(state="visible", timeout=15_000)
 
 
 def j7_cabinet_anon(ctx: JourneyCtx) -> None:

@@ -100,6 +100,17 @@ _CATEGORY_HINTS: dict[str, tuple[str, ...]] = {
         "javascript",
         "backend",
         "интеграц",
+        "react",
+        "node.js",
+        "nodejs",
+        "typescript",
+        "laravel",
+        "sql",
+        "postgresql",
+        "mysql",
+        "docker",
+        "linux",
+        "разработ",
     ),
     "design": (
         "figma",
@@ -149,19 +160,37 @@ _CATEGORY_HINTS: dict[str, tuple[str, ...]] = {
     ),
     "text": (
         "копирайт",
+        "копирайтинг",
         "рерайт",
+        "рерайтинг",
         "локализац",
         "редактур",
         "субтитр",
         "transcription",
         "перевод",
+        "переводчик",
         "статья",
+        "статьи",
+        "статей",
         "текст",
         "тексты",
         "текстов",
+        "текстовый",
+        "текстовое",
         "наполнение",
+        "написать текст",
+        "написание текст",
+        "контент",
+        "контента",
+        "описани",
+        "описания товар",
+        "seo-текст",
+        "seo текст",
     ),
 }
+
+# При равном score — более специфичные ниши раньше dev
+_CATEGORY_TIEBREAK: tuple[str, ...] = ("text", "marketing", "design", "dev")
 
 
 def _haystack(title: str, body: str, tags: list[str] | tuple[str, ...]) -> str:
@@ -318,6 +347,14 @@ def resolve_lead_category(
     inferred_score = _score_category(hay, inferred)
     if inferred_score > stored_score:
         return inferred
+    if inferred_score < stored_score:
+        return cat
+    # Оба score=0: stored часто legacy default dev — доверяем infer (other, не dev)
+    if stored_score == 0:
+        return inferred
+    for pick in _CATEGORY_TIEBREAK:
+        if pick in (cat, inferred):
+            return pick
     return cat
 
 
@@ -343,15 +380,14 @@ def infer_lead_category(
     scores = {cat: _score_category(hay, cat) for cat in CATEGORIES}
     best = max(scores.values())
     if best == 0:
-        return "dev"
+        return OTHER_CATEGORY
     winners = [c for c in CATEGORIES if scores[c] == best]
     if len(winners) == 1:
         return winners[0]
-    priority = ("dev", "design", "marketing", "text")
-    for cat in priority:
+    for cat in _CATEGORY_TIEBREAK:
         if cat in winners:
             return cat
-    return "dev"
+    return OTHER_CATEGORY
 
 
 def categorize_tag(tag: str) -> str:

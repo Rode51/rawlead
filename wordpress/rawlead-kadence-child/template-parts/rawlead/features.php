@@ -22,11 +22,6 @@ $items = [
     ],
 ];
 
-$trust_chips = [
-    __('Не один текст на всех', 'rawlead-kadence-child'),
-    __('Не автоспам', 'rawlead-kadence-child'),
-    __('До 10 откликов на заказ — не шаблон, не бан', 'rawlead-kadence-child'),
-];
 ?>
 <section class="rl-section rl-features-scroll rl-reveal" aria-labelledby="rl-features-title">
 	<div class="rl-container">
@@ -40,14 +35,6 @@ $trust_chips = [
 					<p class="rl-feature__text"><?php echo esc_html($item['text']); ?></p>
 				</article>
 			<?php endforeach; ?>
-		</div>
-		<div class="rl-trust-strip" aria-label="<?php esc_attr_e('Почему RawLead безопасен', 'rawlead-kadence-child'); ?>">
-			<div class="rl-trust-strip__chips">
-				<?php foreach ($trust_chips as $chip) : ?>
-					<span class="rl-trust-strip__chip"><?php echo esc_html($chip); ?></span>
-				<?php endforeach; ?>
-			</div>
-			<p class="rl-trust-strip__mobile"><?php esc_html_e('Свой черновик у каждого', 'rawlead-kadence-child'); ?></p>
 		</div>
 	</div>
 </section>

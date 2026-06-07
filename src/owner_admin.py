@@ -6,6 +6,7 @@ import html
 import os
 import re
 import subprocess
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,9 @@ _LOG_TS = re.compile(
 )
 _AUTH_ERR = re.compile(r"bot_(?:auth|login):(?:fail|err)\b")
 _FETCH_ERR = re.compile(r"fetch_error|fetch:(?:fl|kwork).*?(?:err|HTTP\s+[45])", re.I)
+
+_RAWLEAD_BOT_USERNAME = "@rawlead_bot"
+_FLPARSING_BOT_USERNAME = "@FLPARSINGBOT"
 
 _OPS_HTML = """<!DOCTYPE html>
 <html lang="ru">
@@ -49,26 +53,69 @@ th{background:#121820} .err{color:var(--bad)} .btn{font-size:.75rem;padding:.2re
 .ctl-status.is-ok .dot{background:var(--ok)}
 .ctl-status.is-bad .dot{background:var(--bad)}
 @keyframes rlPulse{0%{opacity:.45}50%{opacity:1}100%{opacity:.45}}
+.ops-nav{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:.35rem;padding:.55rem 0;margin:0 0 .85rem;background:var(--bg);border-bottom:1px solid var(--line)}
+.ops-nav .chip{font-size:.78rem;padding:.45rem .65rem;min-height:44px;border-radius:999px;border:1px solid var(--line);background:#121820;color:var(--muted);cursor:pointer}
+.ops-nav .chip.is-active{background:#243044;color:var(--txt);border-color:#3d5166}
+.ops-proxy-toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.65rem}
+.ops-proxy-badge{font-size:.75rem;padding:.25rem .55rem;border-radius:999px;background:#132a1a;color:#86efac;border:1px solid #22543d}
+.ops-proxy-group{margin:1rem 0}
+.ops-proxy-group h4{margin:0 0 .45rem;font-size:.92rem}
+.ops-proxy-group__help{margin:0 0 .55rem;font-size:.78rem;color:var(--muted);line-height:1.35}
+.ops-proxy-table-wrap{display:block}
+.ops-proxy-cards{display:none;gap:.55rem}
+.ops-proxy-row.is-active,.ops-proxy-card.is-active{outline:1px solid #3d5166;background:#121820}
+.ops-proxy-row td,.ops-proxy-card{padding:.45rem .5rem}
+.ops-status-dot{display:inline-block;width:.55rem;height:.55rem;border-radius:50%;margin-right:.25rem;vertical-align:middle}
+.ops-status-dot--ok{background:var(--ok)} .ops-status-dot--warn{background:var(--warn)} .ops-status-dot--bad{background:var(--bad)}
+.ops-proxy-actions{display:flex;flex-wrap:wrap;gap:.35rem}
+.ops-proxy-actions .btn{min-height:44px;min-width:44px;padding:.45rem .55rem}
+.ops-proxy-probe{display:none;margin:.35rem 0 .55rem;padding:.45rem .6rem;border:1px solid var(--line);border-radius:8px;background:#121820;font-size:.78rem;color:var(--muted)}
+.ops-proxy-probe.is-open{display:block}
 .login-box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem;margin:1rem 0}
 .login-box ol{margin:.5rem 0 0 1.1rem;padding:0}
 .login-box a{color:#7dd3fc}
+@media (max-width:640px){
+  .ops-proxy-table-wrap{display:none}
+  .ops-proxy-cards{display:grid}
+}
 </style>
 </head>
 <body>
 <h1>Пульт RawLead</h1>
 __LOGIN_BLOCK__
+<nav class="ops-nav" id="rl-ops-mini-nav" aria-label="Разделы пульта">
+<button type="button" class="chip is-active" data-target="ops-summary">Сводка</button>
+<button type="button" class="chip" data-target="ops-bots">Боты</button>
+<button type="button" class="chip" data-target="ops-exchanges">Биржи</button>
+<button type="button" class="chip" data-target="ops-proxies">Прокси</button>
+<button type="button" class="chip" data-target="ops-controls">Управление</button>
+<button type="button" class="chip" data-target="ops-leads">Лента</button>
+</nav>
+<section id="ops-summary">
 <p class="sub" id="rl-ops-status">__STATUS__</p>
 <div class="grid" id="rl-ops-cards">__CARDS__</div>
-<section><h3>Биржи и скорость</h3>
+</section>
+<section id="ops-bots"><h3>Боты</h3>
+<div class="grid" id="rl-ops-bots">__BOTS__</div>
+<div class="ctl" style="margin-top:.5rem" id="rl-ops-bots-ctl">__BOTS_CTL__</div>
+</section>
+<section id="ops-exchanges"><h3>Биржи и скорость</h3>
 <div class="grid" id="rl-ops-exchanges">__EXCHANGES__</div>
 </section>
-<section><h3>Управление</h3><div class="ctl" id="rl-ops-controls">__CONTROLS__</div><div id="rl-ops-control-status" class="ctl-status"><span class="dot"></span><span>Ожидание команд</span></div></section>
-<section><h3>Последние заказы в ленте</h3>
+<section id="ops-proxies"><h3>Прокси</h3>
+__PROXIES__
+</section>
+<section id="ops-controls"><h3>Управление</h3><div class="ctl" id="rl-ops-controls">__CONTROLS__</div><p class="sub" id="rl-ops-delist-stats" style="margin:.35rem 0 0">__DELIST_STATS__</p><div id="rl-ops-control-status" class="ctl-status"><span class="dot"></span><span>Ожидание команд</span></div></section>
+<section id="ops-leads"><h3>Последние заказы в ленте</h3>
 <table id="rl-ops-leads"><thead><tr><th>#</th><th>Источник</th><th>Заголовок</th><th></th></tr></thead><tbody>__LEADS__</tbody></table>
 </section>
 <section><h3>Посещения (7 дней)</h3>
 <p class="sub" style="margin-top:0">По страницам — где открывали сайт. /lenta = лента, /cabinet = кабинет, / = главная.</p>
 <table id="rl-ops-views"><thead><tr><th>День</th><th>Страница</th><th>Просмотры</th></tr></thead><tbody>__VIEWS__</tbody></table>
+</section>
+<section><h3>Поддержка (тикеты)</h3>
+<p class="sub" style="margin-top:0">Ответ уходит в окно «Поддержка» на сайте у пользователя.</p>
+<div id="rl-ops-support"></div>
 </section>
 __SCRIPT__
 </body>
@@ -87,6 +134,11 @@ _OPS_LOGIN_BLOCK = """<div class="login-box">
 _OPS_SCRIPT_SSR = """<script>
 (function () {
   var API = "__API_BASE__";
+  function ctlFetchErr(r, body) {
+    if (body && typeof body.detail === "string" && body.detail) return body.detail;
+    if (body && typeof body.message === "string" && body.message) return body.message;
+    return "HTTP " + r.status;
+  }
   document.querySelectorAll(".rl-ctl").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var action = btn.getAttribute("data-action") || "";
@@ -109,8 +161,10 @@ _OPS_SCRIPT_SSR = """<script>
         },
         body: JSON.stringify({ action: action, target: target })
       }).then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
+        return r.json().catch(function () { return null; }).then(function (body) {
+          if (!r.ok) throw new Error(ctlFetchErr(r, body));
+          return body;
+        });
       }).then(function (data) {
         if (ctl) {
           ctl.className = "ctl-status is-ok";
@@ -153,14 +207,208 @@ _OPS_SCRIPT_SSR = """<script>
       });
     });
   });
+  var supportEl = document.getElementById("rl-ops-support");
+  if (supportEl) {
+    var token = "";
+    try { token = localStorage.getItem("rawlead_access_token") || ""; } catch (e) { token = ""; }
+    fetch(API + "/ops/support/tickets", {
+      credentials: "same-origin",
+      headers: { "Authorization": "Bearer " + token }
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (data) {
+      var tickets = (data && data.tickets) || [];
+      if (!tickets.length) {
+        supportEl.innerHTML = "<p class=\\"sub\\">Тикетов пока нет.</p>";
+        return;
+      }
+      supportEl.innerHTML = tickets.map(function (t) {
+        var who = t.tg_username ? ("@" + t.tg_username) : (t.user_id || t.guest_token || "—");
+        return '<div class="card" style="margin-bottom:.75rem">'
+          + '<p><strong>#' + t.id + '</strong> · ' + who + ' · ' + (t.last_preview || "") + '</p>'
+          + '<textarea class="rl-ops-reply" data-id="' + t.id + '" rows="2" style="width:100%;margin:.35rem 0"></textarea>'
+          + '<button type="button" class="btn rl-ops-reply-btn" data-id="' + t.id + '">Ответить</button>'
+          + '</div>';
+      }).join("");
+      supportEl.querySelectorAll(".rl-ops-reply-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var id = btn.getAttribute("data-id");
+          var area = supportEl.querySelector('.rl-ops-reply[data-id="' + id + '"]');
+          var text = area ? area.value.trim() : "";
+          if (!text) return;
+          btn.disabled = true;
+          fetch(API + "/ops/support/tickets/" + id + "/reply", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + token
+            },
+            body: JSON.stringify({ message: text })
+          }).then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            btn.textContent = "Отправлено";
+            if (area) area.value = "";
+          }).catch(function () {
+            btn.disabled = false;
+            alert("Не удалось ответить в тикет #" + id);
+          });
+        });
+      });
+    }).catch(function () {
+      supportEl.innerHTML = "<p class=\\"err\\">Поддержка: войди в кабинет владельца.</p>";
+    });
+  }
+  __NAV_PROXY_JS__
 })();
 </script>"""
+
+_OPS_NAV_PROXY_JS = r"""
+  function bindMiniNav() {
+    var nav = document.getElementById("rl-ops-mini-nav");
+    if (!nav) return;
+    var chips = nav.querySelectorAll(".chip");
+    var sections = ["ops-summary","ops-bots","ops-exchanges","ops-proxies","ops-controls","ops-leads"];
+    function setActive(id) {
+      chips.forEach(function (c) {
+        c.classList.toggle("is-active", c.getAttribute("data-target") === id);
+      });
+    }
+    chips.forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        var id = chip.getAttribute("data-target") || "";
+        var el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        setActive(id);
+      });
+    });
+    if (typeof IntersectionObserver !== "undefined") {
+      var io = new IntersectionObserver(function (entries) {
+        var best = null;
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            if (!best || e.intersectionRatio > best.ratio) {
+              best = { id: e.target.id, ratio: e.intersectionRatio };
+            }
+          }
+        });
+        if (best && best.id) setActive(best.id);
+      }, { rootMargin: "-20% 0px -55% 0px", threshold: [0.1, 0.35, 0.6] });
+      sections.forEach(function (sid) {
+        var el = document.getElementById(sid);
+        if (el) io.observe(el);
+      });
+    }
+  }
+  function setProxyStatus(kind, text) {
+    var el = document.getElementById("rl-ops-proxy-status");
+    if (!el) return;
+    el.className = "ctl-status" + (kind ? " is-" + kind : "");
+    el.innerHTML = '<span class="dot"></span><span>' + text + "</span>";
+  }
+  function showProbeResult(group, slot, probe) {
+    var box = document.getElementById("ops-probe-" + group + "-" + slot);
+    if (!box || !probe) return;
+    var tcp = probe.tcp || {};
+    var https = probe.https || {};
+    box.className = "ops-proxy-probe is-open";
+    box.innerHTML = "TCP: " + (tcp.ok ? "OK" : "FAIL") + " — " + (tcp.message || "")
+      + "<br>HTTPS: " + (https.ok ? "OK" : "FAIL") + " — " + (https.message || "")
+      + (https.target ? " → " + https.target : "");
+  }
+  function postProxyControl(body, btn) {
+    var token = "";
+    try { token = localStorage.getItem("rawlead_access_token") || ""; } catch (e) { token = ""; }
+    setProxyStatus("working", "Выполняем…");
+    if (btn) btn.disabled = true;
+    return fetch(API + "/ops/control", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (data) {
+        if (!r.ok) throw new Error(ctlFetchErr(r, data));
+        return data;
+      });
+    }).then(function (data) {
+      if (data && data.ok === false) {
+        setProxyStatus("bad", (data && data.message) ? data.message : "Ошибка");
+        return data;
+      }
+      setProxyStatus("ok", (data && data.message) ? data.message : "Готово");
+      if (data && data.probe && body.group && body.slot) {
+        showProbeResult(body.group, body.slot, data.probe);
+      }
+      if (data && data.results) {
+        data.results.forEach(function (item) {
+          showProbeResult(item.group, item.slot, item.probe);
+        });
+      }
+      if (data && data.proxies && window.rlOpsRenderProxies) {
+        window.rlOpsRenderProxies(data.proxies);
+      }
+      return data;
+    }).catch(function (e) {
+      setProxyStatus("bad", (e && e.message) || "Ошибка");
+      throw e;
+    }).finally(function () {
+      if (btn) btn.disabled = false;
+    });
+  }
+  function bindProxyControls() {
+    document.querySelectorAll(".rl-proxy-probe").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        postProxyControl({
+          target: "proxy",
+          action: "probe",
+          group: btn.getAttribute("data-group") || "",
+          slot: parseInt(btn.getAttribute("data-slot") || "0", 10)
+        }, btn);
+      });
+    });
+    document.querySelectorAll(".rl-proxy-switch").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        if (btn.disabled) return;
+        postProxyControl({
+          target: "proxy",
+          action: "switch",
+          group: btn.getAttribute("data-group") || "",
+          slot: parseInt(btn.getAttribute("data-slot") || "0", 10)
+        }, btn);
+      });
+    });
+    var allBtn = document.querySelector(".rl-proxy-probe-all");
+    if (allBtn) {
+      allBtn.addEventListener("click", function () {
+        postProxyControl({ target: "proxy", action: "probe-all" }, allBtn);
+      });
+    }
+    var clearBtn = document.querySelector(".rl-proxy-clear-bans");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        postProxyControl({ target: "proxy", action: "clear-bans" }, clearBtn);
+      });
+    }
+  }
+  bindMiniNav();
+  bindProxyControls();
+"""
 
 _OPS_SCRIPT_CLIENT = """<script>
 (function () {
   var API = "__API_BASE__";
   var SSR = __SSR__;
   if (SSR) return;
+  function ctlFetchErr(r, body) {
+    if (body && typeof body.detail === "string" && body.detail) return body.detail;
+    if (body && typeof body.message === "string" && body.message) return body.message;
+    return "HTTP " + r.status;
+  }
   var token = "";
   try {
     token = localStorage.getItem("rawlead_access_token") || "";
@@ -205,8 +453,10 @@ _OPS_SCRIPT_CLIENT = """<script>
           },
           body: JSON.stringify({ action: action, target: target })
         }).then(function (r) {
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          return r.json();
+          return r.json().catch(function () { return null; }).then(function (body) {
+            if (!r.ok) throw new Error(ctlFetchErr(r, body));
+            return body;
+          });
         }).then(function (res) {
           if (controlStatusEl) {
             controlStatusEl.className = "ctl-status is-ok";
@@ -268,7 +518,12 @@ _OPS_SCRIPT_CLIENT = """<script>
       + card("Лента", (feed.visible_count || 0) + " заказов",
         "Видимых на /lenta/", "ok")
       + card("Бот", (bot.push_subscribers || 0) + " с push",
-        bot.match_push_enabled === false ? "Push выключен глобально" : "Match-уведомления", "ok")
+        "@rawlead_bot: " + (bot.bot_poll_status || "unknown") + " · @FLPARSINGBOT: "
+        + (bot.legacy_radar_status || "unknown") + " · "
+        + (bot.match_push_enabled === false ? "Push выключен глобально" : "Match-уведомления"),
+        ((bot.bot_poll_status === "active" && bot.legacy_radar_status === "active") ? "ok"
+          : ((bot.bot_poll_status === "failed" || bot.bot_poll_status === "inactive"
+            || bot.legacy_radar_status === "failed" || bot.legacy_radar_status === "inactive") ? "bad" : "warn")))
       + card("Проблемы за 24 ч",
         (prob.auth_errors_24h || 0) + " вход · " + (prob.fetch_errors_24h || 0) + " парсер",
         "Детали — radar.log", pLevel);
@@ -310,9 +565,159 @@ _OPS_SCRIPT_CLIENT = """<script>
         '<button class="btn rl-ctl" data-target="radar" data-action="pause">Radar: пауза</button>' +
         '<button class="btn rl-ctl" data-target="radar" data-action="resume">Radar: продолжить</button>' +
         '<button class="btn rl-ctl" data-target="radar" data-action="restart">Radar: перезапуск</button>' +
-        '<button class="btn rl-ctl" data-target="site" data-action="restart">Site: перезапуск</button>';
+        '<button class="btn rl-ctl" data-target="site" data-action="restart">Site: перезапуск</button>' +
+        '<button class="btn rl-ctl" data-target="delist" data-action="run">Проверить ссылки</button>';
     }
+    var delistStatsEl = document.getElementById("rl-ops-delist-stats");
+    if (delistStatsEl) {
+      var delist = data.delist || {};
+      if (delist.last_run_at) {
+        delistStatsEl.textContent = "Ссылки: последний прогон " + delist.last_run_at
+          + " — проверено " + (delist.checked || 0) + ", снято " + (delist.delisted || 0);
+      } else {
+        delistStatsEl.textContent = "Ссылки: автопроверка FL/Kwork ещё не запускалась";
+      }
+    }
+    function renderBotCards(bots) {
+      if (!bots || !bots.length) {
+        return '<div class="card"><p class="hint">Нет данных о ботах</p></div>';
+      }
+      return bots.map(function (b) {
+        var hint = "is-active: " + (b.is_active || "unknown");
+        if (b.last_cmd) hint += " · " + b.last_cmd;
+        return '<div class="card"><h2>' + dot(b.level || "warn") + (b.username || "—") + '</h2>'
+          + '<p class="val">' + (b.is_active || "unknown") + '</p>'
+          + '<p class="hint">' + hint + '</p>'
+          + '<button class="btn rl-ctl" data-target="' + (b.target || "") + '" data-action="restart">Перезапуск</button></div>';
+      }).join("");
+    }
+    var botsEl = document.getElementById("rl-ops-bots");
+    if (botsEl) botsEl.innerHTML = renderBotCards(data.bots || []);
+    var botsCtl = document.getElementById("rl-ops-bots-ctl");
+    if (botsCtl && !botsCtl.innerHTML.trim()) {
+      botsCtl.innerHTML =
+        '<button class="btn rl-ctl" data-target="bots-both" data-action="restart">Перезапуск обоих ботов</button>';
+    }
+    function proxyDot(status) {
+      var lv = (status === "ok" || status === "warn" || status === "bad") ? status : "warn";
+      return '<span class="ops-status-dot ops-status-dot--' + lv + '"></span>';
+    }
+    function switchable(gid) {
+      return gid === "tg-bot" || gid === "exchange-fl" || gid === "exchange-kwork" || gid === "exchange-pool";
+    }
+    function proxyGroupHelp(gid) {
+      var map = {
+        "tg-bot": "@rawlead_bot ходит в Telegram через этот прокси. Красный = бот может молчать или не слать push.",
+        "telethon": "Радар читает TG-группы через acc1/2/3. Переключить кнопкой пока нельзя — только «Проверить».",
+        "exchange-fl": "Заказы с FL.ru качаются через этот прокси. Жёлтый/красный = FL в ленте может пропасть.",
+        "exchange-kwork": "Заказы с Kwork — то же.",
+        "exchange-pool": "Запасной пул для бирж."
+      };
+      return map[gid] || "";
+    }
+    function switchBtn(gid, sn, active, banned) {
+      if (!switchable(gid)) return "";
+      if (banned) {
+        return '<button type="button" class="btn rl-proxy-switch" data-group="' + gid
+          + '" data-slot="' + sn + '" disabled>Забанен — сначала сброс</button>';
+      }
+      return '<button type="button" class="btn rl-proxy-switch" data-group="' + gid + '" data-slot="' + sn + '"'
+        + (active ? " disabled" : "") + ">" + (active ? "Активен" : "→ Активировать") + "</button>";
+    }
+    function renderProxyGroup(group) {
+      var gid = group.id || "";
+      var title = group.title || gid;
+      var help = proxyGroupHelp(gid);
+      var slots = group.slots || [];
+      if (!slots.length) {
+        return '<div class="ops-proxy-group"><h4>' + title + '</h4><p class="sub">Слотов нет</p></div>';
+      }
+      var rows = "";
+      var cards = "";
+      slots.forEach(function (slot) {
+        var sn = slot.slot || 0;
+        var mask = slot.mask || "—";
+        var status = slot.status || "warn";
+        var active = !!slot.active;
+        var banned = !!slot.banned_until;
+        var label = slot.status_label || "—";
+        var sw = switchBtn(gid, sn, active, banned);
+        var actions = '<div class="ops-proxy-actions"><button type="button" class="btn rl-proxy-probe" data-group="'
+          + gid + '" data-slot="' + sn + '">Проверить</button>' + sw + "</div>";
+        var probe = '<div class="ops-proxy-probe" id="ops-probe-' + gid + "-" + sn + '"></div>';
+        rows += '<tr class="ops-proxy-row' + (active ? " is-active" : "") + '"><td>' + sn + '</td><td>'
+          + proxyDot(status) + mask + '</td><td>' + label + '</td><td>' + actions + '</td></tr>'
+          + '<tr><td colspan="4">' + probe + '</td></tr>';
+        cards += '<div class="ops-proxy-card card' + (active ? " is-active" : "") + '"><p><strong>'
+          + proxyDot(status) + "Слот " + sn + '</strong></p><p>' + mask + '</p><p class="hint">' + label
+          + '</p>' + actions + probe + '</div>';
+      });
+      var helpHtml = help ? '<p class="ops-proxy-group__help">' + help + '</p>' : "";
+      return '<div class="ops-proxy-group" data-group="' + gid + '"><h4>' + title + '</h4>' + helpHtml
+        + '<div class="ops-proxy-table-wrap"><table><thead><tr><th>#</th><th>Прокси</th><th>Что значит</th><th></th></tr></thead><tbody>'
+        + rows + '</tbody></table></div><div class="ops-proxy-cards">' + cards + '</div></div>';
+    }
+    window.rlOpsRenderProxies = function (proxies) {
+      var body = document.getElementById("rl-ops-proxies-body");
+      if (!body || !proxies) return;
+      var html = "";
+      (proxies.groups || []).forEach(function (g) { html += renderProxyGroup(g); });
+      body.innerHTML = html || '<p class="sub">Нет настроенных прокси в env</p>';
+      bindProxyControls();
+    };
+    if (data.proxies) window.rlOpsRenderProxies(data.proxies);
     bindControls(token);
+    var supportEl = document.getElementById("rl-ops-support");
+    if (supportEl) {
+      fetch(API + "/ops/support/tickets", {
+        credentials: "same-origin",
+        headers: { "Authorization": "Bearer " + token }
+      }).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }).then(function (data) {
+        var tickets = (data && data.tickets) || [];
+        if (!tickets.length) {
+          supportEl.innerHTML = "<p class=\\"sub\\">Тикетов пока нет.</p>";
+          return;
+        }
+        supportEl.innerHTML = tickets.map(function (t) {
+          var who = t.tg_username ? ("@" + t.tg_username) : (t.user_id || t.guest_token || "—");
+          return '<div class="card" style="margin-bottom:.75rem">'
+            + '<p><strong>#' + t.id + '</strong> · ' + who + ' · ' + (t.last_preview || "") + '</p>'
+            + '<textarea class="rl-ops-reply" data-id="' + t.id + '" rows="2" style="width:100%;margin:.35rem 0"></textarea>'
+            + '<button type="button" class="btn rl-ops-reply-btn" data-id="' + t.id + '">Ответить</button>'
+            + '</div>';
+        }).join("");
+        supportEl.querySelectorAll(".rl-ops-reply-btn").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var id = btn.getAttribute("data-id");
+            var area = supportEl.querySelector('.rl-ops-reply[data-id="' + id + '"]');
+            var text = area ? area.value.trim() : "";
+            if (!text) return;
+            btn.disabled = true;
+            fetch(API + "/ops/support/tickets/" + id + "/reply", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + token
+              },
+              body: JSON.stringify({ message: text })
+            }).then(function (r) {
+              if (!r.ok) throw new Error("HTTP " + r.status);
+              btn.textContent = "Отправлено";
+              if (area) area.value = "";
+            }).catch(function () {
+              btn.disabled = false;
+              alert("Не удалось ответить в тикет #" + id);
+            });
+          });
+        });
+      }).catch(function () {
+        supportEl.innerHTML = "<p class=\\"err\\">Поддержка: нет доступа.</p>";
+      });
+    }
   }).catch(function (e) {
     if (timer) clearTimeout(timer);
     if (e && e.name === "AbortError") {
@@ -321,6 +726,7 @@ _OPS_SCRIPT_CLIENT = """<script>
     }
     fail((e && e.message) || String(e));
   });
+  __NAV_PROXY_JS__
 })();
 </script>"""
 
@@ -430,6 +836,64 @@ def record_pageview(
                         (p, d),
                     )
         conn.commit()
+
+
+def _resolve_data_log(name: str) -> Path | None:
+    p = Path(__file__).resolve().parent.parent / "data" / name
+    return p if p.is_file() else None
+
+
+def _last_log_line_matching(path: Path | None, *, needle: str) -> str | None:
+    if path is None:
+        return None
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines[-500:]):
+        if needle in line:
+            return line.strip()[:200]
+    return None
+
+
+def _status_level(is_active: str) -> str:
+    st = (is_active or "").strip().lower()
+    if st == "active":
+        return "ok"
+    if st in {"failed", "inactive"}:
+        return "bad"
+    return "warn"
+
+
+def _bot_poll_last_cmd() -> str | None:
+    return _last_log_line_matching(_resolve_data_log("radar_site.log"), needle="тг:команда:")
+
+
+def _legacy_bot_last_cmd() -> str | None:
+    return _last_log_line_matching(_resolve_data_log("radar_legacy.log"), needle="тг:команда:")
+
+
+def _bots_snapshot() -> list[dict[str, Any]]:
+    poll_st = _bot_poll_status()
+    legacy_st = _legacy_radar_status()
+    return [
+        {
+            "username": _RAWLEAD_BOT_USERNAME,
+            "service": "rawlead-bot-poll",
+            "target": "rawlead-bot",
+            "is_active": poll_st,
+            "level": _status_level(poll_st),
+            "last_cmd": _bot_poll_last_cmd(),
+        },
+        {
+            "username": _FLPARSING_BOT_USERNAME,
+            "service": "rawlead-radar-legacy",
+            "target": "flparsing-bot",
+            "is_active": legacy_st,
+            "level": _status_level(legacy_st),
+            "last_cmd": _legacy_bot_last_cmd(),
+        },
+    ]
 
 
 def _resolve_log_path() -> Path | None:
@@ -865,12 +1329,26 @@ def fetch_dashboard(database_url: str) -> dict[str, Any]:
         "bot": {
             "push_subscribers": push_subscribers,
             "match_push_enabled": match_push_enabled,
+            "bot_poll_status": _bot_poll_status(),
+            "legacy_radar_status": _legacy_radar_status(),
         },
+        "bots": _bots_snapshot(),
         "problems": count_log_errors(),
         "users": users,
         "pageviews": pageviews,
         "exchanges": _exchange_ops_rows(),
+        "delist": _delist_snapshot(),
+        "proxies": _proxies_snapshot(),
     }
+
+
+def _proxies_snapshot() -> dict[str, Any]:
+    try:
+        from proxy_ops import collect_proxies_payload, strip_internal_urls
+
+        return strip_internal_urls(collect_proxies_payload())
+    except Exception:
+        return {"auto_failover": True, "last_probe_at": None, "groups": []}
 
 
 def _dot_html(level: str) -> str:
@@ -896,7 +1374,16 @@ def _render_cards(data: dict[str, Any]) -> str:
     auth_e = int(prob.get("auth_errors_24h") or 0)
     fetch_e = int(prob.get("fetch_errors_24h") or 0)
     p_level = "bad" if auth_e + fetch_e > 5 else ("warn" if auth_e + fetch_e > 0 else "ok")
+    poll_status = str(bot.get("bot_poll_status") or "unknown")
+    legacy_status = str(bot.get("legacy_radar_status") or "unknown")
+    poll_level = "ok" if poll_status == "active" and legacy_status == "active" else (
+        "bad" if poll_status in {"failed", "inactive"} or legacy_status in {"failed", "inactive"} else "warn"
+    )
     push_hint = "Push выключен глобально" if bot.get("match_push_enabled") is False else "Match-уведомления"
+    bot_hint = (
+        f"{_RAWLEAD_BOT_USERNAME}: {poll_status} · "
+        f"{_FLPARSING_BOT_USERNAME}: {legacy_status} · {push_hint}"
+    )
     return (
         _card_html(
             "Сегодня на сайте",
@@ -907,7 +1394,7 @@ def _render_cards(data: dict[str, Any]) -> str:
         )
         + _card_html("Радар", str(radar.get("status_label") or "—"), str(radar.get("hint") or ""), r_level)
         + _card_html("Лента", f"{int(feed.get('visible_count') or 0)} заказов", "Видимых на /lenta/", "ok")
-        + _card_html("Бот", f"{int(bot.get('push_subscribers') or 0)} с push", push_hint, "ok")
+        + _card_html("Бот", f"{int(bot.get('push_subscribers') or 0)} с push", bot_hint, poll_level)
         + _card_html("Проблемы за 24 ч", f"{auth_e} вход · {fetch_e} парсер", "Детали — radar.log", p_level)
     )
 
@@ -938,19 +1425,179 @@ def _render_exchanges(data: dict[str, Any]) -> str:
     return "".join(parts)
 
 
+def _render_bots(data: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for bot in data.get("bots") or []:
+        username = str(bot.get("username") or "—")
+        is_active = str(bot.get("is_active") or "unknown")
+        level = str(bot.get("level") or _status_level(is_active))
+        target = html.escape(str(bot.get("target") or ""))
+        hint = f"is-active: {is_active}"
+        last_cmd = str(bot.get("last_cmd") or "").strip()
+        if last_cmd:
+            hint += f" · {last_cmd}"
+        parts.append(
+            f'<div class="card"><h2>{_dot_html(level)}{html.escape(username)}</h2>'
+            f'<p class="val">{html.escape(is_active)}</p>'
+            f'<p class="hint">{html.escape(hint)}</p>'
+            f'<button class="btn rl-ctl" data-target="{target}" data-action="restart">'
+            f"Перезапуск</button></div>"
+        )
+    if not parts:
+        return '<div class="card"><p class="hint">Нет данных о ботах</p></div>'
+    return "".join(parts)
+
+
+def _render_bots_ctl() -> str:
+    return (
+        '<button class="btn rl-ctl" data-target="bots-both" data-action="restart">'
+        "Перезапуск обоих ботов</button>"
+    )
+
+
+def _render_delist_stats(data: dict[str, Any] | None = None) -> str:
+    delist = (data or {}).get("delist") or {}
+    if delist.get("last_run_at"):
+        return html.escape(
+            f"Ссылки: последний прогон {delist['last_run_at']} — "
+            f"проверено {int(delist.get('checked') or 0)}, "
+            f"снято {int(delist.get('delisted') or 0)}"
+        )
+    return "Ссылки: автопроверка FL/Kwork ещё не запускалась"
+
+
 def _render_controls() -> str:
     return (
         '<button class="btn rl-ctl" data-target="radar" data-action="pause">Radar: пауза</button>'
         '<button class="btn rl-ctl" data-target="radar" data-action="resume">Radar: продолжить</button>'
         '<button class="btn rl-ctl" data-target="radar" data-action="restart">Radar: перезапуск</button>'
         '<button class="btn rl-ctl" data-target="site" data-action="restart">Site: перезапуск</button>'
+        '<button class="btn rl-ctl" data-target="delist" data-action="run">Проверить ссылки</button>'
     )
+
+
+def _delist_snapshot() -> dict[str, Any]:
+    sqlite = _resolve_sqlite_path()
+    if sqlite is None:
+        return {"last_run_at": None, "checked": 0, "delisted": 0, "skipped": 0}
+    from delist_checker import load_delist_last_stats
+
+    return load_delist_last_stats(ProjectStorage(sqlite))
+
+
+def _run_delist_batch_ops() -> tuple[bool, str]:
+    sqlite = _resolve_sqlite_path()
+    if sqlite is None:
+        return False, "SQLite not found for delist"
+    db_url = os.environ.get("DATABASE_URL", "").strip()
+    if not db_url:
+        return False, "DATABASE_URL not configured"
+    saved_profile = os.environ.get("RADAR_PROFILE")
+    try:
+        os.environ["RADAR_PROFILE"] = "site"
+        from config import load_config, load_radar_env
+        from delist_checker import run_delist_batch, save_delist_run
+        from pg_storage import NeonLeadStorage
+
+        load_radar_env()
+        cfg = load_config()
+        pg = NeonLeadStorage(cfg.database_url or db_url)
+        if not pg.enabled:
+            return False, "Neon not available"
+        storage = ProjectStorage(sqlite)
+        errors: list[str] = []
+        stats = run_delist_batch(cfg, pg, errors=errors, limit=15)
+        save_delist_run(storage, stats)
+        msg = (
+            f"delist: checked={stats['checked']} delisted={stats['delisted']} "
+            f"skipped={stats['skipped']}"
+        )
+        if errors:
+            msg += f" · errors={len(errors)}"
+        return True, msg
+    except Exception as exc:
+        return False, f"delist failed: {exc}"
+    finally:
+        if saved_profile is None:
+            os.environ.pop("RADAR_PROFILE", None)
+        else:
+            os.environ["RADAR_PROFILE"] = saved_profile
+
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_RADAR_CTL_SCRIPT = _PROJECT_ROOT / "deploy" / "radar-ctl.sh"
+_BOT_CTL_SCRIPT = _PROJECT_ROOT / "deploy" / "bot-ctl.sh"
+_UNIT_OK_STATES = frozenset({"active", "activating"})
+
+
+def _unit_status_note(status: str) -> str:
+    return " (ещё поднимается)" if status == "activating" else ""
+
+
+def _unit_restart_ok(status: str) -> bool:
+    return status in _UNIT_OK_STATES
+
+
+def _run_sudo_ctl(script: Path, *args: str) -> tuple[bool, str]:
+    if not script.is_file():
+        return False, f"{script.name} не найден (ожидается VPS)."
+    cmd = ["sudo", str(script), *args]
+    try:
+        proc = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
+    except Exception as exc:
+        return False, str(exc)[:200]
+    out = (proc.stdout or proc.stderr or "").strip()
+    if proc.returncode != 0:
+        return False, (out or f"exit {proc.returncode}")[:300]
+    return True, out or "ok"
+
+
+def _systemctl_is_active(service: str) -> str:
+    if service == "rawlead-radar-legacy":
+        ok, state = _run_sudo_ctl(_RADAR_CTL_SCRIPT, "status", "legacy")
+        return state if ok else "unknown"
+    if service == "rawlead-radar":
+        ok, state = _run_sudo_ctl(_RADAR_CTL_SCRIPT, "status", "site")
+        return state if ok else "unknown"
+    if service == "rawlead-bot-poll":
+        ok, state = _run_sudo_ctl(_BOT_CTL_SCRIPT, "status")
+        return state if ok else "unknown"
+    try:
+        proc = subprocess.run(
+            ["systemctl", "is-active", service],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return "unknown"
+    return (proc.stdout or proc.stderr or "unknown").strip() or "unknown"
+
+
+def _bot_poll_status() -> str:
+    """systemctl is-active rawlead-bot-poll — active/inactive/failed/unknown."""
+    return _systemctl_is_active("rawlead-bot-poll")
+
+
+def _legacy_radar_status() -> str:
+    """systemctl is-active rawlead-radar-legacy — @FLPARSINGBOT poll + dogfood."""
+    return _systemctl_is_active("rawlead-radar-legacy")
 
 
 def _run_systemctl(action: str, service: str) -> tuple[bool, str]:
     if action not in {"restart", "start", "stop"}:
         return False, "unsupported action"
-    if service not in {"rawlead-radar", "rawlead-api", "nginx"}:
+    if service == "rawlead-bot-poll":
+        ok, msg = _run_sudo_ctl(_BOT_CTL_SCRIPT, action)
+        return ok, f"rawlead-bot-poll: {action} {msg}"
+    if service == "rawlead-radar":
+        ok, msg = _run_sudo_ctl(_RADAR_CTL_SCRIPT, action, "site")
+        return ok, f"rawlead-radar: {action} {msg}"
+    if service == "rawlead-radar-legacy":
+        ok, msg = _run_sudo_ctl(_RADAR_CTL_SCRIPT, action, "legacy")
+        return ok, f"rawlead-radar-legacy: {action} {msg}"
+    if service not in {"rawlead-api", "nginx"}:
         return False, "unsupported service"
     cmd = ["systemctl", action, service]
     try:
@@ -962,9 +1609,162 @@ def _run_systemctl(action: str, service: str) -> tuple[bool, str]:
     return True, f"{service}: {action} ok"
 
 
-def run_ops_control(*, target: str, action: str) -> dict[str, Any]:
+def _drain_legacy_tg_queue() -> str:
+    """Stop legacy, advance getUpdates offset (съесть queued /stop без выполнения)."""
+    _run_sudo_ctl(_RADAR_CTL_SCRIPT, "stop", "legacy")
+    time.sleep(1)
+    saved_profile = os.environ.get("RADAR_PROFILE")
+    drained = 0
+    try:
+        os.environ["RADAR_PROFILE"] = "legacy"
+        from config import load_config, load_radar_env
+        from storage import storage_from_config
+        from tg_proxy_pool import tg_http_request
+
+        import requests
+
+        load_radar_env()
+        cfg = load_config()
+        storage = storage_from_config(cfg)
+        bot_token = cfg.telegram_bot_token.strip()
+        if not bot_token:
+            return "tg-drain:skip no_token"
+        offset = storage.get_tg_update_offset(bot_token=bot_token)
+        api_url = f"https://api.telegram.org/bot{bot_token}/getUpdates"
+        session = requests.Session()
+        session.trust_env = False
+        for _ in range(5):
+            try:
+                resp = tg_http_request(
+                    "GET",
+                    api_url,
+                    session=session,
+                    params={"offset": offset, "timeout": 0},
+                    timeout=25.0,
+                )
+            except Exception:
+                break
+            if resp.status_code != 200:
+                break
+            try:
+                body = resp.json()
+            except ValueError:
+                break
+            if not body.get("ok"):
+                break
+            updates = body.get("result")
+            if not isinstance(updates, list) or not updates:
+                break
+            next_offset = offset
+            for upd in updates:
+                if not isinstance(upd, dict):
+                    continue
+                update_id = upd.get("update_id")
+                if isinstance(update_id, int):
+                    next_offset = max(next_offset, update_id + 1)
+            if next_offset <= offset:
+                break
+            storage.set_tg_update_offset(next_offset, bot_token=bot_token)
+            drained += len(updates)
+            offset = next_offset
+    except Exception as exc:
+        return f"tg-drain:err {type(exc).__name__}"[:120]
+    finally:
+        if saved_profile is None:
+            os.environ.pop("RADAR_PROFILE", None)
+        else:
+            os.environ["RADAR_PROFILE"] = saved_profile
+    return f"tg-drain={drained}"
+
+
+def _restart_bot_poll() -> tuple[bool, str]:
+    ok, msg = _run_systemctl("restart", "rawlead-bot-poll")
+    time.sleep(2)
+    poll_st = _bot_poll_status()
+    ok_final = ok and _unit_restart_ok(poll_st)
+    note = _unit_status_note(poll_st)
+    return ok_final, f"{msg}; bot-poll is-active={poll_st}{note}"
+
+
+def _restart_legacy_radar_unit() -> tuple[bool, str]:
+    """Stop → drain TG queue → start legacy; recovery if still down."""
+    drain = _drain_legacy_tg_queue()
+    ok_start, msg_start = _run_sudo_ctl(_RADAR_CTL_SCRIPT, "start", "legacy")
+    time.sleep(2)
+    legacy_st = _legacy_radar_status()
+    recovery = ""
+    if not _unit_restart_ok(legacy_st):
+        ok_rec, msg_rec = _run_sudo_ctl(_RADAR_CTL_SCRIPT, "start", "legacy")
+        time.sleep(2)
+        legacy_st = _legacy_radar_status()
+        recovery = f"; recovery: {msg_rec}"
+        ok_start = ok_start or ok_rec
+    ok = ok_start and _unit_restart_ok(legacy_st)
+    note = _unit_status_note(legacy_st)
+    msg = f"{drain}; {msg_start}{recovery}; legacy is-active={legacy_st}{note}"
+    return ok, msg
+
+
+def _restart_both_bots() -> tuple[bool, str]:
+    ok_poll, msg_poll = _restart_bot_poll()
+    ok_legacy, msg_legacy = _restart_legacy_radar_unit()
+    ok = ok_poll and ok_legacy
+    msg = f"{msg_poll}; {msg_legacy}"
+    return ok, msg
+
+
+def _restart_radar_units(*, unpause: bool = True) -> tuple[bool, str]:
+    """
+    Restart site + legacy. После restart legacy может съесть queued /stop и выйти —
+    тогда второй start (очередь уже без stop).
+    """
+    if unpause:
+        sqlite = _resolve_sqlite_path()
+        if sqlite is not None:
+            ProjectStorage(sqlite).set_radar_paused(False)
+
+    ok_site, msg_site = _run_systemctl("restart", "rawlead-radar")
+    ok_legacy, msg_legacy = _restart_legacy_radar_unit()
+    ok = ok_site and ok_legacy
+    msg = f"{msg_site}; {msg_legacy}"
+    return ok, msg
+
+
+def run_ops_control(
+    *,
+    target: str,
+    action: str,
+    group: str = "",
+    slot: int | None = None,
+) -> dict[str, Any]:
     t = (target or "").strip().lower()
     a = (action or "").strip().lower()
+    if t == "proxy":
+        from proxy_ops import run_proxy_control, strip_internal_urls
+
+        result = run_proxy_control(action=a, group=group, slot=slot)
+        if result.get("ok") and a == "clear-bans":
+            ok_radar, msg_radar = _run_systemctl("restart", "rawlead-radar")
+            ok_bot, msg_bot = _restart_bot_poll()
+            result = dict(result)
+            parts = [str(result.get("message") or "")]
+            if ok_radar:
+                parts.append("Радар перезапущен.")
+            else:
+                parts.append(f"Радар: {msg_radar}")
+            if ok_bot:
+                parts.append("Бот перезапущен.")
+            else:
+                parts.append(f"Бот: {msg_bot}")
+            result["message"] = " ".join(p for p in parts if p)
+            # Свежий снимок после clear (радар подхватит файл/SQLite при рестарте)
+            from proxy_ops import collect_proxies_payload
+
+            result["proxies"] = strip_internal_urls(collect_proxies_payload())
+        elif result.get("ok") and "proxies" in result:
+            result = dict(result)
+            result["proxies"] = strip_internal_urls(result["proxies"])
+        return result
     if t == "radar" and a in {"pause", "resume"}:
         sqlite = _resolve_sqlite_path()
         if sqlite is None:
@@ -973,14 +1773,155 @@ def run_ops_control(*, target: str, action: str) -> dict[str, Any]:
         storage.set_radar_paused(a == "pause")
         return {"ok": True, "message": "Radar paused" if a == "pause" else "Radar resumed"}
     if t == "radar" and a == "restart":
-        ok, msg = _run_systemctl("restart", "rawlead-radar")
+        ok, msg = _restart_radar_units(unpause=True)
         return {"ok": ok, "message": msg}
     if t == "site" and a == "restart":
         ok_api, msg_api = _run_systemctl("restart", "rawlead-api")
         ok_ng, msg_ng = _run_systemctl("restart", "nginx")
         ok = ok_api and ok_ng
         return {"ok": ok, "message": f"{msg_api}; {msg_ng}"}
+    if t == "rawlead-bot" and a == "restart":
+        ok, msg = _restart_bot_poll()
+        return {"ok": ok, "message": msg}
+    if t == "flparsing-bot" and a == "restart":
+        ok, msg = _restart_legacy_radar_unit()
+        return {"ok": ok, "message": msg}
+    if t in {"bots-both", "bots"} and a == "restart":
+        ok, msg = _restart_both_bots()
+        return {"ok": ok, "message": msg}
+    if t in {"bot-poll", "bot"} and a == "restart":
+        ok, msg = _restart_bot_poll()
+        return {"ok": ok, "message": msg}
+    if t == "delist" and a == "run":
+        ok, msg = _run_delist_batch_ops()
+        return {"ok": ok, "message": msg}
     return {"ok": False, "message": "Unsupported control target/action"}
+
+
+def _proxy_status_dot(status: str) -> str:
+    lv = status if status in ("ok", "warn", "bad") else "warn"
+    return f'<span class="ops-status-dot ops-status-dot--{lv}"></span>'
+
+
+def _proxy_switchable(group_id: str) -> bool:
+    return group_id in {"tg-bot", "exchange-fl", "exchange-kwork", "exchange-pool"}
+
+
+def _render_proxy_slot_actions(
+    group_id: str,
+    slot: int,
+    active: bool,
+    *,
+    banned: bool = False,
+) -> str:
+    gid = html.escape(group_id)
+    switch_btn = ""
+    if _proxy_switchable(group_id):
+        if banned:
+            switch_btn = (
+                f'<button type="button" class="btn rl-proxy-switch" data-group="{gid}" '
+                f'data-slot="{slot}" disabled>Забанен — сначала сброс</button>'
+            )
+        else:
+            switch_label = "Активен" if active else "→ Активировать"
+            switch_disabled = " disabled" if active else ""
+            switch_btn = (
+                f'<button type="button" class="btn rl-proxy-switch" data-group="{gid}" '
+                f'data-slot="{slot}"{switch_disabled}>{switch_label}</button>'
+            )
+    return (
+        f'<div class="ops-proxy-actions">'
+        f'<button type="button" class="btn rl-proxy-probe" data-group="{gid}" data-slot="{slot}">'
+        f"Проверить</button>{switch_btn}</div>"
+    )
+
+
+def _render_proxy_probe_box(group_id: str, slot: int) -> str:
+    gid = html.escape(group_id)
+    return (
+        f'<div class="ops-proxy-probe" id="ops-probe-{gid}-{slot}" '
+        f'data-group="{gid}" data-slot="{slot}"></div>'
+    )
+
+
+def _render_proxy_group(group: dict[str, Any]) -> str:
+    from proxy_ops import PROXY_GROUP_HELP
+
+    gid = str(group.get("id") or "")
+    title = html.escape(str(group.get("title") or gid))
+    help_text = PROXY_GROUP_HELP.get(gid, "")
+    help_html = (
+        f'<p class="ops-proxy-group__help">{html.escape(help_text)}</p>' if help_text else ""
+    )
+    slots = group.get("slots") or []
+    if not slots:
+        return f'<div class="ops-proxy-group"><h4>{title}</h4><p class="sub">Слотов нет</p></div>'
+
+    table_rows: list[str] = []
+    cards: list[str] = []
+    for slot in slots:
+        sn = int(slot.get("slot") or 0)
+        mask = html.escape(str(slot.get("mask") or "—"))
+        status = str(slot.get("status") or "warn")
+        active = bool(slot.get("active"))
+        banned = bool(slot.get("banned_until"))
+        label = html.escape(str(slot.get("status_label") or "—"))
+        row_cls = "ops-proxy-row is-active" if active else "ops-proxy-row"
+        card_cls = "ops-proxy-card is-active" if active else "ops-proxy-card"
+        actions = _render_proxy_slot_actions(gid, sn, active, banned=banned)
+        probe_box = _render_proxy_probe_box(gid, sn)
+        table_rows.append(
+            f'<tr class="{row_cls}">'
+            f"<td>{sn}</td>"
+            f"<td>{_proxy_status_dot(status)}{mask}</td>"
+            f"<td>{label}</td>"
+            f"<td>{actions}</td></tr>"
+            f"<tr><td colspan=\"4\">{probe_box}</td></tr>"
+        )
+        cards.append(
+            f'<div class="{card_cls} card">'
+            f"<p><strong>{_proxy_status_dot(status)}Слот {sn}</strong></p>"
+            f"<p>{mask}</p><p class=\"hint\">{label}</p>{actions}{probe_box}</div>"
+        )
+
+    return (
+        f'<div class="ops-proxy-group" data-group="{html.escape(gid)}">'
+        f"<h4>{title}</h4>{help_html}"
+        f'<div class="ops-proxy-table-wrap"><table><thead><tr>'
+        f"<th>#</th><th>Прокси</th><th>Что значит</th><th></th></tr></thead><tbody>"
+        f"{''.join(table_rows)}</tbody></table></div>"
+        f'<div class="ops-proxy-cards">{''.join(cards)}</div></div>'
+    )
+
+
+def _render_proxies(data: dict[str, Any] | None) -> str:
+    proxies = (data or {}).get("proxies") or {}
+    auto = proxies.get("auto_failover")
+    badge = (
+        '<span class="ops-proxy-badge" title="Если прокси падает, система сама пробует следующий">'
+        "Авто-переключение: вкл</span>"
+        if auto
+        else '<span class="ops-proxy-badge">Авто-переключение: выкл</span>'
+    )
+    last = proxies.get("last_probe_at")
+    last_hint = (
+        f'<span class="sub">Последняя проверка: {html.escape(str(last))}</span>'
+        if last
+        else ""
+    )
+    toolbar = (
+        f'<div class="ops-proxy-toolbar">{badge}{last_hint}'
+        f'<button type="button" class="btn rl-proxy-probe-all">Проверить все</button>'
+        f'<button type="button" class="btn rl-proxy-clear-bans">Сбросить баны</button>'
+        f"</div>"
+        f'<div id="rl-ops-proxy-status" class="ctl-status"><span class="dot"></span>'
+        f"<span>Ожидание команд прокси</span></div>"
+        f'<div id="rl-ops-proxies-body">'
+    )
+    groups_html = "".join(_render_proxy_group(g) for g in (proxies.get("groups") or []))
+    if not groups_html:
+        groups_html = '<p class="sub">Нет настроенных прокси в env</p>'
+    return toolbar + groups_html + "</div>"
 
 
 def _render_leads_rows(data: dict[str, Any]) -> str:
@@ -1007,31 +1948,58 @@ def _render_views_rows(data: dict[str, Any]) -> str:
     return "".join(rows)
 
 
+def _proxy_shell_html() -> str:
+    return (
+        '<div class="ops-proxy-toolbar">'
+        '<span class="ops-proxy-badge" title="Если прокси падает, система сама пробует следующий">'
+        "Авто-переключение: вкл</span>"
+        '<button type="button" class="btn rl-proxy-probe-all">Проверить все</button>'
+        '<button type="button" class="btn rl-proxy-clear-bans">Сбросить баны</button>'
+        "</div>"
+        '<div id="rl-ops-proxy-status" class="ctl-status"><span class="dot"></span>'
+        "<span>Ожидание команд прокси</span></div>"
+        '<div id="rl-ops-proxies-body"><p class="sub">Загрузка прокси…</p></div>'
+    )
+
+
 def ops_html(*, api_base: str, data: dict[str, Any] | None = None) -> str:
     base = (api_base or "").strip().rstrip("/") or "/wp-json/rawlead/v1"
     base_esc = html.escape(base, quote=True)
+    nav_js = _OPS_NAV_PROXY_JS
     if data is not None:
         updated = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
-        script = _OPS_SCRIPT_SSR.replace("__API_BASE__", base_esc)
+        script = (
+            _OPS_SCRIPT_SSR.replace("__API_BASE__", base_esc).replace("__NAV_PROXY_JS__", nav_js)
+        )
         return (
             _OPS_HTML.replace("__LOGIN_BLOCK__", "")
             .replace("__STATUS__", f"Обновлено {updated}")
             .replace("__CARDS__", _render_cards(data))
+            .replace("__BOTS__", _render_bots(data))
+            .replace("__BOTS_CTL__", _render_bots_ctl())
             .replace("__EXCHANGES__", _render_exchanges(data))
+            .replace("__PROXIES__", _render_proxies(data))
             .replace("__CONTROLS__", _render_controls())
+            .replace("__DELIST_STATS__", _render_delist_stats(data))
             .replace("__LEADS__", _render_leads_rows(data))
             .replace("__VIEWS__", _render_views_rows(data))
             .replace("__SCRIPT__", script)
         )
     script = (
-        _OPS_SCRIPT_CLIENT.replace("__API_BASE__", base_esc).replace("__SSR__", "false")
+        _OPS_SCRIPT_CLIENT.replace("__API_BASE__", base_esc)
+        .replace("__SSR__", "false")
+        .replace("__NAV_PROXY_JS__", nav_js)
     )
     return (
         _OPS_HTML.replace("__LOGIN_BLOCK__", _OPS_LOGIN_BLOCK)
         .replace("__STATUS__", "Нужен вход в кабинет (см. шаги ниже)")
         .replace("__CARDS__", "")
+        .replace("__BOTS__", "")
+        .replace("__BOTS_CTL__", "")
         .replace("__EXCHANGES__", "")
+        .replace("__PROXIES__", _proxy_shell_html())
         .replace("__CONTROLS__", "")
+        .replace("__DELIST_STATS__", "")
         .replace("__LEADS__", "")
         .replace("__VIEWS__", "")
         .replace("__SCRIPT__", script)

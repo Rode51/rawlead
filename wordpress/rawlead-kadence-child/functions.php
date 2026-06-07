@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.18.6');
+define('RAWLEAD_CHILD_VERSION', '1.18.35');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -174,6 +174,26 @@ add_action('wp_enqueue_scripts', static function (): void {
             RAWLEAD_CHILD_VERSION,
             true
         );
+        wp_enqueue_script(
+            'rawlead-ticker',
+            RAWLEAD_CHILD_URI . '/assets/js/rawlead-ticker.js',
+            [],
+            RAWLEAD_CHILD_VERSION,
+            true
+        );
+        wp_localize_script('rawlead-ticker', 'rawleadTicker', [
+            'restStats' => esc_url_raw(rest_url('rawlead/v1/site-stats')),
+        ]);
+    }
+
+    if (is_page('faq')) {
+        wp_enqueue_script(
+            'rawlead-faq',
+            RAWLEAD_CHILD_URI . '/assets/js/rawlead-faq.js',
+            [],
+            RAWLEAD_CHILD_VERSION,
+            true
+        );
     }
 
     if (is_page('lenta')) {
@@ -187,6 +207,7 @@ add_action('wp_enqueue_scripts', static function (): void {
         wp_localize_script('rawlead-feed', 'rawleadFeed', [
             'restFeed'         => esc_url_raw(rest_url('rawlead/v1/feed')),
             'restMeFeed'       => esc_url_raw(rest_url('rawlead/v1/me/feed')),
+            'restFeedPrefs'    => esc_url_raw(rest_url('rawlead/v1/me/feed-prefs')),
             'restTags'         => esc_url_raw(rest_url('rawlead/v1/me/tags')),
             'restSkills'       => esc_url_raw(rest_url('rawlead/v1/skills/catalog')),
             'restDraft'        => esc_url_raw(rest_url('rawlead/v1/me/leads')),
@@ -217,6 +238,7 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restQrImage'          => esc_url_raw(rest_url('rawlead/v1/auth/qr-image')),
             'botLoginUrl'          => esc_url_raw('https://t.me/' . rawlead_tg_login_bot_username() . '?start=login'),
             'restSubscription'          => esc_url_raw(rest_url('rawlead/v1/me/subscription')),
+            'restTrialStart'            => esc_url_raw(rest_url('rawlead/v1/me/subscription/trial-start')),
             'restNotificationSettings'  => esc_url_raw(rest_url('rawlead/v1/me/notification-settings')),
             'lentaUrl'                  => esc_url_raw(rawlead_page_url('lenta')),
             'pricingUrl'           => esc_url_raw(rawlead_page_url('pricing')),
@@ -242,7 +264,9 @@ add_action('wp_enqueue_scripts', static function (): void {
             true
         );
         wp_localize_script('rawlead-support', 'rawleadSupport', [
-            'restSupport' => esc_url_raw(rest_url('rawlead/v1/support')),
+            'restTicket' => esc_url_raw(rest_url('rawlead/v1/support/ticket')),
+            'restThread' => esc_url_raw(rest_url('rawlead/v1/support/thread')),
+            'restUnread' => esc_url_raw(rest_url('rawlead/v1/support/unread')),
         ]);
     }
 

@@ -98,6 +98,8 @@ _TOOL_ALIAS_MAP: dict[str, str] = {
     "aiogram": "telegram",
     "pyrogram": "telegram",
     "js": "javascript",
+    "html": "javascript",
+    "css": "javascript",
     "react": "javascript",
     "vue": "javascript",
     "node": "javascript",
@@ -190,6 +192,32 @@ _TZ_TOOL_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bton\b|\bnft\b|\bblockchain\b", re.I), "blockchain"),
 )
 
+_CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
+_CONSULTATION_MARKERS = re.compile(
+    r"консультац|консалтинг|аудит|сопровожден|нужна\s+консультац|без\s+работ\s+исполнител",
+    re.I,
+)
+_RHINO_3D_MARKERS = re.compile(
+    r"\brhino\b|\bрино\b|grasshopper|\b3d\b|cad|черт[её]ж|моделир",
+    re.I,
+)
+
+
+def _slug_has_cyrillic(slug: str) -> bool:
+    return bool(slug and _CYRILLIC_RE.search(slug))
+
+
+def _tz_hay(*chunks: str) -> str:
+    return "\n".join(c for c in chunks if c)
+
+
+def _has_consultation_markers(*chunks: str) -> bool:
+    return bool(_CONSULTATION_MARKERS.search(_tz_hay(*chunks)))
+
+
+def _has_rhino_3d_markers(*chunks: str) -> bool:
+    return bool(_RHINO_3D_MARKERS.search(_tz_hay(*chunks)))
+
 
 def normalize_tool_key(raw: str) -> str:
     """Lowercase slug for lookup (spaces/dots/dashes → _)."""
@@ -243,7 +271,12 @@ def normalize_tools_required(raw: Any, *, limit: int = 8) -> tuple[str, ...]:
     seen: set[str] = set()
     for item in items:
         mapped = _resolve_tool_slug(item)
-        if mapped and mapped not in seen and is_known_tool(mapped):
+        if (
+            mapped
+            and not _slug_has_cyrillic(mapped)
+            and mapped not in seen
+            and is_known_tool(mapped)
+        ):
             seen.add(mapped)
             out.append(mapped)
         if len(out) >= limit:
@@ -259,15 +292,23 @@ def finalize_tools_for_lead(
     task_summary: str = "",
     limit: int = 8,
 ) -> tuple[str, ...]:
-    """O98: нормализация + только known + добор из ТЗ до min 2."""
+    """O98/L2-tune: нормализация + known + consulting/rhino guards + добор из ТЗ до min 2."""
+    tz_chunks = (title, snippet, task_summary)
     out = list(normalize_tools_required(tools, limit=limit))
+
+    if "rhino" in out and not _has_rhino_3d_markers(*tz_chunks):
+        out = [t for t in out if t != "rhino"]
+    if "consulting" in out and not _has_consultation_markers(*tz_chunks):
+        out = [t for t in out if t != "consulting"]
+
+    out = list(normalize_tools_required(out, limit=limit))
     if len(out) < 2:
-        for hint in tools_from_tz_text(title, snippet, task_summary):
+        for hint in tools_from_tz_text(*tz_chunks):
             if hint not in out:
                 extra = normalize_tools_required([hint], limit=1)
                 if extra:
                     out.append(extra[0])
-            if len(out) >= limit:
+            if len(out) >= 2:
                 break
     return normalize_tools_required(out, limit=limit)
 

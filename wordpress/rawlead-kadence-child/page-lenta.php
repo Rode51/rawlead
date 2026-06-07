@@ -10,83 +10,31 @@ declare(strict_types=1);
 
 get_header();
 rawlead_get_part('header');
+
+$rl_feed_logged_in = isset($_COOKIE['rl_access']) && trim((string) $_COOKIE['rl_access']) !== '';
+require_once RAWLEAD_CHILD_DIR . '/template-parts/rawlead/feed-card.php';
+$rl_feed_tier = rawlead_feed_tier($rl_feed_logged_in);
+$rl_feed_main_class = 'rl-app rl-app--feed site-main';
+if ($rl_feed_logged_in) {
+	$rl_feed_main_class .= ' rl-app--feed-logged-in';
+} else {
+	$rl_feed_main_class .= ' rl-app--feed-anon';
+}
 ?>
-<main id="primary" class="rl-app rl-app--feed site-main" data-rl-app="feed">
-	<div class="rl-filter-bar" id="rl-feed-sidebar" aria-label="<?php esc_attr_e('Фильтры', 'rawlead-kadence-child'); ?>">
-		<div class="rl-filter-bar__inner" id="rl-feed-sidebar-scroll">
-			<fieldset class="rl-feed-filter rl-feed-filter--source is-visually-hidden">
-				<legend><?php esc_html_e('Источник', 'rawlead-kadence-child'); ?></legend>
-				<label class="rl-feed-chip is-active"><input type="radio" name="source" value="" checked> <?php esc_html_e('Все', 'rawlead-kadence-child'); ?></label>
-				<label class="rl-feed-chip"><input type="radio" name="source" value="fl"> FL.ru</label>
-				<label class="rl-feed-chip"><input type="radio" name="source" value="kwork"> Kwork</label>
-				<label class="rl-feed-chip"><input type="radio" name="source" value="youdo"> YouDo</label>
-				<label class="rl-feed-chip"><input type="radio" name="source" value="freelance_ru"> Freelance.ru</label>
-				<label class="rl-feed-chip"><input type="radio" name="source" value="freelancejob"> FreelanceJob</label>
-				<label class="rl-feed-chip"><input type="radio" name="source" value="pchyol"> Пчёл.нет</label>
-				<label class="rl-feed-chip"><input type="radio" name="source" value="tg"> Telegram</label>
-			</fieldset>
-			<fieldset class="rl-feed-filter rl-feed-filter--category rl-filter-bar__cats">
-				<legend class="screen-reader-text"><?php esc_html_e('Специализация', 'rawlead-kadence-child'); ?></legend>
-				<label class="rl-cat-chip is-active" id="filter-category-all">
-					<input type="checkbox" name="category" value="" checked>
-					<?php esc_html_e('Все', 'rawlead-kadence-child'); ?>
-				</label>
-				<label class="rl-cat-chip" id="filter-category-dev">
-					<input type="checkbox" name="category" value="dev">
-					<span class="rl-cat-chip__icon" aria-hidden="true">&lt;/&gt;</span>
-					<span class="rl-cat-chip__label rl-cat-chip__label--full"><?php esc_html_e('Разработка', 'rawlead-kadence-child'); ?></span>
-					<span class="rl-cat-chip__label rl-cat-chip__label--short"><?php esc_html_e('Код', 'rawlead-kadence-child'); ?></span>
-				</label>
-				<label class="rl-cat-chip" id="filter-category-design">
-					<input type="checkbox" name="category" value="design">
-					<span class="rl-cat-chip__icon" aria-hidden="true">✦</span>
-					<span class="rl-cat-chip__label rl-cat-chip__label--full"><?php esc_html_e('Дизайн', 'rawlead-kadence-child'); ?></span>
-					<span class="rl-cat-chip__label rl-cat-chip__label--short"><?php esc_html_e('Дизайн', 'rawlead-kadence-child'); ?></span>
-				</label>
-				<label class="rl-cat-chip" id="filter-category-marketing">
-					<input type="checkbox" name="category" value="marketing">
-					<span class="rl-cat-chip__icon" aria-hidden="true">
-						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-							<path d="M3 6.5L8 3v10L3 9.5V6.5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-							<path d="M8 5l5 2v4l-5 2V5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-						</svg>
-					</span>
-					<span class="rl-cat-chip__label rl-cat-chip__label--full"><?php esc_html_e('Маркетинг', 'rawlead-kadence-child'); ?></span>
-					<span class="rl-cat-chip__label rl-cat-chip__label--short"><?php esc_html_e('SMM', 'rawlead-kadence-child'); ?></span>
-				</label>
-				<label class="rl-cat-chip" id="filter-category-text">
-					<input type="checkbox" name="category" value="text">
-					<span class="rl-cat-chip__icon" aria-hidden="true">Aa</span>
-					<span class="rl-cat-chip__label rl-cat-chip__label--full"><?php esc_html_e('Тексты', 'rawlead-kadence-child'); ?></span>
-					<span class="rl-cat-chip__label rl-cat-chip__label--short"><?php esc_html_e('Тексты', 'rawlead-kadence-child'); ?></span>
-				</label>
-			</fieldset>
-			<div class="rl-filter-bar__actions">
-				<button type="button" class="rl-filter-dropdown-btn rl-feed-skills-dd__trigger" id="rl-feed-skills-trigger">
-					<span class="rl-feed-skills-dd__label" id="rl-feed-skills-trigger-label"><?php esc_html_e('Навыки', 'rawlead-kadence-child'); ?></span>
-					<span class="rl-feed-skills-dd__badge" id="rl-feed-skills-badge" hidden></span>
-				</button>
-				<button type="button" class="rl-filter-dropdown-btn rl-filter-mobile-trigger" id="rl-feed-filters-open" aria-expanded="false" aria-controls="rl-feed-sheet">
-					<?php esc_html_e('Фильтр', 'rawlead-kadence-child'); ?>
-				</button>
-				<button type="button" class="rl-filter-reset rl-feed-reset" hidden><?php esc_html_e('Сбросить фильтр', 'rawlead-kadence-child'); ?></button>
-			</div>
-		</div>
-	</div>
-	<p class="rl-feed-delay-notice" id="rl-feed-delay-notice" hidden></p>
-	<div class="rl-feed-anon-strip" id="rl-feed-anon-strip" hidden>
-		<span class="rl-feed-anon-strip__text"><?php esc_html_e('⏱ Лента с задержкой 15 мин ·', 'rawlead-kadence-child'); ?></span>
-		<a class="rl-feed-anon-strip__cta" href="<?php echo esc_url(rawlead_page_url('pricing')); ?>"><?php esc_html_e('Premium — сразу, от 790 ₽ →', 'rawlead-kadence-child'); ?></a>
-	</div>
+<main id="primary" class="<?php echo esc_attr($rl_feed_main_class); ?>" data-rl-app="feed" data-feed-tier="<?php echo esc_attr($rl_feed_tier); ?>">
+	<?php rawlead_get_part('feed-filter-bar', ['rl_feed_logged_in' => $rl_feed_logged_in, 'rl_feed_tier' => $rl_feed_tier]); ?>
+	<?php rawlead_get_part('feed-strip'); ?>
 	<div class="rl-container rl-feed-main-wrap">
+		<div class="rl-feed-cabinet-bar">
+			<a href="<?php echo esc_url(rawlead_page_url('cabinet')); ?>" class="rl-feed-cabinet-bar__link" id="rl-feed-cabinet-link">
+				<?php esc_html_e('Кабинет', 'rawlead-kadence-child'); ?> →
+			</a>
+		</div>
 		<header class="rl-feed-head">
 			<h1 class="rl-feed-head__title"><?php esc_html_e('Лента заказов', 'rawlead-kadence-child'); ?></h1>
 			<div class="rl-feed-head__meta">
-				<p class="rl-feed-head__count" id="rl-feed-count" aria-live="polite"></p>
-				<button type="button" class="rl-feed-tags-edit" id="rl-feed-tags-edit" hidden>
-					<span aria-hidden="true">⚙</span>
-					<span class="rl-feed-tags-edit__label"><?php esc_html_e('Изменить навыки', 'rawlead-kadence-child'); ?></span>
-				</button>
+				<div class="rl-feed-toolbar" id="rl-feed-toolbar" aria-live="polite"></div>
+				<p class="rl-feed-head__count rl-feed-head__count--legacy" id="rl-feed-count" hidden aria-live="polite"></p>
 			</div>
 		</header>
 		<div class="rl-feed-banner" id="rl-feed-error" role="alert" hidden></div>

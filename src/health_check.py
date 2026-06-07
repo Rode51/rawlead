@@ -19,8 +19,8 @@ from config import (
     load_radar_env,
     radar_lock_path,
     radar_timestamp,
-    telegram_requests_proxies,
 )
+from tg_proxy_pool import get_active_proxy_url, probe_proxy_https, status_summary, tg_http_request
 from storage import ProjectStorage
 
 logger = logging.getLogger(__name__)
@@ -245,6 +245,68 @@ def _verify_flparsing_bot_token(token: str) -> tuple[bool, str]:
     return False, f"ожидали @FLPARSINGBOT, getMe=@{username or '?'}"
 
 
+def _site_bot_credentials() -> tuple[str, str, str]:
+    """Токен @rawlead_bot только из `.env.site` (не legacy / не os.environ радара)."""
+    from dotenv import dotenv_values
+
+    site_path = _PROJECT_ROOT / ".env.site"
+    if not site_path.is_file():
+        return "", "", "нет файла .env.site"
+    vals = dotenv_values(site_path)
+    token = (vals.get("TELEGRAM_BOT_TOKEN") or "").strip()
+    if not token:
+        return "", "", "в .env.site нет TELEGRAM_BOT_TOKEN"
+    return token, "", ""
+
+
+def _verify_rawlead_bot_token(token: str) -> tuple[bool, str]:
+    """Не слать пользователю из @FLPARSINGBOT — только @rawlead_bot."""
+    url = f"https://api.telegram.org/bot{token}/getMe"
+    try:
+        resp = requests.get(url, timeout=15)
+        body = resp.json()
+    except requests.RequestException as exc:
+        return False, f"getMe: {exc}"
+    if not isinstance(body, dict) or not body.get("ok"):
+        return False, "getMe fail"
+    username = str((body.get("result") or {}).get("username", "")).strip().lower()
+    if username == "rawlead_bot":
+        return True, f"@{username}"
+    return False, f"ожидали @rawlead_bot, getMe=@{username or '?'}"
+
+
+def send_rawlead_user_text(chat_id: int | str, text: str) -> tuple[bool, str]:
+    """Сообщение подписчику только через @rawlead_bot."""
+    token, _, err = _site_bot_credentials()
+    if err:
+        return False, err
+    ok_bot, bot_detail = _verify_rawlead_bot_token(token)
+    if not ok_bot:
+        logger.warning("rawlead user msg blocked: %s", bot_detail)
+        return False, bot_detail
+    from config import load_config_for_profile
+
+    _ = load_config_for_profile("site", merge_root_env=False)
+    try:
+        session = requests.Session()
+        session.trust_env = False
+        resp = tg_http_request(
+            "POST",
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            session=session,
+            data={"chat_id": str(chat_id), "text": text, "disable_web_page_preview": True},
+            timeout=25.0,
+        )
+        if resp.status_code != 200:
+            return False, f"HTTP {resp.status_code}"
+        body = resp.json()
+        if isinstance(body, dict) and body.get("ok"):
+            return True, bot_detail
+        return False, str(body.get("description") or "send fail")
+    except requests.RequestException as exc:
+        return False, str(exc)
+
+
 def send_flparsing_admin_text(text: str) -> tuple[bool, str]:
     """Инженерные алерты только @FLPARSINGBOT (парсер), никогда @rawlead_bot."""
     token, chat_id, err = _legacy_alert_credentials()
@@ -257,21 +319,21 @@ def send_flparsing_admin_text(text: str) -> tuple[bool, str]:
 
     from config import load_config_for_profile
 
-    cfg = load_config_for_profile("legacy", merge_root_env=False)
-    proxies = telegram_requests_proxies(cfg)
+    _ = load_config_for_profile("legacy", merge_root_env=False)
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try:
         session = requests.Session()
         session.trust_env = False
-        resp = session.post(
+        resp = tg_http_request(
+            "POST",
             url,
+            session=session,
             data={
                 "chat_id": chat_id,
                 "text": text,
                 "disable_web_page_preview": True,
             },
             timeout=25.0,
-            proxies=proxies,
         )
     except requests.RequestException as exc:
         return False, f"сеть: {exc}"
@@ -291,22 +353,42 @@ def send_flparsing_admin_text(text: str) -> tuple[bool, str]:
     return True, bot_detail
 
 
+def tg_bot_proxy_health_summary() -> dict[str, object]:
+    """Статус пула TG Bot API для /status и watchdog."""
+    summary = status_summary()
+    active = str(summary.get("active_host") or "?")
+    alive = int(summary.get("alive") or 0)
+    total = int(summary.get("total") or 0)
+    probe_url = get_active_proxy_url()
+    if probe_url:
+        ok, detail = probe_proxy_https(probe_url, timeout=12.0)
+    else:
+        ok, detail = False, "no proxy configured"
+    return {
+        **summary,
+        "probe_ok": ok,
+        "probe_detail": detail,
+        "line": f"TG Bot API: {active} · alive {alive}/{total} · probe {'OK' if ok else detail}",
+    }
+
+
 def send_owner_text(cfg: Config, text: str) -> tuple[bool, str]:
     """sendMessage без кнопок. Возвращает (успех, деталь ошибки)."""
-    proxies = telegram_requests_proxies(cfg)
+    _ = cfg
     url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/sendMessage"
     try:
         session = requests.Session()
         session.trust_env = False
-        resp = session.post(
+        resp = tg_http_request(
+            "POST",
             url,
+            session=session,
             data={
                 "chat_id": cfg.telegram_chat_id.strip(),
                 "text": text,
                 "disable_web_page_preview": True,
             },
             timeout=25.0,
-            proxies=proxies,
         )
     except requests.RequestException as exc:
         return False, f"сеть: {exc}"

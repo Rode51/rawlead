@@ -197,3 +197,13 @@ def display_views(
     return min(max(views, 1), _CAP)
 
 
+def display_replies(lead_id: int, display_views: int) -> int:
+    """O116 B5: one synthetic reply when fake views land in 8–15 band."""
+    if display_views < 8 or display_views > 15:
+        return 0
+    threshold = 8 if lead_id % 2 == 0 else 10
+    if display_views < threshold:
+        return 0
+    return 1
+
+

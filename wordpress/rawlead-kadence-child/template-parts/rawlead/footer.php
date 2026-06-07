@@ -27,7 +27,8 @@ $year = (int) gmdate('Y');
 		</p>
 	</div>
 </footer>
-<button type="button" class="rl-support-fab" id="rl-support-fab" aria-label="<?php esc_attr_e('Нашли ошибку?', 'rawlead-kadence-child'); ?>" title="<?php esc_attr_e('Нашли ошибку?', 'rawlead-kadence-child'); ?>">
+<button type="button" class="rl-support-fab" id="rl-support-fab" aria-label="<?php esc_attr_e('Поддержка', 'rawlead-kadence-child'); ?>" title="<?php esc_attr_e('Поддержка', 'rawlead-kadence-child'); ?>">
+	<span class="rl-support-fab__badge" id="rl-support-badge" hidden aria-hidden="true">!</span>
 	<svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
 		<circle cx="10" cy="10" r="9" stroke="#0A0A0A" stroke-width="2"/>
 		<path d="M10 6v5M10 13v1" stroke="#0A0A0A" stroke-width="2" stroke-linecap="round"/>
@@ -38,9 +39,10 @@ $year = (int) gmdate('Y');
 	<div class="rl-support-modal__overlay" id="rl-support-overlay"></div>
 	<div class="rl-support-modal__box">
 		<div class="rl-support-modal__head">
-			<span class="rl-support-modal__title" id="rl-support-modal-title"><?php esc_html_e('Сообщить об ошибке', 'rawlead-kadence-child'); ?></span>
+			<span class="rl-support-modal__title" id="rl-support-modal-title"><?php esc_html_e('Поддержка', 'rawlead-kadence-child'); ?></span>
 			<button type="button" class="rl-support-modal__close" id="rl-support-close" aria-label="<?php esc_attr_e('Закрыть', 'rawlead-kadence-child'); ?>">✕</button>
 		</div>
+		<div class="rl-support-thread" id="rl-support-thread" hidden></div>
 		<label class="rl-support-modal__label" for="rl-support-text"><?php esc_html_e('Что случилось?', 'rawlead-kadence-child'); ?></label>
 		<textarea class="rl-support-modal__input" id="rl-support-text"
 			placeholder="<?php esc_attr_e('Опиши кратко — поможем разобраться', 'rawlead-kadence-child'); ?>"

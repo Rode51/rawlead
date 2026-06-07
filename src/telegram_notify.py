@@ -12,6 +12,7 @@ import requests
 from ai_analyze import AiAnalysis
 from budget import display_budget_text
 from config import Config, telegram_requests_proxies
+from tg_proxy_pool import tg_http_request
 from listing import SOURCE_KWORK, ListingProject
 
 __all__ = [
@@ -369,11 +370,12 @@ def send_project_notification(
             data["reply_markup"] = payload.reply_markup
         if payload.parse_mode:
             data["parse_mode"] = payload.parse_mode
-        resp = session.post(
+        resp = tg_http_request(
+            "POST",
             api_url,
+            session=session,
             data=data,
             timeout=timeout_sec,
-            proxies=proxies,
         )
     except requests.RequestException as exc:
         raise TelegramNotifyError(f"Сетевой сбой при отправке в Telegram: {exc}") from exc

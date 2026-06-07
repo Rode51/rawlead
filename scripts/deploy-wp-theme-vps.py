@@ -50,7 +50,7 @@ def main() -> int:
     print("version:", ver.strip())
     print("GUEST_SKILLS lines:", gs.strip())
     print("auth guard lines:", auth.strip())
-    ok = "1.10.2" in ver and int((gs.strip() or "0").split()[0]) >= 1
+    ok = "RAWLEAD_CHILD_VERSION" in ver and "1.18." in ver
     if ok:
         print("DEPLOY OK")
         return 0

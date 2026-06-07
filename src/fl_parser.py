@@ -332,7 +332,26 @@ _FL_GONE_MARKERS = (
     "исполнитель найден",
     "страница не найдена",
     "проект не найден",
+    "в архиве",
+    "закрыт для откликов",
+    "отклики не принимаются",
+    "прием откликов закрыт",
+    "приём откликов закрыт",
 )
+
+_FL_PROJECT_ID_RE = re.compile(r"/projects/(\d+)", re.I)
+
+
+def _fl_redirected_away(original: str, final: str) -> bool:
+    orig = (original or "").strip()
+    fin = final.strip() if isinstance(final, str) else ""
+    if not orig or not fin or orig.casefold() == fin.casefold():
+        return False
+    m = _FL_PROJECT_ID_RE.search(orig)
+    if not m:
+        return False
+    pid = m.group(1)
+    return f"/projects/{pid}" not in fin.casefold()
 
 
 def check_project_page_gone(
@@ -355,6 +374,11 @@ def check_project_page_gone(
         return True
     if resp.status_code != 200:
         return None
+
+    raw_final = getattr(resp, "url", None)
+    final_url = raw_final.strip() if isinstance(raw_final, str) and raw_final.strip() else url
+    if _fl_redirected_away(url, final_url):
+        return True
 
     encoding = resp.encoding or "utf-8"
     html = resp.content.decode(encoding, errors="replace").casefold()
