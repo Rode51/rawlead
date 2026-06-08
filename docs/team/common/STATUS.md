@@ -70,7 +70,7 @@
 | **6c** | **O131-PERF** | ✅ deploy · load@20 p95 **2549 ms** ⏸ |
 | 7 | **Wave 2 rerun** · sign-off · ads | **⏸** до **O132 deploy + 24h** |
 | **7a** | **O132-STABILITY** | **deploy ✅** · 24h watch |
-| **7b** | **O134-INGEST-SLA** — скорость ленты FL/Kwork | **код ✅ Lead verify** · **deploy ⏳** |
+| **7b** | **O134-INGEST-SLA** — скорость ленты FL/Kwork | **deploy ✅ 2026-06-08** · мониторинг ≤5m |
 
 **Owner фон:** **45.152.197.25** — починить/заменить у провайдера (сейчас acc1+бот на **38.154** spare).
 
