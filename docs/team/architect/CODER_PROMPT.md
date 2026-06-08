@@ -1,8 +1,8 @@
 # Coder — горячий контур (активное)
 
-**→ Сейчас:** **Wave 2** owner smoke · **O121-w2b** `/ops/` Failed to fetch (блокер ops)
+**→ Сейчас:** фон post-launch — **perf gate** · **O133** TZ (после ads) · split god-files **O142/O143**
 
-**Закрыто:** O158-MATCH-UX **deploy ✅ 2026-06-08** · theme **1.18.49**
+**Закрыто:** O121-w2b **код ✅** · O158 deploy ✅ · Wave 2 owner **✅**
 
 **Deploy:** `scripts/deploy-o158-vps.py`
 

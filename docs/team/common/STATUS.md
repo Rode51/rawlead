@@ -51,6 +51,7 @@
 | **O152-EXCHANGE-TRACE** | trace jsonl · /ops/ · deploy ✅ **2026-06-08** |
 | **O155-O157** | HC pulse · YouDo human · traffic · deploy ✅ **2026-06-08** |
 | **O158-MATCH-UX** | push dedup · match bar · ?lead= km · **1.18.49** · deploy ✅ **2026-06-08** |
+| **O121-w2b** | `/ops/` timeout 90s · pytest **4/4** · deploy ⏸ Lead |
 
 ---
 
@@ -63,7 +64,7 @@
 | O131–O141 | ✅ **deploy 2026-06-08** |
 | **O144-RFP** | deploy ✅ **2026-06-08** |
 | **O145-FEED-CAT** | deploy ✅ **2026-06-08** |
-| **Wave 2 rerun** · sign-off | **⚠️** O146 fix J4 flip · journey re-run ⏸ owner |
+| **Wave 2 rerun** · sign-off | **✅ owner 2026-06-08** (draft ~30s · O158 ok) |
 | **Perf gate** | load@20 p95 **2549 ms** vs <2s ⏸ |
 | **O132 watch** | 24h 0 oom-kill ⏸ |
 | **ads + portfolio** | **последним** |
@@ -80,7 +81,7 @@
 | **TG в ленте** | ingest 93 · visible 6 — **L1**, не PUBLIC_FEED_SOURCES |
 | **O115** | tg judge pilot — не гоняли |
 | **O105-w1-r3** | ⏸ по симптому Stars |
-| **O155-O157** | **deploy ✅** · HC URL в `.env` · YouDo **0/3** → **Сбросить баны** |
+| **O155-O157** | **deploy ✅** · HC URL в `.env` · YouDo **0/3** → owner smoke **Сбросить баны** |
 
 **После ads:** O113-seo · O123-w2 copy · O105-w2 crypto
 
@@ -115,6 +116,8 @@ O116 · O72e · O108 — [`STATUS_ARCHIVE.md`](../archive/STATUS_ARCHIVE.md)
 **O155–O157 Lead deploy ✅ 2026-06-08:** pytest **18/18** · `deploy-o155-o157-vps.py` · HC URL в VPS `.env` · radar active · YouDo **0/3 proxy** → owner **Сбросить баны** `/ops/`
 
 **O158 Lead deploy ✅ 2026-06-08:** `deploy-o158-vps.py` · api+radar active · theme **1.18.49** · owner smoke ⏸
+
+**O121-w2b Coder ✅ 2026-06-08:** `rawlead-api.php` `/ops/control` · clear-bans/restart **90s** · delist **120s** · pytest **4/4** · `deploy-o121-w2b-vps.py` · owner smoke `/ops/` ⏸
 
 _Lead **2026-06-08** · O158 prod ✅_
 

@@ -8,9 +8,9 @@
 
 ## Где мы
 
-**→ @owner:** Wave 2 smoke — `/lenta/` полоски match · TG «Лента» · draft ≤90s
+**→ @owner:** `/ops/` **Сбросить баны** (после deploy) · Wave 2 sign-off ✅
 
-**→ @coder (след.):** § **O121-w2b** — `/ops/` «Сбросить баны» Failed to fetch
+**→ @coder:** фон — perf gate · O133 TZ (после ads)
 
 ---
 
@@ -34,7 +34,7 @@
 | **14b** | **O152-EXCHANGE-TRACE** | @coder | **deploy ✅** · owner `/ops/` ⏸ |
 | **14c–e** | **O155–O157** HC · YouDo human · traffic | @coder + Lead | **deploy ✅** |
 | **14f** | **O158-MATCH-UX** дубли push · шкала · ?lead= | @coder + Lead | **deploy ✅ 2026-06-08** |
-| **14g** | **O121-w2b** `/ops/` clear-bans fetch | @coder | **→ следующий** |
+| **14g** | **O121-w2b** `/ops/` clear-bans fetch | @coder + Lead | **✅ код · deploy ⏸ owner smoke** |
 | **13b** | **Wave 2** journey 10/10 | owner | ⏸ после O147 |
 | **14** | **ads + portfolio** | owner | **последним** |
 
