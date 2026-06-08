@@ -51,6 +51,89 @@ def goto_lenta(page: Any, base: str) -> None:
     page.wait_for_timeout(800)
 
 
+def _skills_modal_open(page: Any) -> bool:
+    return bool(
+        page.evaluate(
+            f"() => {{ const m = document.querySelector('{SKILLS_MODAL}'); return !!(m && !m.hidden); }}"
+        )
+    )
+
+
+def _close_skills_modal_if_open(page: Any) -> None:
+    if not _skills_modal_open(page):
+        return
+    apply = page.locator(SKILLS_APPLY)
+    if apply.count() and apply.is_enabled():
+        apply.click()
+        page.wait_for_timeout(800)
+    else:
+        close_btn = page.locator("#rl-feed-skill-tree-close")
+        if close_btn.count():
+            close_btn.click(force=True)
+            page.wait_for_timeout(400)
+        if _skills_modal_open(page):
+            close_skills_modal_overlay(page)
+            page.wait_for_timeout(400)
+        if _skills_modal_open(page):
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(400)
+    page.wait_for_function(
+        f"() => {{ const m = document.querySelector('{SKILLS_MODAL}'); return !m || m.hidden; }}",
+        timeout=10_000,
+    )
+
+
+def reset_feed_filters(page: Any, *, is_mobile: bool = False) -> None:
+    """Category all · skills clear · sort/time · min_match default (O129 J3→J4 flake)."""
+    page.wait_for_selector(FEED_APP, state="visible")
+    if is_mobile:
+        _close_skills_modal_if_open(page)
+        sheet_reset = page.locator("#rl-feed-sheet-reset")
+        if sheet_reset.count():
+            sheet_reset.click(force=True)
+            page.wait_for_timeout(1500)
+        else:
+            sheet = open_mobile_feed_sheet(page)
+            sheet.locator('input[name="category"][value=""]').check(force=True)
+            page.wait_for_timeout(400)
+            sheet.locator(MOBILE_SHEET_APPLY).click()
+            page.wait_for_timeout(1200)
+    else:
+        _close_skills_modal_if_open(page)
+        page.evaluate(
+            """() => {
+              const btn = document.querySelector('.rl-feed-reset');
+              if (btn) btn.click();
+            }"""
+        )
+        page.wait_for_timeout(1200)
+        page.locator("#filter-category-all input").check(force=True)
+        page.wait_for_timeout(400)
+        _close_skills_modal_if_open(page)
+        if not is_filter_locked(page, "sort"):
+            sort_dd = page.locator(SORT_DD)
+            if sort_dd.count():
+                current = page.evaluate(
+                    """() => {
+                      const checked = document.querySelector('input[name="rl-feed-sort"]:checked');
+                      return checked ? checked.value : 'time';
+                    }"""
+                )
+                if current != "time":
+                    sort_dd.locator("summary").click()
+                    time_radio = page.locator(f'{SORT_RADIO_DESKTOP}[value="time"]')
+                    if time_radio.count():
+                        time_radio.first.check(force=True)
+                        page.locator("#rl-feed-sort-apply").click()
+                        page.wait_for_timeout(800)
+                    _close_skills_modal_if_open(page)
+    page.wait_for_selector(FEED_CARD, timeout=45_000)
+    page.wait_for_timeout(400)
+    err = feed_error_visible(page)
+    if err:
+        raise RuntimeError(f"feed error after reset: {err}")
+
+
 def wait_feed_tier(page: Any, *allowed: str, timeout_ms: int = 30_000) -> str:
     """Wait until JS sets data-feed-tier on main."""
     page.wait_for_function(

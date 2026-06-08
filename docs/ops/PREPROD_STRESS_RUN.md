@@ -129,7 +129,7 @@ Debug с окном браузера: `--headed`
 
 | # | Проверка |
 |---|----------|
-| 1 | **`DATABASE_URL`** на VPS — **pooler** Neon (host `*-pooler.*` или порт **6543**), не direct при 50 VU. См. Neon dashboard → Connection pooling. |
+| 1 | **`DATABASE_URL`** на VPS — **pooler** Neon (host `*-pooler.*` или порт **6543**), не direct при 50 VU. См. Neon dashboard → Connection pooling. **Проверка:** `python scripts/check_neon_pooler.py` (локально/VPS env) · в логе `rawlead-api` startup: `db: pooler`. |
 | 2 | Если только direct URL — **снизить** load: `--workers 15–20` или k6 `VUS=20`, не 50 с первого раза. |
 | 3 | **Ramp-up:** 2 мин × 10 VU → 3 мин × 30 → 5 мин × 50 (k6 stages или два прогона `preprod_load_feed.py`). |
 | 4 | Во время прогона: `journalctl -u rawlead-api -n 50` — нет лавины `psycopg` / `connection` / `53300`. |
@@ -236,6 +236,8 @@ k6 run -e API_URL=https://api.rawlead.ru -e VUS=50 -e DURATION=5m scripts/prepro
 | `scripts/preprod_ai_matrix.py` | S1 |
 | `scripts/preprod_k6_feed.js` | S3 (k6) |
 | `scripts/preprod_load_feed.py` | S3 (Python) |
+| `scripts/preprod_stress_v2.py` | O129 Wave 2 orchestrator |
+| `scripts/preprod_draft_burst.py` | O129 draft burst (cap 20) |
 | `scripts/preprod_playwright/ux_audit.py` | S2 / O37c (U1–U10 + LLM) |
 | `scripts/preprod_playwright/smoke.py` | S2 smoke (legacy 5 сценариев) |
 
@@ -302,7 +304,49 @@ cd C:\Users\hramo\uisness
 
 ## Wave 2 — O129 (Coder)
 
+**Pre-gate O131-PERF (owner, до полного rerun):** deploy § O131 в `CODER_PROMPT.md` · Neon **pooler** на VPS · затем Wave 2 gates ниже.
+
 Полная симуляция: тиры × draft burst × TZ × **timings JSON** × parser snapshot. § **O129-STRESS-V2** в `CODER_PROMPT.md`.
+
+```powershell
+cd C:\Users\hramo\uisness
+
+# Полный прогон (ramp 10→30→50 VU, draft×20, J1–J11, TZ, parsers)
+.venv\Scripts\python.exe scripts\preprod_stress_v2.py `
+  --base-url https://rawlead.ru `
+  --api-url https://api.rawlead.ru `
+  --vps-log
+
+# Быстрый smoke orchestrator (короткий ramp, draft×5)
+.venv\Scripts\python.exe scripts\preprod_stress_v2.py --quick --skip-journey
+
+# Только draft burst
+.venv\Scripts\python.exe scripts\preprod_draft_burst.py --api-url https://api.rawlead.ru
+
+# S1-b отдельно
+.venv\Scripts\python.exe scripts\preprod_ai_matrix.py --profile site --scenario skills_mismatch
+```
+
+| Артеfact | Путь |
+|----------|------|
+| Orchestrator JSON | `data/preprod_stress_v2.json` |
+| Human md | `data/preprod_stress_v2.md` |
+| Draft burst | `data/preprod_draft_burst.json` |
+| skills_mismatch | `data/preprod_skills_mismatch.json` |
+| Journey (stress) | `data/preprod_ux_journey_stress.json` |
+
+| Gate | PASS |
+|------|------|
+| Load p95 feed | < 2s @ 50 VU (после S3-pre ramp) |
+| Draft burst | 0% 5xx · p95 draft < 90s · 429 в отчёте |
+| TZ | ≥2/3 `[TZ attachment — извлечено` в detail |
+| UX J1–J11 | 0 critical |
+| Parsers | не все red · cascade < 5 · cycle_sec ≤180s |
+| S1-b | skills_mismatch pass |
+
+**Env:** `RAWLEAD_PREPROD_ACCESS_TOKEN` (premium) · опц. `RAWLEAD_PREPROD_FREE_TOKEN` · `RAWLEAD_PREPROD_TRIAL_TOKEN` · `DATABASE_URL` для TZ/skills · `--no-mint` если токены уже в `.env.site`.
+
+**Не гонять:** mass regen · judge · правки proxy/env.
 
 ---
 

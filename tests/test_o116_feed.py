@@ -55,7 +55,7 @@ class TestFeedDelayedJwt(unittest.TestCase):
     def test_bearer_feed_delayed_false(self) -> None:
         user_id = "00000000-0000-0000-0000-000000000099"
         token = issue_access_token(user_id, tg_user_id=4242)
-        empty_page = ([], 0)
+        empty_page = ([], 0, 0)
 
         with patch.object(api_server, "psycopg") as mock_pg:
             conn = MagicMock()

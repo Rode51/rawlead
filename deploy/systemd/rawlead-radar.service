@@ -15,6 +15,10 @@ Environment=PYTHONPATH=/opt/rawlead/src
 ExecStart=/opt/rawlead/deploy/run-radar-site.sh
 Restart=on-failure
 RestartSec=30
+MemoryMax=1400M
+MemoryHigh=1200M
+OOMScoreAdjust=200
+KillMode=mixed
 
 [Install]
 WantedBy=multi-user.target

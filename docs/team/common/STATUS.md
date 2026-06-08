@@ -12,9 +12,9 @@
 
 | Контур | Факт |
 |--------|------|
-| **WP theme** | **1.18.34** · O127 + O124-w2 tail · deploy VPS ✅ |
+| **WP theme** | **1.18.35** · O131 perf boot + draft poll · deploy VPS ✅ |
 | **ИИ gate** | L2 send **71.8%** ✅ · combined **4.28** · L1 **83.1%** · L3 **92%** |
-| **VPS radar** | **active** · FL/Kwork/TG ingest · delist auto |
+| **VPS** | **2 GB RAM** ✅ owner upgrade **2026-06-08** · swap 0 · radar **0 OOM** post-reboot |
 | **Бот prod** | @rawlead_bot · O120 TG failover · **O105 pay ✅** (WP 1.18.3+ · `premium_pay.py`) |
 | **Админка** | `/ops/` w2 · **w2b** timeout 90s в коде ✅ · deploy/smoke owner |
 | **TG acc2** | **6/6 done** · listen **6 чатов** на VPS ✅ · CSV v2 синхронизирован |
@@ -52,6 +52,7 @@
 | **O125 L2 on-demand** | `TOOLS_BACKLOG_DRAIN=0` · tools+draft только по клику · VPS ✅ |
 | **O128-L2-VOICE** | план по ТЗ B · smell/cliche · uniquify (A) план→шаги · tests **36/36** · VPS ✅ |
 | **O110-B** | proxy hygiene: browser wipe · cooldown 5–15s · UA · VPS ✅ |
+| **O131-PERF** | L2 · pooler · feed boot · API scan | ✅ deploy **2026-06-07** |
 | **O129-W1** | UX anon/free/premium **24/24** · smoke **5/5** · load p95 **1846ms** · AI **96%** · S4 FL **4/4** |
 
 ---
@@ -65,21 +66,36 @@
 | 1–5d | pay · ops · O126 · O127 UI | ✅ |
 | **5e** | **O128 L2 voice B** | ✅ |
 | **6** | **Stress Wave 1** | ✅ **2026-06-07** · [`PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md) |
-| **6b** | **O129 stress v2** | **→ @coder** |
-| 7 | stress sign-off · ads | после 6b |
+| **6b** | **O129 stress v2** | orchestrator ✅ · journey partial |
+| **6c** | **O131-PERF** | ✅ deploy · load@20 p95 **2549 ms** ⏸ |
+| 7 | **Wave 2 rerun** · sign-off · ads | **⏸** до **O132 deploy + 24h** |
+| **7a** | **O132-STABILITY** | **deploy ✅** · 24h watch |
+| **7b** | **O134-INGEST-SLA** — скорость ленты FL/Kwork | **код ✅ Lead verify** · **deploy ⏳** |
 
 **Owner фон:** **45.152.197.25** — починить/заменить у провайдера (сейчас acc1+бот на **38.154** spare).
 
 ---
 
-## ⚠️ Частично / блокеры
+## O131-PERF ✅ deploy (2026-06-07)
+
+**Deploy:** `deploy-o131-vps.py` — API (`api_server`, `match_push`, `ai_analyze`) + theme **1.18.35**  
+**Pooler:** `check_neon_pooler.py` → **OK** (local `.env`)  
+**Smoke:** feed **1818 ms** · 40 items · today_count **245**  
+**Load@20×60s:** p95 **2549 ms** · 0% err — gate **<2s** ещё ⏸ (Neon latency / 1 vCPU)
+
+**Owner next:** draft_burst · J5 · full stress v2
+
+---
 
 | § | Gap |
 |---|-----|
 | **L2-draft** | legacy drafts обновятся on-demand; #9909 ИИ-edge — опц. |
 | **O115** | tg ingest ok (~25/24h) · judge pilot только tg — не гоняли |
 | **O105-w1-r3** | только если снова 300⭐ / нет «Изменить способ» | ⏸ по симптому |
-| **O129-W2** | orchestrator `preprod_stress_v2.py` · J1–J11 · draft burst | **→ @coder** |
+| **Perf** | load@20 p95 **2549 ms** post-O131 | rerun stress · app pool backlog |
+| **O129-W2** | orchestrator ✅ · journey **9/10** | **⏸** Wave 2 |
+| **O132** | deploy ✅ · MemoryMax · browser cleanup | 24h watch 0 oom-kill |
+| **O134-INGEST-SLA** | deploy ✅ **2026-06-08** · fresh-only · /ops/ SLA | мониторинг ≤5m 24h |
 
 ---
 
@@ -87,4 +103,4 @@
 
 O116 детали · O72e волны · O108 · PRE-RELEASE-AUDIT — [`STATUS_ARCHIVE.md`](../archive/STATUS_ARCHIVE.md) § 2026-06-05
 
-_O129-W1 ✅ **2026-06-07** · hot → **O129-STRESS-V2** § CODER_PROMPT_
+_O129-W2 verify fix **2026-06-07** · pytest **7/7** · owner: full без `--skip-*`_

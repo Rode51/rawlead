@@ -100,6 +100,7 @@ __LOGIN_BLOCK__
 <div class="ctl" style="margin-top:.5rem" id="rl-ops-bots-ctl">__BOTS_CTL__</div>
 </section>
 <section id="ops-exchanges"><h3>Биржи и скорость</h3>
+<div class="grid" id="rl-ops-ingest-sla">__INGEST_SLA__</div>
 <div class="grid" id="rl-ops-exchanges">__EXCHANGES__</div>
 </section>
 <section id="ops-proxies"><h3>Прокси</h3>
@@ -1098,7 +1099,20 @@ def _ingest_metrics_snapshot() -> dict[str, dict[str, int | float | str]]:
                       ) FILTER (
                         WHERE source_published_at IS NOT NULL
                           AND created_at >= NOW() - INTERVAL '24 hours'
-                      ) AS feed_p95_sec
+                      ) AS feed_p95_sec,
+                      COUNT(*) FILTER (
+                        WHERE source_published_at IS NOT NULL
+                          AND created_at >= NOW() - INTERVAL '24 hours'
+                          AND EXTRACT(
+                            EPOCH FROM (
+                              COALESCE(l1_completed_at, created_at) - source_published_at
+                            )
+                          ) <= 300
+                      )::int AS feed_within_5m,
+                      COUNT(*) FILTER (
+                        WHERE source_published_at IS NOT NULL
+                          AND created_at >= NOW() - INTERVAL '24 hours'
+                      )::int AS feed_measurable_24h
                     FROM base
                     GROUP BY source_bucket
                     """
@@ -1117,6 +1131,8 @@ def _ingest_metrics_snapshot() -> dict[str, dict[str, int | float | str]]:
                         "l1_p95_sec": float(row[7] or 0.0),
                         "feed_p50_sec": float(row[8] or 0.0),
                         "feed_p95_sec": float(row[9] or 0.0),
+                        "feed_within_5m": int(row[10] or 0),
+                        "feed_measurable_24h": int(row[11] or 0),
                     }
     except Exception:
         return {}
@@ -1337,6 +1353,7 @@ def fetch_dashboard(database_url: str) -> dict[str, Any]:
         "users": users,
         "pageviews": pageviews,
         "exchanges": _exchange_ops_rows(),
+        "ingest": _ingest_metrics_snapshot(),
         "delist": _delist_snapshot(),
         "proxies": _proxies_snapshot(),
     }
@@ -1399,6 +1416,49 @@ def _render_cards(data: dict[str, Any]) -> str:
     )
 
 
+def _ingest_sla_level(row: dict[str, int | float | str]) -> str:
+    measurable = int(row.get("feed_measurable_24h", 0) or 0)
+    feed_p50 = float(row.get("feed_p50_sec", 0.0) or 0.0)
+    within = int(row.get("feed_within_5m", 0) or 0)
+    if measurable < 5:
+        return "warn"
+    pct = (within / measurable * 100.0) if measurable else 0.0
+    if feed_p50 <= 300 and pct >= 50:
+        return "ok"
+    if feed_p50 <= 600 or pct >= 25:
+        return "warn"
+    return "bad"
+
+
+def _render_ingest_sla(data: dict[str, Any]) -> str:
+    metrics = data.get("ingest") or {}
+    if not metrics:
+        return (
+            '<div class="card"><p class="hint">Ingest SLA — нет данных Neon</p></div>'
+        )
+    parts: list[str] = []
+    for bucket, label in (("fl", "FL.ru"), ("kwork", "Kwork")):
+        row = metrics.get(bucket)
+        if not row:
+            continue
+        gap_min = int(row.get("last_insert_gap_sec", 0) or 0) // 60
+        feed_p50 = int(float(row.get("feed_p50_sec", 0.0) or 0.0) // 60)
+        within = int(row.get("feed_within_5m", 0) or 0)
+        measurable = int(row.get("feed_measurable_24h", 0) or 0)
+        pct = int(within * 100 / measurable) if measurable else 0
+        level = _ingest_sla_level(row)
+        hint = (
+            f"gap {gap_min} мин · feed p50 {feed_p50} мин · "
+            f"≤5 мин {within}/{measurable} ({pct}%)"
+        )
+        parts.append(_card_html(f"Ingest SLA · {label}", f"≤5m {pct}%", hint, level))
+    if not parts:
+        return (
+            '<div class="card"><p class="hint">Ingest SLA — ждём FL/Kwork с published_at</p></div>'
+        )
+    return "".join(parts)
+
+
 def _render_exchanges(data: dict[str, Any]) -> str:
     rows = data.get("exchanges") or []
     if not rows:
@@ -1413,11 +1473,15 @@ def _render_exchanges(data: dict[str, Any]) -> str:
         insert_hint = f"{last_ins} ({gap} мин назад)" if last_ins else "ещё не было"
         ingest_min = row.get("ingest_p50_min")
         feed_min = row.get("feed_p50_min")
+        within_5m = row.get("feed_within_5m")
+        within_pct = row.get("feed_within_5m_pct")
         lag_parts: list[str] = []
         if ingest_min is not None:
             lag_parts.append(f"На бирже → к нам: {ingest_min} мин")
         if feed_min is not None:
             lag_parts.append(f"К нам → в ленту: {feed_min} мин")
+        if within_5m is not None and within_pct is not None:
+            lag_parts.append(f"≤5 мин: {within_5m} ({within_pct}%)")
         lag_hint = " · ".join(lag_parts) if lag_parts else "Тайминги — после накопления данных"
         what = html.escape(str(row.get("what_happened") or "—"))
         hint = html.escape(f"Последний заказ: {insert_hint} · {lag_hint} · {what}")
@@ -1884,13 +1948,15 @@ def _render_proxy_group(group: dict[str, Any]) -> str:
             f"<p>{mask}</p><p class=\"hint\">{label}</p>{actions}{probe_box}</div>"
         )
 
+    cards_html = "".join(cards)
+    rows_html = "".join(table_rows)
     return (
         f'<div class="ops-proxy-group" data-group="{html.escape(gid)}">'
         f"<h4>{title}</h4>{help_html}"
         f'<div class="ops-proxy-table-wrap"><table><thead><tr>'
         f"<th>#</th><th>Прокси</th><th>Что значит</th><th></th></tr></thead><tbody>"
-        f"{''.join(table_rows)}</tbody></table></div>"
-        f'<div class="ops-proxy-cards">{''.join(cards)}</div></div>'
+        f"{rows_html}</tbody></table></div>"
+        f'<div class="ops-proxy-cards">{cards_html}</div></div>'
     )
 
 
@@ -1977,6 +2043,7 @@ def ops_html(*, api_base: str, data: dict[str, Any] | None = None) -> str:
             .replace("__CARDS__", _render_cards(data))
             .replace("__BOTS__", _render_bots(data))
             .replace("__BOTS_CTL__", _render_bots_ctl())
+            .replace("__INGEST_SLA__", _render_ingest_sla(data))
             .replace("__EXCHANGES__", _render_exchanges(data))
             .replace("__PROXIES__", _render_proxies(data))
             .replace("__CONTROLS__", _render_controls())
@@ -1996,6 +2063,7 @@ def ops_html(*, api_base: str, data: dict[str, Any] | None = None) -> str:
         .replace("__CARDS__", "")
         .replace("__BOTS__", "")
         .replace("__BOTS_CTL__", "")
+        .replace("__INGEST_SLA__", "")
         .replace("__EXCHANGES__", "")
         .replace("__PROXIES__", _proxy_shell_html())
         .replace("__CONTROLS__", "")

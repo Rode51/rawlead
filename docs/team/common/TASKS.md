@@ -10,7 +10,7 @@
 
 | ✅ | ⏳ до ads |
 |----|----------|
-| O121 ops · O126 · O127 · **O128** · **W1 stress** | **O129 v2** |
+| O121 ops · O126 · O127 · **O128** · **W1** · **O131** | **Wave 2 rerun** → ads |
 | ИИ gate · VPS · O125 on-demand | **ads последним** |
 
 ---
@@ -25,8 +25,10 @@
 | **9d** | **O124-w2** BrowserSync tail | owner | ✅ минимально |
 | **9e** | **O128 L2 voice B** | @coder | ✅ **36/36** · VPS |
 | **10** | **Stress Wave 1** (PREPROD) | owner | ✅ **2026-06-07** |
-| **10b** | **O129 stress v2** | @coder | **→ сейчас** |
-| **11** | Sign-off · **ads** | owner | после 10b |
+| **10b** | **O129 stress v2** orchestrator + journey harness | @coder | ✅ pytest · journey partial |
+| **10c** | **O131-PERF** | @coder + Lead deploy | ✅ **2026-06-07** |
+| **11** | **Wave 2 rerun** · sign-off · **ads** | **⏸** O132 deploy |
+| **11a** | **O132-STABILITY** radar OOM | **код ✅** · **owner deploy** |
 
 ---
 
@@ -44,4 +46,4 @@ O113 · O123-w2 · O105-w2
 
 ---
 
-_W1 ✅ **2026-06-07** · O129 Coder **→** sign-off **→** ads_
+_W1 ✅ · O131 deploy ✅ **2026-06-07** · owner: Wave 2 rerun **→** ads_

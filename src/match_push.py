@@ -43,7 +43,7 @@ _PUSH_MIN_MATCH_DEFAULT = 60
 _DRAFT_CALLBACK_RE = re.compile(r"^draft:(\d+)$")
 _DRAFT_WINDOW_SEC = 3600
 _ONDEMAND_L2_SEM = threading.Semaphore(2)
-_ONDEMAND_L2_BACKOFF_SEC = (1, 2, 4, 8, 16)
+_ONDEMAND_L2_BACKOFF_SEC = (0.5, 1)
 _draft_attempts: dict[str, deque[float]] = defaultdict(deque)
 
 _LEAD_SELECT_COLS = """
@@ -430,7 +430,7 @@ def _analyze_shared_ondemand(
     tools_required: list[str],
     ai_errors: list[str],
     log_prefix: str,
-    max_retries: int = 4,
+    max_retries: int = 2,
 ) -> str | None:
     """O57/O59a: shared on-demand L2 — без profile, отдельный semaphore + backoff."""
     attempts = max(1, int(max_retries))
@@ -477,6 +477,7 @@ def _build_personalized_reply(
     shared_reply: str,
     ai_errors: list[str],
     log_prefix: str,
+    max_attempts: int = 2,
 ) -> tuple[str, bool]:
     """O89: per-user uniquify; fallback to shared only on emergency."""
     base = strip_reply_draft_price_deadline(shared_reply)
@@ -487,6 +488,7 @@ def _build_personalized_reply(
         lead_id=lead_id,
         errors=ai_errors,
         log_prefix=log_prefix,
+        max_attempts=max_attempts,
     )
     if personalized:
         return personalized, False
@@ -585,7 +587,7 @@ def generate_and_store_lead_draft(
     user_id: str,
     lead_id: int,
     log_prefix: str = "",
-    max_retries: int = 4,
+    max_retries: int = 2,
     enforce_rate_limit: bool = True,
 ) -> DraftResult:
     """O57: shared on-demand L2 → leads.reply_draft + user_lead_replies."""
@@ -641,8 +643,9 @@ def generate_and_store_lead_draft(
                 )
                 _insert_user_draft(cur, user_id, lead_id, reply)
                 conn.commit()
-                mode = "fallback_shared" if fallback_shared else "personalized"
-                logger.info("%s%s lead=%s user=%s", prefix, mode, lead_id, user_id[:8])
+                logger.info("%sfast_shared lead=%s user=%s", prefix, lead_id, user_id[:8])
+                if fallback_shared:
+                    logger.warning("%sfallback_shared lead=%s user=%s", prefix, lead_id, user_id[:8])
                 note_draft_request(True)
                 if tools:
                     row = _fetch_lead_row(cur, lead_id) or row

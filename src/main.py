@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import inspect
 import random
 import sys
 import time
@@ -227,13 +228,18 @@ def _process_listings(
 
 def _fetch_source(
     label: str,
-    fetch_fn: Callable[[Config], list[ListingProject]],
+    fetch_fn: Callable[..., list[ListingProject]],
     cfg: Config,
     errors: list[str],
     stats: SourceCycleStats | None = None,
+    *,
+    storage: ProjectStorage | None = None,
 ) -> list[ListingProject] | None:
     try:
-        return fetch_fn(cfg)
+        kwargs: dict[str, object] = {}
+        if storage is not None and "storage" in inspect.signature(fetch_fn).parameters:
+            kwargs["storage"] = storage
+        return fetch_fn(cfg, **kwargs)
     except _LISTING_ERRORS as exc:
         msg = short_err(exc)
         errors.append(f"{label}:fetch:{msg}")
@@ -353,7 +359,9 @@ def run_cycle(
 
     if "fl" in enabled_sources:
         stats_fl = summary.ensure("fl")
-        fl_projects = _fetch_source("fl", fetch_listing_projects, cfg, errors, stats_fl)
+        fl_projects = _fetch_source(
+            "fl", fetch_listing_projects, cfg, errors, stats_fl, storage=storage
+        )
         if fl_projects is None:
             for err in errors:
                 if err.startswith("fl:fetch:"):
@@ -385,7 +393,12 @@ def run_cycle(
         stats_kwork = summary.ensure("kwork")
         if cfg.kwork_projects_url:
             kwork_projects = _fetch_source(
-                "kwork", fetch_kwork_listing_projects, cfg, errors, stats_kwork
+                "kwork",
+                fetch_kwork_listing_projects,
+                cfg,
+                errors,
+                stats_kwork,
+                storage=storage,
             )
             if kwork_projects is not None:
                 stats_kwork.downloaded = len(kwork_projects)
@@ -547,6 +560,14 @@ def run_cycle(
         )
     if cfg.radar_profile == "site":
         _maybe_log_site_rollup(cfg, storage)
+
+    from exchange_browser_fetch import (
+        cleanup_stale_browser_processes,
+        close_all_browser_contexts,
+    )
+
+    close_all_browser_contexts()
+    cleanup_stale_browser_processes()
 
 
 def _poll_and_log_tg_commands(cfg: Config, storage: ProjectStorage) -> None:
@@ -719,6 +740,15 @@ def main() -> None:
 
     ts0 = radar_timestamp()
     _append_log_line(cfg.radar_log_path, f"{ts0} радар:старт", echo=True)
+    from exchange_browser_fetch import cleanup_stale_browser_processes
+
+    n_killed = cleanup_stale_browser_processes()
+    if n_killed:
+        _append_log_line(
+            cfg.radar_log_path,
+            f"{ts0} browser:cleanup killed={n_killed}",
+            echo=True,
+        )
     if cfg.radar_profile == "site":
         reset_site_rollup_emit_clock()
 

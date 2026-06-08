@@ -40,6 +40,19 @@ from ai_analyze import (
 from config import apply_profile_argv, load_config, load_radar_env
 from preprod_fixtures import CATEGORIES, PREPROD_LEAD_FIXTURES, PreprodLeadFixture
 
+_SKILLS_MISMATCH_FIXTURE = PreprodLeadFixture(
+    id="skills-mismatch-node",
+    category="dev",
+    title="Backend Node.js (NestJS) для CS-маркетплейса",
+    budget_text="150 000 ₽",
+    snippet=(
+        "Node.js (NestJS / Express), React frontend. Steam API, P2P-маркет скинов. "
+        "PostgreSQL, Redis. REST + WebSocket."
+    ),
+    url="https://www.fl.ru/projects/skills-mismatch-node/",
+)
+_PREPROD_TEST_USER_ID = "895912a1-ffb6-46fb-be7e-4e051f2ff8c1"
+
 
 def _analysis_to_dict(obj: AiLiteAnalysis | AiAnalysis | None) -> dict | None:
     if obj is None:
@@ -193,6 +206,112 @@ def _build_shared_draft_summary(results: list[dict]) -> dict:
     }
 
 
+def _run_skills_mismatch(cfg) -> dict:
+    """S1-b / S6-b: Node lead + user tag yii2 — draft по ТЗ, без Yii2/опыт."""
+    import os
+
+    import psycopg
+    from l3_human_style import reply_ai_smell_reason
+    from match_push import generate_and_store_lead_draft
+
+    errors: list[str] = []
+    user_id = os.environ.get("PREPROD_TEST_USER_ID", _PREPROD_TEST_USER_ID).strip()
+    fx = _SKILLS_MISMATCH_FIXTURE
+    db_url = cfg.database_url.strip()
+    if not db_url:
+        return {
+            "scenario": "skills_mismatch",
+            "pass": False,
+            "error": "DATABASE_URL missing",
+            "summary": {"pass": False},
+        }
+
+    lead_id: int | None = None
+    ext_id = f"skills-mismatch-{int(time.time())}"
+    with psycopg.connect(db_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM user_tags WHERE user_id = %s::uuid", (user_id,))
+            cur.execute(
+                "INSERT INTO user_tags (user_id, tag) VALUES (%s::uuid, %s)",
+                (user_id, "yii2"),
+            )
+            cur.execute(
+                """
+                INSERT INTO leads (
+                    source, external_id, title, body, url, budget_text,
+                    lead_tags, is_visible, category, task_summary, reply_draft
+                )
+                VALUES ('fl', %s, %s, %s, %s, %s, %s::jsonb, TRUE, 'dev', %s, '')
+                RETURNING id
+                """,
+                (
+                    ext_id,
+                    fx.title,
+                    f"{fx.title}\n\n{fx.snippet}",
+                    fx.url,
+                    fx.budget_text,
+                    '["nodejs","nestjs","react"]',
+                    "Node.js backend NestJS и React frontend для маркетплейса.",
+                ),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {
+                    "scenario": "skills_mismatch",
+                    "pass": False,
+                    "error": "lead insert failed",
+                    "summary": {"pass": False},
+                }
+            lead_id = int(row[0])
+        conn.commit()
+
+    t0 = time.perf_counter()
+    try:
+        result = generate_and_store_lead_draft(
+            cfg,
+            user_id=user_id,
+            lead_id=int(lead_id),
+            log_prefix="skills_mismatch:",
+            enforce_rate_limit=False,
+        )
+    except Exception as exc:
+        return {
+            "scenario": "skills_mismatch",
+            "pass": False,
+            "lead_id": lead_id,
+            "error": str(exc),
+            "summary": {"pass": False, "errors": [str(exc)]},
+        }
+    total_ms = int((time.perf_counter() - t0) * 1000)
+
+    draft = (result.reply_draft or "").strip()
+    lower = draft.casefold()
+    bad_stack = any(x in lower for x in ("yii2", "yii 2", "fontlab"))
+    smell = reply_ai_smell_reason(draft) if draft else "empty"
+    node_in_tz = "node" in lower or "nestjs" in lower
+    ok = bool(draft) and not bad_stack and smell is None and node_in_tz and total_ms < 90_000
+
+    return {
+        "scenario": "skills_mismatch",
+        "pass": ok,
+        "lead_id": lead_id,
+        "user_id": user_id,
+        "user_tags": ["yii2"],
+        "reply_draft": draft[:500] if draft else None,
+        "timings_ms": {"total": total_ms},
+        "checks": {
+            "non_empty": bool(draft),
+            "no_yii2_fontlab": not bad_stack,
+            "no_smell": smell is None,
+            "node_from_tz": node_in_tz,
+            "under_90s": total_ms < 90_000,
+        },
+        "smell": smell,
+        "errors": errors,
+        "summary": {"pass": ok},
+    }
+
+
 def _build_summary(results: list[dict]) -> dict:
     by_cat: dict[str, dict[str, int]] = defaultdict(
         lambda: {
@@ -251,8 +370,26 @@ def main() -> int:
         type=Path,
         default=_ROOT / "data" / "preprod_ai_report.json",
     )
+    parser.add_argument(
+        "--scenario",
+        default="matrix",
+        choices=("matrix", "skills_mismatch"),
+        help="matrix = 4×category L1+L2; skills_mismatch = S1-b edge case",
+    )
     args = parser.parse_args()
     apply_profile_argv(["--profile", args.profile])
+
+    if args.scenario == "skills_mismatch":
+        load_radar_env()
+        cfg = load_config()
+        if not cfg.ai_active:
+            print("AI_ENABLED=0 — skills_mismatch невозможен.", file=sys.stderr)
+            return 2
+        report = _run_skills_mismatch(cfg)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0 if report.get("pass") else 1
 
     fixtures = list(PREPROD_LEAD_FIXTURES)
     if args.categories:

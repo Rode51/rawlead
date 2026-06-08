@@ -390,6 +390,9 @@ def build_ops_exchange_row(
     last_insert = str(ing.get("last_insert_at") or "").strip()
     ingest_p50 = float(ing.get("ingest_p50_sec", 0.0) or 0.0)
     feed_p50 = float(ing.get("feed_p50_sec", 0.0) or 0.0)
+    within = int(ing.get("feed_within_5m", 0) or 0)
+    measurable = int(ing.get("feed_measurable_24h", 0) or 0)
+    within_pct = int(within * 100 / measurable) if measurable else None
     err = str(health.get("last_error_short") or "").strip()
     kind = str(health.get("last_error_kind") or "ok")
     what = err if err else ("—" if kind in ("", "ok") else kind_label(kind))
@@ -402,5 +405,7 @@ def build_ops_exchange_row(
         "last_insert_ago_min": gap_min,
         "ingest_p50_min": int(ingest_p50 // 60) if ingest_p50 else None,
         "feed_p50_min": int(feed_p50 // 60) if feed_p50 else None,
+        "feed_within_5m": within if measurable else None,
+        "feed_within_5m_pct": within_pct,
         "what_happened": what[:_ERROR_SHORT_MAX],
     }

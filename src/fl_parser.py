@@ -14,19 +14,21 @@ from config import Config
 from exchange_browser_fetch import fetch_listing_html_browser, listing_browser_enabled
 from exchange_proxy import exchange_fetch_begin, exchange_fetch_end, exchange_get, proxy_log_hint
 from html_fetch import HtmlFetchError
+from ingest_published_at import parse_fl_published_at
 from lead_category import category_from_fl_listing_url
 from listing import SOURCE_FL, ListingProject
+from listing_fresh import trim_listing_at_known
 from radar_cycle_log import log_pipeline_line
 
 logger = logging.getLogger(__name__)
 
 # Сколько страниц ленты запрашивать за один цикл (см. docs/SOURCES.md).
 def _fl_listing_max_pages() -> int:
-    raw = os.environ.get("FL_LISTING_MAX_PAGES", "3").strip()
+    raw = os.environ.get("FL_LISTING_MAX_PAGES", "1").strip()
     try:
         n = int(raw)
     except ValueError:
-        n = 3
+        n = 1
     return max(1, min(5, n))
 
 _PAGE_PATH_RE = re.compile(r"/page-\d+/?")
@@ -77,8 +79,12 @@ def _parse_items(html: str, page_url: str) -> list[ListingProject]:
         for sp in node.select("span.text-gray-opacity-4"):
             t = sp.get_text(strip=True)
             if t:
-                published_at = t
+                published_at = parse_fl_published_at(t)
                 break
+        if not published_at:
+            time_el = node.select_one("time[datetime]")
+            if time_el and time_el.get("datetime"):
+                published_at = parse_fl_published_at(str(time_el["datetime"]))
 
         body_el = node.select_one(".b-post__body .b-post__txt") or node.select_one(
             ".b-post__body"
@@ -180,10 +186,16 @@ def _fetch_listing_html(
     )
 
 
-def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[ListingProject]:
+def fetch_listing_projects(
+    cfg: Config,
+    *,
+    timeout_sec: float = 30.0,
+    storage: object | None = None,
+) -> list[ListingProject]:
     """GET до `FL_LISTING_MAX_PAGES` страниц `cfg.fl_projects_url`, дедуп id внутри цикла.
 
     Без прокси: домашний IP, не TG_PROXY_URL и не системные HTTP_PROXY из ОС.
+    O134: `storage` → fresh-only (stop at known id).
     """
     merged: list[ListingProject] = []
     seen: set[int] = set()
@@ -192,7 +204,10 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
     exchange_fetch_begin("fl")
     log_pipeline_line(cfg.radar_log_path, f"fetch:fl proxy={proxy_log_hint('fl')}")
     try:
-        return _fetch_listing_pages(cfg, timeout_sec, max_pages, merged, seen)
+        projects = _fetch_listing_pages(
+            cfg, timeout_sec, max_pages, merged, seen, storage=storage
+        )
+        return trim_listing_at_known(projects, storage, SOURCE_FL)  # type: ignore[arg-type]
     finally:
         exchange_fetch_end("fl")
 
@@ -203,6 +218,8 @@ def _fetch_listing_pages(
     max_pages: int,
     merged: list[ListingProject],
     seen: set[int],
+    *,
+    storage: object | None = None,
 ) -> list[ListingProject]:
     for page in range(1, max_pages + 1):
         page_url = _fl_listing_page_url(cfg.fl_projects_url, page)
@@ -221,11 +238,18 @@ def _fetch_listing_pages(
                 )
             break
 
+        hit_known = False
         for project in batch:
             if project.project_id in seen:
                 continue
+            if storage is not None and hasattr(storage, "has_seen"):
+                if storage.has_seen(SOURCE_FL, project.project_id):
+                    hit_known = True
+                    break
             seen.add(project.project_id)
             merged.append(project)
+        if hit_known:
+            break
 
     feed_cat = category_from_fl_listing_url(cfg.fl_projects_url) or ""
     if not feed_cat:

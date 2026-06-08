@@ -188,29 +188,10 @@ def _source_bucket(source: str) -> str:
     return s.split(":")[0] or s
 
 
-def _parse_source_published_at(raw: str) -> datetime | None:
-    text = (raw or "").strip()
-    if not text:
-        return None
-    normalized = text.replace("Z", "+00:00")
-    try:
-        dt = datetime.fromisoformat(normalized)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
-    except ValueError:
-        pass
-    for fmt in (
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%d.%m.%Y %H:%M",
-        "%d.%m.%Y %H:%M:%S",
-    ):
-        try:
-            return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-    return None
+def _parse_source_published_at(raw: str, *, source: str | None = None) -> datetime | None:
+    from ingest_published_at import parse_source_published_at
+
+    return parse_source_published_at(raw, source=source)
 
 
 class NeonLeadStorage:
@@ -247,7 +228,9 @@ class NeonLeadStorage:
         h = (content_hash or "").strip() or None
         body_text = (body or project.listing_snippet or project.title or "").strip()
         category = _ingest_category(project, body_text)
-        source_published_at = _parse_source_published_at(project.published_at)
+        source_published_at = _parse_source_published_at(
+            project.published_at, source=project.source
+        )
         base_params = (
             project.source,
             str(project.project_id),

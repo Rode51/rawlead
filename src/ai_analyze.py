@@ -2097,6 +2097,7 @@ def rephrase_reply_draft_per_user(
     errors: list[str] | None = None,
     log_prefix: str = "",
     model_override: str = "",
+    max_attempts: int = 4,
 ) -> str | None:
     """O99: per-user uniquify — human FL voice, anti-copypaste + ai_smell guard."""
     if not cfg.ai_active or cfg.ai_provider != "openrouter":
@@ -2126,7 +2127,8 @@ def rephrase_reply_draft_per_user(
     last_exc: BaseException | None = None
     retry_reason: str | None = None
     last_draft: str | None = None
-    for attempt in range(4):
+    attempts = max(1, int(max_attempts))
+    for attempt in range(attempts):
         user = user_base
         if retry_reason and attempt > 0:
             user += reply_retry_user_suffix(
@@ -2171,10 +2173,10 @@ def rephrase_reply_draft_per_user(
                 draft = draft.replace("Здравствуйте!", "Здравствуйте! ", 1).strip()
             smell = reply_ai_smell_reason(draft)
             last_draft = draft
-            if smell and attempt < 3:
+            if smell and attempt < attempts - 1:
                 retry_reason = smell
                 continue
-            if l3_too_similar(base, draft) and attempt < 3:
+            if l3_too_similar(base, draft) and attempt < attempts - 1:
                 retry_reason = "similar"
                 continue
             note_ai_l2_call()
@@ -2199,7 +2201,7 @@ def rephrase_reply_draft_per_user(
     if last_exc is not None:
         _log_ai_failure(errors, log_prefix, last_exc)
     elif errors is not None and log_prefix:
-        errors.append(f"{log_prefix}L3: no draft after 4 attempts")
+        errors.append(f"{log_prefix}L3: no draft after {attempts} attempts")
     return None
 
 

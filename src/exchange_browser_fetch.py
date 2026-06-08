@@ -23,9 +23,19 @@ from html_fetch import HtmlFetchError, _playwright_proxy
 logger = logging.getLogger(__name__)
 
 _LOCK = threading.Lock()
+_FETCH_LOCK = threading.Lock()
 _CONTEXTS: dict[str, Any] = {}
 _PLAYWRIGHT = None
 _PW_LOCK = threading.Lock()
+
+_STALE_BROWSER_MARKERS = (
+    "chrome-headless",
+    "headless_shell",
+    "chromium",
+    "ms-playwright",
+    "playwright/chromium",
+    "playwright/driver",
+)
 
 _JITTER_MS = (200, 800)
 _DEFAULT_UA = (
@@ -164,6 +174,67 @@ def _close_context(key: str) -> None:
             pass
 
 
+def close_all_browser_contexts() -> None:
+    """Close every open Playwright persistent context (O132 cycle teardown)."""
+    with _LOCK:
+        for key in list(_CONTEXTS):
+            _close_context(key)
+
+
+def _is_stale_browser_process(name: str, cmd: str) -> bool:
+    blob = f"{name} {cmd}".casefold()
+    return any(marker in blob for marker in _STALE_BROWSER_MARKERS)
+
+
+def _browser_process_tree() -> set[int]:
+    import psutil
+
+    root = os.getpid()
+    tree = {root}
+    try:
+        proc = psutil.Process(root)
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return tree
+    for child in proc.children(recursive=True):
+        try:
+            tree.add(child.pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    return tree
+
+
+def cleanup_stale_browser_processes() -> int:
+    """Kill orphan chrome-headless / Playwright PIDs for the current user (O132)."""
+    import getpass
+
+    import psutil
+
+    user = getpass.getuser().casefold()
+    keep = _browser_process_tree()
+    killed = 0
+    for proc in psutil.process_iter(["pid", "username", "name", "cmdline"]):
+        try:
+            info = proc.info
+            pid = int(info.get("pid") or 0)
+            if pid <= 0 or pid in keep:
+                continue
+            owner = str(info.get("username") or "").casefold()
+            if owner and owner != user:
+                continue
+            name = str(info.get("name") or "")
+            cmdline = info.get("cmdline") or []
+            cmd = " ".join(str(part) for part in cmdline)
+            if not _is_stale_browser_process(name, cmd):
+                continue
+            proc.kill()
+            killed += 1
+        except (psutil.NoSuchProcess, psutil.AccessDenied, ProcessLookupError):
+            pass
+    if killed:
+        logger.info("browser:cleanup killed=%d", killed)
+    return killed
+
+
 def _fetch_youdo_ephemeral(
     url: str,
     *,
@@ -172,29 +243,30 @@ def _fetch_youdo_ephemeral(
     proxy_url: str,
 ) -> str:
     """YouDo: ephemeral Chromium (persistent profile ломает node-proxy)."""
-    ua = _DEFAULT_UA  # YouDo режет FLRadar/бот User-Agent из cfg
-    timeout_ms = max(int(timeout_sec * 1000), 5000)
-    _jitter_sleep()
-    px = _playwright_proxy(proxy_url)
-    pw = _get_playwright()
-    launch_kw: dict[str, Any] = {"headless": True}
-    if px:
-        launch_kw["proxy"] = px
-    browser = pw.chromium.launch(**launch_kw)
-    try:
-        ctx = browser.new_context(user_agent=ua, locale="ru-RU")
-        ctx.route("**/*", _abort_heavy_route)
-        page = ctx.new_page()
-        page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+    with _FETCH_LOCK:
+        ua = _DEFAULT_UA  # YouDo режет FLRadar/бот User-Agent из cfg
+        timeout_ms = max(int(timeout_sec * 1000), 5000)
+        _jitter_sleep()
+        px = _playwright_proxy(proxy_url)
+        pw = _get_playwright()
+        launch_kw: dict[str, Any] = {"headless": True}
+        if px:
+            launch_kw["proxy"] = px
+        browser = pw.chromium.launch(**launch_kw)
         try:
-            page.wait_for_selector('a[data-id][href*="/t"]', timeout=min(45000, timeout_ms))
-        except Exception:
-            page.wait_for_timeout(5000)
-        else:
-            page.wait_for_timeout(1500)
-        html = page.content()
-    finally:
-        browser.close()
+            ctx = browser.new_context(user_agent=ua, locale="ru-RU")
+            ctx.route("**/*", _abort_heavy_route)
+            page = ctx.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            try:
+                page.wait_for_selector('a[data-id][href*="/t"]', timeout=min(45000, timeout_ms))
+            except Exception:
+                page.wait_for_timeout(5000)
+            else:
+                page.wait_for_timeout(1500)
+            html = page.content()
+        finally:
+            browser.close()
 
     low = html.lower()
     if "cloudflare" in low and ("challenge" in low or "blocked" in low):
@@ -213,46 +285,49 @@ def fetch_listing_html_browser(
     proxy_url: str | None = None,
 ) -> str:
     """GET листинга через Chromium persistent context (cookies на слот прокси)."""
-    proxy = (proxy_url or "").strip() or exchange_primary_proxy_url(source)
-    key = _profile_key(source, proxy)
-    ua = pick_browser_user_agent(user_agent)
-    timeout_ms = max(int(timeout_sec * 1000), 5000)
-    _jitter_sleep()
+    with _FETCH_LOCK:
+        proxy = (proxy_url or "").strip() or exchange_primary_proxy_url(source)
+        key = _profile_key(source, proxy)
+        ua = pick_browser_user_agent(user_agent)
+        timeout_ms = max(int(timeout_sec * 1000), 5000)
+        _jitter_sleep()
 
-    profile_dir = _data_root() / key
-    profile_dir.mkdir(parents=True, exist_ok=True)
+        profile_dir = _data_root() / key
+        profile_dir.mkdir(parents=True, exist_ok=True)
 
-    with _LOCK:
-        ctx = _CONTEXTS.get(key)
-        if ctx is None:
-            pw = _get_playwright()
-            launch_kw: dict[str, Any] = {
-                "user_data_dir": str(profile_dir),
-                "headless": True,
-                "user_agent": ua,
-                "locale": "ru-RU",
-                "viewport": {"width": 1366, "height": 768},
-            }
-            px = _playwright_proxy(proxy)
-            if px:
-                launch_kw["proxy"] = px
-            try:
-                ctx = pw.chromium.launch_persistent_context(**launch_kw)
-            except Exception as exc:
-                _close_context(key)
-                raise HtmlFetchError(f"Playwright launch failed ({source}): {exc}") from exc
-            _CONTEXTS[key] = ctx
+        with _LOCK:
+            ctx = _CONTEXTS.get(key)
+            if ctx is None:
+                pw = _get_playwright()
+                launch_kw: dict[str, Any] = {
+                    "user_data_dir": str(profile_dir),
+                    "headless": True,
+                    "user_agent": ua,
+                    "locale": "ru-RU",
+                    "viewport": {"width": 1366, "height": 768},
+                }
+                px = _playwright_proxy(proxy)
+                if px:
+                    launch_kw["proxy"] = px
+                try:
+                    ctx = pw.chromium.launch_persistent_context(**launch_kw)
+                except Exception as exc:
+                    _close_context(key)
+                    raise HtmlFetchError(f"Playwright launch failed ({source}): {exc}") from exc
+                _CONTEXTS[key] = ctx
 
-    page = ctx.new_page()
-    try:
-        page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-        page.wait_for_timeout(min(1500, timeout_ms // 4))
-        html = page.content()
-    finally:
+        page = ctx.new_page()
         try:
-            page.close()
-        except Exception:
-            pass
+            page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            page.wait_for_timeout(min(1500, timeout_ms // 4))
+            html = page.content()
+        finally:
+            try:
+                page.close()
+            except Exception:
+                pass
+            with _LOCK:
+                _close_context(key)
 
     low = html.lower()
     if "cloudflare" in low and ("challenge" in low or "blocked" in low):

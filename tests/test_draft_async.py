@@ -70,7 +70,7 @@ class TestDraftAsyncHelpers(unittest.TestCase):
 
 
 class TestAnalyzeSharedOndemand(unittest.TestCase):
-    def test_backoff_calls_four_times(self) -> None:
+    def test_backoff_calls_twice_by_default(self) -> None:
         from src.match_push import _analyze_shared_ondemand
 
         cfg = MagicMock()
@@ -87,10 +87,9 @@ class TestAnalyzeSharedOndemand(unittest.TestCase):
                 tools_required=["python"],
                 ai_errors=[],
                 log_prefix="test:",
-                max_retries=4,
             )
         self.assertIsNone(result)
-        self.assertEqual(mocked.call_count, 4)
+        self.assertEqual(mocked.call_count, 2)
 
 
 class TestRunGenerationFail(unittest.TestCase):

@@ -1,10 +1,212 @@
 # Coder — горячий контур (активное)
 
-**→ Сейчас:** **O129-STRESS-V2** (Coder) · Wave 1 ✅ **2026-06-07** — [`PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md)
+**→ Сейчас:** **O132 deploy** (код ✅) · Wave 2 **⏸** · O131 ✅
 
 ---
 
-## § O129-W1 ✅ (2026-06-07)
+## § O132-STABILITY — radar OOM (**→ Coder**)
+
+**Инцидент:** [`problems/2026-06-08-radar-oom-site-down.md`](../../problems/2026-06-08-radar-oom-site-down.md)
+
+**Owner ✅ 2026-06-08:** Beget **2 GB RAM** · swap **0** post-reboot · radar **0 OOM**.
+
+### Copy-paste для @coder
+
+```
+@coder O132-STABILITY
+
+Спека: docs/team/architect/CODER_PROMPT.md § O132-STABILITY
+Тикет: docs/problems/2026-06-08-radar-oom-site-down.md
+
+Контекст: 1 GB → OOM 8×/night (chrome-headless). Owner **2 GB** ✅.
+Не трогать: proxy/env acc1 · mass regen · WP theme.
+
+## 1 — systemd rawlead-radar.service
+MemoryMax=1400M · MemoryHigh=1200M · OOMScoreAdjust=200 · KillMode=mixed
+
+## 2 — orphan Playwright cleanup
+Конец цикла + startup: kill stale chrome-headless/playwright PIDs (user rawlead)
+Log: browser:cleanup killed=N
+
+## 3 — serialize browser
+Max 1 Playwright fetch одновременно (FL xor Kwork). Close context after fetch.
+
+## 4 — deploy
+scripts/deploy-o132-vps.py · restart rawlead-radar · smoke free -h
+
+DoD: 24h 0 oom-kill · NRestarts stable.
+```
+
+**Не в scope:** O134 ingest SLA · O133 TZ downloader · Wave 2.
+
+**Verify Lead 2026-06-08:** pytest **8/9** (1 flaky UA random) · spec **4/4** ✅ · VPS **не задеплоен** (grep cleanup=0, MemoryMax=∞).
+
+**Owner next:** `.venv\Scripts\python.exe scripts\deploy-o132-vps.py` → 24h мониторинг 0 oom-kill.
+
+---
+
+## § O131-PERF ✅ (2026-06-07)
+
+| A L2 | B pooler | C feed boot | D `/v1/feed` | Deploy |
+|------|----------|-------------|--------------|--------|
+| retries 2 · poll 120s · `fast_shared` | `check_neon_pooler.py` · `db:` log | `Promise.all` · **1.18.35** | scan limit · inline `today_count` | **`deploy-o131-vps.py` ✅** |
+
+**Verify Lead:** pytest **29/31** (2 test env quirks) · load@20 p95 **2549 ms** ⏸ · smoke feed **1818 ms** · pooler local **OK**.
+
+**Owner next:** `preprod_draft_burst` · `ux_journey J5` · `preprod_stress_v2`.
+
+---
+
+## § O131-PERF — archive spec (**✅ закрыто**)
+
+**Решение владельца (2026-06-07):** четыре пункта **до** полного `preprod_stress_v2` + `ux_journey` rerun.
+
+**Контекст (факты):** HTML ~450 ms OK · `/v1/feed` ~1.5 s · draft p95 ~105 s · UI poll **90 s** → ложный «ИИ временно недоступен». Load@50 p95 2396 ms FAIL. Runbook S3-pre: Neon **pooler**.
+
+**Не трогать:** proxy/env acc1 · mass regen · judge · WP theme copy.
+
+### Copy-paste для @coder
+
+```
+@coder O131-PERF
+
+Спека: docs/team/architect/CODER_PROMPT.md § O131-PERF
+Runbook verify: docs/ops/PREPROD_STRESS_RUN.md § S3-pre + Wave 2
+
+## A — L2 hot path (draft по клику)
+
+Уже есть: `match_push.generate_and_store_lead_draft` — если `leads.reply_draft` не пуст → **skip L2**, только L3 uniquify (стр. ~629).
+
+Доработать:
+1. On-demand `_analyze_shared_ondemand`: **max_retries=2** (не 4) · backoff короче · timeout 90s оставить
+2. On-demand L3 `rephrase_reply_draft_per_user`: **2 attempt** max в hot path (smell-retry — только 1 retry, не 3)
+3. UI safety: `rawlead-feed.js` **`DRAFT_POLL_MAX_MS` 90000 → 120000** · сообщение при timeout: «ИИ не успел — повторите» (не generic ai_unavailable)
+4. Log: `lenta:draft:{id}:fast_shared` когда взяли shared без L2
+
+DoD: premium клик на lead **с** `reply_draft` → ready **< 15 s** (L3 only) · lead **без** shared → p95 target **< 75 s** в `preprod_draft_burst.py --max-leads 5`
+
+## B — Neon pooler (VPS ops + guard)
+
+Owner на VPS: `DATABASE_URL` → host `*-pooler.*` или порт **6543** (Neon dashboard → Connection pooling). Direct URL при 50 VU = FAIL S3.
+
+Coder:
+1. `scripts/check_neon_pooler.py` (или расширить deploy probe): read env · warn если нет `pooler`/`6543` в URL · exit 1 в CI optional
+2. `rawlead-api` startup log: one line `db: pooler|direct` (без секретов)
+3. Строка в `docs/ops/PREPROD_STRESS_RUN.md` § S3-pre — «проверено скриптом»
+
+DoD: owner grep / script → `pooler` · load@50 p95 **< 2500 ms** или явный fail с hint «direct DB»
+
+## C — Feed boot parallel (`rawlead-feed.js`)
+
+Сейчас waterfall: `loadSubscription` → `mergeFeedPrefsOnLogin` → `loadTags+loadCatalog` → `resetAndLoad`.
+
+Цель: параллельный boot:
+```javascript
+Promise.all([
+  loadSubscription(),
+  isLoggedIn() ? mergeFeedPrefsOnLogin() : Promise.resolve(),
+  loadTags(),
+  loadCatalog()
+]).then(/* applyFeedShellMode, applyFeedTierUi, resetAndLoad once */)
+```
+
+Правила:
+- Один `resetAndLoad` после всех prefs/tags/catalog/subscription
+- Ошибка одного leg — не блокировать feed (catch per leg, как сейчас)
+- Mirror minimal в `rawlead-cabinet.js` если тот же паттерн
+
+DoD: DevTools Network — feed не ждёт serial chain > 1 RTT сверх max(subscription, tags, catalog)
+
+## D — `/v1/feed` API (`api_server.py`)
+
+1. **`today_count`:** один round-trip — CTE/window или subquery в том же `execute`, не второй full scan после page query
+2. **Scan limit:** `_ME_FEED_SCAN_LIMIT=500` только при `categories` или `sort=match`+skills; time sort без filter → `limit+offset+20` buffer
+3. Tests: `tests/test_api_feed.py` или extend existing — today_count present · scan limit regression
+
+DoD: anon `GET /v1/feed?limit=20` p95 **< 1200 ms** (local probe или `preprod_load_feed.py --workers 20`) · один SQL round-trip для count+page где возможно
+
+## Verify (owner после deploy VPS + WP JS bump)
+
+```powershell
+python scripts/check_neon_pooler.py   # или owner SSH grep DATABASE_URL
+.venv\Scripts\python.exe scripts\preprod_load_feed.py --api-url https://api.rawlead.ru --workers 20 --duration 120
+.venv\Scripts\python.exe scripts\preprod_draft_burst.py --max-leads 5 --concurrency 2
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_journey.py --journeys J5
+.venv\Scripts\python.exe scripts\preprod_stress_v2.py --no-mint --skip-journey
+```
+
+Target gates: load@50 p95 < 2s · draft p95 < 90s · J5 pass · stress v2 draft gate green.
+```
+
+---
+
+## § O129-JOURNEY-FIX — harness + draft burst feed (**⏸ после O131**)
+
+### Copy-paste для @coder
+
+```
+@coder O129-JOURNEY-FIX
+
+Контекст: ux_journey прогон 2026-06-07 → data/preprod_ux_journey.json — 6/10, 3 critical.
+O129-W2 orchestrator + skills_mismatch + tier mint — ✅ (pytest 7/7).
+Не трогать: proxy/env, VPS deploy, WP theme, mass regen.
+
+## Fail 1 — J4/J5/J6 empty feed (critical)
+
+Симптом: после J3 (design + skill filter) J4 ждёт `#rl-feed-list .rl-lead-card[data-id]` 45s timeout.
+Root: фильтры J3 остаются в UI/localStorage; J4 `_goto_lenta` не сбрасывает.
+
+Fix:
+- `scripts/preprod_playwright/feed_ui.py` — `reset_feed_filters(page)` (category all · skills clear · sort/time · min_match default)
+- `ux_journey.py` — в начале J4, J5, J6 вызвать reset (или shared helper `_lenta_fresh(ctx)`)
+- Mirror: тот же паттерн что ux_audit desktop flake U2→U4 (если есть — reuse)
+
+DoD: J4–J6 pass на prod с chromium+token.
+
+## Fail 2 — J8 cabinet inbox (critical/warn)
+
+Симптом: click на `.rl-lead-card--skeleton`, `#rl-cabinet-list` intercepts pointer events.
+Fix:
+- `j8_cabinet_logged`: ждать `#rl-inbox-list .rl-lead-card[data-id]:not(.rl-lead-card--skeleton)` (timeout 45s)
+- optional scroll / force click только после real card
+- не кликать skeleton
+
+DoD: J8 pass.
+
+## Fail 3 — draft_burst empty lead ids
+
+Симптом: `preprod_draft_burst.py` → `feed returned no lead ids` для premium JWT acc1.
+API: anon `/v1/feed?limit=5` → 5 items; premium bearer без skills → 0 items (`_personal_feed_page`, user_tags без km>0).
+
+Fix в `fetch_feed_lead_ids`:
+1. auth feed как сейчас
+2. if empty → fallback anon feed (те же lead_id, draft всё равно с premium token)
+3. или fallback `?skills=<one visible tag>` чтобы обойти personal-only path
+4. fail loud с hint если оба пусты
+
+DoD: `preprod_draft_burst.py --max-leads 5 --concurrency 2` → pass (не skipped).
+
+## Tests
+
+- extend `tests/test_preprod_stress_v2.py` или новый `tests/test_preprod_draft_burst.py`: mock empty auth feed → fallback ids
+- optional: unit for reset_feed_filters selectors (minimal)
+
+## Verify (owner после merge)
+
+.venv\Scripts\python.exe scripts\preprod_playwright\ux_journey.py --base-url https://rawlead.ru
+.venv\Scripts\python.exe scripts\preprod_draft_burst.py --max-leads 5 --concurrency 2
+
+Target: journeys 0 critical (J10 mobile optional), draft_burst pass.
+```
+
+---
+
+## § O129-W2 orchestrator ✅ (2026-06-07)
+
+`preprod_stress_v2.py` · `preprod_draft_burst.py` · tier mint · skills `fl` · skipped gates ⏭ · pytest **7/7**.
+Owner verify: `preprod_stress_v2_r2.json` — tier/skills/tz/parsers ✅ · load@50/draft p95 ⏸ infra.
+
+---
 
 | Gate | Result | Artifact |
 |------|--------|----------|

@@ -560,8 +560,9 @@
   }
 
   var DRAFT_POLL_MS = 2000;
-  var DRAFT_POLL_MAX_MS = 90000;
+  var DRAFT_POLL_MAX_MS = 120000;
   var DRAFT_FAIL_RU = "ИИ временно недоступен — повторите";
+  var DRAFT_POLL_TIMEOUT_RU = "ИИ не успел — повторите";
 
   function draftReadyPayload(data) {
     if (!data || data.status === "failed") {
@@ -578,9 +579,9 @@
 
   function pollDraftStatus(leadId, startedMs) {
     if (Date.now() - startedMs > DRAFT_POLL_MAX_MS) {
-      var timeoutErr = new Error(DRAFT_FAIL_RU);
+      var timeoutErr = new Error(DRAFT_POLL_TIMEOUT_RU);
       timeoutErr.status = 503;
-      timeoutErr.detail = DRAFT_FAIL_RU;
+      timeoutErr.detail = DRAFT_POLL_TIMEOUT_RU;
       throw timeoutErr;
     }
     return new Promise(function (resolve) {
@@ -3165,14 +3166,23 @@
     }, 2800);
   }
 
+  function revealFocusCard(card) {
+    if (!card) {
+      return;
+    }
+    card.classList.add("is-visible");
+    expandCard(card);
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    pulseFocusCard(card);
+  }
+
   function focusLeadCard(leadId) {
     if (!leadId || !listEl) {
       return Promise.resolve();
     }
     var card = listEl.querySelector('.rl-lead-card[data-id="' + leadId + '"]');
     if (card) {
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
-      pulseFocusCard(card);
+      revealFocusCard(card);
       return Promise.resolve();
     }
     return fetch(leadDetailApiUrl(leadId), {
@@ -3197,8 +3207,7 @@
           return;
         }
         bindCards();
-        newCard.scrollIntoView({ behavior: "smooth", block: "center" });
-        pulseFocusCard(newCard);
+        revealFocusCard(newCard);
       })
       .catch(function () {
         /* карточка недоступна — остаёмся на ленте */
@@ -4058,15 +4067,14 @@
     applyFeedPrefsToState(readLocalFeedPrefs());
   }
 
-  loadSubscription()
+  Promise.all([
+    loadSubscription(),
+    isLoggedIn() ? mergeFeedPrefsOnLogin() : Promise.resolve(),
+    loadTags().catch(function () {}),
+    loadCatalog().catch(function () {}),
+  ])
     .then(function () {
-      applyFeedShellMode();
-      return mergeFeedPrefsOnLogin();
-    })
-    .then(function () {
-      return Promise.all([loadTags(), loadCatalog()]);
-    })
-    .then(function () {
+    applyFeedShellMode();
     if (!isLoggedIn()) {
       state.draftCategories = readCategoriesFrom();
       state.appliedCategories = cloneCategories(state.draftCategories);

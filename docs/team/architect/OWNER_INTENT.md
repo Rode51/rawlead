@@ -599,7 +599,36 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 **Правило:** запись в чат → сюда; **код** — когда этап активен в `ROADMAP` / шапка `CODER_PROMPT`. Срочно — только по слову «сейчас».
 
-**→ Coder:** после O107 или параллельно w1 · § **O123** ниже
+**→ Coder:** **O131-PERF** (perf перед stress rerun) · § **O123** ниже
+
+### § O131-PERF — perf перед Wave 2 rerun (**P0**, 2026-06-07)
+
+**Решение владельца:** перед следующим полным stress/journey — четыре пункта:
+
+| # | Что | Кто |
+|---|-----|-----|
+| A | L2 hot path: меньше ретраев · fast path если `reply_draft` уже в Neon · poll 120s | @coder |
+| B | Neon **pooler** в `DATABASE_URL` на VPS | **owner** + guard script @coder |
+| C | Параллельный boot `/lenta/` (`rawlead-feed.js`) | @coder |
+| D | `/v1/feed`: меньше scan · `today_count` в одном запросе | @coder |
+
+**Порядок:** O131 deploy ✅ → rerun stress/journey → ads.
+
+**Deploy Lead 2026-06-07:** `deploy-o131-vps.py` · theme **1.18.35** · load@20 p95 2549 ms (gate ⏸).
+
+### § O133-TZ-DOWNLOADER — акк только на скачивание ТЗ (**P1**, 2026-06-08)
+
+**Идея владельца:** по одному аккаунту FL + Kwork **только для download ТЗ**; listing-парсинг — как сейчас (proxy/browser anon). Если на карточке есть вложение → отдельный login-session качает файл → меньше риск бана.
+
+**Сейчас:** `tz_attachments.py` → `skipped_auth` / «нужен вход на биржу» без cookies.
+
+**→ Coder после O132:** `FL_TZ_SESSION` / `KWORK_TZ_SESSION` (cookies или Playwright persistent profile) · rate limit · **не** использовать для listing crawl.
+
+### § O134-INGEST-SLA — FL/Kwork ≤5 мин (**P1**, 2026-06-08)
+
+**Факт Neon 7d:** Kwork measurable lag p50 **~182 мин** (≤6h sample) · **0/253** within 5 min · FL `source_published_at` **NULL** (метрика сломана). L1 после insert p50 **9s**. Radar cycle **75–181s** + OOM + dup resync ~180/цикл.
+
+**→ Coder:** fix FL/Kwork `published_at` · ingest SLA в `/ops/` · fresh-only listing path.
 
 ### § O127 — Финальный UI unify: лента + фильтры + карточка (**P0**, 2026-06-07)
 
@@ -667,6 +696,29 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 **Порядок (Lead, обновлено 2026-06-05 — решение владельца):**
 
 **Ads + portfolio — последние.** Админка **до** рекламы: без панели владелец не может чинить FL/прокси сам.
+
+### § O130 — ICQ AI Portfolio (**P2 · концепт**, 2026-06-07)
+
+**Запрос владельца:** интерактивное AI-портфолио в стиле **ICQ 2000-х** (узкий UI, пиксель-иконки, звук `message.mp3`) · контакты = проекты (RawLead, Crystal Debt, FastAPI/Supabase, «Верстка Фigma/Битрикс — в бане») · чат с LLM-«секретарём» Никиты на базе Markdown RAG · FastAPI `/api/v1/chat/icq` · deploy на отдельный домен.
+
+**Статус:** **концепт, не активировать** — владелец «ещё подумаем». Код **после** O129 v2 sign-off + soft ads (как **P-PORTFOLIO**).
+
+**Связь:** эволюция **P-PORTFOLIO** / **Михалыч** · возможная замена brutalism `labs.rawlead.ru` (Design § D-P-PORTFOLIO v4) — **выбор владельца позже**.
+
+| Фаза | Scope | Оценка Lead |
+|------|-------|-------------|
+| **v0** | HTML+Tailwind ICQ UI · звук · клик → окно чата (mock) | **1–2 дня** @coder |
+| **v1** | FastAPI POST chat · OpenRouter · system prompt + **curated** KB (не весь repo) | **+2–3 дня** |
+| **v2** | rate limit · deploy `labs.*` · Crystal Debt = скрины only (сервер paused) | **+1 день** |
+
+**Lead замечания (зафиксировать до ТЗ):**
+- **Neon**, не Supabase — один стек с RawLead; RAG = статические `.md` в репо или отдельная папка `portfolio-kb/`.
+- **WebSockets не нужны** на v1 — обычный POST + typing indicator достаточно.
+- **Публичный чат = расход OpenRouter** — лимит req/IP, без логов/секретов в KB.
+- **ИИ-тон:** «куда встроить ИИ в бизнес» (P-PORTFOLIO ИИ v3 ✅) · **не** МИМО/БРАТЬ по ТЗ гостя.
+- **«В бане» контакт** — easter egg / humor OK; не обещать live demo Crystal Debt.
+
+**→ Design (когда созреет):** реф `image_4dbbb9.png` · ICQ vs brutalism — **A / B / гибрид** с владельцем.
 
 | Волна | Что | Кто |
 |-------|-----|-----|
@@ -1230,3 +1282,4 @@ _Заменено решением v1.1 B+C выше._
 | 2026-06-05 | **O122 delist** | Мёртвые ссылки на ленте · усилить O65 + `/ops/` | § **O122** |
 | 2026-06-07 | **L2 voice O128 B** | план по ТЗ · без «опыта» · бизнес-вопросы | § **O128** → @coder |
 | 2026-06-07 | **Stress edge cases** | S3-pre Neon pool · S4-pre proxy cascade · S1-b skills_mismatch | `PREPROD_STRESS_RUN.md` |
+| 2026-06-07 | **O130 ICQ AI Portfolio** | Концепт Y2K-ICQ + LLM-секретарь · **пока идея** | § **O130** · после ads · см. P-PORTFOLIO |

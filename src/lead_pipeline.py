@@ -420,6 +420,7 @@ def plan_new_listing(
     neon_replay = False
     neon_sqlite_resync = False
     ext_id = str(project.project_id)
+    filter_ok = word_filter.accepts_listing(project, wide=cfg.filter_wide)
 
     in_neon = False
     if neon_wide and pg is not None:
@@ -433,6 +434,14 @@ def plan_new_listing(
             return _neon_dup_fast_skip_return(
                 project, inserted=inserted, errors=errors, stats=stats
             )
+
+        if not inserted and not filter_ok:
+            line = f"pipeline:skip filter {project.source}:id={ext_id}"
+            errors.append(line)
+            log_pipeline_line(cfg.radar_log_path, line)
+            if stats is not None:
+                stats.note_skip("skip:filter")
+            return False, None
 
         in_neon = pg.lead_exists(project.source, ext_id, errors)
         if in_neon and _neon_needs_l1_replay(
@@ -464,12 +473,10 @@ def plan_new_listing(
                 )
         elif not in_neon and not inserted and not exchange_neon:
             return False, None
-        elif not in_neon and not inserted and exchange_neon:
-            errors.append(_neon_resync_tag(project, "neon_resync_check"))
     elif not inserted:
         return False, None
 
-    if not word_filter.accepts_listing(project, wide=cfg.filter_wide):
+    if not filter_ok:
         line = f"pipeline:skip filter {project.source}:id={ext_id}"
         errors.append(line)
         log_pipeline_line(cfg.radar_log_path, line)

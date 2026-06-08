@@ -17,8 +17,10 @@ from exchange_browser_fetch import (
 )
 from exchange_proxy import exchange_fetch_begin, exchange_fetch_end, exchange_get, proxy_log_hint
 from html_fetch import HtmlFetchError
+from ingest_published_at import parse_kwork_date_create
 from lead_category import category_from_kwork_listing_url, category_from_kwork_want
 from listing import SOURCE_KWORK, ListingProject
+from listing_fresh import trim_listing_at_known
 from radar_cycle_log import log_pipeline_line
 
 logger = logging.getLogger(__name__)
@@ -72,13 +74,13 @@ def _format_budget(price_limit: object, *, is_higher: bool) -> str:
 def _published_at(want: dict) -> str:
     raw = want.get("date_create")
     if raw:
-        return str(raw).strip()
+        return parse_kwork_date_create(raw)
     dates = want.get("wantDates")
     if isinstance(dates, dict):
         for key in ("dateCreate", "dateActive"):
             val = dates.get(key)
             if val:
-                return str(val).strip()
+                return parse_kwork_date_create(val)
     return ""
 
 
@@ -159,7 +161,12 @@ def _kwork_listing_wall_clock_sec() -> float:
         return 120.0
 
 
-def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[ListingProject]:
+def fetch_listing_projects(
+    cfg: Config,
+    *,
+    timeout_sec: float = 30.0,
+    storage: object | None = None,
+) -> list[ListingProject]:
     """GET `cfg.kwork_projects_url`, первая страница (без пагинации в MVP)."""
     url = cfg.kwork_projects_url
     exchange_fetch_begin("kwork")
@@ -211,8 +218,8 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
         raise
     feed_cat = category_from_kwork_listing_url(url) or ""
     if not feed_cat:
-        return projects
-    return [
+        return trim_listing_at_known(projects, storage, SOURCE_KWORK)  # type: ignore[arg-type]
+    normalized = [
         ListingProject(
             project_id=p.project_id,
             title=p.title,
@@ -227,6 +234,7 @@ def fetch_listing_projects(cfg: Config, *, timeout_sec: float = 30.0) -> list[Li
         )
         for p in projects
     ]
+    return trim_listing_at_known(normalized, storage, SOURCE_KWORK)  # type: ignore[arg-type]
 
 
 _KWORK_GONE_MARKERS = (

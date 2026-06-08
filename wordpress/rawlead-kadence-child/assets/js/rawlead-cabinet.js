@@ -4517,8 +4517,9 @@
 
 
   var DRAFT_POLL_MS = 2000;
-  var DRAFT_POLL_MAX_MS = 90000;
+  var DRAFT_POLL_MAX_MS = 120000;
   var DRAFT_FAIL_RU = "ИИ временно недоступен — повторите";
+  var DRAFT_POLL_TIMEOUT_RU = "ИИ не успел — повторите";
 
   function draftReadyPayload(data) {
     if (!data || data.status === "failed") {
@@ -4535,9 +4536,9 @@
 
   function pollDraftStatus(leadId, startedMs) {
     if (Date.now() - startedMs > DRAFT_POLL_MAX_MS) {
-      var timeoutErr = new Error(DRAFT_FAIL_RU);
+      var timeoutErr = new Error(DRAFT_POLL_TIMEOUT_RU);
       timeoutErr.status = 503;
-      timeoutErr.detail = DRAFT_FAIL_RU;
+      timeoutErr.detail = DRAFT_POLL_TIMEOUT_RU;
       throw timeoutErr;
     }
     return new Promise(function (resolve) {
@@ -4989,20 +4990,13 @@
 
     renderCabinetToolbar();
 
-    loadSubscription();
-
-    loadCatalog()
-
+    Promise.all([
+      loadSubscription(),
+      loadCatalog().catch(function () {}),
+      loadTags().catch(function () {}),
+    ])
       .then(function () {
-
-        return loadTags();
-
-      })
-
-      .then(function () {
-
         resetAndLoad();
-
       })
 
       .catch(function () {

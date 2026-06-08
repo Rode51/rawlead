@@ -212,6 +212,7 @@ class JourneyCtx:
     page: Any
     profile_auth: bool = False
     allow_manual_login: bool = False
+    is_mobile: bool = False
     console_errors: list[str] = field(default_factory=list)
     network_failures: list[dict[str, Any]] = field(default_factory=list)
     findings: list[dict[str, Any]] = field(default_factory=list)
@@ -292,6 +293,12 @@ def _goto_lenta(ctx: JourneyCtx) -> None:
     feed_ui.goto_lenta(ctx.page, ctx.base)
 
 
+def _lenta_fresh(ctx: JourneyCtx, *, is_mobile: bool = False) -> None:
+    """Lenta load with filters reset (J3 design+skills must not leak into J4+)."""
+    _goto_lenta(ctx)
+    feed_ui.reset_feed_filters(ctx.page, is_mobile=is_mobile)
+
+
 def _open_skills_panel(ctx: JourneyCtx) -> None:
     feed_ui.open_skills_modal(ctx.page, is_mobile=False)
 
@@ -370,6 +377,7 @@ def _card_match_percent(card: Any) -> int:
 def _ensure_feed_draft_ready(ctx: JourneyCtx) -> None:
     """Вход + paid → карточки с кнопкой «Написать отклик» (O61: km=0 OK)."""
     _wait_feed_logged_in(ctx)
+    feed_ui.reset_feed_filters(ctx.page, is_mobile=ctx.is_mobile)
     _wait_effective_access(ctx)
     ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
     if not _cards_with_reply_btn(ctx):
@@ -589,7 +597,7 @@ def j3_filters(ctx: JourneyCtx) -> None:
 
 
 def j4_card_expand(ctx: JourneyCtx) -> None:
-    _goto_lenta(ctx)
+    _lenta_fresh(ctx, is_mobile=ctx.is_mobile)
     card = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]").first
     card.wait_for(state="visible")
     card.locator(".rl-lead-card__title").first.click()
@@ -695,11 +703,14 @@ def j8_cabinet_logged(ctx: JourneyCtx) -> None:
             "still on login gate"
             + (" (JWT в localStorage есть — обнови /cabinet/)" if has_token else "")
         )
-    inbox = ctx.page.locator(
-        "#rl-inbox-list .rl-inbox-card, #rl-inbox-list .rl-lead-card, .rl-cabinet-inbox .rl-lead-card"
+    inbox_sel = (
+        "#rl-inbox-list .rl-lead-card[data-id]:not(.rl-lead-card--skeleton), "
+        "#rl-inbox-list .rl-inbox-card[data-id]:not(.rl-lead-card--skeleton), "
+        ".rl-cabinet-inbox .rl-lead-card[data-id]:not(.rl-lead-card--skeleton)"
     )
-    inbox.first.wait_for(state="visible", timeout=45_000)
-    card = inbox.first
+    ctx.page.wait_for_selector(inbox_sel, state="visible", timeout=45_000)
+    card = ctx.page.locator(inbox_sel).first
+    card.scroll_into_view_if_needed()
     card.click()
     ctx.page.wait_for_timeout(800)
     draft = card.locator("[data-reply-text], .rl-feed-card__reply, .rl-inbox-card__reply")
@@ -886,6 +897,7 @@ def run_journeys(
             profile_auth=browser_name
             in ("yandex-profile", "yandex-cdp", "cdp", "dolphin-cdp"),
             allow_manual_login=not headless,
+            is_mobile=mobile,
         )
         _attach_observers(ctx)
         has_auth = _has_auth(browser_name=browser_name, storage_state=storage_state) or bool(
