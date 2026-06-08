@@ -34,14 +34,33 @@
 | `tg_join_runner.py` | Тик join, лимиты |
 | `tg_join_registry.py` | Один client на acc (без lock) |
 | `tg_forward.py` | Пересылка поста владельцу |
-| `lead_pipeline.py` | TG: фильтр → ИИ → notify |
+| `exchange_detail.py` | O141 dispatch detail-fetch для web-бирж |
+| `lead_pipeline.py` | ingest: фильтр → ИИ → notify / L1 pool |
 | `telegram_notify.py`, `telegram_control.py` | Bot API |
 | `filters.py`, `ai_analyze.py` | Фильтр и ИИ |
-| `storage.py`, `pg_storage.py` | SQLite / Neon |
+| `api_server.py` | FastAPI Site: `/v1/feed`, auth, draft, me — **~2.2k строк** |
+| `match_push.py` | Match push + on-demand draft в боте — **~1k** |
+| `owner_admin.py` | `/ops/` HTML-пульт — **~1.9k** |
+| `pg_storage.py` | Neon CRUD — **~1.8k** |
+| `storage.py` | SQLite (локально) |
 | `config.py` | `.env` |
 | `radar_status.py`, `health_check.py` | Статус, health |
 
 **Не раздувать** `tg_monitor.py` / `config.py` — новое выносить в отдельный файл.
+
+### Тяжёлые файлы (legacy) — риск путаницы
+
+| Файл | Строк | Риск | Как работать |
+|------|-------|------|--------------|
+| `api_server.py` | ~2260 | 🔴 | Только по § «Файлы» в `CODER_PROMPT`; новые роуты → отдельный router-модуль, не +200 строк внутрь |
+| `ai_analyze.py` | ~2140 | 🔴 | L1/L2/L3 в одном месте; новая логика L2 → `l3_human_style.py` / отдельный guard; split — отдельная задача Lead |
+| `owner_admin.py` | ~1930 | 🟡 | Ops UI; правки точечно по секции `/ops/` |
+| `pg_storage.py` | ~1780 | 🟡 | Одна зона (Neon); новые таблицы — по `NEON_SCHEMA` + Lead |
+| `lead_pipeline.py` | ~1010 | 🟡 | Ingest-оркестрация; detail → `exchange_detail.py`, парсинг → `*_parser.py` |
+
+**Coder** не обязан читать эти файлы целиком — только функции из § «Файлы». **Человек без карты** — высокий риск «открыл api_server и потерялся».
+
+**Split god-files** — backlog **после ads** (отдельный § Lead, не «Coder сам переезжает»).
 
 ---
 
@@ -73,6 +92,8 @@
 ## Бэклог (не сейчас)
 
 - Пакеты `src/tg/`, `src/parsers/` — если вырастет >40 модулей; до тех пор плоский `src/` ок.
+- **O142** — `ai_analyze.py` → `src/ai/` (post-ads, § `OWNER_INTENT`)
+- **O143** — `api_server.py` → FastAPI routers (post-ads, § `OWNER_INTENT`)
 
 ---
 

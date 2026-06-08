@@ -8,6 +8,7 @@ import re
 import threading
 import time
 from collections import defaultdict, deque
+from urllib.parse import urlparse, urlunparse
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -18,7 +19,6 @@ import requests
 
 from ai_analyze import (
     AiLiteAnalysis,
-    analyze_lead_tools,
     rephrase_reply_draft_per_user,
     analyze_shared_reply_draft,
     note_draft_request,
@@ -28,8 +28,9 @@ from public_feed import feed_visibility_where_sql
 from radar_cycle_log import SOURCE_LABELS
 from rank import keyword_match, parse_lead_tags, tags_as_weights
 from reply_draft_strip import strip_reply_draft_price_deadline, strip_tg_draft_price_deadline
-from draft_limits import draft_hourly_limit
+from draft_limits import draft_hourly_limit, draft_warm_hourly_cap
 from skills_catalog import lead_tags_for_feed, normalize_user_tags
+from tools_catalog import normalize_tools_required, tools_from_tz_text
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ _DRAFT_WINDOW_SEC = 3600
 _ONDEMAND_L2_SEM = threading.Semaphore(2)
 _ONDEMAND_L2_BACKOFF_SEC = (0.5, 1)
 _draft_attempts: dict[str, deque[float]] = defaultdict(deque)
+_warm_attempts: dict[str, deque[float]] = defaultdict(deque)
 
 _LEAD_SELECT_COLS = """
     id, source, title, body, url, budget_text,
@@ -82,6 +84,23 @@ def draft_rate_limit_retry_after(user_id: str) -> int | None:
     if len(q) >= limit:
         return max(1, int(_DRAFT_WINDOW_SEC - (now - q[0])))
     q.append(now)
+    return None
+
+
+def warm_rate_limit_retry_after(user_id: str, *, consume: bool = True) -> int | None:
+    """O148: DRAFT_WARM_HOURLY_CAP per user on expand pre-warm."""
+    cap = draft_warm_hourly_cap()
+    if cap <= 0:
+        return None
+    now = time.time()
+    q = _warm_attempts[user_id]
+    cutoff = now - _DRAFT_WINDOW_SEC
+    while q and q[0] < cutoff:
+        q.popleft()
+    if len(q) >= cap:
+        return max(1, int(_DRAFT_WINDOW_SEC - (now - q[0])))
+    if consume:
+        q.append(now)
     return None
 
 
@@ -266,6 +285,22 @@ def _lite_from_lead_row(row: tuple[Any, ...]) -> AiLiteAnalysis:
     )
 
 
+def _tools_from_lead_row(row: tuple[Any, ...]) -> list[str]:
+    """O148: regex/heuristic from TZ — 0 LLM on draft/warm hot path."""
+    tools = _parse_tools_required(row[13])
+    if tools:
+        return tools
+    lite = _lite_from_lead_row(row)
+    hints = tools_from_tz_text(
+        row[2] or "",
+        row[3] or "",
+        lite.task_summary or "",
+    )
+    if not hints:
+        return []
+    return list(normalize_tools_required(hints))
+
+
 def _ondemand_lead_tools(
     cfg: Config,
     row: tuple[Any, ...],
@@ -274,25 +309,9 @@ def _ondemand_lead_tools(
     log_prefix: str,
     max_retries: int = 2,
 ) -> list[str]:
-    """O57/O125: tools-only L2 on draft click — not radar backlog, not full premium."""
-    tools = _parse_tools_required(row[13])
-    if tools:
-        return tools
-    lite = _lite_from_lead_row(row)
-    snippet = (row[3] or lite.task_summary or "").strip()
-    result = analyze_lead_tools(
-        cfg,
-        title=row[2] or "",
-        budget_text=row[5] or "",
-        description=snippet,
-        lite=lite,
-        errors=ai_errors,
-        log_prefix=log_prefix,
-        max_retries=max(1, min(int(max_retries), 2)),
-    )
-    if not result:
-        return []
-    return [str(t).strip() for t in result if str(t).strip()]
+    """O148: was pro LLM — tz heuristic only (offline backlog keeps analyze_lead_tools)."""
+    del cfg, ai_errors, log_prefix, max_retries
+    return _tools_from_lead_row(row)
 
 
 def _backfill_lead_tools_if_empty(
@@ -411,6 +430,62 @@ def _send_push_message(
         return False
 
 
+def _normalize_order_url(url: str) -> str:
+    """Canonical order URL for push dedup (no query/fragment, lower host)."""
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    parsed = urlparse(raw)
+    if not parsed.scheme or not parsed.netloc:
+        return raw.split("?", 1)[0].rstrip("/") or raw
+    path = parsed.path.rstrip("/") or "/"
+    return urlunparse((parsed.scheme.lower(), parsed.netloc.lower(), path, "", "", ""))
+
+
+def _user_already_pushed_for_order(
+    cur: Any,
+    user_id: str,
+    *,
+    source: str,
+    external_id: str,
+    order_url: str,
+) -> bool:
+    """O158: dedup push by (source, external_id) or normalized URL — not only lead_id."""
+    src = (source or "").strip()
+    ext = (external_id or "").strip()
+    if src and ext:
+        cur.execute(
+            """
+            SELECT 1 FROM match_push_log mpl
+            INNER JOIN leads l ON l.id = mpl.lead_id
+            WHERE mpl.user_id = %s::uuid
+              AND l.source = %s
+              AND l.external_id = %s
+            LIMIT 1
+            """,
+            (user_id, src, ext),
+        )
+        if cur.fetchone():
+            return True
+    norm = _normalize_order_url(order_url)
+    if not norm:
+        return False
+    cur.execute(
+        """
+        SELECT 1 FROM match_push_log mpl
+        INNER JOIN leads l ON l.id = mpl.lead_id
+        WHERE mpl.user_id = %s::uuid
+          AND l.url IS NOT NULL
+          AND TRIM(l.url) <> ''
+          AND split_part(regexp_replace(TRIM(l.url), '/$', ''), '?', 1)
+              = split_part(%s, '?', 1)
+        LIMIT 1
+        """,
+        (user_id, norm),
+    )
+    return cur.fetchone() is not None
+
+
 def _fetch_lead_row(cur: Any, lead_id: int) -> tuple[Any, ...] | None:
     feed_where, feed_params = _feed_where_sql()
     cur.execute(
@@ -431,6 +506,7 @@ def _analyze_shared_ondemand(
     ai_errors: list[str],
     log_prefix: str,
     max_retries: int = 2,
+    lead_id: int | None = None,
 ) -> str | None:
     """O57/O59a: shared on-demand L2 — без profile, отдельный semaphore + backoff."""
     attempts = max(1, int(max_retries))
@@ -447,6 +523,7 @@ def _analyze_shared_ondemand(
                 log_prefix=log_prefix,
                 timeout_sec=90.0,
                 max_attempts=2,
+                lead_id=lead_id,
             )
             if draft:
                 return draft
@@ -603,10 +680,15 @@ def generate_and_store_lead_draft(
 
     prefix = log_prefix or f"draft:{lead_id}:"
     ai_errors: list[str] = []
+    from draft_trace import DraftTimer, log_draft_stage
+
+    trace = DraftTimer()
+    log_draft_stage(prefix, stage="start", timer=trace, lead_id=lead_id, user_id=user_id[:8])
     with psycopg.connect(cfg.database_url) as conn:
         with conn.cursor() as cur:
             if not _user_effective_access(cur, user_id):
                 raise DraftError("forbidden", "paid subscription required")
+            log_draft_stage(prefix, stage="access_ok", timer=trace, lead_id=lead_id)
 
             saved = _fetch_saved_draft(cur, user_id, lead_id)
             if saved:
@@ -619,11 +701,20 @@ def generate_and_store_lead_draft(
                 if tools:
                     row = _fetch_lead_row(cur, lead_id) or row
                     conn.commit()
+                log_draft_stage(
+                    prefix,
+                    stage="done",
+                    timer=trace,
+                    lead_id=lead_id,
+                    path="cache_hit",
+                    user_id=user_id[:8],
+                )
                 return _draft_result_from_row(cur, user_id, row, saved)
 
             row = _fetch_lead_row(cur, lead_id)
             if row is None:
                 raise DraftError("not_found")
+            log_draft_stage(prefix, stage="lead_loaded", timer=trace, lead_id=lead_id)
 
             user_tags = _load_user_tags(cur, user_id)
             tags = _canonical_lead_tags(row[8])
@@ -631,6 +722,13 @@ def generate_and_store_lead_draft(
 
             shared = (row[14] or "").strip()
             if shared:
+                log_draft_stage(
+                    prefix,
+                    stage="path_fast_shared",
+                    timer=trace,
+                    lead_id=lead_id,
+                    shared_len=len(shared),
+                )
                 reply, fallback_shared = _build_personalized_reply(
                     cfg,
                     user_id=user_id,
@@ -638,6 +736,13 @@ def generate_and_store_lead_draft(
                     shared_reply=shared,
                     ai_errors=ai_errors,
                     log_prefix=prefix,
+                )
+                log_draft_stage(
+                    prefix,
+                    stage="l3",
+                    timer=trace,
+                    lead_id=lead_id,
+                    fallback=fallback_shared,
                 )
                 tools = _backfill_lead_tools_if_empty(
                     cur, cfg, row, ai_errors=ai_errors, log_prefix=prefix
@@ -648,10 +753,19 @@ def generate_and_store_lead_draft(
                 if fallback_shared:
                     logger.warning("%sfallback_shared lead=%s user=%s", prefix, lead_id, user_id[:8])
                 note_draft_request(True)
+                log_draft_stage(
+                    prefix,
+                    stage="done",
+                    timer=trace,
+                    lead_id=lead_id,
+                    path="fast_shared",
+                    user_id=user_id[:8],
+                )
                 if tools:
                     row = _fetch_lead_row(cur, lead_id) or row
                 return _draft_result_from_row(cur, user_id, row, reply)
 
+            log_draft_stage(prefix, stage="path_cold_l2", timer=trace, lead_id=lead_id)
             lite = _lite_from_lead_row(row)
             tools = _parse_tools_required(row[13])
             if not tools:
@@ -664,6 +778,13 @@ def generate_and_store_lead_draft(
                 )
                 if tools:
                     _persist_lead_tools_required(cur, lead_id, tools)
+            log_draft_stage(
+                prefix,
+                stage="tools",
+                timer=trace,
+                lead_id=lead_id,
+                count=len(tools),
+            )
             reply_raw = _analyze_shared_ondemand(
                 cfg,
                 title=row[2] or "",
@@ -674,13 +795,21 @@ def generate_and_store_lead_draft(
                 ai_errors=ai_errors,
                 log_prefix=prefix,
                 max_retries=max_retries,
+                lead_id=lead_id,
+            )
+            log_draft_stage(
+                prefix,
+                stage="l2",
+                timer=trace,
+                lead_id=lead_id,
+                ok=bool(reply_raw),
             )
             if not reply_raw:
                 note_draft_request(False)
                 detail = "; ".join(ai_errors) if ai_errors else "draft generation failed"
                 logger.warning("%sfail %s", prefix, detail)
                 raise DraftError("ai_fail", detail)
-            reply = strip_reply_draft_price_deadline(reply_raw.strip())
+            reply = strip_reply_draft_price_deadline(str(reply_raw or "").strip())
             cur.execute(
                 """
                 UPDATE leads
@@ -698,9 +827,104 @@ def generate_and_store_lead_draft(
                 lead_id,
                 user_id[:8],
             )
+            log_draft_stage(
+                prefix,
+                stage="done",
+                timer=trace,
+                lead_id=lead_id,
+                path="cold_l2",
+                user_id=user_id[:8],
+            )
 
     note_draft_request(True)
     return DraftResult(reply_draft=reply, tools_required=tools, keyword_match=km)
+
+
+def warm_shared_lead_draft(
+    cfg: Config,
+    *,
+    lead_id: int,
+    log_prefix: str = "",
+) -> bool:
+    """O148: 1× pro L2 → leads.reply_draft only (no user_lead_replies)."""
+    if not cfg.ai_active:
+        raise DraftError("ai_unavailable")
+
+    prefix = log_prefix or f"draft:warm:{lead_id}:"
+    ai_errors: list[str] = []
+    from draft_trace import DraftTimer, log_draft_stage
+
+    trace = DraftTimer()
+    log_draft_stage(prefix, stage="start", timer=trace, lead_id=lead_id, path="warm")
+    with psycopg.connect(cfg.database_url) as conn:
+        with conn.cursor() as cur:
+            row = _fetch_lead_row(cur, lead_id)
+            if row is None:
+                raise DraftError("not_found")
+
+            shared = (row[14] or "").strip()
+            if shared:
+                log_draft_stage(
+                    prefix,
+                    stage="done",
+                    timer=trace,
+                    lead_id=lead_id,
+                    path="warm_skip",
+                )
+                return True
+
+            lite = _lite_from_lead_row(row)
+            tools = _tools_from_lead_row(row)
+            if tools:
+                _persist_lead_tools_required(cur, int(row[0]), tools)
+                conn.commit()
+                row = _fetch_lead_row(cur, lead_id) or row
+
+            log_draft_stage(prefix, stage="path_warm", timer=trace, lead_id=lead_id)
+            reply_raw = _analyze_shared_ondemand(
+                cfg,
+                title=row[2] or "",
+                budget_text=row[5] or "",
+                description=row[3] or "",
+                lite=lite,
+                tools_required=tools,
+                ai_errors=ai_errors,
+                log_prefix=prefix,
+                max_retries=2,
+                lead_id=lead_id,
+            )
+            log_draft_stage(
+                prefix,
+                stage="l2",
+                timer=trace,
+                lead_id=lead_id,
+                ok=bool(reply_raw),
+            )
+            if not reply_raw:
+                note_draft_request(False)
+                detail = "; ".join(ai_errors) if ai_errors else "draft generation failed"
+                logger.warning("%sfail %s", prefix, detail)
+                raise DraftError("ai_fail", detail)
+
+            reply = strip_reply_draft_price_deadline(str(reply_raw or "").strip())
+            cur.execute(
+                """
+                UPDATE leads
+                SET reply_draft = COALESCE(NULLIF(%s, ''), reply_draft)
+                WHERE id = %s
+                """,
+                (reply, lead_id),
+            )
+            conn.commit()
+            note_draft_request(True)
+            log_draft_stage(
+                prefix,
+                stage="done",
+                timer=trace,
+                lead_id=lead_id,
+                path="warm",
+            )
+            return True
 
 
 def _send_tg_draft_result(
@@ -939,6 +1163,12 @@ def push_match_for_lead(
                 lead_order_url = str(row[4] or "").strip()
                 tools = _parse_tools_required(row[13])
                 card_tags = _canonical_lead_tags(row[8]) or lead_tags
+                cur.execute(
+                    "SELECT external_id FROM leads WHERE id = %s",
+                    (lead_id,),
+                )
+                ext_row = cur.fetchone()
+                lead_external_id = str(ext_row[0] or "").strip() if ext_row else ""
 
                 cur.execute(
                     """
@@ -990,6 +1220,14 @@ def push_match_for_lead(
                         (user_id, lead_id),
                     )
                     if cur.fetchone():
+                        continue
+                    if _user_already_pushed_for_order(
+                        cur,
+                        str(user_id),
+                        source=lead_source,
+                        external_id=lead_external_id,
+                        order_url=lead_order_url,
+                    ):
                         continue
                     show_generate = _user_effective_access(cur, str(user_id))
                     text = _format_push_text(

@@ -21,7 +21,7 @@ from ingest_published_at import parse_kwork_date_create
 from lead_category import category_from_kwork_listing_url, category_from_kwork_want
 from listing import SOURCE_KWORK, ListingProject
 from listing_fresh import trim_listing_at_known
-from radar_cycle_log import log_pipeline_line
+from radar_cycle_log import log_pipeline_line, stash_listing_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -218,23 +218,32 @@ def fetch_listing_projects(
         raise
     feed_cat = category_from_kwork_listing_url(url) or ""
     if not feed_cat:
-        return trim_listing_at_known(projects, storage, SOURCE_KWORK)  # type: ignore[arg-type]
-    normalized = [
-        ListingProject(
-            project_id=p.project_id,
-            title=p.title,
-            budget_text=p.budget_text,
-            url=p.url,
-            published_at=p.published_at,
-            listing_snippet=p.listing_snippet,
-            source=p.source,
-            listing_category=p.listing_category or feed_cat,
-            chat_invite_url=p.chat_invite_url,
-            chat_title=p.chat_title,
-        )
-        for p in projects
-    ]
-    return trim_listing_at_known(normalized, storage, SOURCE_KWORK)  # type: ignore[arg-type]
+        batch = projects
+    else:
+        batch = [
+            ListingProject(
+                project_id=p.project_id,
+                title=p.title,
+                budget_text=p.budget_text,
+                url=p.url,
+                published_at=p.published_at,
+                listing_snippet=p.listing_snippet,
+                source=p.source,
+                listing_category=p.listing_category or feed_cat,
+                chat_invite_url=p.chat_invite_url,
+                chat_title=p.chat_title,
+            )
+            for p in projects
+        ]
+    parsed_cards = len(batch)
+    trimmed = trim_listing_at_known(batch, storage, SOURCE_KWORK)  # type: ignore[arg-type]
+    fresh = len(trimmed)
+    log_pipeline_line(
+        cfg.radar_log_path,
+        f"listing:kwork parsed={parsed_cards} fresh={fresh}",
+    )
+    stash_listing_metrics("kwork", parsed_cards, fresh)
+    return trimmed
 
 
 _KWORK_GONE_MARKERS = (

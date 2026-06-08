@@ -91,6 +91,55 @@ class TestO134FreshListing(TestCase):
         storage = None  # type: ignore[assignment]
         tmp.cleanup()
 
+    def test_trim_pinned_known_new_below(self) -> None:
+        """O139: закреплённые known сверху не блокируют fresh ниже."""
+        tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        storage = ProjectStorage(Path(tmp.name) / "t.db")
+        storage.try_record_new("fl", 100)
+        storage.try_record_new("fl", 101)
+        projects = [
+            ListingProject(
+                project_id=100,
+                title="pinned old",
+                budget_text="",
+                url="https://fl.ru/projects/100/",
+                published_at="",
+                listing_snippet="",
+                source="fl",
+            ),
+            ListingProject(
+                project_id=101,
+                title="pinned old 2",
+                budget_text="",
+                url="https://fl.ru/projects/101/",
+                published_at="",
+                listing_snippet="",
+                source="fl",
+            ),
+            ListingProject(
+                project_id=200,
+                title="new below",
+                budget_text="",
+                url="https://fl.ru/projects/200/",
+                published_at="",
+                listing_snippet="",
+                source="fl",
+            ),
+            ListingProject(
+                project_id=201,
+                title="new below 2",
+                budget_text="",
+                url="https://fl.ru/projects/201/",
+                published_at="",
+                listing_snippet="",
+                source="fl",
+            ),
+        ]
+        kept = trim_listing_at_known(projects, storage, "fl")
+        self.assertEqual([p.project_id for p in kept], [200, 201])
+        storage = None  # type: ignore[assignment]
+        tmp.cleanup()
+
 
 class TestO134PipelineSkipResync(TestCase):
     def test_sqlite_dup_filter_reject_skips_neon(self) -> None:

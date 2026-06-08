@@ -8,19 +8,21 @@
 
 ---
 
-## Снимок prod (2026-06-07)
+## Снимок prod (2026-06-08)
 
 | Контур | Факт |
 |--------|------|
-| **WP theme** | **1.18.35** · O131 perf boot + draft poll · deploy VPS ✅ |
-| **ИИ gate** | L2 send **71.8%** ✅ · combined **4.28** · L1 **83.1%** · L3 **92%** |
-| **VPS** | **2 GB RAM** ✅ owner upgrade **2026-06-08** · swap 0 · radar **0 OOM** post-reboot |
-| **Бот prod** | @rawlead_bot · O120 TG failover · **O105 pay ✅** (WP 1.18.3+ · `premium_pay.py`) |
-| **Админка** | `/ops/` w2 · **w2b** timeout 90s в коде ✅ · deploy/smoke owner |
-| **TG acc2** | **6/6 done** · listen **6 чатов** на VPS ✅ · CSV v2 синхронизирован |
-| **TG proxy acc1** | **45.152** мёртв (TLS) · **временно 38.154** (acc2 spare) · VPS ✅ local script |
+| **WP theme** | **1.18.49** · O158 deploy ✅ **2026-06-08** |
+| **OR L2 draft** | **acc2 US** `38.154.16.60` · `OPENROUTER_HTTP_PROXY` · L1 direct |
+| **API O148** | warm endpoint · deploy ✅ 2026-06-08 |
+| **ИИ gate** | L2 send **71.8%** · combined **4.28** · L1 **83.1%** · L3 **92%** |
+| **VPS** | **2 GB RAM** · swap 0 · radar **0 OOM** post-O132 |
+| **Бот** | @rawlead_bot · O120 failover · **O105 pay ✅** |
+| **Админка** | `/ops/` · O152 trace · **O155 HC** deploy ✅ |
+| **TG** | acc2 listen 6 чатов · acc1 proxy **38.154** spare (45.152 мёртв) |
+| **Feed env** | fl,kwork,youdo,freelance_ru,… + **21× tg** · TG visible **~6%** (L1) |
 
-**Judge freeze:** [`preprod_ai_prod_audit_judge_o72e_a_freeze.md`](../../data/preprod_ai_prod_audit_judge_o72e_a_freeze.md) · r12 [`…_r12.md`](../../data/preprod_ai_prod_audit_judge_o72e_a_r12.md)
+**Judge freeze:** [`preprod_ai_prod_audit_judge_o72e_a_freeze.md`](../../data/preprod_ai_prod_audit_judge_o72e_a_freeze.md)
 
 ---
 
@@ -28,81 +30,92 @@
 
 | § | Суть |
 |---|------|
-| **O117** | Kwork Playwright wall-clock **120s** → httpx fallback · на VPS |
-| **O120** | TG Bot API proxy pool · auto-failover acc1→2→3 · на VPS |
-| **O121-w0** | `/ops/` Bot restart |
-| **O121-w0b** | секция **«Боты»** · per-bot restart · `deploy-o121-w0b-vps.py` |
-| **O121-w0c** | `/ops/` restart 400 → detail в UI · sudo ctl · legacy TG drain · `deploy-o121-w0c-vps.py` |
-| **O123-w1** | copy 10/ч · feed-strip · **1.18.16** |
-| **O107** | Trial 3 дня · Neon 020 · TG push · **1.18.17** |
-| **O122** | Delist + hotfix: trial deploy · WP 120s · limit 15 |
-| **O121-w1** | прокси · probe/switch · `deploy-o121-w1-vps.py` |
-| **O121-w2/b** | сброс банов · timeout **90s** · `deploy-o121-w2-vps.py` + `w2b` · VPS ✅ |
-| **O121-w3-acc2** | acc2 join-bootstrap legacy filter · tests **6/6** · `deploy-o121-w3-acc2-vps.py` |
-| **O116** | Z234+FEED+MKT+CABINET+b2+W4 · prod **1.18.11→1.18.15** |
-| **O72e-regen-tail** | allowlist «ИИ» · regen **28/28** |
-| **O109** | Kwork delist fix · bot deep link `/lenta/?lead=` |
-| **O114** | vacancy filter · backfill **12** |
-| **O124** | лента: accordion · flip · match-bar · free CTA · **1.18.18** prod |
-| **O124-w2** | anon/free/premium polish · **1.18.34** prod ✅ |
-| **O127-WP** | Filter Bar v2 + Lead Card v3 · **1.18.34** prod ✅ |
-| **O126** | category filter API + backfill · prod ✅ |
-| **O127-D** | Filter Bar v2 + Lead Card v3 · `feed-cabinet-mvp` §9 ✅ |
-| **L2-tools-tune** | consulting/rhino guards · catalog post-process · tests **11/11** · VPS ✅ |
-| **O125 L2 on-demand** | `TOOLS_BACKLOG_DRAIN=0` · tools+draft только по клику · VPS ✅ |
-| **O128-L2-VOICE** | план по ТЗ B · smell/cliche · uniquify (A) план→шаги · tests **36/36** · VPS ✅ |
-| **O110-B** | proxy hygiene: browser wipe · cooldown 5–15s · UA · VPS ✅ |
-| **O131-PERF** | L2 · pooler · feed boot · API scan | ✅ deploy **2026-06-07** |
-| **O129-W1** | UX anon/free/premium **24/24** · smoke **5/5** · load p95 **1846ms** · AI **96%** · S4 FL **4/4** |
+| **O131-PERF** | pooler · feed boot · deploy **2026-06-07** |
+| **O132** | radar OOM · MemoryMax · browser cleanup |
+| **O134** | fresh-only listing · ingest SLA в `/ops/` |
+| **O135-DRAFT** | L2-only 1-й · draft restart · OR proxy env |
+| **O136-TRACE** | draft stage logs · journal INFO |
+| **O137-FEED** | Premium sort time/match · scan 500 · pagination |
+| **O138-PARSER** | parsed/fresh · red при parsed=0 · `/ops/` listing line |
+| **O139-FL-PINNED** | filter unseen · pinned FL не блокируют ingest |
+| **O141-EXCHANGE-PARITY** | detail all web · TG labels · L2 guard | **deploy ✅ 2026-06-08** |
+| **O145-FEED-CAT** | personal+category+time → scan 500 · pytest ✅ |
+| **O146-DRAFT-CARD-UX** | flip lock · inflight · btn shimmer · **1.18.39** · 3 UX регресса → O147 |
+| **O147-FEED-FLIP-MATCH** | syncMatchFill · trial hide · **1.18.44** (flip → O149) |
+| **O148-DRAFT-OR** | deploy ✅ · smoke частично → **O150** |
+| **O149-NO-FLIP** | **1.18.45** deploy ✅ · smoke частично → **O150** |
+| **O150-DRAFT-UX-POLISH** | **1.18.46** deploy ✅ · owner smoke ⏸ |
+| **O151-OR-ACC2-UX** | **1.18.47** deploy ✅ · owner smoke ⏸ |
+| **O153-CARD-CHIPS** | syncCardChips · **1.18.48** · Lead smoke ✅ |
+| **O154-GRID-NEIGHBOR** | grid start · **1.18.48** · Lead smoke ✅ |
+| **O152-EXCHANGE-TRACE** | trace jsonl · /ops/ · deploy ✅ **2026-06-08** |
+| **O155-O157** | HC pulse · YouDo human · traffic · deploy ✅ **2026-06-08** |
+| **O158-MATCH-UX** | push dedup · match bar · ?lead= km · **1.18.49** · deploy ✅ **2026-06-08** |
 
 ---
 
-## До soft ads — что осталось ⏳
+## До soft ads ⏳
 
-**Порядок:** **UI ✅ → L2 ✅ → E2E → stress → ads**
+**Порядок:** UI ✅ → L2 ✅ → **O141 parity** → Wave 2 → ads
 
-| Шаг | Задача |
+| Шаг | Статус |
 |-----|--------|
-| 1–5d | pay · ops · O126 · O127 UI | ✅ |
-| **5e** | **O128 L2 voice B** | ✅ |
-| **6** | **Stress Wave 1** | ✅ **2026-06-07** · [`PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md) |
-| **6b** | **O129 stress v2** | orchestrator ✅ · journey partial |
-| **6c** | **O131-PERF** | ✅ deploy · load@20 p95 **2549 ms** ⏸ |
-| 7 | **Wave 2 rerun** · sign-off · ads | **⏸** до **O132 deploy + 24h** |
-| **7a** | **O132-STABILITY** | **deploy ✅** · 24h watch |
-| **7b** | **O134-INGEST-SLA** | **deploy ✅** |
-| **7c** | **O135-DRAFT** — отклик L2-only · draft restart · OR proxy | **deploy ✅ 2026-06-08** |
-
-**Owner фон:** **45.152.197.25** — починить/заменить у провайдера (сейчас acc1+бот на **38.154** spare).
+| O131–O141 | ✅ **deploy 2026-06-08** |
+| **O144-RFP** | deploy ✅ **2026-06-08** |
+| **O145-FEED-CAT** | deploy ✅ **2026-06-08** |
+| **Wave 2 rerun** · sign-off | **⚠️** O146 fix J4 flip · journey re-run ⏸ owner |
+| **Perf gate** | load@20 p95 **2549 ms** vs <2s ⏸ |
+| **O132 watch** | 24h 0 oom-kill ⏸ |
+| **ads + portfolio** | **последним** |
 
 ---
 
-## O131-PERF ✅ deploy (2026-06-07)
+## Gaps / фон
 
-**Deploy:** `deploy-o131-vps.py` — API (`api_server`, `match_push`, `ai_analyze`) + theme **1.18.35**  
-**Pooler:** `check_neon_pooler.py` → **OK** (local `.env`)  
-**Smoke:** feed **1818 ms** · 40 items · today_count **245**  
-**Load@20×60s:** p95 **2549 ms** · 0% err — gate **<2s** ещё ⏸ (Neon latency / 1 vCPU)
+| Тема | Статус |
+|------|--------|
+| **O141 deploy** | `deploy-o141-exchange-parity-vps.py` · VPS youdo body>500 · push **YouDo** |
+| **Perf** | p95 2549 ms · app pool backlog |
+| **O133 TZ downloader** | backlog P1 · cookies session для вложений |
+| **TG в ленте** | ingest 93 · visible 6 — **L1**, не PUBLIC_FEED_SOURCES |
+| **O115** | tg judge pilot — не гоняли |
+| **O105-w1-r3** | ⏸ по симптому Stars |
+| **O155-O157** | **deploy ✅** · HC URL в `.env` · YouDo **0/3** → **Сбросить баны** |
 
-**Owner next:** draft_burst · J5 · full stress v2
-
----
-
-| § | Gap |
-|---|-----|
-| **L2-draft** | legacy drafts обновятся on-demand; #9909 ИИ-edge — опц. |
-| **O115** | tg ingest ok (~25/24h) · judge pilot только tg — не гоняли |
-| **O105-w1-r3** | только если снова 300⭐ / нет «Изменить способ» | ⏸ по симптому |
-| **Perf** | load@20 p95 **2549 ms** post-O131 | rerun stress · app pool backlog |
-| **O129-W2** | orchestrator ✅ · journey **9/10** | **⏸** Wave 2 |
-| **O132** | deploy ✅ · MemoryMax · browser cleanup | 24h watch 0 oom-kill |
-| **O134-INGEST-SLA** | deploy ✅ · fresh-only · /ops/ SLA | мониторинг ≤5m |
-| **O135-DRAFT** | L2-only 1-й · draft restart · OR proxy env | **deploy ✅** · owner: OR proxy smoke |
+**После ads:** O113-seo · O123-w2 copy · O105-w2 crypto
 
 ---
 
-## Архив
+## Архив · O141 сдача
 
-O116 детали · O72e волны · O108 · PRE-RELEASE-AUDIT — [`STATUS_ARCHIVE.md`](../archive/STATUS_ARCHIVE.md) § 2026-06-05
+O116 · O72e · O108 — [`STATUS_ARCHIVE.md`](../archive/STATUS_ARCHIVE.md)
 
-_O129-W2 verify fix **2026-06-07** · pytest **7/7** · owner: full без `--skip-*`_
+**O141 Coder:** detail all web (`exchange_detail` + parsers) · Kwork always detail · legacy re-fetch · TG `SOURCE_LABELS` · secondary=1 · L2 bot-vague guard · `pytest tests/test_exchange_detail_parity.py`
+
+**O144 Coder:** `_rfp_defer_instead_of_ideas` guard · RFP-блок в `build_shared_l2_system` · `tests/test_o144_rfp_draft.py` 10/10 · `deploy-o144-rfp-vps.py`
+
+**O145 Coder:** `_personal_feed_page` sort=time+categories → `_feed_scan_limit` 500 · slice offset · `tests/test_personal_feed_time.py` 2/2 · `deploy-o145-feed-cat-vps.py`
+
+**O146 Coder:** `onDraftReady`→`showDraftFlip` · `draft-done` · match #d4d4d4/#0a0a0a · trial hide premium · **1.18.39**
+
+**O147 Coder:** `syncMatchFill`+IO · trial guard · flip (superseded O149) · **1.18.44**
+
+**O148 Coder:** `POST …/draft/warm` · `tools_from_tz_text` hot path · `DRAFT_WARM_HOURLY_CAP` · btn >40s · poll 150s
+
+**O149 Coder:** no flip DOM/CSS · inline expand + skeleton · btn shimmer kept · **1.18.45** · `deploy-wp-theme-vps.py` ⏸
+
+**O150 Coder:** pending без skeleton · btn 20s · banner · preload · poll 180s · L2 direct · **1.18.46** · deploy ✅
+
+**O151 Coder:** L2 via OR proxy if env · hideFeedBanner · no «ИИ пишет…» · **1.18.47** · deploy ✅
+
+**O152 Lead deploy ✅ 2026-06-08:** `deploy-o152-exchange-trace-vps.py` · radar+api active · jsonl `/opt/rawlead/data/exchange_trace.jsonl` (freelancejob/pchyol traces ok)
+
+**O153–O154 Lead smoke ✅ 2026-06-08:** prod `/lenta/` · expand/collapse chips + сосед стабилен
+
+**O155–O157 Lead deploy ✅ 2026-06-08:** pytest **18/18** · `deploy-o155-o157-vps.py` · HC URL в VPS `.env` · radar active · YouDo **0/3 proxy** → owner **Сбросить баны** `/ops/`
+
+**O158 Lead deploy ✅ 2026-06-08:** `deploy-o158-vps.py` · api+radar active · theme **1.18.49** · owner smoke ⏸
+
+_Lead **2026-06-08** · O158 prod ✅_
+
+_Lead **2026-06-08** · O152 deploy ✅ · owner `/ops/` smoke ⏸_

@@ -6,34 +6,31 @@
 
 ---
 
-## Сейчас (2026-06-05)
+## Сейчас (2026-06-08)
 
-**Стадия:** продукт **на prod**, идём к **soft ads**. ИИ-gate и основной UI **закрыты**.
+**Стадия:** продукт **на prod**, ingest/ops/draft **закрыты** · идём к **Wave 2 sign-off** → soft ads.
 
 ### ✅ Сделано (не возвращать в hot)
 
 | Блок | § / факт |
 |------|----------|
-| **Ingest + VPS** | O99 browser FL/Kwork · P5-E2 VPS 24/7 · TG 21 каналов |
-| **Лента + ЛК** | O94–O97 · O95-fix · O116 · O123-w1 · **O107 trial** · theme **1.18.17** |
-| **ИИ quality** | O72e gate **send 71.8%** · O114 vacancy · O72e-regen-tail |
-| **Support** | O116-W4 FAB + TG tickets |
-| **Надёжность** | O117 · O120 · **O121-w0/w0b/w0c** ops `/ops/` |
-| **Match UX** | O82 w1–w2 · O89 uniquify · O101 slots (код) |
-| **Оплата (код)** | O105-w1 `premium_pay.py` · Stars · pending approve |
+| **Ingest + VPS** | O99 · P5-E2 · TG 21 каналов · **O134 fresh-only** · **O138 parsed/fresh** |
+| **Лента + ЛК** | O94–O97 · O116 · O123-w1 · O107 trial · **O137 feed sort** · theme **1.18.35** |
+| **ИИ quality** | O72e gate · O114 · O128 L2 voice · **O135 draft L2-only** |
+| **Support / ops** | O121 `/ops/` · O132 stability · O120 TG failover |
+| **Оплата** | O105-w1 Stars · pending approve |
 
-### ⏳ До soft ads (новый порядок — владелец 2026-06-05)
+### ⏳ До soft ads
 
 ```
-…код закрыт → O121-spec → O121-w1/w2 (панель) → E2E → stress → ads+portfolio (последним)
+код Launch sprint ✅ → Wave 2 owner (journey + draft burst + stress) → ads последним
 ```
 
 | # | Что | Статус |
 |---|-----|--------|
-| 1–4 | O123 · O107 · O122 · O121-w0* | ✅ |
-| 5 | **O121 панель** | **→ Design + Coder** |
-| 6 | E2E · stress | после панели v1 |
-| 7 | **ads + portfolio** | **последним** |
+| 1–7 | O131–O138 deploy | ✅ |
+| 8 | **Wave 2 sign-off** | **→ owner** |
+| 9 | **ads + portfolio** | **последним** |
 
 ### ⏸ После ads / фон
 

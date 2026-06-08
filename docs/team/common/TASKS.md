@@ -2,16 +2,15 @@
 
 **Снимок:** [`STATUS.md`](STATUS.md) · **карта:** [`ROADMAP.md`](../architect/ROADMAP.md)
 
-**Фаза:** **Launch path** · prod theme **1.18.34**
+**Фаза:** **Launch path** · prod theme **1.18.49**
 
 ---
 
 ## Где мы
 
-| ✅ | ⏳ до ads |
-|----|----------|
-| O121 ops · O126 · O127 · **O128** · **W1** · **O131** | **Wave 2 rerun** → ads |
-| ИИ gate · VPS · O125 on-demand | **ads последним** |
+**→ @owner:** Wave 2 smoke — `/lenta/` полоски match · TG «Лента» · draft ≤90s
+
+**→ @coder (след.):** § **O121-w2b** — `/ops/` «Сбросить баны» Failed to fetch
 
 ---
 
@@ -19,33 +18,43 @@
 
 | # | Что | Кто | Статус |
 |---|-----|-----|--------|
-| 1–8c | … · O121-w3-acc2 | — | ✅ |
-| **9a** | **O126** category API + backfill | @coder | ✅ prod |
-| **9b–9c** | **O127-D/WP** + theme deploy | @coder | ✅ **1.18.34** |
-| **9d** | **O124-w2** BrowserSync tail | owner | ✅ минимально |
-| **9e** | **O128 L2 voice B** | @coder | ✅ **36/36** · VPS |
-| **10** | **Stress Wave 1** (PREPROD) | owner | ✅ **2026-06-07** |
-| **10b** | **O129 stress v2** orchestrator + journey harness | @coder | ✅ pytest · journey partial |
-| **10c** | **O131-PERF** | @coder + Lead deploy | ✅ **2026-06-07** |
-| **11** | **Wave 2 rerun** · sign-off · **ads** | **⏸** после draft smoke |
-| **11a** | **O132-STABILITY** radar OOM | **deploy ✅** |
-| **11b** | **O134-INGEST-SLA** | **deploy ✅** |
-| **11c** | **O135-DRAFT** отклик timeout | **deploy ✅** · owner OR proxy |
+| 1–11e | … · O139 | — | ✅ |
+| **11f** | **O141-EXCHANGE-PARITY** | @coder + Lead deploy | ✅ **2026-06-08** |
+| **12** | **O144-RFP-COMPLY** | @coder | ✅ код · deploy ⏸ |
+| **12a** | **O145-FEED-CAT** | @coder | ✅ код · deploy ⏸ |
+| **12b** | **Wave 2 rerun** | owner | **⚠️** J5 ✅ · J4 flake |
+| **13** | **O146-DRAFT-CARD-UX** flip · pending · btn glow | @coder | ✅ код · accept ⏸ |
+| **13a** | **O147-FEED-FLIP-MATCH** | @coder | ✅ deploy · **flip → O149** |
+| **13c** | **O148-DRAFT-OR** warm · tools tz · btn 40s | @coder | ✅ deploy · owner smoke ⏸ |
+| **13d** | **O149-NO-FLIP** inline expand | @coder | ✅ deploy · smoke → O150 |
+| **13e** | **O150-DRAFT-UX-POLISH** | @coder + Lead | ✅ deploy ✅ |
+| **13f** | **O151-OR-ACC2-UX** | @coder + Lead | ✅ deploy ✅ |
+| **14a** | **O153-CARD-CHIPS** | @coder | **✅ Lead smoke** |
+| **14a2** | **O154-GRID-NEIGHBOR** | @coder | **✅ Lead smoke** |
+| **14b** | **O152-EXCHANGE-TRACE** | @coder | **deploy ✅** · owner `/ops/` ⏸ |
+| **14c–e** | **O155–O157** HC · YouDo human · traffic | @coder + Lead | **deploy ✅** |
+| **14f** | **O158-MATCH-UX** дубли push · шкала · ?lead= | @coder + Lead | **deploy ✅ 2026-06-08** |
+| **14g** | **O121-w2b** `/ops/` clear-bans fetch | @coder | **→ следующий** |
+| **13b** | **Wave 2** journey 10/10 | owner | ⏸ после O147 |
+| **14** | **ads + portfolio** | owner | **последним** |
 
 ---
 
-## L2 smoke (owner, после deploy)
+## Owner checklist (Wave 2)
 
-1. Premium → лид **без** `reply_draft` → «Написать отклик» → cold L2 **≤ 90s** (1-й user L2-only)
-2. Повторный клик / 2-й user → cache или L3 **≤ 20s**
-3. `/ops/` → radar active · `openrouter:proxy=direct|host:port` в api log
+1. Premium → lead без draft → отклик **≤90s**
+2. `/ops/` → FL row: `listing: 30 parsed · N fresh` (после O139 fresh>0 при новых)
+3. Premium feed → sort **date** показывает все visible, не 10 cap
+4. `preprod_draft_burst --max-leads 3`
+5. `preprod_ux_journey` full → **10/10**
+6. Опц. `OPENROUTER_HTTP_PROXY` если OR direct медленный
 
 ---
 
 ## ⏸ После ads
 
-O113 · O123-w2 · O105-w2
+O113 · O123-w2 · O105-w2 · **O133** TZ downloader · **O142** split `ai_analyze` · **O143** split `api_server`
 
 ---
 
-_W1 ✅ · O131 deploy ✅ **2026-06-07** · owner: Wave 2 rerun **→** ads_
+_O144 active **2026-06-08** · Wave 2 ⏸ до deploy_

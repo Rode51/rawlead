@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.18.36');
+define('RAWLEAD_CHILD_VERSION', '1.18.49');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -113,6 +113,26 @@ function rawlead_favicon_url(): string {
 add_action('init', static function (): void {
     remove_action('wp_head', 'wp_site_icon', 99);
 });
+
+add_action('wp_head', static function (): void {
+    $manrope_cyr = 'https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2';
+    $manrope_lat = 'https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2';
+    printf(
+        '<link rel="preload" href="%s" as="font" type="font/woff2" crossorigin>' . "\n",
+        esc_url($manrope_cyr)
+    );
+    printf(
+        '<link rel="preload" href="%s" as="font" type="font/woff2" crossorigin>' . "\n",
+        esc_url($manrope_lat)
+    );
+    if (is_front_page()) {
+        $unbounded_cyr = 'https://fonts.gstatic.com/s/unbounded/v12/Yq6F-LOTXCb04q32xlpat-6uR42XTqtG6__2447Ngc6L.woff2';
+        printf(
+            '<link rel="preload" href="%s" as="font" type="font/woff2" crossorigin>' . "\n",
+            esc_url($unbounded_cyr)
+        );
+    }
+}, 1);
 
 add_action('wp_head', static function (): void {
     $icon = rawlead_favicon_url();

@@ -167,6 +167,34 @@ TELETHON_PROXY_PROBE=1
 
 **Watchdog** — алерты FLPARSING; скрипт `/opt/rawlead/scripts/ingest_watchdog.py`.
 
+```bash
+systemctl is-enabled rawlead-ingest-watchdog.timer   # O155 deploy checklist
+```
+
+**O155 Healthchecks.io** — внешний dead man's switch (дополнение к watchdog):
+
+```env
+HEALTHCHECKS_SITE_URL=https://hc-ping.com/<uuid>   # prod задан · пусто = no-op
+# HEALTHCHECKS_SITE_FAIL_URL=https://hc-ping.com/<uuid>/fail
+```
+
+UI Healthchecks: **Period 10 min** · **Grace 15 min** · Integrations → Telegram.
+
+**Ping после ok site-cycle** (не «только FL/Kwork»): success, если **хотя бы одна** web-биржа из `PUBLIC_FEED_SOURCES` без `fetch_error` **или** `tg_main` пульсирует (≤5 мин). Fail URL — только когда **все** опрошенные web упали **и** TG-монитор мёртв. Deploy: `scripts/deploy-o155-o157-vps.py`.
+
+**O158 match UX** (push dedup · feed bar · `?lead=` km): `scripts/deploy-o158-vps.py` — api + radar + theme **1.18.49**.
+
+**O156–O157 YouDo** (residential, один прокси):
+
+```env
+YOUDO_BROWSER_ONLY=1
+YOUDO_ONE_SLOT_PER_CYCLE=1
+YOUDO_DETAIL_MIN_CHARS=300
+YOUDO_FETCH_EVERY_N_CYCLES=4
+YOUDO_WARM_TTL_MIN=45
+SECONDARY_FETCH_EVERY_N_CYCLES=4   # опц. все secondary реже
+```
+
 **ПК / Cursor:** те же `TG_*` / `TELETHON_*` в локальном `.env`; `FL_PROXY_URLS` на ПК **не нужны**, если Site ■ (парсинг только VPS).
 
 ---

@@ -66,6 +66,7 @@ from pg_storage import NeonLeadStorage, pg_storage_from_config
 from radar_cycle_log import (
     CycleSummary,
     SourceCycleStats,
+    take_listing_metrics,
     begin_site_rollup_cycle,
     commit_site_rollup_cycle,
     emit_site_rollup_line,
@@ -266,6 +267,7 @@ def _record_source_health(
     ts: str,
 ) -> None:
     ok = not stats.fetch_error
+    parsed_cards = stats.parsed_cards if ok and stats.parsed_cards >= 0 else None
     health = record_fetch(
         storage,
         source,
@@ -273,8 +275,22 @@ def _record_source_health(
         error_msg=stats.fetch_error,
         downloaded=stats.downloaded,
         new_ids=stats.new_ids,
+        parsed_cards=parsed_cards,
         ts=ts,
     )
+    try:
+        from exchange_trace import log_exchange_trace
+
+        log_exchange_trace(
+            source,
+            stage="cycle_end",
+            parsed=stats.parsed_cards if stats.parsed_cards >= 0 else "",
+            fresh=stats.downloaded,
+            new_ids=stats.new_ids,
+            err=stats.fetch_error or "",
+        )
+    except Exception:
+        pass
     maybe_send_red_alert(storage, source, health, fetch_failed=not ok)
 
 
@@ -301,7 +317,7 @@ def _log_cycle_health_lines(
 
 def _should_fetch_secondary(storage: ProjectStorage) -> bool:
     """O99: secondary (YouDo, Пчёл, …) реже — не блокирует hot FL/Kwork."""
-    every = max(1, int(os.getenv("SECONDARY_FETCH_EVERY_N_CYCLES", "2") or "2"))
+    every = max(1, int(os.getenv("SECONDARY_FETCH_EVERY_N_CYCLES", "1") or "1"))
     if every <= 1:
         return True
     raw = storage.get_setting("main_cycle_count", "0") or "0"
@@ -369,6 +385,7 @@ def run_cycle(
                     break
         _tg_poll_if_due(cfg, storage, tg_poll_state)
         if fl_projects is not None:
+            stats_fl.parsed_cards = take_listing_metrics("fl")[0]
             stats_fl.downloaded = len(fl_projects)
             n, notify = _process_listings(
                 fl_projects,
@@ -401,6 +418,7 @@ def run_cycle(
                 storage=storage,
             )
             if kwork_projects is not None:
+                stats_kwork.parsed_cards = take_listing_metrics("kwork")[0]
                 stats_kwork.downloaded = len(kwork_projects)
                 n, notify = _process_listings(
                     kwork_projects,
@@ -445,8 +463,11 @@ def run_cycle(
             continue
         stats_web = summary.ensure(source_label)
         _tg_poll_if_due(cfg, storage, tg_poll_state)
-        web_projects = _fetch_source(source_label, fetch_fn, cfg, errors, stats_web)
+        web_projects = _fetch_source(
+            source_label, fetch_fn, cfg, errors, stats_web, storage=storage
+        )
         if web_projects is not None:
+            stats_web.parsed_cards = len(web_projects)
             if source_label == "pchyol":
                 web_projects = filter_new_pchyol_projects(web_projects, storage)
             stats_web.downloaded = len(web_projects)
@@ -518,6 +539,10 @@ def run_cycle(
     if cfg.radar_profile == "site":
         commit_site_rollup_cycle(summary)
     record_cycle_summary(storage, summary)
+    if cfg.radar_profile == "site":
+        from healthchecks import ping_after_site_cycle
+
+        ping_after_site_cycle(summary, storage)
     storage.set_setting("status_main_last_cycle_at", summary.ts)
     for src in sorted(enabled_sources):
         st = summary.sources.get(src)

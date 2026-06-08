@@ -20,3 +20,13 @@ def draft_rate_limit_detail() -> str:
     if lim <= 0:
         return ""
     return f"draft rate limit: max {lim}/hour"
+
+
+def draft_warm_hourly_cap() -> int:
+    """DRAFT_WARM_HOURLY_CAP: pre-warm on premium expand (default 30). 0 = без лимита."""
+    raw = os.environ.get("DRAFT_WARM_HOURLY_CAP", "30").strip()
+    try:
+        n = int(raw)
+    except ValueError:
+        n = 30
+    return max(0, n)

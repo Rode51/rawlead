@@ -7,6 +7,54 @@
 
 ---
 
+# Перенесено из hot **2026-06-08** (O136–O138 + slim hot)
+
+## § O158-MATCH-UX ✅ (2026-06-08)
+
+Push dedup `_user_already_pushed_for_order` (source+external_id / URL) · `get_lead` Bearer+`keyword_match` · `syncMatchFillsInViewport` · theme **1.18.49** · `pytest tests/test_match_push.py` **7/7** · `deploy-o158-vps.py`.
+
+## § O139-FL-PINNED-FRESH ✅ (2026-06-08)
+
+filter unseen в `listing_fresh.py` · full page в `fl_parser.py` · `deploy-o139-fl-pinned-vps.py` · VPS fresh=26.
+
+---
+
+## § O138-PARSER-OBS ✅ (2026-06-08)
+
+**Суть:** parsed vs fresh в health + `/ops/` · red при `parsed=0`, green при `parsed≥1 fresh=0` (O134 догнали).
+
+| A parsed/fresh log | B O104 health | C /ops/ row | D smoke script | Deploy |
+|--------------------|---------------|-------------|----------------|--------|
+| `listing:fl parsed=N` · `stash_listing_metrics` | `last_parsed_cards` · `status_level` | `listing_line` · `what_happened` | `exchange_parse_smoke.py` | **`deploy-o138-vps.py` ✅** |
+
+**Verify Lead:** pytest **7/7** · VPS deploy ✅ radar+api
+
+---
+
+## § O137-FEED-SORT ✅ (2026-06-08)
+
+**Симптом:** Premium «10 заказов» при 75 new/day · match sort 6 шт.
+
+**Fix:** `_personal_feed_page` — `sort=time` без `min_match`, SQL LIMIT/OFFSET; match scan `_ME_FEED_SCAN_LIMIT=500`.
+
+**Deploy:** `deploy-o137-feed-sort-vps.py` · `tests/test_personal_feed_time.py`
+
+---
+
+## § O136-DRAFT-TRACE ✅ (2026-06-08)
+
+**Суть:** `draft_trace.py` · stage timing в `match_push`/`draft_async`/`ai_analyze` · uvicorn INFO для app loggers.
+
+**Deploy:** `deploy-o136-draft-trace-vps.py` · `tests/test_draft_trace.py`
+
+---
+
+## § O135-DRAFT ✅ (2026-06-08)
+
+L2-only 1-й user · draft_async restart · OR proxy env · `deploy-o135-vps.py`
+
+---
+
 # Перенесено из hot **2026-06-03** (Lead slim CODER_PROMPT)
 
 ## § O109 — Kwork delist + bot deeplink (архив DoD **2026-06-04**)

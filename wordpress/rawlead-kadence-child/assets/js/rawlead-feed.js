@@ -150,6 +150,8 @@
     itemsById: {},
     focusLeadId: null,
     focusLeadHandled: false,
+    draftInflight: {},
+    draftWarmSession: {},
   };
 
   var subscriptionState = null;
@@ -165,12 +167,56 @@
         entries.forEach(function (entry) {
           if (entry.isIntersecting) {
             entry.target.classList.add("is-visible");
+            syncMatchFill(entry.target);
             rlCardIo.unobserve(entry.target);
           }
         });
       },
       { threshold: 0.08, rootMargin: "0px 0px -5% 0px" }
     );
+  }
+
+  function syncMatchFill(card) {
+    if (!card) {
+      return;
+    }
+    card.querySelectorAll(".rl-match__fill").forEach(function (fill) {
+      var pct = fill.getAttribute("data-match-pct");
+      if (pct == null) {
+        var style = fill.getAttribute("style") || "";
+        var m = style.match(/--match-value:\s*(\d+(?:\.\d+)?)%/);
+        pct = m ? m[1] : null;
+      }
+      if (pct == null) {
+        return;
+      }
+      var target = parseFloat(pct);
+      if (isNaN(target) || target < 0) {
+        target = 0;
+      }
+      if (target > 100) {
+        target = 100;
+      }
+      var val = target + "%";
+      fill.style.setProperty("--match-value", val);
+      fill.setAttribute("data-match-pct", String(target));
+      fill.style.removeProperty("width");
+    });
+  }
+
+  function syncMatchFillsInViewport(root) {
+    if (!root) {
+      return;
+    }
+    var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    root.querySelectorAll(".rl-lead-card").forEach(function (card) {
+      var rect = card.getBoundingClientRect();
+      if (rect.bottom <= 0 || rect.top >= vh) {
+        return;
+      }
+      card.classList.add("is-visible");
+      syncMatchFill(card);
+    });
   }
 
   function observeLeadCards(root) {
@@ -181,12 +227,15 @@
     if (prefersReduced || !rlCardIo) {
       cards.forEach(function (el) {
         el.classList.add("is-visible");
+        syncMatchFill(el);
       });
+      syncMatchFillsInViewport(root);
       return;
     }
     cards.forEach(function (el) {
       rlCardIo.observe(el);
     });
+    syncMatchFillsInViewport(root);
   }
 
   function updatePagination() {
@@ -559,10 +608,16 @@
     return base + "/" + leadId + "/draft";
   }
 
+  function draftWarmUrl(leadId) {
+    return draftUrl(leadId) + "/warm";
+  }
+
   var DRAFT_POLL_MS = 2000;
-  var DRAFT_POLL_MAX_MS = 120000;
+  var DRAFT_POLL_MAX_MS = 180000;
+  var DRAFT_BTN_SLOW_MS = 20000;
+  var DRAFT_BTN_SLOW_RU = "Сложный бриф, ИИ полирует отклик...";
   var DRAFT_FAIL_RU = "ИИ временно недоступен — повторите";
-  var DRAFT_POLL_TIMEOUT_RU = "ИИ не успел — повторите";
+  var draftLastPollStatus = {};
 
   function draftReadyPayload(data) {
     if (!data || data.status === "failed") {
@@ -577,11 +632,15 @@
     return null;
   }
 
-  function pollDraftStatus(leadId, startedMs) {
+  function pollDraftStatus(leadId, startedMs, autoRetried) {
+    autoRetried = !!autoRetried;
     if (Date.now() - startedMs > DRAFT_POLL_MAX_MS) {
-      var timeoutErr = new Error(DRAFT_POLL_TIMEOUT_RU);
+      if (draftLastPollStatus[leadId] === "pending" && !autoRetried) {
+        return pollDraftStatus(leadId, Date.now(), true);
+      }
+      var timeoutErr = new Error(DRAFT_BTN_SLOW_RU);
       timeoutErr.status = 503;
-      timeoutErr.detail = DRAFT_POLL_TIMEOUT_RU;
+      timeoutErr.detail = DRAFT_BTN_SLOW_RU;
       throw timeoutErr;
     }
     return new Promise(function (resolve) {
@@ -598,14 +657,22 @@
           if (res.status === 429 || res.status === 403 || res.status === 404) {
             throw parseDraftApiError(res, data);
           }
+          if (data && data.status === "failed") {
+            draftLastPollStatus[leadId] = "failed";
+            throw draftReadyPayload(data);
+          }
+          draftLastPollStatus[leadId] =
+            (data && data.status) ||
+            (data && data.reply_draft ? "ready" : "pending");
           var ready = draftReadyPayload(data);
           if (ready) {
+            delete draftLastPollStatus[leadId];
             return ready;
           }
           if (res.status >= 500 && !data.status) {
             throw parseDraftApiError(res, data);
           }
-          return pollDraftStatus(leadId, startedMs);
+          return pollDraftStatus(leadId, startedMs, autoRetried);
         });
       });
     });
@@ -923,10 +990,6 @@
     if (diff) {
       html += diff;
     }
-    if (hasPaidAccess() && !prepForDisplay(item.reply_draft || "", false).trim()) {
-      html +=
-        '<p class="rl-feed-card__cta-note rl-feed-card__cta-note--expanded">ИИ напишет формулировку под тебя — не как у остальных</p>';
-    }
     return html;
   }
 
@@ -1151,7 +1214,7 @@
     if (!card || !item) {
       return;
     }
-    var chips = card.querySelector(".rl-feed-card__face--front > .rl-chips");
+    var chips = card.querySelector(".rl-chips");
     if (!chips) {
       return;
     }
@@ -1345,9 +1408,9 @@
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
       km +
       '" aria-valuemin="0" aria-valuemax="100">' +
-      '<span class="rl-match__fill" style="--match-value:' +
+      '<span class="rl-match__fill" data-match-pct="' +
       km +
-      "%;width:" +
+      '" style="--match-value:' +
       km +
       '%"></span>' +
       "</div>" +
@@ -1462,6 +1525,9 @@
     "</svg></span>";
 
   function cardUpsellHtml() {
+    if (hasPaidAccess()) {
+      return "";
+    }
     var pricing = cfg.pricingUrl || "/pricing/";
     var cabinet = cfg.cabinetUrl || "/cabinet/";
     return (
@@ -1521,19 +1587,10 @@
 
   function viewsHeadHtml(item) {
     var v = effectiveDisplayViews(item);
-    var replies = effectiveDisplayReplies(item);
-    if ((v == null || v <= 0) && (!replies || replies <= 0)) {
+    if (v == null || v <= 0) {
       return "";
     }
     var html = "";
-    if (replies > 0) {
-      html +=
-        '<span class="rl-feed-card__replies" aria-label="' +
-        replies +
-        ' откликов">' +
-        escapeHtml(String(replies)) +
-        " откл.</span>";
-    }
     if (v != null && v > 0) {
       var n = escapeHtml(String(v));
       html +=
@@ -1590,9 +1647,6 @@
       '" data-tier="' +
       tier +
       '" tabindex="0" role="button" aria-label="Карточка заказа">' +
-      '<div class="rl-feed-card__flip">' +
-      '<div class="rl-feed-card__flip-inner">' +
-      '<div class="rl-feed-card__face rl-feed-card__face--front">' +
       '<div class="rl-feed-card__head">' +
       '<div class="rl-feed-card__head-start">' +
       headBadgesHtml(item, perfect) +
@@ -1626,12 +1680,6 @@
       '<div class="rl-feed-card__body-inner">' +
       renderExpandedBody(item) +
       "</div></div>" +
-      "</div>" +
-      '<div class="rl-feed-card__face rl-feed-card__face--back">' +
-      '<div class="rl-feed-card__body-inner">' +
-      renderExpandedBody(item) +
-      "</div></div>" +
-      "</div></div>" +
       "</article>"
     );
   }
@@ -1652,18 +1700,31 @@
     return html;
   }
 
+  function hideFeedBanner() {
+    if (!errorEl) {
+      return;
+    }
+    errorEl.hidden = true;
+    errorEl.innerHTML = "";
+  }
+
   function showError(msg) {
     if (!errorEl) {
       return;
     }
+    if (!String(msg).trim()) {
+      hideFeedBanner();
+      return;
+    }
     errorEl.hidden = false;
     errorEl.innerHTML =
+      '<span class="rl-feed-banner__text">' +
       escapeHtml(msg) +
-      ' · <button type="button" class="rl-feed-banner__retry">Попробовать снова</button>';
+      '</span> <button type="button" class="rl-btn rl-btn--ghost rl-feed-banner__retry">Попробовать снова</button>';
     var btn = errorEl.querySelector(".rl-feed-banner__retry");
     if (btn) {
       btn.addEventListener("click", function () {
-        errorEl.hidden = true;
+        hideFeedBanner();
         resetAndLoad();
       });
     }
@@ -1673,16 +1734,21 @@
     if (!errorEl) {
       return;
     }
+    if (!String(msg).trim()) {
+      hideFeedBanner();
+      return;
+    }
     errorEl.hidden = false;
-    var html = escapeHtml(msg);
+    var html = '<span class="rl-feed-banner__text">' + escapeHtml(msg) + "</span>";
     if (retryFn) {
-      html += ' · <button type="button" class="rl-feed-banner__retry">Повторить</button>';
+      html +=
+        ' <button type="button" class="rl-btn rl-btn--ghost rl-feed-banner__retry">Повторить</button>';
     }
     errorEl.innerHTML = html;
     var btn = errorEl.querySelector(".rl-feed-banner__retry");
     if (btn && retryFn) {
       btn.addEventListener("click", function () {
-        errorEl.hidden = true;
+        hideFeedBanner();
         retryFn();
       });
     }
@@ -2978,38 +3044,66 @@
       });
   }
 
-  function syncFlipHeight(card) {
-    if (!card || !listEl || !listEl.contains(card)) {
+  function cardDraftSessionActive(card) {
+    if (!card) {
+      return false;
+    }
+    var id = parseInt(card.getAttribute("data-id"), 10);
+    return (
+      (id && state.draftInflight[id]) ||
+      card.classList.contains("rl-lead-card--draft-pending") ||
+      card.classList.contains("rl-lead-card--draft-done")
+    );
+  }
+
+  function resetCardDraftUi(card) {
+    if (!card) {
       return;
     }
-    if (!card.classList.contains("rl-lead-card--draft-flip")) {
-      var innerReset = card.querySelector(".rl-feed-card__flip-inner");
-      if (innerReset) {
-        innerReset.style.minHeight = "";
-      }
+    card.classList.remove(
+      "rl-lead-card--draft-done",
+      "rl-lead-card--draft-pending"
+    );
+  }
+
+  function setDraftPendingBody(card, item) {
+    if (!card || !item) {
       return;
     }
-    var inner = card.querySelector(".rl-feed-card__flip-inner");
-    var front = card.querySelector(".rl-feed-card__face--front");
-    var back = card.querySelector(".rl-feed-card__face--back");
-    if (!inner || !front || !back) {
+    setCardBodyHtml(card, renderExpandedBody(item));
+  }
+
+  function setReplyBtnGenerating(replyBtn, on, prevLabel, slowText) {
+    if (!replyBtn) {
       return;
     }
-    if (!card.classList.contains("is-expanded")) {
-      inner.style.minHeight = "";
+    if (on) {
+      replyBtn.disabled = true;
+      replyBtn.textContent = slowText || "Генерируем…";
+      replyBtn.classList.add("is-generating");
       return;
     }
-    if (
-      window.matchMedia &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      inner.style.minHeight = "";
+    replyBtn.disabled = false;
+    replyBtn.classList.remove("is-generating");
+    if (prevLabel) {
+      replyBtn.textContent = prevLabel;
+    }
+  }
+
+  function syncDraftGeneratingUi(card) {
+    var id = parseInt(card.getAttribute("data-id"), 10);
+    if (!id || !state.draftInflight[id]) {
       return;
     }
-    window.requestAnimationFrame(function () {
-      var h = Math.max(front.offsetHeight, back.scrollHeight);
-      inner.style.minHeight = h > 0 ? h + "px" : "";
-    });
+    var btn = card.querySelector(".rl-feed-card__reply-btn");
+    var inflight = state.draftInflight[id];
+    var slow =
+      inflight && Date.now() - inflight.startedMs > DRAFT_BTN_SLOW_MS;
+    setReplyBtnGenerating(btn, true, null, slow ? DRAFT_BTN_SLOW_RU : null);
+    card.classList.add("rl-lead-card--draft-pending");
+    if (card.classList.contains("is-expanded") && state.itemsById[id]) {
+      setDraftPendingBody(card, state.itemsById[id]);
+    }
   }
 
   function refreshCardSocialMeta(card, item) {
@@ -3024,11 +3118,7 @@
         : '<span class="rl-feed-card__time">' + formatTime(item.created_at) + "</span>";
       meta.innerHTML = viewsHeadHtml(item) + timeHtml;
     }
-    var front = card.querySelector(".rl-feed-card__face--front");
-    if (!front) {
-      return;
-    }
-    var slotRow = front.querySelector(".rl-slot-row");
+    var slotRow = card.querySelector(".rl-slot-row");
     var slotHtml = renderSlotLine(item);
     if (slotRow) {
       if (slotHtml) {
@@ -3037,21 +3127,45 @@
         slotRow.remove();
       }
     } else if (slotHtml) {
-      var chips = front.querySelector(".rl-chips");
+      var chips = card.querySelector(".rl-chips");
       if (chips) {
         chips.insertAdjacentHTML("beforebegin", slotHtml);
       }
     }
-    var ctaZone = front.querySelector(".rl-card-cta-zone, .rl-card-cta");
-    var ctaHtml = cardCtaHtml(item);
-    if (ctaZone) {
-      ctaZone.outerHTML = ctaHtml;
-    } else {
-      var bodyEl = front.querySelector(".rl-feed-card__body");
-      if (bodyEl) {
-        bodyEl.insertAdjacentHTML("beforebegin", ctaHtml);
+    if (!cardDraftSessionActive(card)) {
+      var ctaZone = card.querySelector(".rl-card-cta-zone, .rl-card-cta");
+      var ctaHtml = cardCtaHtml(item);
+      if (ctaZone) {
+        ctaZone.outerHTML = ctaHtml;
+      } else {
+        var bodyEl = card.querySelector(".rl-feed-card__body");
+        if (bodyEl) {
+          bodyEl.insertAdjacentHTML("beforebegin", ctaHtml);
+        }
       }
     }
+  }
+
+  function maybeWarmDraftOnExpand(card) {
+    if (getFeedTier() !== "premium" || !hasPaidAccess()) {
+      return;
+    }
+    var id = parseInt(card.getAttribute("data-id"), 10);
+    if (!id || state.draftWarmSession[id]) {
+      return;
+    }
+    var item = state.itemsById[id];
+    if (item && prepForDisplay(item.reply_draft || "", false).trim()) {
+      return;
+    }
+    state.draftWarmSession[id] = true;
+    fetch(draftWarmUrl(id), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: authHeaders(),
+    }).catch(function () {
+      /* fire-and-forget */
+    });
   }
 
   function expandCard(card) {
@@ -3064,80 +3178,59 @@
     }
     listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
       if (c !== card) {
-        c.classList.remove("is-expanded", "rl-lead-card--draft-flip");
+        c.classList.remove("is-expanded");
         var otherId = parseInt(c.getAttribute("data-id"), 10);
         if (otherId && state.itemsById[otherId]) {
           syncCardChips(c, state.itemsById[otherId], false);
         }
-        syncFlipHeight(c);
       }
     });
     state.expandedId = id;
     card.classList.add("is-expanded");
     if (state.itemsById[id]) {
       syncCardChips(card, state.itemsById[id], true);
+      if (
+        card.classList.contains("rl-lead-card--draft-done") &&
+        prepForDisplay(state.itemsById[id].reply_draft || "", false).trim()
+      ) {
+        setCardBodyHtml(card, renderExpandedBody(state.itemsById[id]));
+      }
     }
-    syncFlipHeight(card);
+    syncDraftGeneratingUi(card);
+    maybeWarmDraftOnExpand(card);
   }
 
   function setCardBodyHtml(card, html) {
-    card.querySelectorAll(".rl-feed-card__body-inner").forEach(function (el) {
-      el.innerHTML = html;
-    });
+    var inner = card.querySelector(".rl-feed-card__body-inner");
+    if (inner) {
+      inner.innerHTML = html;
+    }
   }
 
-  function finishDraftFlip(card) {
-    card.classList.remove("rl-lead-card--draft-flip");
-    syncFlipHeight(card);
+  function updateCardDraftCta(card, item) {
+    var ctaZone = card.querySelector(".rl-card-cta-zone, .rl-card-cta");
+    var ctaHtml = cardCtaHtml(item);
+    if (ctaZone) {
+      ctaZone.outerHTML = ctaHtml;
+    } else {
+      var bodyEl = card.querySelector(".rl-feed-card__body");
+      if (bodyEl) {
+        bodyEl.insertAdjacentHTML("beforebegin", ctaHtml);
+      }
+    }
+  }
+
+  function onDraftReady(card, item) {
+    expandCard(card);
+    var bodyHtml = renderExpandedBody(item);
+    setCardBodyHtml(card, bodyHtml);
+    card.classList.remove("rl-lead-card--draft-pending");
+    card.classList.add("rl-lead-card--draft-done");
+    updateCardDraftCta(card, item);
     var replyEl = card.querySelector("[data-reply-text]");
     if (replyEl) {
       replyEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-  }
-
-  function flipCardOnce(card) {
-    if (!card) {
-      return;
-    }
-    var inner = card.querySelector(".rl-feed-card__flip-inner");
-    var reduceMotion =
-      window.matchMedia &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    expandCard(card);
-    card.classList.add("rl-lead-card--draft-flip");
-    syncFlipHeight(card);
-    if (!inner || reduceMotion) {
-      window.setTimeout(function () {
-        finishDraftFlip(card);
-      }, 32);
-      return;
-    }
-    function onFlipEnd(e) {
-      if (e.propertyName !== "transform") {
-        return;
-      }
-      inner.removeEventListener("transitionend", onFlipEnd);
-      finishDraftFlip(card);
-    }
-    inner.addEventListener("transitionend", onFlipEnd);
-    window.setTimeout(function () {
-      if (card.classList.contains("rl-lead-card--draft-flip")) {
-        inner.removeEventListener("transitionend", onFlipEnd);
-        finishDraftFlip(card);
-      }
-    }, 700);
-  }
-
-  function updateCardDraft(card, item) {
-    var bodyHtml = renderExpandedBody(item);
-    setCardBodyHtml(card, bodyHtml);
-    var headStart = card.querySelector(".rl-feed-card__head-start");
-    if (headStart) {
-      headStart.innerHTML = headBadgesHtml(item, isIdealMatch(item));
-    }
-    refreshCardSocialMeta(card, item);
-    card.classList.add("rl-lead-card--draft-ready");
-    flipCardOnce(card);
   }
 
   function parseFocusLeadId() {
@@ -3171,6 +3264,7 @@
       return;
     }
     card.classList.add("is-visible");
+    syncMatchFill(card);
     expandCard(card);
     card.scrollIntoView({ behavior: "smooth", block: "center" });
     pulseFocusCard(card);
@@ -3207,6 +3301,7 @@
           return;
         }
         bindCards();
+        observeLeadCards(listEl);
         revealFocusCard(newCard);
       })
       .catch(function () {
@@ -3220,13 +3315,18 @@
     var id = parseInt(card.getAttribute("data-id"), 10);
     if (state.expandedId === id) {
       state.expandedId = null;
-      card.classList.remove("is-expanded", "rl-lead-card--draft-flip");
+      card.classList.remove("is-expanded");
       if (state.itemsById[id]) {
         syncCardChips(card, state.itemsById[id], false);
+        if (
+          card.classList.contains("rl-lead-card--draft-done") &&
+          prepForDisplay(state.itemsById[id].reply_draft || "", false).trim()
+        ) {
+          setCardBodyHtml(card, renderExpandedBody(state.itemsById[id]));
+        }
       }
-      syncFlipHeight(card);
     } else {
-      if (state.itemsById[id]) {
+      if (state.itemsById[id] && !cardDraftSessionActive(card)) {
         bumpHumanView(id);
         refreshCardSocialMeta(card, state.itemsById[id]);
       }
@@ -3260,28 +3360,52 @@
       return;
     }
     listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
-      c.classList.remove("is-expanded", "rl-lead-card--draft-flip");
+      if (c === card) {
+        return;
+      }
       var collapsedId = parseInt(c.getAttribute("data-id"), 10);
+      if (collapsedId && state.draftInflight[collapsedId]) {
+        return;
+      }
+      c.classList.remove("is-expanded");
       if (collapsedId && state.itemsById[collapsedId]) {
         syncCardChips(c, state.itemsById[collapsedId], false);
       }
-      syncFlipHeight(c);
     });
-    state.expandedId = null;
-    card.classList.remove("is-expanded", "rl-lead-card--draft-ready", "rl-lead-card--draft-flip");
-    if (state.itemsById[id]) {
-      syncCardChips(card, state.itemsById[id], false);
+    if (state.expandedId && state.expandedId !== id) {
+      state.expandedId = card.classList.contains("is-expanded") ? id : null;
     }
-    syncFlipHeight(card);
     var replyEl = card.querySelector("[data-reply-text]");
     if (replyEl && replyEl.textContent.trim()) {
       expandCard(card);
       replyEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
       return;
     }
+    if (state.draftInflight[id]) {
+      return;
+    }
+    resetCardDraftUi(card);
+    expandCard(card);
+    if (baseItem) {
+      setDraftPendingBody(card, baseItem);
+    }
     var prevLabel = replyBtn.textContent;
-    replyBtn.disabled = true;
-    replyBtn.textContent = "Генерируем…";
+    var startedMs = Date.now();
+    var slowTimer = window.setTimeout(function () {
+      if (!state.draftInflight[id]) {
+        return;
+      }
+      var btn = card.querySelector(".rl-feed-card__reply-btn");
+      if (btn && btn.classList.contains("is-generating")) {
+        btn.textContent = DRAFT_BTN_SLOW_RU;
+      }
+    }, DRAFT_BTN_SLOW_MS);
+    state.draftInflight[id] = {
+      startedMs: startedMs,
+      prevLabel: prevLabel,
+      slowTimer: slowTimer,
+    };
+    setReplyBtnGenerating(replyBtn, true);
     card.classList.add("rl-lead-card--draft-pending");
     fetchDraft(id)
       .then(function (data) {
@@ -3291,12 +3415,15 @@
           tools_required: data.tools_required || base.tools_required || [],
         });
         state.itemsById[id] = merged;
-        card.classList.remove("rl-lead-card--draft-pending");
-        card.classList.add("rl-lead-card--draft-ready");
-        updateCardDraft(card, merged);
+        onDraftReady(card, merged);
       })
       .catch(function (err) {
+        delete draftLastPollStatus[id];
         card.classList.remove("rl-lead-card--draft-pending");
+        var itemAfterFail = state.itemsById[id];
+        if (itemAfterFail && card.classList.contains("is-expanded")) {
+          setCardBodyHtml(card, renderExpandedBody(itemAfterFail));
+        }
         if (err && err.status === 403) {
           showError(err.detail || "Нет доступа");
           return;
@@ -3319,10 +3446,26 @@
         });
       })
       .finally(function () {
-        if (replyBtn && replyBtn.isConnected) {
-          replyBtn.disabled = false;
-          replyBtn.textContent = prevLabel;
+        var inflight = state.draftInflight[id];
+        delete state.draftInflight[id];
+        if (inflight && inflight.slowTimer) {
+          window.clearTimeout(inflight.slowTimer);
         }
+        var item = state.itemsById[id];
+        var hasDraft =
+          item && prepForDisplay(item.reply_draft || "", false).trim();
+        if (hasDraft) {
+          return;
+        }
+        var btn =
+          replyBtn && replyBtn.isConnected
+            ? replyBtn
+            : card.querySelector(".rl-feed-card__reply-btn");
+        setReplyBtnGenerating(
+          btn,
+          false,
+          (inflight && inflight.prevLabel) || prevLabel
+        );
       });
   }
 
@@ -3426,22 +3569,12 @@
           el.classList.remove("is-visible");
         });
         listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
-          c.classList.remove("is-expanded", "rl-lead-card--draft-flip");
-          syncFlipHeight(c);
+          c.classList.remove("is-expanded");
         });
         state.expandedId = null;
       }
       if (!e.target.closest("#rl-feed-sidebar, .rl-filter-hint")) {
         hideFilterHint();
-      }
-    });
-    listEl.addEventListener("transitionend", function (e) {
-      if (!e.target.classList.contains("rl-feed-card__flip-inner")) {
-        return;
-      }
-      var card = e.target.closest(".rl-lead-card");
-      if (card && card.classList.contains("rl-lead-card--draft-flip")) {
-        syncFlipHeight(card);
       }
     });
   }
@@ -4066,6 +4199,8 @@
   } else {
     applyFeedPrefsToState(readLocalFeedPrefs());
   }
+
+  hideFeedBanner();
 
   Promise.all([
     loadSubscription(),

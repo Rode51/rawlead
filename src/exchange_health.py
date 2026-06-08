@@ -130,6 +130,8 @@ def _empty_record() -> dict[str, Any]:
         "last_error_at": "",
         "last_error_kind": "ok",
         "last_error_short": "",
+        "last_error_full": "",
+        "last_parsed_cards": -1,
         "last_downloaded": 0,
         "last_new_ids": 0,
     }
@@ -147,6 +149,11 @@ def load_health(storage: ProjectStorage, source: str) -> dict[str, Any]:
         return _empty_record()
     out = _empty_record()
     out.update({k: data.get(k, out[k]) for k in out})
+    raw_parsed = data.get("last_parsed_cards", -1)
+    try:
+        out["last_parsed_cards"] = int(raw_parsed if raw_parsed is not None else -1)
+    except (TypeError, ValueError):
+        out["last_parsed_cards"] = -1
     out["last_downloaded"] = int(data.get("last_downloaded", 0) or 0)
     out["last_new_ids"] = int(data.get("last_new_ids", 0) or 0)
     out["last_error_kind"] = str(data.get("last_error_kind", "ok") or "ok")
@@ -173,18 +180,66 @@ def silence_minutes(health: dict[str, Any], *, now: float | None = None) -> int 
     return max(0, int((ref - epoch) // 60))
 
 
+def _parsed_cards(health: dict[str, Any]) -> int:
+    raw = health.get("last_parsed_cards", -1)
+    if raw is None:
+        return -1
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return -1
+
+
+def _last_fetch_ok(health: dict[str, Any]) -> bool:
+    kind = str(health.get("last_error_kind", "ok") or "ok")
+    if kind not in ("", "ok"):
+        return False
+    fetch_at = str(health.get("last_fetch_at") or "").strip()
+    ok_at = str(health.get("last_ok_at") or "").strip()
+    return bool(fetch_at and ok_at and fetch_at == ok_at)
+
+
+def _ok_after_error(health: dict[str, Any]) -> bool:
+    """True when last_ok_at is newer than last_error_at (O152 FL lamp fix)."""
+    ok_at = str(health.get("last_ok_at") or "").strip()
+    err_at = str(health.get("last_error_at") or "").strip()
+    if not ok_at:
+        return False
+    if not err_at:
+        return str(health.get("last_error_kind", "ok") or "ok") in ("", "ok")
+    ok_epoch = _parse_ts_epoch(ok_at)
+    err_epoch = _parse_ts_epoch(err_at)
+    if ok_epoch is None or err_epoch is None:
+        return str(health.get("last_error_kind", "ok") or "ok") in ("", "ok")
+    return ok_epoch >= err_epoch
+
+
 def status_level(
     health: dict[str, Any],
     *,
     fetch_failed: bool = False,
     now: float | None = None,
+    source_id: str | None = None,
+    neon_gap_min: int | None = None,
 ) -> str:
     """green | yellow | red."""
-    if fetch_failed or str(health.get("last_error_kind", "ok")) not in ("", "ok"):
+    recovered = _ok_after_error(health)
+    effective_fetch_failed = fetch_failed and not recovered
+    kind = str(health.get("last_error_kind", "ok") or "ok")
+    if effective_fetch_failed or (kind not in ("", "ok") and not recovered):
         err_at = str(health.get("last_error_at") or "").strip()
         fetch_at = str(health.get("last_fetch_at") or "").strip()
-        if fetch_failed or (err_at and err_at == fetch_at):
+        if effective_fetch_failed or (err_at and err_at == fetch_at):
             return "red"
+    if source_id != "tg" and _last_fetch_ok(health):
+        parsed = _parsed_cards(health)
+        fresh = int(health.get("last_downloaded", 0) or 0)
+        if parsed >= 0:
+            if parsed == 0:
+                return "red"
+            if fresh == 0 and neon_gap_min is not None and neon_gap_min > 120:
+                return "yellow"
+            return "green"
     mins = silence_minutes(health, now=now)
     if mins is None:
         return "red"
@@ -207,6 +262,7 @@ def record_fetch(
     error_msg: str = "",
     downloaded: int = 0,
     new_ids: int = 0,
+    parsed_cards: int | None = None,
     ts: str | None = None,
 ) -> dict[str, Any]:
     """После fetch в run_cycle — обновить реестр."""
@@ -219,12 +275,16 @@ def record_fetch(
         rec["last_ok_at"] = stamp
         rec["last_error_kind"] = "ok"
         rec["last_error_short"] = ""
+        rec["last_error_full"] = ""
+        if parsed_cards is not None:
+            rec["last_parsed_cards"] = int(parsed_cards)
     else:
         kind = classify_error(error_msg)
         rec["last_error_at"] = stamp
         rec["last_error_kind"] = kind
-        short = (error_msg or kind_label(kind)).strip()[:_ERROR_SHORT_MAX]
-        rec["last_error_short"] = short
+        short = (error_msg or kind_label(kind)).strip()
+        rec["last_error_short"] = short[:_ERROR_SHORT_MAX]
+        rec["last_error_full"] = short
     save_health(storage, source, rec)
     return rec
 
@@ -248,12 +308,14 @@ def format_health_log_line(
     ingest_lag_p50_min: int | None = None,
 ) -> str:
     if fetch_ok and str(health.get("last_error_kind", "ok")) in ("", "ok"):
-        parts = [
-            f"health:{source}",
-            "status=ok",
-            f"downloaded={int(health.get('last_downloaded', 0))}",
-            f"new={int(health.get('last_new_ids', 0))}",
-        ]
+        parsed = _parsed_cards(health)
+        parts = [f"health:{source}", "status=ok"]
+        if parsed >= 0:
+            parts.append(f"parsed={parsed}")
+            parts.append(f"fresh={int(health.get('last_downloaded', 0))}")
+        else:
+            parts.append(f"downloaded={int(health.get('last_downloaded', 0))}")
+        parts.append(f"new={int(health.get('last_new_ids', 0))}")
         if ingest_lag_p50_min is not None:
             parts.append(f"lag_p50={ingest_lag_p50_min}m")
         return " ".join(parts)
@@ -321,7 +383,11 @@ def maybe_send_red_alert(
     cooldown_sec: int = ALERT_COOLDOWN_SEC,
 ) -> bool:
     """Push в @FLPARSINGBOT при 🔴; cooldown на источник."""
-    level = status_level(health, fetch_failed=fetch_failed)
+    level = status_level(
+        health,
+        fetch_failed=fetch_failed,
+        source_id=source,
+    )
     if level != "red":
         return False
     if not _alert_cooldown_ok(storage, source, cooldown_sec):
@@ -349,7 +415,12 @@ def format_exchange_status_line(
 ) -> str:
     """Строка для блока «Биржи» в /status."""
     label = source_display_name(source_id).ljust(7)
-    level = status_level(health, fetch_failed=fetch_failed, now=now)
+    level = status_level(
+        health,
+        fetch_failed=fetch_failed,
+        now=now,
+        source_id=source_id,
+    )
     icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(level, "🔴")
     mins = silence_minutes(health, now=now)
     dl = downloaded if downloaded is not None else int(health.get("last_downloaded", 0))
@@ -383,24 +454,55 @@ def build_ops_exchange_row(
     now: float | None = None,
 ) -> dict[str, Any]:
     """Строка для /ops/ «Биржи и скорость»."""
-    level = status_level(health, fetch_failed=fetch_failed, now=now)
     ing = ingest or {}
     gap_sec = int(ing.get("last_insert_gap_sec", 0) or 0)
     gap_min = gap_sec // 60
+    level = status_level(
+        health,
+        fetch_failed=fetch_failed,
+        now=now,
+        source_id=source_id,
+        neon_gap_min=gap_min if gap_min else None,
+    )
     last_insert = str(ing.get("last_insert_at") or "").strip()
     ingest_p50 = float(ing.get("ingest_p50_sec", 0.0) or 0.0)
     feed_p50 = float(ing.get("feed_p50_sec", 0.0) or 0.0)
     within = int(ing.get("feed_within_5m", 0) or 0)
     measurable = int(ing.get("feed_measurable_24h", 0) or 0)
     within_pct = int(within * 100 / measurable) if measurable else None
-    err = str(health.get("last_error_short") or "").strip()
+    parsed = _parsed_cards(health)
+    fresh = int(health.get("last_downloaded", 0) or 0)
+    err = str(health.get("last_error_full") or health.get("last_error_short") or "").strip()
     kind = str(health.get("last_error_kind") or "ok")
-    what = err if err else ("—" if kind in ("", "ok") else kind_label(kind))
+    trace_lines: list[str] = []
+    try:
+        from exchange_trace import recent_traces
+
+        trace_lines = recent_traces(source_id, limit=8)
+    except Exception:
+        pass
+    if err:
+        what = err
+    elif kind not in ("", "ok"):
+        what = kind_label(kind)
+    elif parsed == 0 and _last_fetch_ok(health):
+        what = "parsed=0 — проверить parse"
+    elif parsed >= 1 and fresh == 0 and _last_fetch_ok(health):
+        what = f"parsed={parsed} fresh=0 — догнали"
+    else:
+        what = "—"
+    listing_line = ""
+    if parsed >= 0:
+        neon_hint = f"neon {gap_min}m ago" if gap_min else "neon —"
+        listing_line = f"listing: {parsed} parsed · {fresh} fresh · {neon_hint}"
     return {
         "source_id": source_id,
         "name": source_display_name(source_id),
         "level": level,
         "status_label": status_label_ru(level),
+        "last_parsed_cards": parsed if parsed >= 0 else None,
+        "last_fresh_cards": fresh,
+        "listing_line": listing_line,
         "last_insert_at": last_insert,
         "last_insert_ago_min": gap_min,
         "ingest_p50_min": int(ingest_p50 // 60) if ingest_p50 else None,
@@ -408,4 +510,6 @@ def build_ops_exchange_row(
         "feed_within_5m": within if measurable else None,
         "feed_within_5m_pct": within_pct,
         "what_happened": what[:_ERROR_SHORT_MAX],
+        "what_happened_full": err or what,
+        "trace_lines": trace_lines,
     }

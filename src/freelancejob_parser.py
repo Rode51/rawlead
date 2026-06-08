@@ -158,6 +158,64 @@ def _fetch_listing_html(
     return resp.content.decode(encoding, errors="replace")
 
 
+def _parse_freelancejob_detail_html(html: str, *, fallback_snippet: str = "") -> str:
+    soup = BeautifulSoup(html, "html.parser")
+    for sel in ("div.x17", ".vacancy-description", ".project-description", "article"):
+        nodes = soup.select(sel) if sel != "div.x17" else [soup.select_one(sel)]
+        for node in nodes:
+            if not node:
+                continue
+            text = node.get_text(" ", strip=True)
+            if len(text) > len((fallback_snippet or "").strip()):
+                return text
+    blocks: list[str] = []
+    for node in soup.select("div.x17 div, .vacancy p"):
+        t = node.get_text(" ", strip=True)
+        if len(t) > 60:
+            blocks.append(t)
+    if blocks:
+        return max(blocks, key=len)
+    return fallback_snippet
+
+
+def fetch_project_page_html(
+    project_url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float = 30.0,
+) -> tuple[str, bool]:
+    url = (project_url or "").strip()
+    if not url:
+        return "", False
+    headers = {
+        "User-Agent": cfg.http_user_agent,
+        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+    }
+    try:
+        resp = exchange_get("freelancejob", url, headers=headers, timeout_sec=timeout_sec)
+    except requests.RequestException:
+        return "", False
+    if resp.status_code != 200:
+        return "", False
+    encoding = resp.encoding or "utf-8"
+    return resp.content.decode(encoding, errors="replace"), True
+
+
+def fetch_project_detail(
+    project_url: str,
+    cfg: Config,
+    *,
+    fallback_snippet: str = "",
+    timeout_sec: float = 30.0,
+) -> tuple[str, str, bool]:
+    html, ok = fetch_project_page_html(project_url, cfg, timeout_sec=timeout_sec)
+    if not ok:
+        return fallback_snippet, "", False
+    text = _parse_freelancejob_detail_html(html, fallback_snippet=fallback_snippet)
+    detail_ok = bool(text and text != (fallback_snippet or "").strip())
+    return text, html, detail_ok
+
+
 def fetch_listing_projects(
     cfg: Config, *, timeout_sec: float = 30.0
 ) -> list[ListingProject]:

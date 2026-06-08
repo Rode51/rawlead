@@ -14,17 +14,24 @@ from typing import Any, Literal
 import psycopg
 
 from config import Config
+from draft_trace import DraftTimer, log_draft_stage
 from match_push import (
     DraftError,
     DraftResult,
+    _fetch_lead_row,
+    _fetch_saved_draft as _fetch_user_reply_draft,
+    _user_effective_access,
     generate_and_store_lead_draft,
     materialize_shared_draft_for_user,
+    warm_rate_limit_retry_after,
+    warm_shared_lead_draft,
 )
 
 logger = logging.getLogger(__name__)
 
 _DRAFT_QUICK_WAIT_SEC = 3.0
 _DRAFT_JOB_TTL_SEC = 600
+_WARM_USER_KEY = "__warm__"
 _DRAFT_USER_FAIL = "ИИ временно недоступен — повторите"
 _SECRET_RE = re.compile(
     r"(?i)(api[_-]?key|bearer\s+\S+|sk-[a-z0-9]{8,}|openrouter[_-]?api[_-]?key)\s*[:=]?\s*\S+"
@@ -221,14 +228,23 @@ def _user_facing_error(exc: DraftError) -> str:
     return _DRAFT_USER_FAIL
 
 
-def _poll_error_from_stored(stored: str) -> str:
-    return sanitize_draft_error_detail(stored) if stored.strip() else _DRAFT_USER_FAIL
+def _poll_error_from_stored(stored: str | None) -> str:
+    msg = (stored or "").strip()
+    return sanitize_draft_error_detail(msg) if msg else _DRAFT_USER_FAIL
 
 
 def _worker_running(key: tuple[str, int]) -> bool:
     with _jobs_lock:
         fut = _active_futures.get(key)
         return fut is not None and not fut.done()
+
+
+def _lead_worker_running(lead_id: int) -> bool:
+    with _jobs_lock:
+        for key, fut in _active_futures.items():
+            if key[1] == lead_id and fut is not None and not fut.done():
+                return True
+    return False
 
 
 def _restart_worker(cfg: Config, user_id: str, lead_id: int, log_prefix: str) -> None:
@@ -241,7 +257,14 @@ def _restart_worker(cfg: Config, user_id: str, lead_id: int, log_prefix: str) ->
 
 def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) -> None:
     key = (user_id, lead_id)
-    t0 = time.monotonic()
+    trace = DraftTimer()
+    log_draft_stage(
+        log_prefix,
+        stage="worker_start",
+        timer=trace,
+        lead_id=lead_id,
+        user_id=user_id[:8],
+    )
     try:
         generate_and_store_lead_draft(
             cfg,
@@ -257,6 +280,13 @@ def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) ->
             conn.commit()
         with _jobs_lock:
             _job_errors.pop(key, None)
+        log_draft_stage(
+            log_prefix,
+            stage="worker_ok",
+            timer=trace,
+            lead_id=lead_id,
+            user_id=user_id[:8],
+        )
     except DraftError as exc:
         raw = exc.detail if exc.code == "ai_fail" else ""
         stored = raw or _user_facing_error(exc)
@@ -276,6 +306,100 @@ def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) ->
             conn.commit()
         with _jobs_lock:
             _job_errors[key] = stored
+        log_draft_stage(
+            log_prefix,
+            stage="worker_fail",
+            timer=trace,
+            lead_id=lead_id,
+            code=exc.code,
+            user_id=user_id[:8],
+        )
+    except Exception as exc:
+        logger.error("%serror %s", log_prefix, exc)
+        with psycopg.connect(cfg.database_url) as conn:
+            with conn.cursor() as cur:
+                _set_lead_job_failed(cur, lead_id, _DRAFT_USER_FAIL)
+            conn.commit()
+        with _jobs_lock:
+            _job_errors[key] = _DRAFT_USER_FAIL
+        log_draft_stage(
+            log_prefix,
+            stage="worker_error",
+            timer=trace,
+            lead_id=lead_id,
+            user_id=user_id[:8],
+        )
+    finally:
+        with _jobs_lock:
+            _active_futures.pop(key, None)
+        ms = trace.elapsed_ms()
+        logger.info("draft:worker_done lead=%s ms=%s", lead_id, ms)
+
+
+def _start_worker(cfg: Config, user_id: str, lead_id: int, log_prefix: str) -> None:
+    if _lead_worker_running(lead_id):
+        return
+    key = (user_id, lead_id)
+    with _jobs_lock:
+        fut = _active_futures.get(key)
+        if fut is not None and not fut.done():
+            return
+        fut = _pool.submit(_run_generation, cfg, user_id, lead_id, log_prefix)
+        _active_futures[key] = fut
+
+
+def _run_warm_generation(cfg: Config, lead_id: int, log_prefix: str) -> None:
+    key = (_WARM_USER_KEY, lead_id)
+    trace = DraftTimer()
+    log_draft_stage(
+        log_prefix,
+        stage="worker_start",
+        timer=trace,
+        lead_id=lead_id,
+        path="warm",
+    )
+    try:
+        warm_shared_lead_draft(cfg, lead_id=lead_id, log_prefix=log_prefix)
+        with psycopg.connect(cfg.database_url) as conn:
+            with conn.cursor() as cur:
+                _delete_lead_job(cur, lead_id)
+            conn.commit()
+        with _jobs_lock:
+            _job_errors.pop(key, None)
+        log_draft_stage(
+            log_prefix,
+            stage="worker_ok",
+            timer=trace,
+            lead_id=lead_id,
+            path="warm",
+        )
+    except DraftError as exc:
+        raw = exc.detail if exc.code == "ai_fail" else ""
+        stored = raw or _user_facing_error(exc)
+        from ai_analyze import note_ai_error, note_draft_request
+
+        note_draft_request(False)
+        note_ai_error(raw or exc.detail or exc.code)
+        logger.warning(
+            "%sfail code=%s detail=%s",
+            log_prefix,
+            exc.code,
+            raw or exc.detail,
+        )
+        with psycopg.connect(cfg.database_url) as conn:
+            with conn.cursor() as cur:
+                _set_lead_job_failed(cur, lead_id, stored)
+            conn.commit()
+        with _jobs_lock:
+            _job_errors[key] = stored
+        log_draft_stage(
+            log_prefix,
+            stage="worker_fail",
+            timer=trace,
+            lead_id=lead_id,
+            code=exc.code,
+            path="warm",
+        )
     except Exception as exc:
         logger.error("%serror %s", log_prefix, exc)
         with psycopg.connect(cfg.database_url) as conn:
@@ -287,18 +411,117 @@ def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) ->
     finally:
         with _jobs_lock:
             _active_futures.pop(key, None)
-        ms = int((time.monotonic() - t0) * 1000)
-        logger.info("draft:worker_done lead=%s ms=%s", lead_id, ms)
+        ms = trace.elapsed_ms()
+        logger.info("draft:warm_done lead=%s ms=%s", lead_id, ms)
 
 
-def _start_worker(cfg: Config, user_id: str, lead_id: int, log_prefix: str) -> None:
-    key = (user_id, lead_id)
+def _start_warm_worker(cfg: Config, lead_id: int, log_prefix: str) -> None:
+    if _lead_worker_running(lead_id):
+        return
+    key = (_WARM_USER_KEY, lead_id)
     with _jobs_lock:
         fut = _active_futures.get(key)
         if fut is not None and not fut.done():
             return
-        fut = _pool.submit(_run_generation, cfg, user_id, lead_id, log_prefix)
+        fut = _pool.submit(_run_warm_generation, cfg, lead_id, log_prefix)
         _active_futures[key] = fut
+
+
+def submit_warm(
+    cfg: Config,
+    *,
+    user_id: str,
+    lead_id: int,
+    log_prefix: str = "",
+) -> DraftPollResponse:
+    """POST /draft/warm — shared L2 pre-warm on premium expand."""
+    if not cfg.ai_active:
+        raise DraftError("ai_unavailable")
+    if not cfg.database_url.strip():
+        raise DraftError("ai_unavailable")
+
+    prefix = log_prefix or f"lenta:draft:warm:{lead_id}:"
+    trace = DraftTimer()
+    log_draft_stage(
+        prefix,
+        stage="submit",
+        timer=trace,
+        lead_id=lead_id,
+        path="warm",
+        user_id=user_id[:8],
+    )
+
+    _ensure_draft_tables(cfg.database_url)
+    with psycopg.connect(cfg.database_url) as conn:
+        with conn.cursor() as cur:
+            if not _user_effective_access(cur, user_id):
+                raise DraftError("forbidden", "paid subscription required")
+            if _fetch_user_reply_draft(cur, user_id, lead_id):
+                log_draft_stage(
+                    prefix,
+                    stage="submit_done",
+                    timer=trace,
+                    lead_id=lead_id,
+                    status="ready",
+                    path="user_cache",
+                    user_id=user_id[:8],
+                )
+                return DraftPollResponse(status="ready", lead_id=lead_id)
+            row = _fetch_lead_row(cur, lead_id)
+            if row is None:
+                raise DraftError("not_found")
+            if (row[14] or "").strip():
+                log_draft_stage(
+                    prefix,
+                    stage="submit_done",
+                    timer=trace,
+                    lead_id=lead_id,
+                    status="ready",
+                    path="shared_cache",
+                    user_id=user_id[:8],
+                )
+                return DraftPollResponse(status="ready", lead_id=lead_id)
+        conn.commit()
+
+    retry_after = warm_rate_limit_retry_after(user_id, consume=False)
+    if retry_after is not None:
+        from draft_limits import draft_warm_hourly_cap
+
+        lim = draft_warm_hourly_cap()
+        raise DraftError("rate_limit", f"warm cap {lim}/hour")
+
+    with psycopg.connect(cfg.database_url) as conn:
+        with conn.cursor() as cur:
+            _clear_stale_lead_pending(cur, lead_id)
+            job = _read_lead_job(cur, lead_id)
+            if job and job[0] == "failed":
+                _delete_lead_job(cur, lead_id)
+            if job is None or (job and job[0] == "failed"):
+                _insert_lead_pending(cur, lead_id)
+            conn.commit()
+
+    warm_rate_limit_retry_after(user_id, consume=True)
+    if not _worker_running((_WARM_USER_KEY, lead_id)) and not _lead_worker_running(lead_id):
+        log_draft_stage(
+            prefix,
+            stage="worker_queue",
+            timer=trace,
+            lead_id=lead_id,
+            path="warm",
+            user_id=user_id[:8],
+        )
+        _start_warm_worker(cfg, lead_id, prefix)
+
+    log_draft_stage(
+        prefix,
+        stage="submit_done",
+        timer=trace,
+        lead_id=lead_id,
+        status="pending",
+        path="warm",
+        user_id=user_id[:8],
+    )
+    return DraftPollResponse(status="pending", lead_id=lead_id)
 
 
 def poll_draft(
@@ -320,6 +543,15 @@ def poll_draft(
         with conn.cursor() as cur:
             saved = _fetch_saved_draft(cur, user_id, lead_id)
             if saved:
+                trace = DraftTimer()
+                log_draft_stage(
+                    prefix,
+                    stage="poll_ready",
+                    timer=trace,
+                    lead_id=lead_id,
+                    path="cache",
+                    user_id=user_id[:8],
+                )
                 return _draft_to_poll(saved, lead_id)
             _clear_stale_lead_pending(cur, lead_id)
             job = _read_lead_job(cur, lead_id)
@@ -332,6 +564,15 @@ def poll_draft(
         err = _job_errors.get(key, "")
 
     if err:
+        trace = DraftTimer()
+        log_draft_stage(
+            prefix,
+            stage="poll_failed",
+            timer=trace,
+            lead_id=lead_id,
+            source="memory",
+            user_id=user_id[:8],
+        )
         return DraftPollResponse(
             status="failed",
             lead_id=lead_id,
@@ -341,15 +582,41 @@ def poll_draft(
     if job:
         status, stored_err = job
         if status == "failed":
+            trace = DraftTimer()
+            log_draft_stage(
+                prefix,
+                stage="poll_failed",
+                timer=trace,
+                lead_id=lead_id,
+                source="db",
+                user_id=user_id[:8],
+            )
             return DraftPollResponse(
                 status="failed",
                 lead_id=lead_id,
                 error=_poll_error_from_stored(stored_err),
             )
         if status == "pending" and not _worker_running(key):
+            trace = DraftTimer()
+            log_draft_stage(
+                prefix,
+                stage="poll_restart",
+                timer=trace,
+                lead_id=lead_id,
+                user_id=user_id[:8],
+            )
             _restart_worker(cfg, user_id, lead_id, prefix)
         return DraftPollResponse(status="pending", lead_id=lead_id)
 
+    trace = DraftTimer()
+    log_draft_stage(
+        prefix,
+        stage="poll_restart",
+        timer=trace,
+        lead_id=lead_id,
+        reason="no_job",
+        user_id=user_id[:8],
+    )
     _restart_worker(cfg, user_id, lead_id, prefix)
     return DraftPollResponse(status="pending", lead_id=lead_id)
 
@@ -371,6 +638,15 @@ def submit_draft(
     prefix = log_prefix or f"lenta:draft:{lead_id}:"
     key = (user_id, lead_id)
 
+    trace = DraftTimer()
+    log_draft_stage(
+        prefix,
+        stage="submit",
+        timer=trace,
+        lead_id=lead_id,
+        user_id=user_id[:8],
+    )
+
     _ensure_draft_tables(cfg.database_url)
     with psycopg.connect(cfg.database_url) as conn:
         with conn.cursor() as cur:
@@ -378,6 +654,15 @@ def submit_draft(
             if saved:
                 _delete_lead_job(cur, lead_id)
                 conn.commit()
+                log_draft_stage(
+                    prefix,
+                    stage="submit_done",
+                    timer=trace,
+                    lead_id=lead_id,
+                    status="ready",
+                    path="cache",
+                    user_id=user_id[:8],
+                )
                 return _draft_to_poll(saved, lead_id)
 
             _clear_stale_lead_pending(cur, lead_id)
@@ -389,15 +674,38 @@ def submit_draft(
             conn.commit()
 
     if not _worker_running(key):
+        log_draft_stage(
+            prefix,
+            stage="worker_queue",
+            timer=trace,
+            lead_id=lead_id,
+            user_id=user_id[:8],
+        )
         _restart_worker(cfg, user_id, lead_id, prefix)
 
     deadline = time.monotonic() + max(0.0, quick_wait_sec)
     while time.monotonic() < deadline:
         resp = poll_draft(cfg, user_id=user_id, lead_id=lead_id, log_prefix=prefix)
         if resp.status != "pending":
+            log_draft_stage(
+                prefix,
+                stage="submit_done",
+                timer=trace,
+                lead_id=lead_id,
+                status=resp.status,
+                user_id=user_id[:8],
+            )
             return resp
         time.sleep(0.35)
 
+    log_draft_stage(
+        prefix,
+        stage="submit_done",
+        timer=trace,
+        lead_id=lead_id,
+        status="pending",
+        user_id=user_id[:8],
+    )
     return DraftPollResponse(status="pending", lead_id=lead_id)
 
 

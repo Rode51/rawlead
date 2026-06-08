@@ -1057,8 +1057,18 @@
     }
 
     if (subTrialEl) {
+      var hideTrial =
+        status === "active" ||
+        status === "beta" ||
+        status === "trial" ||
+        isTrial ||
+        !!data.effective_access ||
+        !!data.is_trial ||
+        (data.plan && data.plan !== "free" && data.is_active);
       var showTrialCta =
-        status === "free" && !data.trial_used && !data.effective_access;
+        status === "free" &&
+        !data.trial_used &&
+        !hideTrial;
       subTrialEl.hidden = !showTrialCta;
       subTrialEl.disabled = false;
       subTrialEl.classList.remove("is-disabled");
@@ -3892,7 +3902,9 @@
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
       km +
       '" aria-valuemin="0" aria-valuemax="100">' +
-      '<span class="rl-match__fill" style="--match-value:' +
+      '<span class="rl-match__fill" data-match-pct="' +
+      km +
+      '" style="--match-value:' +
       km +
       '%"></span>' +
       "</div>" +

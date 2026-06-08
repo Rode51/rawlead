@@ -38,7 +38,7 @@ class TestToolsPersistO37b(unittest.TestCase):
     @patch("match_push.note_draft_request")
     @patch("match_push._build_personalized_reply", return_value=("Hello draft", False))
     @patch("match_push._analyze_shared_ondemand", return_value="Hello draft")
-    @patch("match_push.analyze_lead_tools", return_value=("python", "fastapi"))
+    @patch("match_push.tools_from_tz_text", return_value=["python", "fastapi"])
     @patch("match_push._user_effective_access", return_value=True)
     @patch("match_push._fetch_saved_draft", return_value=None)
     @patch("match_push.psycopg.connect")
@@ -48,7 +48,7 @@ class TestToolsPersistO37b(unittest.TestCase):
         mock_cur = MagicMock()
         mock_cur.fetchone.side_effect = [
             _lead_row(tools=None, shared=""),
-            _lead_row(tools='["python", "fastapi"]', shared=""),
+            _lead_row(tools='["python"]', shared=""),
         ]
         mock_conn = MagicMock()
         mock_conn.__enter__.return_value = mock_conn
@@ -66,7 +66,7 @@ class TestToolsPersistO37b(unittest.TestCase):
                 )
 
         self.assertEqual(result.reply_draft, "Hello draft")
-        self.assertEqual(result.tools_required, ["python", "fastapi"])
+        self.assertEqual(result.tools_required, ["python"])
         sqls = [str(c[0][0]) for c in mock_cur.execute.call_args_list]
         self.assertTrue(any("tools_required" in s for s in sqls))
 

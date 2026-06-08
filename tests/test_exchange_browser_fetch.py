@@ -13,6 +13,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 
 import exchange_browser_fetch as ebf  # noqa: E402
 from exchange_browser_fetch import (  # noqa: E402
+    _abort_youdo_lean_route,
     _DEFAULT_UA,
     _abort_heavy_route,
     _fetch_youdo_ephemeral,
@@ -41,10 +42,11 @@ class TestExchangeBrowserFetch(unittest.TestCase):
                 pass
         ebf._PLAYWRIGHT = None
 
-    @patch("exchange_browser_fetch._jitter_sleep")
+    @patch("exchange_browser_fetch._youdo_jitter_sleep")
+    @patch("exchange_browser_fetch._warm_youdo_home")
     @patch("exchange_browser_fetch._playwright_proxy", return_value={"server": "http://1.2.3.4:8000"})
     def test_youdo_ephemeral_uses_shared_playwright_launch(
-        self, _mock_px: MagicMock, _mock_jitter: MagicMock
+        self, _mock_px: MagicMock, _mock_warm: MagicMock, _mock_jitter: MagicMock
     ) -> None:
         mock_pw = MagicMock()
         mock_browser = MagicMock()
@@ -56,21 +58,25 @@ class TestExchangeBrowserFetch(unittest.TestCase):
         mock_pw.chromium.launch.return_value = mock_browser
 
         with patch("exchange_browser_fetch._get_playwright", return_value=mock_pw) as get_pw:
-            with patch("playwright.sync_api.sync_playwright") as sync_pw:
-                html = _fetch_youdo_ephemeral(
-                    "https://youdo.com/tasks-all-opened-all",
-                    user_agent="FLRadar/bot",
-                    timeout_sec=45.0,
-                    proxy_url="http://u:p@1.2.3.4:8000",
-                )
+            with patch("exchange_browser_fetch.youdo_ephemeral", return_value=True):
+                with patch("playwright.sync_api.sync_playwright") as sync_pw:
+                    html = ebf._fetch_youdo_ephemeral(
+                        "https://youdo.com/tasks-all-opened-all",
+                        user_agent="FLRadar/bot",
+                        timeout_sec=45.0,
+                        proxy_url="http://u:p@1.2.3.4:8000",
+                    )
 
         get_pw.assert_called_once()
         sync_pw.assert_not_called()
         mock_pw.chromium.launch.assert_called_once_with(
             headless=True, proxy={"server": "http://1.2.3.4:8000"}
         )
-        mock_browser.new_context.assert_called_once_with(user_agent=_DEFAULT_UA, locale="ru-RU")
-        mock_ctx.route.assert_called_once_with("**/*", _abort_heavy_route)
+        ctx_kw = mock_browser.new_context.call_args.kwargs
+        self.assertEqual(ctx_kw.get("locale"), "ru-RU")
+        self.assertEqual(ctx_kw.get("timezone_id"), "Europe/Moscow")
+        self.assertNotIn("flradar", str(ctx_kw.get("user_agent", "")).casefold())
+        mock_ctx.route.assert_called_once_with("**/*", _abort_youdo_lean_route)
         mock_browser.close.assert_called_once()
         self.assertGreater(len(html), 500)
 
@@ -133,12 +139,15 @@ class TestExchangeBrowserFetch(unittest.TestCase):
                             user_agent=_DEFAULT_UA,
                             timeout_sec=30.0,
                         )
-                        _fetch_youdo_ephemeral(
-                            "https://youdo.com/tasks-all-opened-all",
-                            user_agent="FLRadar/bot",
-                            timeout_sec=45.0,
-                            proxy_url="http://u:p@1.2.3.4:8000",
-                        )
+                        with patch("exchange_browser_fetch.youdo_ephemeral", return_value=True):
+                            with patch("exchange_browser_fetch._warm_youdo_home"):
+                                with patch("exchange_browser_fetch._youdo_jitter_sleep"):
+                                    _fetch_youdo_ephemeral(
+                                        "https://youdo.com/tasks-all-opened-all",
+                                        user_agent="FLRadar/bot",
+                                        timeout_sec=45.0,
+                                        proxy_url="http://u:p@1.2.3.4:8000",
+                                    )
                         sync_pw.assert_not_called()
                         self.assertEqual(sync_starts, ["start"])
                         mock_pw.chromium.launch_persistent_context.assert_called_once()
@@ -147,7 +156,7 @@ class TestExchangeBrowserFetch(unittest.TestCase):
     def test_pick_browser_user_agent_rejects_flradar(self) -> None:
         ua = pick_browser_user_agent("Mozilla/5.0 (compatible; FLRadar/1.0)")
         self.assertNotIn("flradar", ua.casefold())
-        self.assertIn("Chrome", ua)
+        self.assertTrue("Chrome" in ua or "Firefox" in ua or "Safari" in ua)
 
     def test_pick_browser_user_agent_keeps_explicit(self) -> None:
         custom = "Mozilla/5.0 CustomBrowser/99.0"

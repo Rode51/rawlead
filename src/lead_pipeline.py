@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 
@@ -15,8 +16,8 @@ from ai_analyze import (
 from budget import meets_min_budget
 from config import Config
 from filters import ListingWordFilter
-from listing import SOURCE_FL, SOURCE_KWORK
-from listing import SOURCE_FL, ListingProject
+from exchange_detail import fetch_project_detail, is_web_detail_source
+from listing import SOURCE_FL, SOURCE_KWORK, SOURCE_YOUDO, ListingProject
 from lead_category import category_for_listing
 from listing_dedup import listing_content_hash
 from pg_storage import NeonLeadRow, NeonLeadStorage
@@ -56,6 +57,18 @@ def short_err(exc: BaseException, *, max_len: int = 240) -> str:
     return s
 
 
+def _youdo_detail_min_chars() -> int:
+    return max(0, int(os.getenv("YOUDO_DETAIL_MIN_CHARS", "300")))
+
+
+def _youdo_detail_fetch_enabled() -> bool:
+    return os.getenv("YOUDO_DETAIL_FETCH", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
 def _resolve_ingest_body(
     project: ListingProject,
     cfg: Config,
@@ -65,11 +78,16 @@ def _resolve_ingest_body(
     base = (project.listing_snippet or project.title or "").strip()
     html = ""
     ext_id = str(project.project_id)
+    source = project.source
 
-    if project.source == SOURCE_FL:
-        from fl_parser import fetch_project_detail
-
+    if is_web_detail_source(source):
+        if source == SOURCE_YOUDO:
+            if not _youdo_detail_fetch_enabled():
+                return base, None
+            if len(base) >= _youdo_detail_min_chars():
+                return base, None
         text, html, ok = fetch_project_detail(
+            source,
             project.url,
             cfg,
             fallback_snippet=base,
@@ -77,32 +95,11 @@ def _resolve_ingest_body(
         if ok and text:
             base = text
         elif not ok:
-            errors.append(f"{project.source}:id={ext_id} ai:detail:fallback")
-    elif project.source == SOURCE_KWORK:
-        from kwork_parser import fetch_project_detail, fetch_project_page_html
-        from tz_attachments import body_promises_attachment, tz_attachments_enabled
-
-        need_page = tz_attachments_enabled() and (
-            len(base) < 400 or body_promises_attachment(base)
-        )
-        if need_page:
-            text, html, ok = fetch_project_detail(
-                project.url,
-                cfg,
-                fallback_snippet=base,
-            )
-            if ok and text:
-                base = text
-            else:
-                page_html, page_ok = fetch_project_page_html(project.url, cfg)
-                if page_ok:
-                    html = page_html
-        else:
-            return base, None
+            errors.append(f"{source}:id={ext_id} ai:detail:fallback")
     else:
         return base, None
 
-    if project.source not in (SOURCE_FL, SOURCE_KWORK) or not html.strip():
+    if source not in (SOURCE_FL, SOURCE_KWORK) or not html.strip():
         return base, None
 
     from tz_attachments import enrich_body_with_attachments, tz_attachments_enabled
@@ -130,9 +127,9 @@ def _resolve_description(
     cfg: Config,
     errors: list[str],
 ) -> str:
-    if project.source in (SOURCE_FL, SOURCE_KWORK):
+    if is_web_detail_source(project.source):
         body, _ = _resolve_ingest_body(project, cfg, errors)
-        return body
+        return body or (project.listing_snippet or project.title)
     return project.listing_snippet or project.title
 
 
@@ -1000,7 +997,12 @@ def process_legacy_neon_listing(
             return True, False
 
         log_prefix = f"{project.source}:id={project.project_id} "
-        description = _resolve_description(project, cfg, errors)
+        neon_body = (project.listing_snippet or "").strip()
+        if is_web_detail_source(project.source) and len(neon_body) < 300:
+            body, _ = _resolve_ingest_body(project, cfg, errors)
+            description = body or neon_body or project.title
+        else:
+            description = neon_body or project.title
         task_fallback_text = description or task_fallback_text
         full_analysis = analyze_project(
             cfg,

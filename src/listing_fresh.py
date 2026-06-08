@@ -1,4 +1,4 @@
-"""O134: fresh-only listing — stop at first known project_id."""
+"""O134/O139: fresh-only listing — keep unseen ids, skip known (incl. pinned)."""
 
 from __future__ import annotations
 
@@ -18,20 +18,21 @@ def trim_listing_at_known(
     storage: ProjectStorage | None,
     source: str,
 ) -> list[ListingProject]:
-    """Keep newest-first prefix until (excluding) first id already in SQLite."""
+    """Filter to project ids not yet in SQLite (skip known pins/gaps, no prefix-stop)."""
     if not projects or storage is None:
         return projects
     out: list[ListingProject] = []
+    skipped = 0
     for project in projects:
         if storage.has_seen(source, project.project_id):
-            break
+            skipped += 1
+            continue
         out.append(project)
-    skipped = len(projects) - len(out)
     if skipped:
         logger.info(
-            "%s: fresh-only stop at known id kept=%d skipped=%d",
+            "%s: skipped_known=%d kept=%d",
             source,
-            len(out),
             skipped,
+            len(out),
         )
     return out

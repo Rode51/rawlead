@@ -102,6 +102,21 @@ def test_status_level_fetch_error() -> None:
     assert status_level(health, fetch_failed=True) == "red"
 
 
+def test_status_level_ok_after_error_not_red() -> None:
+    """O152: FL ok-fetch after timeout — не 🔴 из-за stale cycle summary."""
+    now = time.time()
+    health = {
+        "last_ok_at": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(now - 3 * 60)),
+        "last_fetch_at": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(now - 3 * 60)),
+        "last_error_at": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(now - 60 * 60)),
+        "last_error_kind": "timeout",
+        "last_error_short": "Page.goto timeout 30s",
+        "last_parsed_cards": 21,
+        "last_downloaded": 21,
+    }
+    assert status_level(health, fetch_failed=True, now=now, source_id="fl") == "green"
+
+
 def test_format_health_log_line() -> None:
     ok_health = {"last_downloaded": 50, "last_new_ids": 3, "last_error_kind": "ok"}
     assert "status=ok" in format_health_log_line("youdo", ok_health, fetch_ok=True, ingest_lag_p50_min=2)

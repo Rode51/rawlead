@@ -13,7 +13,8 @@ from ai_analyze import AiAnalysis
 from budget import display_budget_text
 from config import Config, telegram_requests_proxies
 from tg_proxy_pool import tg_http_request
-from listing import SOURCE_KWORK, ListingProject
+from listing import ListingProject
+from radar_cycle_log import SOURCE_LABELS
 
 __all__ = [
     "TelegramNotifyError",
@@ -145,11 +146,15 @@ def format_mvp_message(
 
 
 def _source_labels(source: str) -> tuple[str, str]:
-    if source == SOURCE_KWORK:
-        return "Kwork", "Открыть на Kwork"
     if source == "telegram" or source.startswith("tg:"):
         return "Telegram", "Открыть"
-    return "FL", "Открыть на FL"
+    key = (source or "").strip().lower()
+    label = SOURCE_LABELS.get(key, key or "—")
+    if key == "kwork":
+        return label, "Открыть на Kwork"
+    if key == "fl":
+        return label, "Открыть на FL"
+    return label, f"Открыть на {label}"
 
 
 def _tg_link_lines(project: ListingProject, *, html_mode: bool = False) -> list[str]:

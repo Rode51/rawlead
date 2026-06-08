@@ -27,6 +27,13 @@ _FAILOVER_HTTP = frozenset({403, 429})
 _BAN_TTL_SEC = float(os.getenv("EXCHANGE_PROXY_BAN_TTL_SEC", "3600"))
 _STRIKES_TO_BAN = max(1, int(os.getenv("EXCHANGE_PROXY_STRIKES", "3")))
 _HTTP_STRIKES_TO_BAN = max(2, int(os.getenv("EXCHANGE_PROXY_HTTP_STRIKES", "2")))
+
+
+def _http_strikes_to_ban(source: str) -> int:
+    src = (source or "").strip()
+    if src == "youdo":
+        return max(2, int(os.getenv("YOUDO_HTTP_STRIKES", "4")))
+    return _HTTP_STRIKES_TO_BAN
 _CONNECT_TIMEOUT_SEC = float(os.getenv("EXCHANGE_PROXY_CONNECT_TIMEOUT_SEC", "5"))
 _READ_TIMEOUT_SEC = float(os.getenv("EXCHANGE_PROXY_READ_TIMEOUT_SEC", "20"))
 _ALERT_COOLDOWN_SEC = float(os.getenv("EXCHANGE_PROXY_ALERT_COOLDOWN_SEC", "600"))
@@ -48,6 +55,7 @@ _EXCHANGE_POOL_FORBIDDEN_ENV = (
     "TG_PROXY_URL",
     "TELETHON_PROXY_ACC1",
     "TELETHON_PROXY_URL",
+    "OPENROUTER_HTTP_PROXY",
 )
 
 _sessions: dict[str, "ExchangeFetchSession"] = {}
@@ -353,7 +361,7 @@ def _record_failure(url: str, *, source: str, http_code: int | None = None) -> b
         hk = _http_strike_key(url, source, http_code)
         n = _strike_count.get(hk, 0) + 1
         _strike_count[hk] = n
-        return n >= _HTTP_STRIKES_TO_BAN
+        return n >= _http_strikes_to_ban(source)
     n = _strike_count.get(key, 0) + 1
     _strike_count[key] = n
     return n >= _STRIKES_TO_BAN
@@ -722,6 +730,19 @@ def exchange_fetch_begin(source: str) -> ExchangeFetchSession:
             alive,
             total,
         )
+    try:
+        from exchange_trace import log_exchange_trace
+
+        log_exchange_trace(
+            source,
+            stage="proxy_pick",
+            proxy=_hint_from_url(session.current_url),
+            alive=alive,
+            total=total,
+            err="pool_exhausted" if urls and alive == 0 else "",
+        )
+    except Exception:
+        pass
     _sessions[source] = session
     return session
 
@@ -809,6 +830,7 @@ def exchange_get(
             proxy_url = session.current_url
             if not proxy_url:
                 break
+            t0 = time.monotonic()
             try:
                 resp = requests.get(
                     url,
@@ -817,6 +839,19 @@ def exchange_get(
                     proxies=session.current_proxies(),
                 )
             except requests.RequestException as exc:
+                ms = int((time.monotonic() - t0) * 1000)
+                try:
+                    from exchange_trace import log_exchange_trace
+
+                    log_exchange_trace(
+                        source,
+                        stage="html",
+                        ms=ms,
+                        proxy=_hint_from_url(proxy_url),
+                        err=type(exc).__name__,
+                    )
+                except Exception:
+                    pass
                 if _record_failure(proxy_url, source=source, http_code=None):
                     if session.advance_failover(
                         reason=f"timeout:{type(exc).__name__}",
@@ -840,10 +875,25 @@ def exchange_get(
                     )
                     continue
                 raise
+            ms = int((time.monotonic() - t0) * 1000)
             if resp.status_code in _FAILOVER_HTTP:
                 ban_slot = _record_failure(
                     proxy_url, source=source, http_code=resp.status_code
                 )
+                try:
+                    from exchange_trace import log_exchange_trace
+
+                    log_exchange_trace(
+                        source,
+                        stage="html",
+                        ms=ms,
+                        proxy=_hint_from_url(proxy_url),
+                        http=resp.status_code,
+                        ban=int(_BAN_TTL_SEC) if ban_slot else 0,
+                        err=f"http_{resp.status_code}",
+                    )
+                except Exception:
+                    pass
                 if session.advance_failover(
                     reason=f"http_{resp.status_code}",
                     banned_url=proxy_url if ban_slot else None,
@@ -858,6 +908,18 @@ def exchange_get(
                     continue
                 return resp
             _record_success(proxy_url, source)
+            try:
+                from exchange_trace import log_exchange_trace
+
+                log_exchange_trace(
+                    source,
+                    stage="html",
+                    ms=ms,
+                    proxy=_hint_from_url(proxy_url),
+                    http=resp.status_code,
+                )
+            except Exception:
+                pass
             return resp
         raise requests.RequestException(
             f"exchange_get:{source}: proxy cascade exhausted ({max_attempts} attempts)"

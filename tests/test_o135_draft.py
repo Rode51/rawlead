@@ -210,6 +210,38 @@ class TestO135OpenRouterProxy(unittest.TestCase):
         kwargs = mock_post.call_args.kwargs
         self.assertIn("127.0.0.1:3128", kwargs["proxies"]["http"] or "")
 
+    @patch("src.ai_analyze._openrouter_chat")
+    def test_shared_reply_draft_uses_proxy_when_env(
+        self, mock_chat: MagicMock
+    ) -> None:
+        import config as config_mod
+        from src.ai_analyze import AiLiteAnalysis, analyze_shared_reply_draft
+
+        config_mod._openrouter_proxy_cache = None
+        mock_chat.return_value = '{"reply_draft":"Привет, готов взяться."}'
+        cfg = MagicMock()
+        cfg.ai_active = True
+        cfg.ai_provider = "openrouter"
+        cfg.ai_model_shared_draft = "google/gemini-2.5-pro"
+        lite = AiLiteAnalysis(feed_visible=True, task_summary="Нужен лендинг")
+
+        with patch.dict(
+            os.environ,
+            {"OPENROUTER_HTTP_PROXY": "http://38.154.16.60:8000:user:pass"},
+            clear=False,
+        ):
+            config_mod._openrouter_proxy_cache = None
+            analyze_shared_reply_draft(
+                cfg,
+                title="Лендинг",
+                budget_text="50000",
+                lite=lite,
+                lead_id=1,
+            )
+
+        kwargs = mock_chat.call_args.kwargs
+        self.assertTrue(kwargs.get("use_draft_proxy"))
+
 
 if __name__ == "__main__":
     unittest.main()

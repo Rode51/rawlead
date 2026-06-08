@@ -1484,8 +1484,43 @@ def _render_exchanges(data: dict[str, Any]) -> str:
             lag_parts.append(f"≤5 мин: {within_5m} ({within_pct}%)")
         lag_hint = " · ".join(lag_parts) if lag_parts else "Тайминги — после накопления данных"
         what = html.escape(str(row.get("what_happened") or "—"))
+        what_full = html.escape(str(row.get("what_happened_full") or what))
+        listing_line = str(row.get("listing_line") or "").strip()
+        sub = html.escape(listing_line) if listing_line else ""
         hint = html.escape(f"Последний заказ: {insert_hint} · {lag_hint} · {what}")
-        parts.append(_card_html(name, status, hint, level))
+        trace_lines = row.get("trace_lines") or []
+        if str(row.get("source_id") or "") == "tg" and not trace_lines:
+            try:
+                from exchange_trace import recent_pipeline_lines
+
+                trace_lines = recent_pipeline_lines(
+                    _resolve_log_path(),
+                    source="tg",
+                    limit=3,
+                )
+            except Exception:
+                trace_lines = []
+        trace_block = ""
+        if trace_lines:
+            trace_items = "".join(
+                f"<li>{html.escape(str(line))}</li>" for line in trace_lines[:10]
+            )
+            trace_block = (
+                f'<p class="hint"><strong>Последний trace</strong></p>'
+                f'<ul class="hint rl-ops-trace">{trace_items}</ul>'
+            )
+        card = _card_html(name, status, hint, level)
+        if what_full and what_full != what:
+            card = card.replace(
+                '<p class="hint">',
+                f'<p class="hint" title="{what_full}">',
+                1,
+            )
+        if sub:
+            card = card.replace("</h2>", f"</h2><p class=\"hint\">{sub}</p>", 1)
+        if trace_block:
+            card = card.replace("</div>", f"{trace_block}</div>", 1)
+        parts.append(card)
     return "".join(parts)
 
 

@@ -47,11 +47,24 @@ def cycle_log_source_ids() -> tuple[str, ...]:
     return tuple(sid for sid in ALL_CYCLE_SOURCES if sid in enabled)
 
 
+_listing_metrics: dict[str, tuple[int, int]] = {}
+
+
+def stash_listing_metrics(source_id: str, parsed: int, fresh: int) -> None:
+    """Parsed/fresh с listing fetch — main.py забирает через take_listing_metrics."""
+    _listing_metrics[source_id] = (int(parsed), int(fresh))
+
+
+def take_listing_metrics(source_id: str) -> tuple[int, int]:
+    return _listing_metrics.pop(source_id, (0, 0))
+
+
 @dataclass
 class SourceCycleStats:
     """Счётчики воронки по одному источнику за цикл."""
 
     source_id: str
+    parsed_cards: int = -1
     downloaded: int = 0
     new_ids: int = 0
     to_bot: int = 0

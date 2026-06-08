@@ -18,7 +18,7 @@ from ingest_published_at import parse_fl_published_at
 from lead_category import category_from_fl_listing_url
 from listing import SOURCE_FL, ListingProject
 from listing_fresh import trim_listing_at_known
-from radar_cycle_log import log_pipeline_line
+from radar_cycle_log import log_pipeline_line, stash_listing_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +195,7 @@ def fetch_listing_projects(
     """GET до `FL_LISTING_MAX_PAGES` страниц `cfg.fl_projects_url`, дедуп id внутри цикла.
 
     Без прокси: домашний IP, не TG_PROXY_URL и не системные HTTP_PROXY из ОС.
-    O134: `storage` → fresh-only (stop at known id).
+    O134/O139: `storage` → fresh-only (filter unseen; pinned known do not stop scan).
     """
     merged: list[ListingProject] = []
     seen: set[int] = set()
@@ -207,7 +207,15 @@ def fetch_listing_projects(
         projects = _fetch_listing_pages(
             cfg, timeout_sec, max_pages, merged, seen, storage=storage
         )
-        return trim_listing_at_known(projects, storage, SOURCE_FL)  # type: ignore[arg-type]
+        parsed_cards = len(projects)
+        trimmed = trim_listing_at_known(projects, storage, SOURCE_FL)  # type: ignore[arg-type]
+        fresh = len(trimmed)
+        log_pipeline_line(
+            cfg.radar_log_path,
+            f"listing:fl parsed={parsed_cards} fresh={fresh}",
+        )
+        stash_listing_metrics("fl", parsed_cards, fresh)
+        return trimmed
     finally:
         exchange_fetch_end("fl")
 
@@ -238,18 +246,11 @@ def _fetch_listing_pages(
                 )
             break
 
-        hit_known = False
         for project in batch:
             if project.project_id in seen:
                 continue
-            if storage is not None and hasattr(storage, "has_seen"):
-                if storage.has_seen(SOURCE_FL, project.project_id):
-                    hit_known = True
-                    break
             seen.add(project.project_id)
             merged.append(project)
-        if hit_known:
-            break
 
     feed_cat = category_from_fl_listing_url(cfg.fl_projects_url) or ""
     if not feed_cat:

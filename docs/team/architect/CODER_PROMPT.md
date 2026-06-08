@@ -1,690 +1,650 @@
 # Coder — горячий контур (активное)
 
-**→ Сейчас:** **O135 ✅ deploy** · owner smoke draft + OR proxy env · Wave 2 **⏸**
+**→ Сейчас:** **Wave 2** owner smoke · **O121-w2b** `/ops/` Failed to fetch (блокер ops)
+
+**Закрыто:** O158-MATCH-UX **deploy ✅ 2026-06-08** · theme **1.18.49**
+
+**Deploy:** `scripts/deploy-o158-vps.py`
+
+**Архив DoD:** [`CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md)
 
 ---
 
-## § O135-DRAFT ✅ (2026-06-08)
+## § O158-MATCH-UX — дубли push · шкала совместимости · deep link ?lead=
 
-| A L2-only 1-й | B draft_async restart | C OR proxy | Deploy |
-|---------------|----------------------|------------|--------|
-| skip L3 cold · `first_user_l2_only` | `lead_draft_jobs` + `draft:restart` | `OPENROUTER_HTTP_PROXY` / `OPENROUTER_PROXY_URLS` | **`deploy-o135-vps.py` ✅** |
+**Owner P0** · скрин 2026-06-08 · бэклог [`OWNER_INTENT.md`](OWNER_INTENT.md) § O158-w
 
-**Verify Lead:** pytest **18/18** (o135 + draft_async + shared_draft) · spec **5/5** ✅
+### 1. Дубли TG push (один заказ, 3 сообщения)
 
-**Owner next:** опц. `OPENROUTER_HTTP_PROXY=<1-й YOUDO_PROXY_URLS>` · smoke `/lenta/?lead=15146` · `preprod_draft_burst --max-leads 3`
+**Симптом:** Freelance.ru `/task/view/2245` · Match 82% · текст слегка разный между push.
 
----
+**Корень:** `match_push_log` dedup только `(user_id, lead_id)`. При смене snippet → новый `content_hash` → **новая строка `leads`** (тот же URL) → новый push. См. `push_match_for_lead` · `pg_storage.record_listing`.
 
-## § O135-DRAFT — archive spec (**✅ закрыто**)
+**Fix (минимум):**
+- Перед send: dedup по `(user_id, source, external_id)` **или** нормализованный `url` (без query).
+- Опц.: `match_push_log` колонка `order_url` + unique `(user_id, order_url_hash)`.
+- Verify Neon: `SELECT id, external_id, url, content_hash FROM leads WHERE url LIKE '%2245%'`.
 
-**Симптом owner 2026-06-08:** Premium `/lenta/?lead=15146` → **«ИИ не успел — повторите»** (poll 120s) · lead #15146 kwork OK visible · `reply_draft` NULL · log `Черновик ещё не запущен` после restart API.
+**Файлы:** `src/match_push.py` · `sql/` migration если нужна · `tests/test_match_push.py`
 
-**Корень (Lead):**
-1. **1-й пользователь:** L2 (human, pro) + **лишний L3** → p95 ~105s · UI timeout
-2. **draft_async:** in-memory worker теряется при restart API · GET poll → failed «не запущен»
-3. **OpenRouter:** `DIRECT_REQUESTS_PROXIES` с IP Beget VPS · без прокси · возможен latency/rate-limit
+### 2. Пустая шкала на /lenta/ (подпись «N%» есть)
 
-**Решение owner:** 1-й Premium = **только L2** · 2-й+ = L3 · OpenRouter proxy **без новых покупок** — `YOUDO_PROXY_URLS` (residential RU) или **acc2/acc3** Telethon · **не** bot `TG_PROXY_URL`.
+**Симптом:** регресс O147 — owner verify § O147-w п.2.
 
-### Copy-paste для @coder
+**Корень:** `syncMatchFill` сбрасывает `width:0` inline, ждёт IO/rAF; на collapsed карточках полоска не доезжает.
 
-```
-@coder O135-DRAFT
+**Fix:**
+- После `insertAdjacentHTML` / `observeLeadCards` — `syncMatchFill` для **всех** карточек в viewport сразу (не только IO).
+- Или: не ставить inline `width:0` если `--match-value` уже задан; опираться на CSS `.rl-feed-list .rl-lead-card .rl-match__fill { width: var(--match-value) }`.
+- Smoke: Premium logged-in · `/lenta/` · полоска = подписи N%.
 
-Спека: docs/team/architect/CODER_PROMPT.md § O135-DRAFT
-Lead verify: lead #15146 · journalctl rawlead-api | grep lenta:draft
+**Файлы:** `wordpress/.../assets/js/rawlead-feed.js` · bump theme · deploy WP
 
-Контекст: L2 уже human (l3_human_style shared L2). Сейчас 1-й user = L2+L3 = слишком долго.
-Не трогать: FL/Kwork listing proxy · radar ingest · WP theme copy · mass regen.
+### 3. Deep link `/lenta/?lead={id}` — нет совместимости
 
-## A — 1-й пользователь: L2-only (skip L3)
-Файл: src/match_push.py `generate_and_store_lead_draft`
+**Корень:** `focusLeadCard` → `GET /rawlead/v1/leads/{id}` → API `GET /v1/leads/{id}` — **`keyword_match` не считается** (нет user tags). WP callback **не** пробрасывает Bearer (`rawlead-api.php` ~851).
 
-После успешного cold L2 + UPDATE leads.reply_draft:
-- INSERT user_lead_replies с **текстом L2 as-is**
-- **НЕ** вызывать `_build_personalized_reply` для первого user на этом lead
-- Log: `lenta:draft:{id}:first_user_l2_only`
+**Fix:**
+- API: в `get_lead` при Bearer — `_load_user_tags` + `keyword_match` в `_row_to_item`; или новый `GET /v1/me/leads/{lead_id}`.
+- WP: `rawlead_api_get(..., $request)` для `/leads/{id}` с user headers.
+- JS: `leadDetailApiUrl` — auth endpoint если logged in.
 
-2-й+ без изменений: `shared` есть → только L3 (`fast_shared`).
-
-DoD: cold lead p95 target **< 75s** (1 LLM) · warm **< 20s** (L3 only).
-
-## B — draft_async: не терять job после restart
-Файл: src/draft_async.py (+ api_server если нужно)
-
-1. `poll_draft` GET: status failed «Черновик ещё не запущен» → **pending + auto `_start_worker`** (или 202, не terminal fail)
-2. POST idempotent: если `lead_draft_jobs.pending` и worker dead → restart worker
-3. Wire `_insert_lead_pending` / `_set_lead_job_failed` / `_delete_lead_job` (сейчас dead code)
-4. Worker `max_retries=2` (не 4) — как hot path O131
-
-Log: `draft:restart lead=N` · `draft:worker_done lead=N ms=M`
-
-## C — OpenRouter proxy (отдельный пул, owner без новых IP)
-
-Файлы: `src/config.py` · `src/ai_analyze.py` (`_openrouter_chat` + L3 POST)
-
-**Owner constraint:** новых прокси нет. Кандидаты (owner пропишет в `.env` **вручную**, код только читает):
-
-| Приоритет | Env | Откуда |
-|-----------|-----|--------|
-| **1** | `OPENROUTER_HTTP_PROXY=` | **1-й слот `YOUDO_PROXY_URLS`** (residential RU, node-proxy) |
-| **2** | `OPENROUTER_PROXY_URLS=` | `TELETHON_PROXY_ACC2` и/или `ACC3` (rotate on 429) |
-
-**Запрещено:**
-- автоподключать `tg_proxy_pool` / failover бота — OpenRouter **свой** пул, не трогает active Bot slot
-- **`TG_PROXY_URL` / acc1 primary** — бот живёт там
-- **`EXCHANGE_PROXY_URLS`** / FL listing pool
-- менять `.env` из кода
-
-Поведение:
-- L2/L3 on-demand → proxy если env · иначе DIRECT VPS
-- Startup API: `openrouter:proxy=hint|direct` (host:port без creds)
-- Log fail: `OpenRouter HTTP N via hint`
-
-Owner smoke после deploy: с `OPENROUTER_HTTP_PROXY=<youdo slot>` → draft #15146 < 90s. Если хуже direct — unset, оставить A+B.
-
-## D — hot path L2 trim (если всё ещё >75s)
-- `analyze_shared_reply_draft` on-demand: max **2** outer attempts (не 4) когда вызов из `generate_and_store_lead_draft`
-- `timeout_sec=90` оставить · smell-retry **1** retry max on hot path
-- Не трогать backlog/regen path
-
-## E — deploy + tests
-- scripts/deploy-o135-vps.py → rawlead-api restart
-- tests: first_user_l2_only skips L3 · poll restart · openrouter proxy from env (mock requests)
-- pytest O135 green
-
-## Verify owner (Lead)
-.venv\Scripts\python.exe -m pytest tests/test_o135_draft.py -q
-.venv\Scripts\python.exe scripts\deploy-o135-vps.py
-Premium smoke: /lenta/?lead=15146 → отклик **< 90s** · no «не успел»
-journalctl -u rawlead-api | grep -E 'first_user_l2_only|fast_shared|draft:restart'
-```
-
-**Не в scope:** pre-warm L2 на все visible · смена модели · Wave 2.
-
----
-
-## § O132-STABILITY — radar OOM (**✅**)
-
-**Инцидент:** [`problems/2026-06-08-radar-oom-site-down.md`](../../problems/2026-06-08-radar-oom-site-down.md)
-
-**Owner ✅ 2026-06-08:** Beget **2 GB RAM** · swap **0** post-reboot · radar **0 OOM**.
-
-### Copy-paste для @coder
-
-```
-@coder O132-STABILITY
-
-Спека: docs/team/architect/CODER_PROMPT.md § O132-STABILITY
-Тикет: docs/problems/2026-06-08-radar-oom-site-down.md
-
-Контекст: 1 GB → OOM 8×/night (chrome-headless). Owner **2 GB** ✅.
-Не трогать: proxy/env acc1 · mass regen · WP theme.
-
-## 1 — systemd rawlead-radar.service
-MemoryMax=1400M · MemoryHigh=1200M · OOMScoreAdjust=200 · KillMode=mixed
-
-## 2 — orphan Playwright cleanup
-Конец цикла + startup: kill stale chrome-headless/playwright PIDs (user rawlead)
-Log: browser:cleanup killed=N
-
-## 3 — serialize browser
-Max 1 Playwright fetch одновременно (FL xor Kwork). Close context after fetch.
-
-## 4 — deploy
-scripts/deploy-o132-vps.py · restart rawlead-radar · smoke free -h
-
-DoD: 24h 0 oom-kill · NRestarts stable.
-```
-
-**Не в scope:** O134 ingest SLA · O133 TZ downloader · Wave 2.
-
-**Verify Lead 2026-06-08:** pytest **8/9** (1 flaky UA random) · spec **4/4** ✅ · VPS **не задеплоен** (grep cleanup=0, MemoryMax=∞).
-
-**Owner next:** `.venv\Scripts\python.exe scripts\deploy-o132-vps.py` → 24h мониторинг 0 oom-kill.
-
----
-
-## § O131-PERF ✅ (2026-06-07)
-
-| A L2 | B pooler | C feed boot | D `/v1/feed` | Deploy |
-|------|----------|-------------|--------------|--------|
-| retries 2 · poll 120s · `fast_shared` | `check_neon_pooler.py` · `db:` log | `Promise.all` · **1.18.35** | scan limit · inline `today_count` | **`deploy-o131-vps.py` ✅** |
-
-**Verify Lead:** pytest **29/31** (2 test env quirks) · load@20 p95 **2549 ms** ⏸ · smoke feed **1818 ms** · pooler local **OK**.
-
-**Owner next:** `preprod_draft_burst` · `ux_journey J5` · `preprod_stress_v2`.
-
----
-
-## § O131-PERF — archive spec (**✅ закрыто**)
-
-**Решение владельца (2026-06-07):** четыре пункта **до** полного `preprod_stress_v2` + `ux_journey` rerun.
-
-**Контекст (факты):** HTML ~450 ms OK · `/v1/feed` ~1.5 s · draft p95 ~105 s · UI poll **90 s** → ложный «ИИ временно недоступен». Load@50 p95 2396 ms FAIL. Runbook S3-pre: Neon **pooler**.
-
-**Не трогать:** proxy/env acc1 · mass regen · judge · WP theme copy.
-
-### Copy-paste для @coder
-
-```
-@coder O131-PERF
-
-Спека: docs/team/architect/CODER_PROMPT.md § O131-PERF
-Runbook verify: docs/ops/PREPROD_STRESS_RUN.md § S3-pre + Wave 2
-
-## A — L2 hot path (draft по клику)
-
-Уже есть: `match_push.generate_and_store_lead_draft` — если `leads.reply_draft` не пуст → **skip L2**, только L3 uniquify (стр. ~629).
-
-Доработать:
-1. On-demand `_analyze_shared_ondemand`: **max_retries=2** (не 4) · backoff короче · timeout 90s оставить
-2. On-demand L3 `rephrase_reply_draft_per_user`: **2 attempt** max в hot path (smell-retry — только 1 retry, не 3)
-3. UI safety: `rawlead-feed.js` **`DRAFT_POLL_MAX_MS` 90000 → 120000** · сообщение при timeout: «ИИ не успел — повторите» (не generic ai_unavailable)
-4. Log: `lenta:draft:{id}:fast_shared` когда взяли shared без L2
-
-DoD: premium клик на lead **с** `reply_draft` → ready **< 15 s** (L3 only) · lead **без** shared → p95 target **< 75 s** в `preprod_draft_burst.py --max-leads 5`
-
-## B — Neon pooler (VPS ops + guard)
-
-Owner на VPS: `DATABASE_URL` → host `*-pooler.*` или порт **6543** (Neon dashboard → Connection pooling). Direct URL при 50 VU = FAIL S3.
-
-Coder:
-1. `scripts/check_neon_pooler.py` (или расширить deploy probe): read env · warn если нет `pooler`/`6543` в URL · exit 1 в CI optional
-2. `rawlead-api` startup log: one line `db: pooler|direct` (без секретов)
-3. Строка в `docs/ops/PREPROD_STRESS_RUN.md` § S3-pre — «проверено скриптом»
-
-DoD: owner grep / script → `pooler` · load@50 p95 **< 2500 ms** или явный fail с hint «direct DB»
-
-## C — Feed boot parallel (`rawlead-feed.js`)
-
-Сейчас waterfall: `loadSubscription` → `mergeFeedPrefsOnLogin` → `loadTags+loadCatalog` → `resetAndLoad`.
-
-Цель: параллельный boot:
-```javascript
-Promise.all([
-  loadSubscription(),
-  isLoggedIn() ? mergeFeedPrefsOnLogin() : Promise.resolve(),
-  loadTags(),
-  loadCatalog()
-]).then(/* applyFeedShellMode, applyFeedTierUi, resetAndLoad once */)
-```
-
-Правила:
-- Один `resetAndLoad` после всех prefs/tags/catalog/subscription
-- Ошибка одного leg — не блокировать feed (catch per leg, как сейчас)
-- Mirror minimal в `rawlead-cabinet.js` если тот же паттерн
-
-DoD: DevTools Network — feed не ждёт serial chain > 1 RTT сверх max(subscription, tags, catalog)
-
-## D — `/v1/feed` API (`api_server.py`)
-
-1. **`today_count`:** один round-trip — CTE/window или subquery в том же `execute`, не второй full scan после page query
-2. **Scan limit:** `_ME_FEED_SCAN_LIMIT=500` только при `categories` или `sort=match`+skills; time sort без filter → `limit+offset+20` buffer
-3. Tests: `tests/test_api_feed.py` или extend existing — today_count present · scan limit regression
-
-DoD: anon `GET /v1/feed?limit=20` p95 **< 1200 ms** (local probe или `preprod_load_feed.py --workers 20`) · один SQL round-trip для count+page где возможно
-
-## Verify (owner после deploy VPS + WP JS bump)
-
-```powershell
-python scripts/check_neon_pooler.py   # или owner SSH grep DATABASE_URL
-.venv\Scripts\python.exe scripts\preprod_load_feed.py --api-url https://api.rawlead.ru --workers 20 --duration 120
-.venv\Scripts\python.exe scripts\preprod_draft_burst.py --max-leads 5 --concurrency 2
-.venv\Scripts\python.exe scripts\preprod_playwright\ux_journey.py --journeys J5
-.venv\Scripts\python.exe scripts\preprod_stress_v2.py --no-mint --skip-journey
-```
-
-Target gates: load@50 p95 < 2s · draft p95 < 90s · J5 pass · stress v2 draft gate green.
-```
-
----
-
-## § O129-JOURNEY-FIX — harness + draft burst feed (**⏸ после O131**)
-
-### Copy-paste для @coder
-
-```
-@coder O129-JOURNEY-FIX
-
-Контекст: ux_journey прогон 2026-06-07 → data/preprod_ux_journey.json — 6/10, 3 critical.
-O129-W2 orchestrator + skills_mismatch + tier mint — ✅ (pytest 7/7).
-Не трогать: proxy/env, VPS deploy, WP theme, mass regen.
-
-## Fail 1 — J4/J5/J6 empty feed (critical)
-
-Симптом: после J3 (design + skill filter) J4 ждёт `#rl-feed-list .rl-lead-card[data-id]` 45s timeout.
-Root: фильтры J3 остаются в UI/localStorage; J4 `_goto_lenta` не сбрасывает.
-
-Fix:
-- `scripts/preprod_playwright/feed_ui.py` — `reset_feed_filters(page)` (category all · skills clear · sort/time · min_match default)
-- `ux_journey.py` — в начале J4, J5, J6 вызвать reset (или shared helper `_lenta_fresh(ctx)`)
-- Mirror: тот же паттерн что ux_audit desktop flake U2→U4 (если есть — reuse)
-
-DoD: J4–J6 pass на prod с chromium+token.
-
-## Fail 2 — J8 cabinet inbox (critical/warn)
-
-Симптом: click на `.rl-lead-card--skeleton`, `#rl-cabinet-list` intercepts pointer events.
-Fix:
-- `j8_cabinet_logged`: ждать `#rl-inbox-list .rl-lead-card[data-id]:not(.rl-lead-card--skeleton)` (timeout 45s)
-- optional scroll / force click только после real card
-- не кликать skeleton
-
-DoD: J8 pass.
-
-## Fail 3 — draft_burst empty lead ids
-
-Симптом: `preprod_draft_burst.py` → `feed returned no lead ids` для premium JWT acc1.
-API: anon `/v1/feed?limit=5` → 5 items; premium bearer без skills → 0 items (`_personal_feed_page`, user_tags без km>0).
-
-Fix в `fetch_feed_lead_ids`:
-1. auth feed как сейчас
-2. if empty → fallback anon feed (те же lead_id, draft всё равно с premium token)
-3. или fallback `?skills=<one visible tag>` чтобы обойти personal-only path
-4. fail loud с hint если оба пусты
-
-DoD: `preprod_draft_burst.py --max-leads 5 --concurrency 2` → pass (не skipped).
-
-## Tests
-
-- extend `tests/test_preprod_stress_v2.py` или новый `tests/test_preprod_draft_burst.py`: mock empty auth feed → fallback ids
-- optional: unit for reset_feed_filters selectors (minimal)
-
-## Verify (owner после merge)
-
-.venv\Scripts\python.exe scripts\preprod_playwright\ux_journey.py --base-url https://rawlead.ru
-.venv\Scripts\python.exe scripts\preprod_draft_burst.py --max-leads 5 --concurrency 2
-
-Target: journeys 0 critical (J10 mobile optional), draft_burst pass.
-```
-
----
-
-## § O129-W2 orchestrator ✅ (2026-06-07)
-
-`preprod_stress_v2.py` · `preprod_draft_burst.py` · tier mint · skills `fl` · skipped gates ⏭ · pytest **7/7**.
-Owner verify: `preprod_stress_v2_r2.json` — tier/skills/tz/parsers ✅ · load@50/draft p95 ⏸ infra.
-
----
-
-| Gate | Result | Artifact |
-|------|--------|----------|
-| UX anon/free/premium | **24/24** each | `preprod_ux_audit_{anon,free,premium}.json` |
-| Smoke | **5/5** | `preprod_playwright_report.json` |
-| Load S3 | p95 **1846ms** · 0% err · 20×180s | `preprod_load_summary.json` |
-| AI S5 | **96%** draft+tools | `preprod_ai_prod_audit.json` |
-| Radar S4 | FL **alive=4/4** post ban-clear + O110-B | `radar_site.log` |
-
-**Не в W1:** `ux_journey` J1–J11 · LLM human.md · load 50 VU → **O129 v2**.
-
----
-
-## § O110-B ✅ (2026-06-07)
-
-`invalidate_browser_slot` · wipe profile on ban · failover cooldown 5–15s · random Chrome/Firefox UA · default HTTP UA Chrome 122 · VPS `deploy_ingest_coupled_src` ✅.
-
----
-
-## § O129-PREMIUM-UX-r2 ✅ (2026-06-07)
-
-**Harness:** `ux_audit.py` + `feed_ui.py` · U10b rate-limit · U5→U12 reuse · U7 backdrop close.
-
----
-
-## § O129-STRESS-V2 — полная симуляция наплыва (**→ Coder**)
-
-### Copy-paste для @coder
-
-```
-@coder O129-STRESS-V2
-
-Wave 1 ✅ 2026-06-07 (commits 4d8caf3, 63b63a1). Prod theme 1.18.34, O110-B на VPS.
-Спека: docs/team/architect/CODER_PROMPT.md § O129-STRESS-V2
-Runbook: docs/ops/PREPROD_STRESS_RUN.md § Wave 2
-
-Контекст infra (не трогать env):
-- TG acc1/bot proxy: 45.152 мёртв → временно 38.154 (acc2 spare), VPS+local ✅
-- FL proxy O110-B deployed, S4 green
-
-Задача: scripts/preprod_stress_v2.py — один orchestrator Wave 2.
-
-Deliverables:
-1. scripts/preprod_stress_v2.py → data/preprod_stress_v2.json + .md
-2. Тиры: anon · free JWT · trial · premium (preprod_mint_token.py)
-3. Reuse preprod_load_feed.py (ramp → 50 VU), ux_journey.py J1–J11
-4. Draft burst DRAFT_BURST_MAX=20 (optional preprod_draft_burst.py)
-5. Timings: feed · expand · tools · L2 · L3 · TZ · total (ms table in md)
-6. TZ: 3–5 lead_id с [TZ attachment — assert detail fetch
-7. Parser snapshot из radar_site.log (exchange_health + health:*)
-8. S1-b: preprod_ai_matrix.py --scenario skills_mismatch
-9. Minimal tests (timing parser / tier matrix)
-10. PREPROD_STRESS_RUN.md § Wave 2
-
-Pass: p95 feed <2s @50 VU · draft 0% 5xx p95<90s · TZ ≥2/3 · J1–J11 0 critical · parsers not all red.
-
-Не: mass regen, judge, Sonnet, новый VPS, правки .env/proxy.
-
-Baseline W1: preprod_ux_audit_{anon,free,premium}.json 24/24 · load p95 1846ms · AI 96%.
-```
-
-**Запрос владельца 2026-06-07:** stress «максимально хороший» — все тиры подписки, поток пользователей, draft+tools+TZ, **тайминги** по этапам, UX, парсеры «сломан vs тишина».
-
-**Mechanic сначала — нет.** Mechanic = инцидент «сломалось». Сначала **Wave 1** (готовые скрипты, owner) → **Wave 2** (этот §).
-
-### Scope Coder
-
-| # | Артеfact | DoD |
-|---|----------|-----|
-| 1 | `scripts/preprod_stress_v2.py` (orchestrator) | один entrypoint · JSON `data/preprod_stress_v2.json` + `.md` |
-| 2 | **Тиры:** anon · free JWT · trial · premium JWT | mint через `preprod_mint_token.py` / env · matrix в отчёте |
-| 3 | **Read load** | reuse k6 or `preprod_load_feed.py` · p50/p95/p99 |
-| 4 | **Draft burst (controlled)** | N users × M leads · **cap** `DRAFT_BURST_MAX=20` · **не** 1000 OpenRouter |
-| 5 | **Timings** | per phase ms: feed · expand · tools · shared L2 · L3 · TZ fetch · total; таблица в md |
-| 6 | **TZ** | 3–5 lead_id с `[TZ attachment` в body · assert detail fetch ok · log size/chars |
-| 7 | **Quality spot** | reuse validators O128 на burst sample (no judge) |
-| 8 | **Parser snapshot** | pull `exchange_health:*` + last `health:*` lines from radar log → секция отчёта |
-| 9 | **S3-pre** | ramp VU · fail if 502/`53300`; doc Neon pooler in report |
-| 10 | **S1-b** | `preprod_ai_matrix.py --scenario skills_mismatch` (Node lead + yii2 user tags) |
-| 11 | **S4-pre** | assert no runaway `cycle_sec` / cascade spam in parser snapshot |
-| 12 | tests | smoke unit for timing parser / tier matrix (minimal) |
-
-### Pass criteria (O129)
-
-| Gate | PASS |
-|------|------|
-| Read p95 feed | < 2s @ 50 VU |
-| Draft burst | 0% 5xx · p95 draft < 90s · 429 documented |
-| TZ leads | ≥2/3 attachment text loaded |
-| UX journey | J1–J11 0 critical (reuse `ux_journey.py`) |
-| Parsers | см. runbook § Parser — не все red |
-
-### Файлы
-
-- `scripts/preprod_stress_v2.py` · optional `scripts/preprod_draft_burst.py`
-- `docs/ops/PREPROD_STRESS_RUN.md` § Wave 1 + Wave 2
-- **Не:** mass regen · judge · Sonnet env · новый VPS
-
-### Deploy
-
-Только restart API если меняется instrumentation; иначе scripts-only.
-
----
-
-## § O128-L2-VOICE ✅ (2026-06-07)
-
-**Coder:** `l3_human_style.py` (блок O128-B, uniquify A=план→шаги) · `ai_analyze.py` cliche/smell · tests **36/36** · deploy `deploy-l2-stack-vps.py` ✅
-
-**Verify Lead:** VPS `O128-B` ×2 · audit 50 **96%** draft/tools · GOOD #8752 без «предпочтение по стеку»
-
----
-
-## § O128-L2-VOICE spec (архив DoD)
-
-**Боль:** L2 пишет «имею опыт / делал похожее» → заказчик просит кейсы. RawLead — **универсальный черновик**, не портфолио.
-
-**Решение B (владелец):**
-- ✅ **Можно:** «По ТЗ вижу…», «Для реализации [боль] выстрою: [шаги из ТЗ]», стек **из ТЗ** + 1 фраза «почему»
-- ❌ **Нельзя:** «имею опыт», «я эксперт», «уже делал», «N проектов», «делал похожее», «предпочтение по стеку?», «какой язык выбрать?»
-- **Вопросы:** 1 (редко 2) — только **бизнес-логика / edge case** из ТЗ: «В описании [X]. Как планируете [крайний случай]?»
-
-**Не трогать:** `match_push.py` flow · env моделей · mass regen · `--judge` · `wordpress/`
-
-### Файлы (только эти)
-
-| Файл | Что |
-|------|-----|
-| `src/l3_human_style.py` | `build_shared_l2_system`, `build_uniquify_system`, `_HUMAN_GOOD_PATTERNS`, `_REPLY_AI_SMELL_RE`, GOOD/BAD примеры |
-| `src/ai_analyze.py` | `_REPLY_DRAFT_CLICHE_RE`, `_FORBIDDEN_REPLY_GREETING_RE`, при необходимости `reply_draft_cliche_warn` |
-| `tests/test_l3_human_style.py` | § `test_o128_*` (минимум 8 кейсов) |
-| `tests/test_l3_human_style.py` или новый | smell/validator ловит BAD-фразы |
+**Файлы:** `src/api_server.py` · `wordpress/.../inc/rawlead-api.php` · `rawlead-feed.js` · pytest API
 
 ### DoD
 
-| # | Критерий |
-|---|----------|
-| 1 | **L2 shared prompt:** блок «Позиция исполнителя» — план/шаги из ТЗ; запрет portfolio-claims; шаблон вопроса по edge case |
-| 2 | Убрать/переписать: «Делал похожее…» в `_HUMAN_GOOD_PATTERNS`; GOOD **#8752** без «предпочтение по стеку» |
-| 3 | **L3 uniquify:** каркас **(A)** был «опыт→план→вопрос» → **«план→шаги→вопрос»** (без кейса/опыта); retry suffix не предлагать «начни с опыта» |
-| 4 | **Validator/smell:** retry при «имею опыт», «эксперт», «делал похож», «предпочтение по стеку», «какой стек/язык предпочитаете» |
-| 5 | Сохранить: «Здравствуйте!», 4–6 предл., один «?», запрет Cursor/ИИ/промпт, O99 domain rules (creative/TG/attachments) |
-| 6 | `pytest tests/test_l3_human_style.py -q` — все зелёные + новые o128 |
-| 7 | Deploy: `python scripts/deploy-l2-stack-vps.py` |
+- [x] pytest match push dedup + lead detail km **7/7**
+- [x] theme deploy · `deploy-o158-vps.py` **2026-06-08**
+- [x] owner smoke ⏸ — `/lenta/` полоски · TG «Лента»
 
-### GOOD / BAD (вставить в промпт)
+---
 
-**BAD:** «Имею большой опыт интеграций AmoCRM. Готов обсудить.»  
-**BAD:** «Делал похожие боты. Подскажите, какой стек предпочитаете?»  
-**GOOD (B):** «Здравствуйте! По ТЗ — webhook AmoCRM: заявка с формы → сделка, тест на тестовом аккаунте. REST API Amo, как в описании. Подскажите, одна воронка или разные по источнику?»
+## § O155-EXTERNAL-PULSE — Healthchecks.io dead man's switch
 
-### Проверка
+**Owner принял:** внешний ping после ok-cycle · **дополнение** к O91 watchdog (не замена).
 
-```bat
-python -m pytest tests/test_l3_human_style.py -q
-python scripts/preprod_ai_prod_audit.py --profile site --limit 50
-python scripts/deploy-l2-stack-vps.py
+### Задача
+
+После **успешного** site-cycle (`run_cycle` завершился, `radar_profile=site`) — fire-and-forget GET:
+
+```text
+GET $HEALTHCHECKS_SITE_URL   # https://hc-ping.com/<uuid> или /success
 ```
 
-**Не делать:** Sonnet в `.env.site` · `backfill` reply_draft · правки `tools_catalog` (O125/O98 закрыты).
+| Правило | Значение |
+|---------|----------|
+| Env | `HEALTHCHECKS_SITE_URL` — пусто = **no-op** |
+| Когда ping | конец `run_cycle` после `record_cycle_summary` · **не** на паузе |
+| Fail | silent · не ломать цикл |
+| Grace на HC | owner ставит **15 min** в UI Healthchecks |
 
-**Опц. P2 (если успеешь):** #9909 — «ИИ-бот» в title: не fail validator на слово «бот» когда в ТЗ явно AI-продукт.
+Success ping: **любая** web-биржа из `PUBLIC_FEED_SOURCES` без `fetch_error` **или** живой `tg_main` (пульс ≤5 мин). Fail ping (опц. `HEALTHCHECKS_SITE_FAIL_URL`): **все** опрошенные web упали **и** TG-монитор мёртв. **Не** «только FL/Kwork» — см. § **O141-EXCHANGE-PARITY**.
 
----
+### Watchdog timer (deploy checklist)
 
-## § L2-draft-tune ✅ (2026-06-07)
+В `deploy-o155-o156-vps.py` или `DEPLOY_VPS.md`: проверка
 
-Audit 50: draft **96%** · tools **96%** · deploy `deploy-l2-stack-vps.py` ✅
-
----
-
-## § O127-WP — Filter Bar v2 + Lead Card v3 ✅ (2026-06-07)
-
-**Coder:** partials `feed-filter-bar.php` · `feed-card.php` · CSS §9 · JS `data-tier` · **1.18.19** · deploy VPS.
-
-**Lead verify:** repo DoD ✅ · Local **1.18.19** + `rl-filter-btn--locked` ✅ · prod HTTP timeout из Lead env — owner Ctrl+Shift+R.
-
----
-
-## § O127-WP spec (архив DoD)
-
-**Design:** [`feed-cabinet-mvp.md`](../design/wp/feed-cabinet-mvp.md) **§9** · [`LEAD_DESIGN_PROMPT.md`](../team/design/LEAD_DESIGN_PROMPT.md) § O127-D ✅
-
-**Суть:** один filter bar chrome (anon = locked кнопки, не скрывать) · одна карточка `data-tier` · один CTA · 48px mobile.
-
-| # | DoD | Файл |
-|---|-----|------|
-| 1 | Unified filter bar: chips + `[Навыки▾]` + `[Сорт▾]` у **всех** тиров; anon `.rl-filter-btn--locked` + hint | `feed-filter-bar.php` / `page-lenta.php` · CSS §9.1 |
-| 2 | `data-tier` anon\|free\|premium на карточке; rows auth-only / paid-only | `feed-card.php` · `rawlead-feed.js` |
-| 3 | Lead Card v3 F-pattern · AC-1…AC-12 §9.2h | CSS §9.2g · JS |
-| 4 | Free CTA: inline upsell (не редирект с 1-го клика) · Premium draft · Cabinet accordion | регресс **O124** |
-| 5 | Убрать «Брать»/«Сомнительно» если остались | grep |
-| 6 | Bump `RAWLEAD_CHILD_VERSION` · **не** merge с O124-w2 отдельно — включить anon polish в эту волну |
-
-**Не трогать:** `src/` · `/ops/` · O126 API.
-
-**Smoke:** Local BS `localhost:3009/lenta/` — anon locked hint · free/premium same chrome · card tiers · 390px.
-
-**Deploy:** `deploy-wp-theme-vps.py` по команде owner.
-
----
-
-## § O126-category-fix ✅ код (2026-06-07)
-
-**Lead verify:** tests **7/7** · `_passes_category_filter` в `api_server.py` · `infer` default **`other`** · `scripts/backfill_lead_category.py`
-
-| # | DoD | ✅ |
-|---|-----|---|
-| 1 | `lead_category.py` hints + other default | ✅ |
-| 2 | API filter = resolved category | ✅ |
-| 3 | backfill script | ✅ |
-| 4 | ingest via `category_for_listing` / `lead_category` | ✅ shared module |
-| 5 | `tests/test_o126_category.py` | ✅ **7/7** |
-
-**Prod:** ✅ **2026-06-07** — API + backfill 1757 · smoke `category=dev` → **dev:20** · theme **1.18.20** dev icon `escapeHtml`
-
-**Deploy owner:**
-```bat
-python scripts/backfill_lead_category.py --reconcile-visible --dry-run
-# upload src/lead_category.py src/api_server.py → restart rawlead-api rawlead-radar
-python scripts/backfill_lead_category.py --reconcile-visible
+```bash
+systemctl is-enabled rawlead-ingest-watchdog.timer
 ```
-Smoke: `GET …/feed?limit=12&category=dev` → только `dev` в JSON.
+
+### Файлы
+
+`src/main.py` · `src/healthchecks.py` (новый, ~30 строк) · `.env.example` · `docs/ops/DEPLOY_VPS.md`
+
+**DoD:**
+
+- [x] ping · pytest **5/5** · deploy ✅ · HC URL в VPS `.env`
 
 ---
 
-## § O124-w2 — UI polish live-dev (**local ✅**, 2026-06-07)
+## § O156-YOUDO-HUMAN — один residential, меньше банов (**P0 owner**)
 
-**Режим:** владелец смотрит **BrowserSync** (`npm run dev` → `localhost:3009+`) · пишет правки в чат · Coder правит → BS reload.
+**Owner:** residential уже есть · второй не потяну · «надо больше человечности» · так быть не должно.
 
-**Setup (owner):** Local **radarzakaz** Start · junction OK · `RAWLEAD_API_URL=https://api.rawlead.ru` в wp-config.
+### Корень (Lead triage)
 
-| # | Правило |
-|---|---------|
-| 1 | **Только** `wordpress/rawlead-kadence-child/` — CSS/PHP/мелкий JS layout |
-| 2 | **Не** трогать `src/` · парсеры · L2 · deploy без bump версии |
-| 3 | После сессии: bump `RAWLEAD_CHILD_VERSION` · `deploy-wp-theme-vps.py` · Lead/owner |
-| 4 | Регресс **O124**: accordion expand · flip только `--draft-flip` · free CTA 2-step · match-bar Premium |
+| Проблема | Где |
+|----------|-----|
+| Листинг — **browser**, detail — **`exchange_get` httpx** | `youdo_parser.fetch_project_page_html` → 403 → ban **всех** слотов за 2 удара |
+| `fetch_listing_html_browser_slots` — **перебор всех** слотов за один цикл | 3× cold browser за минуту = antibot |
+| `_fetch_youdo_ephemeral` — **новый** Chromium каждый раз, без cookies | холодная сессия |
+| Jitter 200–800 ms | слишком быстро для YouDo |
 
-**Файлы hot:** `assets/css/rawlead.css` · `assets/js/rawlead-feed.js` (осторожно) · `template-parts/` · `inc/marketing.php`
+Trace O152: чередование `html http=403 ban=3600` + редкий `browser_goto http=200` — browser **может**, httpx **убивает** pool.
 
-**Вход в чат:** владелец кидает список/скрины («кнопка ниже», «полоска как ЛК») — правишь пачкой, не переписываешь ленту.
+### A. Browser-only для YouDo (default ON при `EXCHANGE_LISTING_BROWSER=1`)
 
-**Статус:** ✅ **1.18.34 prod** (2026-06-07) · BrowserSync tail минимально закрыт
+`YOUDO_BROWSER_ONLY=1` (default **1** если listing browser enabled):
 
----
+- **Не** вызывать `exchange_get` для youdo listing **и** detail
+- Detail через Playwright (reuse § B session или тот же persistent context)
 
-## § O124-feed-card ✅ (2026-06-07)
+### B. Warm human path (Playwright)
 
-Лента: accordion expand · flip только отклик (`--draft-flip`) · `renderCompatMatchBar` Premium · free CTA 2-step · `rl-feed-shell--pending` + PHP cookie class · **1.18.18** VPS.
+В `_fetch_youdo_*` (или `fetch_youdo_listing_human`):
 
----
+```text
+1. pick_browser_user_agent (не только _DEFAULT_UA)
+2. viewport 1366×768 · locale ru-RU · timezone Europe/Moscow
+3. goto https://youdo.com/ · wait 2–5s random
+4. опц. page.mouse.wheel(0, 400) · wait 1–2s
+5. goto listing URL · wait selector a[data-id]
+6. jitter YOUDO_JITTER_MS (default 2000–8000) перед стартом
+```
 
-## § O121-w3-acc2 — acc2 join legacy filter ✅ (2026-06-05)
+**Persistent profile** per proxy slot (`youdo_{host:port}`) — default **`YOUDO_EPHEMERAL=0`**. Ephemeral только если env=1 (legacy node-proxy).
 
-**Deploy:** `deploy-o121-w3-acc2-vps.py` · tests **6/6** local
+### C. Один слот за цикл — не жечь pool
 
-| # | DoD | ✅ |
-|---|-----|---|
-| 1 | `_needs_join_bootstrap` · 0 listen + pending → join_loop | ✅ |
-| 2 | `test_o121_w3_acc2.py` | ✅ 6/6 |
-| 3 | Deploy VPS + `join-bootstrap acc2` в log | ⏳ owner |
-| 4 | 6 pending → done в v2 CSV | ⏳ ~1.5–2 ч после deploy |
+`YOUDO_ONE_SLOT_PER_CYCLE=1` (default **1**):
 
----
+- Listing: только **active** slot из `exchange_primary_proxy_url("youdo")`
+- **Не** loop all slots в `fetch_listing_html_browser_slots` для youdo
+- Fail → cooldown (§ D), **не** cascade на slot 2/3 в том же цикле
 
-## § O121-w2b — /ops/ control timeout ✅ (код)
+### D. Cooldown после antibot
 
-**Тикет:** [`2026-06-05-ops-failed-to-fetch.md`](../../problems/2026-06-05-ops-failed-to-fetch.md)
+После `YoudoListingError` / antibot HTML / browser fail:
 
-**Lead verify:** `rawlead-api.php` — `clear-bans` + restart → **90s** · `deploy-o121-w2b-vps.py` есть.
+- SQLite settings `youdo_cooldown_until` = now + **`YOUDO_COOLDOWN_MIN`** (default **30**)
+- `fetch_listing_projects`: if cooldown active → skip с log `youdo:skip cooldown N min`
+- `/ops/` what_happened: «cooldown до HH:MM»
 
-| # | DoD | ✅ |
-|---|-----|---|
-| 1 | timeout 90s в PHP | ✅ |
-| 2 | deploy script | ✅ |
-| 3 | **Owner smoke** `/ops/` clear-bans | ⏳ |
-| 4 | delist 120s (O122) без регресса | ⏳ |
+### E. Мягче баны для youdo
 
----
+Env per-source override (или hardcode youdo):
 
-## § O121-w2 — прокси UX ✅ (2026-06-05)
+- `YOUDO_HTTP_STRIKES=4` (default 4 vs global 2) — httpx если где-то останется
+- **Не** ban slot на browser antibot HTML — только cooldown + invalidate profile
 
-**Deploy:** `deploy-o121-w2-vps.py` · VPS **active** · tests **9/9** local
+### F. Trace
 
-| # | DoD | ✅ |
-|---|-----|---|
-| 1 | «Сбросить баны» TG + биржи | |
-| 2 | Забанен → «Забанен — сначала сброс» | |
-| 3 | Подписи групп · `status_label` human | |
-| 4 | deploy VPS | |
+`exchange:trace stage=warm_home` · `stage=listing` · `stage=detail` · `cooldown_skip`
 
----
+### Файлы (O156)
 
-## § O121-w3 — TG acc UI (**backlog**)
+`exchange_browser_fetch.py` · `youdo_parser.py` · `exchange_proxy.py` · `tests/test_youdo_human.py` · `scripts/deploy-o155-o156-vps.py`
 
-Join-таблица в `/ops/` · listen count · после w3-acc2.
+**DoD O156 (A–F):**
 
----
+- [x] pytest **6/6** · deploy ✅
 
-## Сводка закрытого
-
-O121-w0/w0b/w0c · O121-w1 · **O121-w2** · O122 · O120 · O107 · O123-w1 · O116 — [`STATUS.md`](../common/STATUS.md)
+**→ O157 ниже**
 
 ---
 
-## § O105-w1-r3 (**⏸ по симптому**)
+## § O157-YOUDO-TRAFFIC — экономия residential (**P0 owner 2026-06-08**)
+
+**Owner:** ~**1 GB / 2 дня** · human (O156) **да**, но **трафик режем** · второй прокси нет.
+
+### Корень
+
+| Прожор | Где |
+|--------|-----|
+| Detail browser **на каждый** новый lead | `ingest_with_l1` ~491 → `_resolve_ingest_body` **без** порога 300 (legacy ~983 — есть) |
+| Листинг **каждый** secondary-цикл | `SECONDARY_FETCH_EVERY_N_CYCLES=1` |
+| warm_home + listing | 2 navigation |
+| JS/CSS не в abort | только image/font/media |
+
+### A. Detail только если snippet короткий
+
+`YOUDO_DETAIL_MIN_CHARS=300` — **site path** в `_resolve_ingest_body`:
+
+```python
+if source == "youdo" and len(base) >= min_chars:
+    return base, None
+```
+
+Опц. `YOUDO_DETAIL_FETCH=0` — never detail.
+
+### B. Реже листинг YouDo
+
+`YOUDO_FETCH_EVERY_N_CYCLES=4` — счётчик SQLite `youdo_fetch_cycle_n` · skip log `youdo:skip fetch_every_n`.
+
+До deploy owner: `SECONDARY_FETCH_EVERY_N_CYCLES=4` в `.env` (грубо, все secondary).
+
+### C. Warm home реже
+
+`YOUDO_WARM_TTL_MIN=45` — skip `warm_home` если тот же profile < N min назад · trace `warm_home_skip`.
+
+### D. Lean abort (youdo only)
+
+Block: `stylesheet`, `xhr`, `fetch`, `websocket`, analytics CDN · allow `document` (+ min `script` если нужен SSR).
+
+### E. Trace / ops
+
+Опц. `bytes_est` в trace · target **< ~200 MB/нед** YouDo (owner eyeball residential stats).
+
+### Файлы
+
+`lead_pipeline.py` · `exchange_browser_fetch.py` · `youdo_parser.py` · `main.py` · `tests/test_youdo_traffic.py`
+
+**DoD:**
+
+- [x] pytest **7/7** (`test_youdo_traffic.py`) · deploy ✅
+- [ ] owner: residential traffic ↓ · `/ops/` **Сбросить баны** YouDo (0/3 alive post-deploy)
 
 ---
 
-## § O125 — L2 только по «Написать отклик» ✅ (2026-06-07)
+## § O153-CARD-CHIPS — +n только collapsed (**hot, owner 2026-06-08**)
 
-**Решение владельца:** не гонять tools-L2 на radar вхолостую · `TOOLS_BACKLOG_DRAIN=0`.
+**Симптом:** раскрытая карточка показывает **+2** вместо всех навыков.
 
-| # | DoD | ✅ |
-|---|-----|---|
-| 1 | `main.py` default `TOOLS_BACKLOG_DRAIN=0` | ✅ |
-| 2 | `match_push`: `_ondemand_lead_tools` (tools-only) + `analyze_shared_reply_draft` на клик; **без** `analyze_premium` | ✅ |
-| 3 | VPS `.env.site` `TOOLS_BACKLOG_DRAIN=0` · deploy `deploy-o125-l2-on-demand-vps.py` | ✅ |
-| 4 | tests o37b + shared_draft + o98 | ✅ |
+**Корень (Lead verify):** O149 убрал flip · `syncCardChips` мёртв:
 
-**Deploy:** `python scripts/deploy-o125-l2-on-demand-vps.py`
+```javascript
+// сломано — face--front больше нет
+card.querySelector(".rl-feed-card__face--front > .rl-chips")
+```
+
+`expandCard` вызывает `syncCardChips(..., true)` → **no-op** · остаётся `renderTagChips(item, 2)`.
+
+**Стало:**
+
+```javascript
+var chips = card.querySelector(".rl-chips");
+chips.innerHTML = renderTagChips(item, expanded ? null : 2);
+```
+
+| Состояние | Теги |
+|-----------|------|
+| collapsed | max **2** + `+n` |
+| expanded | **все** · без `+n` |
+
+Проверить **cabinet** (`rawlead-cabinet.js`) — тот же паттерн если есть.
+
+**Файлы:** `rawlead-feed.js` · опц. `rawlead-cabinet.js` · **1.18.48**
+
+**DoD:**
+
+- [x] expand → все chips видны
+- [x] collapse → снова 2 + `+n`
+- [x] deploy theme
 
 ---
 
-## § L2-tools-tune — consulting overuse ✅ (2026-06-07)
+## § O154-GRID-NEIGHBOR — сосед не дёргается при collapse (**hot, owner 2026-06-08**)
 
-**Контекст:** O82-w2 ошибочно поставил Sonnet на prod L2; уже откатили env на `google/gemini-2.5-pro`. В Neon ~2630 visible с `tools_required` — **consulting 28%** slug (catch-all). Настраиваем **tools-only L2** (`analyze_lead_tools`), не shared draft / judge.
+**Симптом:** закрываешь раскрытую карточку → **соседняя** в сетке 2× **растягивается** и визуально «закрывается» тоже.
 
-**Brief:** [`data/l2_tools_tune_brief.json`](../../../data/l2_tools_tune_brief.json) · audit [`data/preprod_ai_prod_audit_human.md`](../../../data/preprod_ai_prod_audit_human.md)
+**Корень (Lead verify, повтор O52e):** в `rawlead.css` ~2892–2899 снова живут правила:
 
-| # | DoD | ✅ |
-|---|-----|---|
-| 1 | `_TOOLS_ONLY_SYSTEM`: consulting guard · rhino guard · whitelist-only | ✅ |
-| 2 | `tools_catalog`: alias html/css→javascript; reject cyrillic/unknown slugs; consulting post-filter | ✅ |
-| 3 | `finalize_tools_for_lead`: min 2 после фильтра; TZ-hints fallback | ✅ |
-| 4 | tests `test_tools_catalog_o98.py` (**11/11**) | ✅ |
-| 5 | deploy VPS: `ai_analyze.py` + `tools_catalog.py` · restart `rawlead-radar` | ✅ Lead verify |
+```css
+.rl-feed-list:has(.rl-lead-card.is-expanded) { align-items: start; }
+.rl-feed-list:has(.rl-lead-card.is-expanded) .rl-lead-card:not(.is-expanded) {
+  height: auto;
+  align-self: start;
+}
+```
 
-### Файлы (только эти)
+Пока **есть** expanded — сосед `height: auto`. При collapse `:has` пропадает → соседи снова `height: 100%` + grid `stretch` → **скачок высоты** + `margin-top: auto` на chips выглядит как раскрытие/закрытие.
 
-- `src/ai_analyze.py` — `_TOOLS_ONLY_SYSTEM`, при необходимости docstring `analyze_lead_tools`
-- `src/tools_catalog.py` — `_TOOL_ALIAS_MAP`, `normalize_tools_required` / `finalize_tools_for_lead`
-- `tests/test_tools_catalog_o98.py` — кейсы consulting/rhino/cyrillic/html
-- `scripts/deploy-fix-l2-models-vps.py` — **не трогать** (env уже ok) · deploy через `deploy_vps_ssh` upload + restart
+**Acceptance (U2, portfolio-w2):** expand/collapse **только** на кликнутой карточке · сосед **не меняет** высоту/контент.
 
-### Правила промпта (обязательно в `_TOOLS_ONLY_SYSTEM`)
+| # | Fix |
+|---|-----|
+| g1 | **Удалить** `.rl-feed-list:has(.rl-lead-card.is-expanded)` и дочерние rules на **соседей** |
+| g2 | `.rl-feed-list .rl-lead-card` → **`height: auto`** (убрать `height: 100%` ~2916, ~2973) · `min-height: 300px` оставить |
+| g3 | Grid: **`align-items: start`** вместо `stretch` (~2885) — строка не тянет соседа под expanded |
+| g4 | Expand/collapse — только `.rl-lead-card.is-expanded` (body grid 0fr→1fr, title clip) |
+| g5 | Smoke 2 col desktop: expand A → B **статичен** · collapse A → B **статичен** · `/lenta/` + `/cabinet/` |
 
-1. **`consulting`** — только если в title/body явно: консультация, аудит, сопровождение, «нужна консультация», без работ исполнителя. Иначе — предметные slug (seo, wordpress_dev, photoshop…).
-2. **`rhino`** — только при 3D / Rhino / Grasshopper / CAD в тексте. **Не** для GAS, ботов, таблиц.
-3. **Whitelist-only** — только slug из списка в промпте; html+css → javascript; google sheets → google_sheets_api.
-4. Исправить строку «GAS/Rhino/google-таблица → … rhino» — она провоцирует false positive (lead #9907).
+**Ref:** archive § **O52e** · [`portfolio-w2-acceptance.md`](../../problems/2026-05-25-portfolio-w2-acceptance.md) U2.
 
-### Post-process (`tools_catalog`)
+**Файлы:** `rawlead.css` · **1.18.48** (вместе с O153)
 
-- Drop slug с кириллицей / не из KNOWN_TOOLS+canonical после alias.
-- Если после normalize остался один `consulting` без «консульта»-маркеров в TZ — заменить hints из `tools_from_tz_text`.
-- Alias: `html`, `css` → `javascript` (или `html_css` если уже в KNOWN_TOOLS).
+**DoD:**
+
+- [x] collapse expanded → сосед **без** анимации высоты
+- [x] ряд collapsed-карточек — ровная сетка, без «дыр» от stretch
+- [x] deploy theme
+
+---
+
+## § O152-EXCHANGE-TRACE — детальный лог бирж + TG
+
+**Owner:** «нельзя уже» — на `/ops/` красное без понятной причины · нужен **trace каждого источника**.
+
+### A. Structured trace (journal + файл)
+
+На **каждый fetch-цикл** по источнику (`fl`, `kwork`, `youdo`, `tg`, …):
+
+```text
+exchange:trace source=youdo stage=browser_goto proxy=gate...:10002 ms=12400 http=403 ban=3600 err=antibot
+```
+
+| Поле | Зачем |
+|------|--------|
+| `source` | fl / youdo / tg |
+| `stage` | proxy_pick · goto · html · parse · L1 |
+| `proxy` | host:port (mask user) |
+| `ms` | wall time |
+| `http` / `err` | 403 / timeout / antibot |
+| `parsed` / `fresh` / `new_ids` | итог цикла |
+
+**Файл:** `data/exchange_trace.jsonl` — append, rotate 7d · **не** git.
+
+### B. `/ops/` UI
+
+На карточке биржи — **«Последний trace»** (5–10 строк из jsonl или health) · полный `last_error_short` без обрезки в tooltip.
+
+**FL лампа:** если `last_ok_at` свежее `last_error_at` → **не** 🔴 (fix `status_level` / `build_ops_exchange_row`).
+
+### C. TG
+
+Строка на сообщение уже есть — добавить в `/ops/` tg-card: **last 3 pipeline lines** из journal/jsonl.
+
+### D. Forbidden hosts
+
+Добавить **`OPENROUTER_HTTP_PROXY`** в `_EXCHANGE_POOL_FORBIDDEN_ENV` — не спамить skip acc2 в логах бирж.
+
+**Файлы:** `exchange_proxy.py` · `exchange_browser_fetch.py` · `exchange_health.py` · `radar_cycle_log.py` · `owner_admin.py` · parsers (fl/youdo/kwork)
+
+**DoD:**
+
+- [x] pytest exchange_health / trace (**12/12** local)
+- [x] deploy VPS (`deploy-o152-exchange-trace-vps.py`) · jsonl пишется
+- [ ] owner smoke `/ops/` — «Последний trace» · FL lamp после ok-fetch
+- [ ] YouDo 403 → trace с proxy + ban (ждём цикл или «Сбросить баны»)
+
+---
+
+## § O151-OR-ACC2-UX ✅ (deploy 2026-06-08)
+
+**DoD:** L2 `use_draft_proxy=bool(openrouter_proxy_urls())` · acc2 in `OPENROUTER_HTTP_PROXY` · hideFeedBanner · no «ИИ пишет…» · **1.18.47** · pytest **7/7**
+
+**Owner smoke:** `/lenta/` Ctrl+F5 — нет пустой плашки · expand → отклик без hint
+
+---
+
+## § O150-DRAFT-UX-POLISH ✅ (deploy 2026-06-08)
+
+**Owner smoke после O148/O149 deploy (theme 1.18.45):** один отклик «ИИ не успел» · skeleton вместо «Суть задания» · плашка не в стиле · шрифты прыгают.
+
+| # | Симптом | Решение |
+|---|---------|---------|
+| 1 | «Сложный бриф…» поздно | **`DRAFT_BTN_SLOW_MS = 20000`** (было 40s) |
+| 2 | При генерации — **серые skeleton**, пропала суть | **Не** затирать `.rl-feed-card__body-inner` · оставить `renderExpandedBody(item)` · pending = btn shimmer + опц. «ИИ пишет отклик…» **внизу**, без `showDraftBodySkeleton` |
+| 3 | Плашка «ИИ не успел — повторите» — не наш дизайн | `.rl-feed-banner` neo-brutalist: `border 2px #0a0a0a` · `box-shadow 4px 4px 0` · фон `#f5f5f0` · **«Повторить»** = `.rl-btn.rl-btn--ghost` |
+| 4 | Шрифты **прыгают** при загрузке | `preload` Manrope (+ Unbounded если hero) woff2 в `functions.php` · `font-display: swap` |
+| 5 | «ИИ не успел» слишком часто | poll `data.status === "failed"` → сразу banner · timeout → «Сложный бриф…» + retry · **1 auto-retry** если последний GET `pending` · опц. `DRAFT_POLL_MAX_MS = 180000` · BE: `use_draft_proxy=False` default direct |
+
+### A. Pending body (главный UX)
+
+**Удалить вызовы** `showDraftBodySkeleton` на inflight (`runDraftFetchForCard`, `syncDraftGeneratingUi`).
+
+```text
+Клик «Написать отклик» → expand
+  · body: task_summary / meta как до клика
+  · кнопка: «Генерируем…» → через 20s «Сложный бриф, ИИ полирует отклик...»
+  · ready: inject reply в renderExpandedBody
+```
+
+### B. Banner `#rl-feed-error`
+
+Единый стиль feed + cabinet · `role="alert"` · retry читаем на mobile.
+
+### C. Fonts FOUT
+
+`wp_head`: preload Manrope w400 woff2 crossorigin · проверить Kadence не подменяет `--font-main`.
+
+### D. Меньше ложных fail
+
+`pollDraftStatus`: if `failed` → throw с `data.error` · не крутить poll до 150s молча.
+
+**Файлы:** `rawlead-feed.js` · `rawlead.css` · `functions.php` · опц. `ai_analyze.py` · **1.18.46**
+
+**DoD:**
+
+- [ ] expand + pending → **видна «Суть задания»**, нет серых полос
+- [ ] 20s → «Сложный бриф…» на кнопке
+- [ ] banner neo-brutalist · retry кликабелен
+- [ ] fonts: нет заметного FOUT `/lenta/` (Ctrl+F5 ×2)
+- [ ] deploy theme + API if BE touched
+
+---
+
+## § O148-DRAFT-OR — Pre-warm · UX · таймауты
+
+**Owner (финал):** L2 на всю ленту ❌ · flash-base ❌ · **pre-warm premium expand ✅** · btn **>40s** → «**Сложный бриф, ИИ полирует отклик...**» · OR proxy unset.
+
+```text
+Ingest: L1 only
+Expand (premium): POST …/draft/warm → 1× pro → leads.reply_draft (cap DRAFT_WARM_HOURLY_CAP=30)
+Клик: warm ready → L3 · иначе cold L2 pro
+```
+
+### A. Pre-warm — **1× L2 на lead, не на юзера**
+
+`POST /v1/me/leads/{id}/draft/warm` · premium only · **не** пишет `user_lead_replies`.
+
+| Состояние `leads.reply_draft` / job | Ответ | LLM |
+|-------------------------------------|-------|-----|
+| **Уже есть** текст | **204** | **0** |
+| Job **pending** (`lead_draft_jobs` / warm future) | **202** | **0** (ждёт тот же job) |
+| Пусто, job не идёт | старт **одного** warm | **1× pro** |
+| Cap `DRAFT_WARM_HOURLY_CAP=30` исчерпан | **429** | **0** · FE silent |
+
+**10 premium смотрят одну карточку:** L2 **один раз** на `lead_id` · остальные expand → 204/202 без токенов.
+
+**Reuse:** тот же dedupe что draft click — `lead_draft_jobs` ON CONFLICT lead_id · `_lead_worker_running(lead_id)`.
+
+**После warm:** любой premium клик → **L3 flash only** (не L2), пока не fail warm.
+
+FE: `state.warmRequested[id]` once/session · **бек — источник истины**.
+
+### B. Кнопка
+
+0–40s «Генерируем…» · >40s «Сложный бриф, ИИ полирует отклик...» · poll 150s.
+
+### C. tools — **убрать лишний LLM** (owner 2026-06-08)
+
+**Факт:** L1 (`AiLiteAnalysis`) **не** пишет `tools_required` — только `lead_tags` (чипы навыков).  
+**UI «Инструменты»** в expand — **только после** `reply_draft` (`rawlead-feed.js` ~1005). До клика tools в карточке **не видны**.
+
+**`analyze_lead_tools`** — отдельный **pro**-вызов «верни tools JSON» перед L2. L2 уже получает **title + task_summary + description** — стек может взять из текста (промпт: «§1 стек из текста выше»).
+
+**Стало (warm + cold click):**
+
+| Было | Стало |
+|------|--------|
+| `analyze_lead_tools` (pro) если tools пуст | **`tools_from_tz_text(title, body, task_summary)`** — regex, **0 LLM** |
+| tools в промпт L2 | optional hint · пусто OK |
+| после L2 ready | persist `tools_required` из tz heuristic для UI блока |
+
+**Не вызывать** `analyze_lead_tools` на hot path draft/warm. Backlog `fetch_leads_missing_tools` — опц. оставить offline.
+
+### D. cold · infra
+
+**DoD:** warm on premium expand · post-warm click <20s · btn copy · anon no warm.
+
+**Файлы:** `api_server.py` · `draft_async.py` · `match_push.py` · `rawlead-feed.js`
+
+---
+
+## § O149-NO-FLIP — убрать 3D flip · inline expand
+
+**Owner:** flip **выкинуть**, UX **с нуля** — без `rotateY`, без front/back.
+
+### Новый UX
+
+1. Collapsed — как сейчас
+2. «Написать отклик» → **expand in-place** · btn shimmer · body skeleton
+3. Ready → `renderExpandedBody` в `.rl-feed-card__body-inner` · btn «Отклик ✓»
+4. Collapse OK — draft в state, re-expand показывает текст
+
+**Удалить:** `showDraftFlip`, `lockDraftFlip`, `syncFlipHeight`, flip DOM/CSS.
+
+**Оставить:** `draftInflight`, poll не отменять, btn shimmer O146, O147 match bar + trial hide.
+
+**Файлы:** `rawlead-feed.js` · `rawlead.css` · `style.css` **1.18.45+** · deploy VPS.
+
+**DoD:** нет flip в DOM · draft = полный expand · deploy · owner smoke 1×.
+
+**O147 § flip — superseded by O149** (match bar + trial — keep).
+
+---
+
+## § O147-FEED-FLIP-MATCH — flip full card · match bar · trial CTA (архив)
+
+**Owner verify 2026-06-08 (скрины):** O146 частично — три регресса.
+
+### A. Flip — карточка «урезаная», не как обычный expand
+
+**Симптом:** после flip черновик в узком скролл-боксе (~половина карточки), не как полный expand.
+
+**Корень (Lead read-only):**
+
+| | |
+|--|--|
+| CSS | `.rl-feed-card__face--back { max-height: min(70vh, 520px); overflow-y: auto; position: absolute }` — обрезает оборот |
+| O146 | удалён `syncFlipHeight()` — flip-inner не тянется по высоте front |
+| Разметка | back обёрнут в `.rl-feed-card__body--draft-back` с grid 0fr/1fr — другой layout чем front expand |
+
+**Стало:**
+
+1. После `rl-lead-card--draft-done` + `is-expanded` — **тот же visual**, что expand до flip: полная высота контента, без `max-height` ловушки на back.
+2. Вернуть **sync высоты** flip-inner от front (или убрать absolute back → back = тот же `.rl-feed-card__body` expand path).
+3. **Не** менять one-way flip lock и inflight poll из O146.
+
+### B. Шкала совместимости пустая на карточках ленты
+
+**Симптом:** подпись «50% / 80% / 100% Совместимость» есть, **полоска серая** (fill = 0).
+
+**Корень:**
+
+| | |
+|--|--|
+| CSS | fill width завязан на `.is-visible` (стр. ~3039) + base `width:0` · race с IO |
+| JS | `observeLeadCards` только добавляет `is-visible`, **не** триггерит fill |
+
+**Стало:**
+
+1. В `observeLeadCards` / IO callback: после `is-visible` — `syncMatchFill(card)` (width из `--match-value` / `keyword_match`).
+2. CSS: один канон для feed/cabinet — `width: var(--match-value, 0%)` **без** зависимости только от `.is-visible`; анимация через rAF 0→target.
+3. `renderCompatMatchBar`: inline `--match-value` + `data-match-pct` (cabinet parity с feed).
+4. Regression: collapsed card на `/lenta/` premium — bar заполнен до клика.
+
+### C. Убрать «Попробовать 3 дня» для Premium / Trial
+
+**Симптом:** в `/cabinet/` при **Premium beta** (и trial) видны обе кнопки: trial + «Продлить».
+
+**Стало (`rawlead-cabinet.js` + при необходимости CSS):**
+
+```text
+showTrialCta = status === "free" && !trial_used && !effective_access && !is_trial
+```
+
+Дополнительно **жёстко скрыть** trial если `status ∈ {active, beta, trial}` **или** `effective_access`.
+
+| Статус | Trial CTA | Pay CTA |
+|--------|-----------|---------|
+| free (no trial) | ✅ | Подключить |
+| trial | ❌ | Оплатить 790 ₽ |
+| active / beta | ❌ | Продлить |
+
+Feed `cardUpsellHtml` — уже `""` при `hasPaidAccess()`; проверить нет других «3 дня» на ленте.
+
+### Файлы
+
+| | |
+|--|--|
+| `wordpress/.../assets/js/rawlead-feed.js` | syncMatchFill · observeLeadCards · flip height |
+| `wordpress/.../assets/css/rawlead.css` | back face height · match fill rules |
+| `wordpress/.../assets/js/rawlead-cabinet.js` | trial CTA guard |
+| `style.css` | bump **1.18.40** |
+| deploy theme VPS | |
+
+**Не трогать:** draft API · L2 · match_push SQL.
+
+### DoD
+
+- [x] syncMatchFill · syncFlipHeight · trial hide · theme **1.18.44** deploy VPS
+- [ ] owner smoke: flip full · match bar · cabinet trial (Ctrl+F5)
+
+---
+
+## § O146-DRAFT-CARD-UX — flip · pending · кнопка
+
+**Решение owner (2026-06-08):**
+
+1. **Flip один раз** — после готовности черновика карточка **остаётся на обороте** (черновик), **не** переворачивается обратно.
+2. **Pending не прерывается** — клик по карточке / expand / collapse **не останавливает** poll `fetchDraft` / `pollDraftStatus`.
+3. **Кнопка «Написать отклик»** пока ИИ пишет — **пульс + золотое свечение** (бегущий блик по кнопке), не только рамка карточки.
+
+**Корень (Lead read-only):** `finishDraftFlip()` **снимает** `rl-lead-card--draft-flip` → CSS возвращает `rotateY(0)` · yo-yo. `toggleCardExpand` / `runDraftFetchForCard` сбрасывают flip/pending при interact.
+
+### A. Flip lock (`rawlead-feed.js` + `rawlead.css`)
+
+| Было | Стало |
+|------|--------|
+| `finishDraftFlip` удаляет `--draft-flip` | После **одной** анимации → класс **`rl-lead-card--draft-on-back`** (transform 180deg **без** reverse) · `--draft-flip` только на время анимации |
+| collapse карточки | снять `--draft-on-back` + `--draft-flip` · показать front (как сейчас collapse) |
+
+**Reduced motion:** как сейчас — front hide / back static, без 3D.
+
+### B. Inflight draft (`rawlead-feed.js`)
+
+- `state.draftInflight[leadId] = { startedMs }` на POST → delete on ready/fail.
+- **Не** отменять fetch при `toggleCardExpand`, document click outside, `syncFlipHeight`.
+- `runDraftFetchForCard`: не сбрасывать другую карточку если у неё `draftInflight[id]`.
+- По ready: `state.itemsById[id].reply_draft` → `updateCardDraft` **даже если collapsed** (DOM both faces); flip **один раз** если expanded.
+- Кнопка: класс **`is-generating`** на `.rl-feed-card__reply-btn` на время inflight · текст «Генерируем…» · **disabled** только против double-click, не против collapse.
+
+### C. Кнопка pending (`rawlead.css`)
+
+На `.rl-feed-card__reply-btn.is-generating` (или `.rl-lead-card--draft-pending .rl-feed-card__reply-btn`):
+
+- `animation`: лёгкий **pulse** scale 1 → 1.03
+- **Золотой блик**: pseudo `::after` + `@keyframes rl-draft-btn-shimmer` (gradient `#facc15` / amber, `background-position` sweep)
+- Карточный `rl-draft-glow` — ослабить или оставить тонкую рамку; **акцент на кнопке**
+
+Токены: `--rl-accent` / `#facc15` · `prefers-reduced-motion: reduce` → только opacity pulse, без shimmer.
+
+### D. Тесты / journey
+
+| | |
+|--|--|
+| `tests/test_o146_draft_card.js` | опц. pure JS extract flip state machine — **или** только manual |
+| Playwright | `ux_journey.py` J4: после fix — body-inner visible на design expand · J5/J6 не регресс |
+
+### Файлы
+
+| Только |
+|--------|
+| `wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js` |
+| `wordpress/rawlead-kadence-child/assets/css/rawlead.css` |
+| `wordpress/rawlead-kadence-child/style.css` — bump version |
+| `scripts/deploy-wp-theme-vps.py` (или существующий theme deploy) |
+| `docs/team/common/STATUS.md` → Сделано |
+
+**Не трогать:** `api_server` draft API · L2 · `match_push`.
 
 ### Как проверить
 
-```bat
-python -m pytest tests/test_tools_catalog_o98.py -q
-python -m pytest tests/test_preprod_ai_prod_audit.py -q
-```
+1. Premium `/lenta/` → «Написать отклик» → карточка **flip один раз** → черновик на обороте **остаётся**
+2. Во время «Генерируем…» — **свернуть/развернуть** карточку → через ~30s черновик **всё равно** появляется
+3. Кнопка **пульсирует + золотой блик** пока pending
+4. `preprod_playwright/ux_journey.py` → J4 + J5 pass
 
-Deploy (local):
+### DoD
 
-```bat
-python scripts/deploy_vps_ssh.py
-```
-
-или upload `src/ai_analyze.py` + `src/tools_catalog.py` → `/opt/rawlead/src/` · `systemctl restart rawlead-radar`.
-
-**Не делать:** `--judge` · `backfill_tools_required.py` mass · `qa_prompt_loop --full` · смена env моделей.
-
-**После deploy:** owner/Lead — `preprod_ai_prod_audit.py --profile site --limit 50` ($0) для сравнения consulting%.
+- [ ] flip lock · inflight poll · button shimmer
+- [ ] theme deploy VPS
+- [ ] J4/J5 smoke owner или journey green
 
 ---
 
-_Lead · L2-tools-tune активно · w3-acc2/w2b deploy owner_
+## Сводка
+
+| § | Статус |
+|---|--------|
+| O144–O145 | deploy ✅ |
+| Wave 2 | draft_burst ✅ · journey 9/10 |
+| O146 | код ✅ · **accept ⏸** (3 регресса) |
+| **O147** | **→ active** |
+
+---
+
+_Lead **2026-06-08** · owner card UX_

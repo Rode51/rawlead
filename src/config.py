@@ -313,10 +313,12 @@ def normalize_proxy_url(raw: str) -> str:
         return f"{scheme}://{user}:{password}@{host}:{port}"
 
     parsed = urlparse(url)
+    if parsed.scheme in ("http", "https", "socks5", "socks5h") and parsed.netloc:
+        return url
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise ValueError(
-            f"TG_PROXY_URL: нужен http(s) прокси, например "
-            f"http://host:port:user:pass или http://user:pass@host:port, сейчас: {raw!r}"
+            f"TG_PROXY_URL: нужен http(s)/socks5 прокси, например "
+            f"http://host:port:user:pass или socks5://user:pass@host:port, сейчас: {raw!r}"
         )
     return url
 

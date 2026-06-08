@@ -103,6 +103,24 @@ _REPLY_DRAFT_VAGUE_RE = re.compile(
     r"ваш\s+креатив\s+за\s+основу|определить\s+приоритет",
     re.IGNORECASE,
 )
+# O144: RFP guard — ТЗ просит идеи, но отклик отфутболивает «пришлите ссылки»
+_RFP_TZ_SIGNAL_RE = re.compile(
+    r"что\s+приложить\s+к\s+отклику|"
+    r"(?:2[-–]3|два[-\s]три)\s+иде|"
+    r"кейс\w*\s+с\s+цифр|"
+    r"что\s+указать\s+в\s+отклике|"
+    r"в\s+отклике\s+прилож",
+    re.IGNORECASE,
+)
+_RFP_DEFER_SIGNAL_RE = re.compile(
+    r"пришлите\s+ссыл|"
+    r"пришлите\s+(?:\w+\s+)?проект|"
+    r"вышлю\s+в\s+личк|"
+    r"чтобы\s+подготовить\s+(?:\w+\s+)?иде|"
+    r"пришлите\s+(?:\w+\s+)?кейс|"
+    r"ссылки\s+вышлю",
+    re.IGNORECASE,
+)
 _MAX_SHARED_SNIPPET_CHARS = 2_400
 
 _DEFAULT_TIMEOUT_SEC = 60.0
@@ -831,10 +849,36 @@ def draft_passes_o72e3_worst_terms(draft: str, lead_id: int, *, min_groups: int 
     return count_o72e3_niche_term_groups(draft, groups) >= min_groups
 
 
-def _shared_draft_too_vague(draft: str) -> str | None:
+def _rfp_defer_instead_of_ideas(description: str, draft: str) -> str | None:
+    """O144: если ТЗ просит идеи/кейсы в отклике — draft не должен отфутболивать «пришлите ссылки»."""
+    if not _RFP_TZ_SIGNAL_RE.search(description or ""):
+        return None
+    if _RFP_DEFER_SIGNAL_RE.search(draft or ""):
+        return "vague:rfp_defer_links"
+    return None
+
+
+def _shared_draft_too_vague(
+    draft: str,
+    *,
+    title: str = "",
+    tools_required: list[str] | None = None,
+    description: str = "",
+) -> str | None:
     if _REPLY_DRAFT_VAGUE_RE.search(draft):
         return "vague:generic_pitch"
-    if "обсуд" in draft.casefold() and "?" not in draft:
+    rfp = _rfp_defer_instead_of_ideas(description, draft)
+    if rfp:
+        return rfp
+    low = (draft or "").casefold()
+    title_low = (title or "").casefold()
+    tools = {str(t).strip().casefold() for t in (tools_required or []) if str(t).strip()}
+    if "бот" in title_low and "telegram_bot_dev" in tools:
+        if re.search(r"что\s+должен\s+делать\s+бот", low):
+            return "vague:bot_what_should_do"
+        if re.search(r"расскажите\s+задач", low):
+            return "vague:tell_about_task"
+    if "обсуд" in low and "?" not in draft:
         return "vague:discuss_without_question"
     return None
 
@@ -1850,6 +1894,10 @@ def analyze_lead_tools(
 ) -> tuple[str, ...] | None:
     """L2 tools-only on draft click / optional backlog (premium model)."""
     if not cfg.ai_active or cfg.ai_provider != "openrouter":
+        msg = f"tools skip: ai_active={cfg.ai_active} provider={cfg.ai_provider!r}"
+        if errors is not None:
+            errors.append(msg)
+        logger.warning("%s%s", log_prefix, msg)
         return None
     desc, truncated = _truncate_description(description)
     summary = (lite.task_summary if lite else "") or desc[:400]
@@ -1997,11 +2045,28 @@ def analyze_shared_reply_draft(
     errors: list[str] | None = None,
     log_prefix: str = "",
     max_attempts: int = 4,
+    lead_id: int | None = None,
 ) -> str | None:
     """O57: shared L2 — один отклик на lead, без profile_excerpt."""
     if not cfg.ai_active or cfg.ai_provider != "openrouter":
+        msg = f"L2 skip: ai_active={cfg.ai_active} provider={cfg.ai_provider!r}"
+        if errors is not None:
+            errors.append(msg)
+        logger.warning("%s%s", log_prefix, msg)
         return None
-    if not (lite.task_summary or "").strip():
+    summary = (lite.task_summary or "").strip()
+    if not summary:
+        msg = "L2 skip: empty task_summary (no body fallback in lite)"
+        if errors is not None:
+            errors.append(msg)
+        logger.warning("%s%s lead=%s", log_prefix, msg, lead_id if lead_id is not None else "-")
+        return None
+    use_model = (cfg.ai_model_shared_draft or "").strip()
+    if not use_model:
+        msg = "L2 skip: OPENROUTER_MODEL_SHARED_DRAFT empty"
+        if errors is not None:
+            errors.append(msg)
+        logger.warning("%s%s", log_prefix, msg)
         return None
 
     set_reply_validate_lead_context(title, description)
@@ -2014,9 +2079,8 @@ def analyze_shared_reply_draft(
         tools_required=tools,
         description=description,
     )
-    use_model = cfg.ai_model_shared_draft.strip()
     seed = int(
-        hashlib.sha256(f"{title}:{lite.task_summary}".encode("utf-8")).hexdigest()[:8],
+        hashlib.sha256(f"{title}:{summary}".encode("utf-8")).hexdigest()[:8],
         16,
     )
 
@@ -2032,6 +2096,8 @@ def analyze_shared_reply_draft(
             user_msg += reply_retry_user_suffix(
                 reason=retry_reason, attempt=attempt, layer="L2"
             )
+        t_http = time.monotonic()
+        outcome = "fail"
         try:
             raw = _openrouter_chat(
                 cfg,
@@ -2040,7 +2106,7 @@ def analyze_shared_reply_draft(
                 user=user_msg,
                 timeout_sec=timeout_sec,
                 json_mode=True,
-                use_draft_proxy=True,
+                use_draft_proxy=bool(openrouter_proxy_urls()),
             )
             if not raw:
                 raise AiAnalyzeError("OpenRouter: пустой ответ")
@@ -2052,13 +2118,16 @@ def analyze_shared_reply_draft(
                     description=description,
                 )
             )
-            vague = _shared_draft_too_vague(draft)
+            vague = _shared_draft_too_vague(
+                draft, title=title, tools_required=tools, description=description
+            )
             if vague:
                 raise AiAnalyzeError(f"reply_draft: {vague}")
             last_draft = draft
             smell = reply_ai_smell_reason(draft)
             if smell and attempt < attempts - 1:
                 retry_reason = smell
+                outcome = "retry_smell"
                 time.sleep(
                     _SHARED_DRAFT_BACKOFF_SEC[
                         min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)
@@ -2070,12 +2139,14 @@ def analyze_shared_reply_draft(
             attach_reason = reply_attachment_claim_reason(draft, description)
             if attach_reason and attempt < attempts - 1:
                 retry_reason = attach_reason
+                outcome = "retry_attach"
                 time.sleep(
                     _SHARED_DRAFT_BACKOFF_SEC[
                         min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)
                     ]
                 )
                 continue
+            outcome = "ok"
             note_ai_l2_call()
             return draft
         except (
@@ -2087,14 +2158,34 @@ def analyze_shared_reply_draft(
         ) as exc:
             last_exc = exc
             if attempt < attempts - 1:
+                outcome = "retry_err"
                 time.sleep(_SHARED_DRAFT_BACKOFF_SEC[min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)])
                 continue
+        finally:
+            if log_prefix:
+                from config import openrouter_proxy_hint
+
+                ms = int((time.monotonic() - t_http) * 1000)
+                logger.info(
+                    "%strace stage=l2_http lead=%s attempt=%s ms=%s outcome=%s via=%s",
+                    log_prefix,
+                    lead_id if lead_id is not None else "-",
+                    attempt + 1,
+                    ms,
+                    outcome,
+                    openrouter_proxy_hint(),
+                )
 
     if last_draft:
         note_ai_l2_call()
         return last_draft
     if last_exc is not None:
         _log_ai_failure(errors, log_prefix, last_exc)
+    else:
+        msg = f"L2: no draft after {attempts} attempts"
+        if errors is not None:
+            errors.append(msg)
+        logger.warning("%s%s lead=%s", log_prefix, msg, lead_id if lead_id is not None else "-")
     return None
 
 
@@ -2153,6 +2244,8 @@ def rephrase_reply_draft_per_user(
             user += reply_retry_user_suffix(
                 reason=retry_reason, attempt=attempt, layer="L3"
             )
+        t_http = time.monotonic()
+        outcome = "fail"
         try:
             headers = {
                 "Authorization": f"Bearer {cfg.ai_api_key}",
@@ -2209,10 +2302,13 @@ def rephrase_reply_draft_per_user(
             last_draft = draft
             if smell and attempt < attempts - 1:
                 retry_reason = smell
+                outcome = "retry_smell"
                 continue
             if l3_too_similar(base, draft) and attempt < attempts - 1:
                 retry_reason = "similar"
+                outcome = "retry_similar"
                 continue
+            outcome = "ok"
             note_ai_l2_call()
             return draft
         except (
@@ -2228,7 +2324,20 @@ def rephrase_reply_draft_per_user(
                 errors.append(
                     f"attempt {attempt + 1}: {type(exc).__name__}: {str(exc)[:120]}"
                 )
+            outcome = "retry_err"
             continue
+        finally:
+            if log_prefix:
+                ms = int((time.monotonic() - t_http) * 1000)
+                logger.info(
+                    "%strace stage=l3_http lead=%s attempt=%s ms=%s outcome=%s via=%s",
+                    log_prefix,
+                    lead_id,
+                    attempt + 1,
+                    ms,
+                    outcome,
+                    openrouter_proxy_hint(),
+                )
     if last_draft:
         note_ai_l2_call()
         return last_draft

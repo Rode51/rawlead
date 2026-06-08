@@ -108,7 +108,9 @@
 | **Watchdog** | `rawlead-ingest-watchdog.timer` **каждые 5 мин** → TG владельцу | gap цикла >15 мин · 0 вставок >20 мин · L1 backlog >120 |
 | **Авторестарт** | `systemctl restart rawlead-radar` если gap >25 мин и **не** пауза | hung process не ловит `Restart=on-failure` |
 | **Прокси** | TCP probe pool (как Telethon) + skip мёртвых в `exchange_proxy` | все 4 упали → алерт, не тихий 0 |
-| **Внешний** | UptimeRobot → `GET /health` API (опц.) | VPS жив, API отвечает |
+| **Внешний** | **O155** Healthchecks.io ping после ok-cycle (grace 15m) | VPS мёртв / цикл завис — алерт **вне** VPS |
+
+**✅ Owner 2026-06-08:** O155 принят · PM2 **не** · YouDo = O156 human, не второй residential.
 
 **❌ Не делаем сейчас:** второй полный парсер на том же VPS (те же прокси/IP — не даёт отказоустойчивости). **Опц. v2:** cold standby VPS в другом DC — после GTM.
 
@@ -154,6 +156,64 @@
 **Copy / UX (Product + Design):** везде акцент **«уникальный отклик»** — `/lenta/` кнопка/tooltip · `/pricing/` · `/how/` · post-login · не пугать «все получают одно и то же». Формулировка честная: *«AI адаптирует формулировку под вас»*, не «пишет с нуля по вашему резюме» (profile rephrase — опционально v2).
 
 **Экономика:** ~$0.001–0.003 за клик vs ~$0.05–0.15 full L2 · маржа сохраняется.
+
+### § O148-w — Pre-warm shared draft (**✅ owner 2026-06-08**)
+
+**Не:** L2 на все visible-лиды в ingest · **не** flash вместо pro.
+
+**Да:** premium раскрыл карточку → фон **1× pro** → `leads.reply_draft` · cap **`DRAFT_WARM_HOURLY_CAP=30`** · клик чаще = L3 only.
+
+**UX:** inflight >**40s** → кнопка «**Сложный бриф, ИИ полирует отклик...**».
+
+**→ Coder:** § **O148-DRAFT-OR** в `CODER_PROMPT.md`.
+
+### § O150-w — Draft UX polish (**owner 2026-06-08 smoke**)
+
+**Симптомы:** «ИИ не успел — повторите» на одном лиде · skeleton вместо сути · плашка розовая не в стиле · FOUT шрифтов.
+
+**Решения владельца:**
+
+| Тема | Решение |
+|------|---------|
+| Медленный отклик | btn **>20s** (не 40s) → «**Сложный бриф, ИИ полирует отклик...**» |
+| Pending UI | **как раньше** — суть задания на месте, **без** серых skeleton-полос |
+| Ошибка | плашка под **neo-brutalist** · «Повторить» читаемо |
+| Шрифты | preload / убрать прыжок при загрузке |
+| Частота fail | максимально сократить (retry · poll failed · direct OR) |
+
+**→ Coder:** § **O150-DRAFT-UX-POLISH** в `CODER_PROMPT.md`.
+
+### § O151-or-45152 — smoke acc1 proxy для OR (**❌ не держим**, 2026-06-08)
+
+**Owner:** попробовать `45.152.197.25:8000` (acc1 TG) как `OPENROUTER_HTTP_PROXY`.
+
+**Smoke VPS:**
+
+| Тест | Результат |
+|------|-----------|
+| flash-lite через proxy | **200** · ~1.1s |
+| pro (64 tok) proxy vs direct | **200** · **2.2s vs 2.1s** — **без выигрыша** |
+| cold L2 lead **19231** | client timeout **180s** · сервер **доделал позже** (579 симв.) |
+| ранее acc1 для TG HTTPS | **ReadTimeout** (тикет 2026-06-05) |
+
+**Решение Lead:** `OPENROUTER_HTTP_PROXY` **unset** → **direct** (backup `.env.site.bak-or-ab-direct`). Следующий кандидат smoke — **acc2 US `38.154.16.60`**, не acc1.
+
+### § O151-or-acc2 — smoke acc2 для OR (**2026-06-08**)
+
+**Setup:** `OPENROUTER_HTTP_PROXY` ← `TELETHON_PROXY_ACC2` (`38.154.16.60:8000`) · **только env**, TG не трогали.
+
+| Тест | acc2 | direct |
+|------|------|--------|
+| flash-lite | 1.3s ✅ | — |
+| pro 64 tok | **2.7s** ✅ | **5.3s** ✅ |
+
+**Cold L2 #19233:** timeout 185s · pending 3+ min — **не валидно**: после O150 L2 идёт `use_draft_proxy=False` → draft **не** через acc2.
+
+**Вывод:** acc2 **быстрее** на коротком OR; на full draft **не тестировали** · env **unset** (direct). Чтобы acc2 влиял на draft — нужен `use_draft_proxy=True` когда `OPENROUTER_HTTP_PROXY` задан (§ O151 Coder).
+
+**Owner 2026-06-08:** **берём A** + UX: пустая `#rl-feed-error` убрать · «ИИ пишет отклик…» убрать.
+
+**Deploy Lead 2026-06-08:** `patch-vps-openrouter-from-acc2.py` · theme **1.18.47** · L2 draft через **38.154 US** (отдельный env, TG не трогали).
 
 ---
 
@@ -599,9 +659,162 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 **Правило:** запись в чат → сюда; **код** — когда этап активен в `ROADMAP` / шапка `CODER_PROMPT`. Срочно — только по слову «сейчас».
 
-**→ Coder:** **O131-PERF** (perf перед stress rerun) · § **O123** ниже
+### § O158-w — Match UX + дубли push (**P0**, owner **2026-06-08**)
 
-### § O131-PERF — perf перед Wave 2 rerun (**P0**, 2026-06-07)
+**Симптомы (скрин TG + /lenta/):**
+
+1. **TG:** один заказ Freelance.ru (`/task/view/2245`) — **3 push подряд**, Match 82%, текст слегка разный («Перенос» / «Перенести»).
+2. **Лента:** подпись «N% Совместимость» есть, **полоска пустая** (регресс O147, owner verify 2026-06-08).
+3. **Deep link** из TG «Лента» → `/lenta/?lead=…` — **% совместимости нет** (или 0%), хотя в push было 82%.
+
+**Корень Lead (read-only):**
+
+| # | Причина |
+|---|---------|
+| 1 | Dedup push только `(user_id, lead_id)` в `match_push_log`; при смене текста заказа — **новый `content_hash` → новый `lead_id`**, тот же URL → новый push. Два вызова `push_match_for_lead` (L1 pool + conveyor) — ок для одного id, не для дублей строк. |
+| 2 | `syncMatchFill` ставит inline `width:0` и ждёт IO/rAF; на collapsed карточках полоска остаётся пустой при живой подписи (§ O147). |
+| 3 | Deep link: `GET /v1/leads/{id}` **без** `keyword_match` · WP `/rawlead/v1/leads/{id}` **не** пробрасывает Bearer. |
+
+**→ Coder:** § **O158-MATCH-UX** в `CODER_PROMPT`. **✅ deploy 2026-06-08**
+
+### § O156-w — YouDo human + external pulse (**P0**, owner **принял 2026-06-08**)
+
+**Owner:** residential один · второй не потяну · «больше человечности» · PM2 **не** · Healthchecks **да**.
+
+**Корень Lead:** browser listing ok · **httpx detail** жжёт pool 403 · перебор 3 слотов за цикл · cold ephemeral browser.
+
+**→ Coder:** § **O155-EXTERNAL-PULSE** + § **O156-YOUDO-HUMAN**
+
+**→ Owner после deploy:** Healthchecks.io check grace 15m · `HEALTHCHECKS_SITE_URL` в `.env` VPS
+
+### § O152-w — Стабильность бирж /ops/ (**P0**, 2026-06-08)
+
+**Owner:** YouDo/FL 🔴 · trace · **карточки: +n при expand + сосед дёргается при collapse**.
+
+**→ Owner:** smoke `/ops/` (trace + лампы) · YouDo «Сбросить баны» если 🔴
+
+**→ Coder:** § **O147-FEED-FLIP-MATCH** · hotfix после O146 verify
+
+### § O147-FEED-FLIP-MATCH — flip full · match bar · trial (**→ active**, 2026-06-08)
+
+**Owner verify (скрины):**
+
+1. **Flip** — карточка урезаная в скролл-боксе; должна выглядеть как обычный expand.
+2. **Match bar** — «Совместимость N%» есть, полоска пустая на collapsed cards.
+3. **Cabinet** — Premium/trial: убрать «Попробовать 3 дня» (оставить только Продлить / Оплатить).
+
+**→ Coder:** § `CODER_PROMPT` O147.
+
+### § O146-DRAFT-CARD-UX — flip lock · pending · кнопка (**✅ код · accept ⏸**, 2026-06-08)
+
+**Owner:** flip **один раз** и остаться на черновике · poll не прерывать при expand/collapse · кнопка pulse + gold shimmer.
+
+**Корень:** `finishDraftFlip` снимает `--draft-flip` → yo-yo.
+
+**→ Coder:** § `CODER_PROMPT` O146 · theme deploy.
+
+### § O145-FEED-CAT — Premium + category (**✅ deploy 2026-06-08**)
+
+**Verify Lead:** pytest **2/2** · wide scan 500 + slice · `deploy-o145-feed-cat-vps.py`
+
+**Deploy:** `python scripts/deploy-o145-feed-cat-vps.py` → **rawlead-api**.
+
+**Owner smoke:** Premium · дата · Маркетинг → несколько карточек.
+
+### § O144-RFP-COMPLY — L2 «идеи в отклике» (**✅ код 2026-06-08** · deploy ⏸)
+
+**Verify Lead:** pytest **10/10** · `deploy-o144-rfp-vps.py` → api + radar + legacy.
+
+**Owner smoke:** Kwork HoReCa → 2–3 идеи в отклике.
+
+### § O142-SPLIT-AI — разнести `ai_analyze.py` (**P2 · post-ads**, 2026-06-08)
+
+**Что это:** рефакторинг **без смены поведения** — один файл ~2140 строк (L1 + L2 + L3 + OpenRouter + валидация) → пакет **`src/ai/`** (или эквивалент):
+
+| Модуль | Зона |
+|--------|------|
+| `l1_analyze.py` | разметка L1, tags, judge hooks |
+| `l2_draft.py` | черновик отклика, guards (`vague`, Veluna) |
+| `l3_human_style.py` | уже отдельно — только импорты |
+| `openrouter_client.py` | HTTP, retry, proxy |
+
+**Зачем:** Coder и человек не теряются в «простыне ИИ»; новые L2-guard — в `l2_draft`, не +100 строк в monolith.
+
+**Не сейчас:** до ads не трогаем — риск регресса L1/L2 на launch path.
+
+**→ Coder:** отдельный § Lead · pytest golden L1/L2 · **zero** изменений API/Neon.
+
+### § O143-SPLIT-API — routers из `api_server.py` (**P2 · post-ads**, 2026-06-08)
+
+**Что это:** рефакторинг **без смены контракта** `/v1/*` — FastAPI monolith ~2260 строк → routers:
+
+| Router | Эндпоинты |
+|--------|-----------|
+| `feed.py` | `/v1/feed`, delay, sort |
+| `draft.py` | draft async, poll |
+| `me.py` | tags, profile |
+| `auth.py` | JWT, Telegram login |
+
+`api_server.py` остаётся thin entry: `app.include_router(...)`.
+
+**Зачем:** Site API читаем для Coder/ревьюера; новые роуты не +200 строк в один файл.
+
+**Не сейчас:** Wave 2 / ads не блокируются.
+
+**→ Coder:** отдельный § Lead · e2e feed + draft smoke · импорты/deploy script checklist.
+
+### § O141-EXCHANGE-PARITY — все биржи = FL/Kwork (**✅ deploy 2026-06-08**)
+
+**Решение owner:** полное ТЗ + качественные отклики + TG push **со всех** бирж в `PUBLIC_FEED_SOURCES`.
+
+**Coder ✅:** `exchange_detail.py` dispatch · detail parsers youdo/freelance_* / pchyol · `lead_pipeline` unified · legacy re-fetch if body<300 · `telegram_notify` → `SOURCE_LABELS` · L2 Veluna guard · `SECONDARY_FETCH_EVERY_N_CYCLES` default **1**.
+
+**Verify Lead:** pytest **18/18** · deploy **`deploy-o141-exchange-parity-vps.py` ✅ 2026-06-08**
+
+### § O140-L2-YOUDO-TZ — (**влито в O141** § D)
+
+**Симптом owner:** YouDo «Сделать бота в телеграмме» · L2: «Подскажите, что именно должен делать бот?» — при том что на бирже (или в полном ТЗ) Veluna Whisper AI: aiogram, PostgreSQL, RAG, админка…
+
+**Корень (Lead):**
+1. **`_resolve_ingest_body`** — detail fetch только **FL + Kwork**; **YouDo** = только `listing_snippet` с карточки (1–2 строки).
+2. L1 `task_summary` = «Разработка Telegram-бота…» — L2 **не видит** 7 пунктов ТЗ.
+3. Промпт O128 уже запрещает «что должен бот?», но без «Описания» модель fallback.
+
+**→ Coder (2 волны):**
+- **A** `youdo_parser.fetch_project_detail` + wire в `lead_pipeline._resolve_ingest_body` (как FL).
+- **B** L2: расширить `_REPLY_DRAFT_VAGUE_RE` + пример GOOD для **AI companion / Veluna-class** ботов (aiogram 3, Postgres, Redis, admin, RAG) · retry если вопрос «что должен бot» при `telegram_bot_dev` в tools и title∋бот.
+
+**Не:** mass regen · смена модели L2.
+
+### § O139-FL-PINNED-FRESH — закреп FL (**✅ deploy 2026-06-08**)
+
+**Симптом:** O134 prefix-stop + закреп FL → `fresh=0` при 26 новых на странице.
+
+**Fix ✅:** `listing_fresh` filter unseen · `fl_parser` full page scan · test `test_trim_pinned_known_new_below`.
+
+**Verify Lead:** pytest **17/17** · VPS `listing:fl parsed=30 fresh=26` (14:49 UTC).
+
+### § O138-PARSER-OBS — parsed vs fresh (**✅ deploy 2026-06-08**)
+
+**Симптом:** `/ops/` 🟢 при `скачано 0` — непонятно: парсер мёртв или O134 fresh-only.
+
+**Coder ✅:** `listing:fl parsed=N fresh=M` · `last_parsed_cards` · red при parsed=0 · `/ops/` listing line · `exchange_parse_smoke.py`.
+
+**Verify:** pytest **7/7** · `deploy-o138-vps.py` ✅
+
+**Не закрыто (опц.):** cron smoke `--write-health` 15m · TG visible 6% — продукт/L1, не O138.
+
+### § O137-FEED-SORT — Premium pagination (**✅ deploy 2026-06-08**)
+
+**Симптом:** 10 заказов по дате при 75 new/day · 6 по match ≥50%.
+
+**Fix:** `sort=time` без min_match + SQL offset; match scan 500 rows.
+
+### § O136-DRAFT-TRACE — observability отклика (**✅ deploy 2026-06-08**)
+
+**Суть:** `draft:trace` stages · L2 skip warnings · uvicorn app log INFO.
+
+### § O131-PERF — perf перед Wave 2 rerun (**✅ deploy 2026-06-07**)
 
 **Решение владельца:** перед следующим полным stress/journey — четыре пункта:
 
@@ -1298,3 +1511,7 @@ _Заменено решением v1.1 B+C выше._
 | 2026-06-07 | **L2 voice O128 B** | план по ТЗ · без «опыта» · бизнес-вопросы | § **O128** → @coder |
 | 2026-06-07 | **Stress edge cases** | S3-pre Neon pool · S4-pre proxy cascade · S1-b skills_mismatch | `PREPROD_STRESS_RUN.md` |
 | 2026-06-07 | **O130 ICQ AI Portfolio** | Концепт Y2K-ICQ + LLM-секретарь · **пока идея** | § **O130** · после ads · см. P-PORTFOLIO |
+| 2026-06-08 | **O135–O138 launch tail** | draft L2-only · feed sort · parsed/fresh `/ops/` | § **O135–O138** ✅ deploy |
+| 2026-06-08 | **O146 draft card UX** | flip один раз · pending не стоп · btn gold shimmer | § **O146** → @coder |
+| 2026-06-08 | **O141 exchange parity** | detail all web · TG labels | § **O141** ✅ deploy |
+| 2026-06-08 | **O142–O143 split god-files** | ai_analyze → `src/ai/` · api_server → routers · **после ads** | § **O142** · § **O143** · P2 |

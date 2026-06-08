@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
@@ -51,6 +51,17 @@ class TestFeedScanLimit(unittest.TestCase):
         )
         self.assertEqual(n, _ME_FEED_SCAN_LIMIT)
 
+    def test_rank_filter_uses_wide_scan(self) -> None:
+        n = _feed_scan_limit(
+            limit=20,
+            offset=0,
+            categories=[],
+            skills=[],
+            sort="time",
+            rank_filter=True,
+        )
+        self.assertEqual(n, _ME_FEED_SCAN_LIMIT)
+
 
 class TestFeedTodaySubquery(unittest.TestCase):
     def test_subquery_embeds_msk_day(self) -> None:
@@ -60,7 +71,14 @@ class TestFeedTodaySubquery(unittest.TestCase):
 
 
 class TestFeedPageTimeInlineToday(unittest.TestCase):
-    def test_single_execute_includes_today_count(self) -> None:
+    @patch("src.api_server._finalize_feed_items")
+    @patch("src.api_server._row_to_item", return_value={"id": 1, "created_at": "2026-01-01"})
+    @patch("src.api_server.passes_score_filter", return_value=True)
+    @patch("src.api_server.resolve_lead_category", return_value="dev")
+    @patch("src.api_server._canonical_lead_tags", return_value=[])
+    def test_single_execute_includes_today_count(
+        self, *_mocks: MagicMock
+    ) -> None:
         cur = MagicMock()
         row = tuple(range(15)) + (7,)
         cur.fetchall.return_value = [row]
@@ -81,6 +99,7 @@ class TestFeedPageTimeInlineToday(unittest.TestCase):
         self.assertEqual(cur.execute.call_count, 1)
         query = cur.execute.call_args[0][0]
         self.assertIn("_today_count", query)
+        self.assertIn("OFFSET", query)
 
 
 class TestDbConnectionMode(unittest.TestCase):

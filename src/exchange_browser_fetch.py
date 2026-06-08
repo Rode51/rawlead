@@ -74,6 +74,51 @@ def listing_browser_enabled() -> bool:
     )
 
 
+def youdo_browser_only() -> bool:
+    if not listing_browser_enabled():
+        return False
+    return os.getenv("YOUDO_BROWSER_ONLY", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def youdo_one_slot_per_cycle() -> bool:
+    return os.getenv("YOUDO_ONE_SLOT_PER_CYCLE", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def youdo_ephemeral() -> bool:
+    return os.getenv("YOUDO_EPHEMERAL", "0").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _youdo_jitter_ms() -> tuple[int, int]:
+    raw = os.getenv("YOUDO_JITTER_MS", "2000,8000").strip()
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    if len(parts) >= 2:
+        try:
+            return int(parts[0]), int(parts[1])
+        except ValueError:
+            pass
+    return 2000, 8000
+
+
+def _youdo_jitter_sleep() -> None:
+    lo, hi = _youdo_jitter_ms()
+    time.sleep(random.randint(lo, hi) / 1000.0)
+
+
+_WARMED_YOUDO_KEYS: set[str] = set()
+
+
 def pick_browser_user_agent(preferred: str = "") -> str:
     """Random Chrome/Firefox UA for a **new** persistent context (O110-B)."""
     pref = (preferred or "").strip()
@@ -131,6 +176,27 @@ def _jitter_sleep() -> None:
     time.sleep(random.randint(lo, hi) / 1000.0)
 
 
+def _log_browser_trace(
+    source: str,
+    proxy_url: str,
+    stage: str,
+    t0: float,
+    **fields: Any,
+) -> None:
+    try:
+        from exchange_trace import log_exchange_trace
+
+        log_exchange_trace(
+            source,
+            stage=stage,
+            ms=int((time.monotonic() - t0) * 1000),
+            proxy=_hint_from_url(proxy_url),
+            **fields,
+        )
+    except Exception:
+        pass
+
+
 def _get_playwright():
     global _PLAYWRIGHT
     with _PW_LOCK:
@@ -147,11 +213,42 @@ def _get_playwright():
 
 
 _HEAVY_RESOURCE_TYPES = frozenset({"image", "font", "media"})
+_YOUDO_BLOCK_RESOURCE_TYPES = frozenset(
+    {"image", "font", "media", "stylesheet", "xhr", "fetch", "websocket"}
+)
+_YOUDO_ANALYTICS_MARKERS = (
+    "google-analytics",
+    "googletagmanager",
+    "mc.yandex",
+    "metrika",
+    "facebook.net",
+    "doubleclick",
+    "hotjar",
+    "segment.io",
+    "amplitude",
+    "analytics",
+)
+_WARM_AT_KEY_PREFIX = "youdo_warm_at_"
 
 
 def _should_abort_playwright_request(request) -> bool:
     url = request.url.lower()
     if request.resource_type in _HEAVY_RESOURCE_TYPES:
+        return True
+    if "tracker" in url or "tag.js" in url:
+        return True
+    return False
+
+
+def _should_abort_youdo_request(request) -> bool:
+    url = request.url.lower()
+    rtype = request.resource_type
+    # O157 lean: xhr/fetch нужны для API листинга — не резать youdo.com
+    if rtype in ("xhr", "fetch") and "youdo.com" in url:
+        return False
+    if rtype in _YOUDO_BLOCK_RESOURCE_TYPES:
+        return True
+    if any(marker in url for marker in _YOUDO_ANALYTICS_MARKERS):
         return True
     if "tracker" in url or "tag.js" in url:
         return True
@@ -165,6 +262,67 @@ def _abort_heavy_route(route) -> None:
         route.continue_()
 
 
+def _abort_youdo_lean_route(route) -> None:
+    if _should_abort_youdo_request(route.request):
+        route.abort()
+    else:
+        route.continue_()
+
+
+def _youdo_warm_ttl_sec() -> float:
+    return max(0.0, float(os.getenv("YOUDO_WARM_TTL_MIN", "45"))) * 60.0
+
+
+def _youdo_settings_storage():
+    from config import load_config
+    from storage import ProjectStorage
+
+    return ProjectStorage(load_config().sqlite_path)
+
+
+def _youdo_warm_recent(key: str) -> bool:
+    ttl = _youdo_warm_ttl_sec()
+    if ttl <= 0:
+        return False
+    try:
+        raw = _youdo_settings_storage().get_setting(f"{_WARM_AT_KEY_PREFIX}{key}", "0")
+        return time.time() - float(raw or 0) < ttl
+    except (ValueError, OSError):
+        return False
+
+
+def _mark_youdo_warm(key: str) -> None:
+    _WARMED_YOUDO_KEYS.add(key)
+    try:
+        _youdo_settings_storage().set_setting(
+            f"{_WARM_AT_KEY_PREFIX}{key}",
+            str(time.time()),
+        )
+    except OSError:
+        pass
+
+
+def _maybe_warm_youdo_home(
+    page,
+    proxy_url: str,
+    key: str,
+    *,
+    timeout_ms: int,
+) -> None:
+    if key in _WARMED_YOUDO_KEYS:
+        return
+    if _youdo_warm_recent(key):
+        _log_browser_trace("youdo", proxy_url, "warm_home_skip", time.monotonic(), ms=0)
+        _WARMED_YOUDO_KEYS.add(key)
+        return
+    _warm_youdo_home(page, proxy_url, timeout_ms=timeout_ms)
+    _mark_youdo_warm(key)
+
+
+def reset_youdo_warm_state_for_tests() -> None:
+    _WARMED_YOUDO_KEYS.clear()
+
+
 def _close_context(key: str) -> None:
     ctx = _CONTEXTS.pop(key, None)
     if ctx is not None:
@@ -176,6 +334,7 @@ def _close_context(key: str) -> None:
 
 def close_all_browser_contexts() -> None:
     """Close every open Playwright persistent context (O132 cycle teardown)."""
+    _WARMED_YOUDO_KEYS.clear()
     with _LOCK:
         for key in list(_CONTEXTS):
             _close_context(key)
@@ -235,44 +394,199 @@ def cleanup_stale_browser_processes() -> int:
     return killed
 
 
-def _fetch_youdo_ephemeral(
+def _youdo_profile_key(proxy_url: str) -> str:
+    return _profile_key("youdo", proxy_url)
+
+
+def _launch_youdo_persistent_context(
+    proxy_url: str,
+    *,
+    user_agent: str,
+) -> Any:
+    key = _youdo_profile_key(proxy_url)
+    with _LOCK:
+        ctx = _CONTEXTS.get(key)
+        if ctx is not None:
+            return ctx, key
+
+    profile_dir = _data_root() / key
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    pw = _get_playwright()
+    ua = pick_browser_user_agent(user_agent)
+    launch_kw: dict[str, Any] = {
+        "user_data_dir": str(profile_dir),
+        "headless": True,
+        "user_agent": ua,
+        "locale": "ru-RU",
+        "timezone_id": "Europe/Moscow",
+        "viewport": {"width": 1366, "height": 768},
+    }
+    px = _playwright_proxy(proxy_url)
+    if px:
+        launch_kw["proxy"] = px
+    try:
+        ctx = pw.chromium.launch_persistent_context(**launch_kw)
+    except Exception as exc:
+        _close_context(key)
+        raise HtmlFetchError(f"Playwright launch failed (youdo): {exc}") from exc
+    ctx.route("**/*", _abort_youdo_lean_route)
+    with _LOCK:
+        _CONTEXTS[key] = ctx
+    return ctx, key
+
+
+def _warm_youdo_home(page, proxy_url: str, *, timeout_ms: int) -> None:
+    t0 = time.monotonic()
+    page.goto("https://youdo.com/", wait_until="domcontentloaded", timeout=timeout_ms)
+    page.wait_for_timeout(random.randint(2000, 5000))
+    try:
+        page.mouse.wheel(0, 400)
+    except Exception:
+        pass
+    page.wait_for_timeout(random.randint(1000, 2000))
+    _log_browser_trace("youdo", proxy_url, "warm_home", t0, http=200)
+
+
+def _validate_youdo_html(html: str, proxy_url: str) -> None:
+    low = html.lower()
+    if "cloudflare" in low and ("challenge" in low or "blocked" in low):
+        raise HtmlFetchError(f"Cloudflare challenge (youdo, {_hint_from_url(proxy_url)})")
+    if len(html.strip()) < 500:
+        raise HtmlFetchError("Слишком короткий ответ Playwright (youdo).")
+    if "проверьте, что вы не робот" in low:
+        raise HtmlFetchError("Antibot HTML (youdo).")
+
+
+def fetch_youdo_html_browser(
     url: str,
     *,
     user_agent: str,
     timeout_sec: float,
     proxy_url: str,
+    stage: str = "listing",
 ) -> str:
-    """YouDo: ephemeral Chromium (persistent profile ломает node-proxy)."""
-    with _FETCH_LOCK:
-        ua = _DEFAULT_UA  # YouDo режет FLRadar/бот User-Agent из cfg
-        timeout_ms = max(int(timeout_sec * 1000), 5000)
-        _jitter_sleep()
-        px = _playwright_proxy(proxy_url)
-        pw = _get_playwright()
-        launch_kw: dict[str, Any] = {"headless": True}
-        if px:
-            launch_kw["proxy"] = px
-        browser = pw.chromium.launch(**launch_kw)
-        try:
-            ctx = browser.new_context(user_agent=ua, locale="ru-RU")
-            ctx.route("**/*", _abort_heavy_route)
-            page = ctx.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+    """O156: warm human Playwright path for YouDo listing/detail."""
+    if youdo_ephemeral():
+        return _fetch_youdo_ephemeral(
+            url,
+            user_agent=user_agent,
+            timeout_sec=timeout_sec,
+            proxy_url=proxy_url,
+            stage=stage,
+        )
+
+    _youdo_jitter_sleep()
+    timeout_ms = max(int(timeout_sec * 1000), 5000)
+    ctx, key = _launch_youdo_persistent_context(proxy_url, user_agent=user_agent)
+    page = ctx.new_page()
+    t0 = time.monotonic()
+    try:
+        if key not in _WARMED_YOUDO_KEYS:
+            _maybe_warm_youdo_home(page, proxy_url, key, timeout_ms=timeout_ms)
+        page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+        if stage == "listing":
             try:
                 page.wait_for_selector('a[data-id][href*="/t"]', timeout=min(45000, timeout_ms))
             except Exception:
                 page.wait_for_timeout(5000)
             else:
                 page.wait_for_timeout(1500)
+        else:
+            page.wait_for_timeout(min(2000, timeout_ms // 4))
+        html = page.content()
+        bytes_est = len(html.encode("utf-8", errors="replace"))
+        _log_browser_trace(
+            "youdo", proxy_url, stage, t0, http=200, bytes_est=bytes_est
+        )
+    except Exception as exc:
+        _log_browser_trace("youdo", proxy_url, stage, t0, err=type(exc).__name__)
+        raise
+    finally:
+        try:
+            page.close()
+        except Exception:
+            pass
+
+    _validate_youdo_html(html, proxy_url)
+    return html
+
+
+def fetch_youdo_detail_html(
+    url: str,
+    *,
+    user_agent: str,
+    timeout_sec: float = 45.0,
+    proxy_url: str | None = None,
+) -> str:
+    proxy = (proxy_url or "").strip() or exchange_primary_proxy_url("youdo")
+    if not proxy:
+        raise HtmlFetchError("youdo: no proxy for detail fetch")
+    return fetch_youdo_html_browser(
+        url,
+        user_agent=user_agent,
+        timeout_sec=timeout_sec,
+        proxy_url=proxy,
+        stage="detail",
+    )
+
+
+def _fetch_youdo_ephemeral(
+    url: str,
+    *,
+    user_agent: str,
+    timeout_sec: float,
+    proxy_url: str,
+    stage: str = "listing",
+) -> str:
+    """YouDo legacy: ephemeral Chromium (YOUDO_EPHEMERAL=1)."""
+    with _FETCH_LOCK:
+        ua = pick_browser_user_agent(user_agent)
+        timeout_ms = max(int(timeout_sec * 1000), 5000)
+        _youdo_jitter_sleep()
+        px = _playwright_proxy(proxy_url)
+        pw = _get_playwright()
+        launch_kw: dict[str, Any] = {"headless": True}
+        if px:
+            launch_kw["proxy"] = px
+        browser = pw.chromium.launch(**launch_kw)
+        t0 = time.monotonic()
+        try:
+            ctx = browser.new_context(
+                user_agent=ua,
+                locale="ru-RU",
+                timezone_id="Europe/Moscow",
+                viewport={"width": 1366, "height": 768},
+            )
+            ctx.route("**/*", _abort_youdo_lean_route)
+            page = ctx.new_page()
+            _maybe_warm_youdo_home(
+                page,
+                proxy_url,
+                _youdo_profile_key(proxy_url),
+                timeout_ms=timeout_ms,
+            )
+            page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            if stage == "listing":
+                try:
+                    page.wait_for_selector('a[data-id][href*="/t"]', timeout=min(45000, timeout_ms))
+                except Exception:
+                    page.wait_for_timeout(5000)
+                else:
+                    page.wait_for_timeout(1500)
+            else:
+                page.wait_for_timeout(min(2000, timeout_ms // 4))
             html = page.content()
+            bytes_est = len(html.encode("utf-8", errors="replace"))
+            _log_browser_trace(
+                "youdo", proxy_url, stage, t0, http=200, bytes_est=bytes_est
+            )
+        except Exception as exc:
+            _log_browser_trace("youdo", proxy_url, stage, t0, err=type(exc).__name__)
+            raise
         finally:
             browser.close()
 
-    low = html.lower()
-    if "cloudflare" in low and ("challenge" in low or "blocked" in low):
-        raise HtmlFetchError(f"Cloudflare challenge (youdo, {_hint_from_url(proxy_url)})")
-    if len(html.strip()) < 500:
-        raise HtmlFetchError("Слишком короткий ответ Playwright (youdo).")
+    _validate_youdo_html(html, proxy_url)
     return html
 
 
@@ -317,10 +631,15 @@ def fetch_listing_html_browser(
                 _CONTEXTS[key] = ctx
 
         page = ctx.new_page()
+        t0 = time.monotonic()
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
             page.wait_for_timeout(min(1500, timeout_ms // 4))
             html = page.content()
+            _log_browser_trace(source, proxy, "browser_goto", t0, http=200)
+        except Exception as exc:
+            _log_browser_trace(source, proxy, "browser_goto", t0, err=type(exc).__name__)
+            raise
         finally:
             try:
                 page.close()
@@ -389,7 +708,13 @@ def fetch_listing_html_browser_slots(
     proxy_urls: list[str] | None = None,
 ) -> str:
     """Browser fetch с перебором живых слотов (O63 YouDo — без httpx fallback)."""
-    slots = proxy_urls if proxy_urls is not None else exchange_alive_proxy_urls(source)
+    if proxy_urls is not None:
+        slots = proxy_urls
+    elif source == "youdo" and youdo_one_slot_per_cycle():
+        primary = exchange_primary_proxy_url("youdo")
+        slots = [primary] if primary else []
+    else:
+        slots = exchange_alive_proxy_urls(source)
     if not slots:
         raise HtmlFetchError(f"{source}: no alive proxy slots for browser")
     last_exc: HtmlFetchError | None = None
@@ -397,11 +722,12 @@ def fetch_listing_html_browser_slots(
         hint = _hint_from_url(proxy_url) or "direct"
         try:
             if source == "youdo":
-                return _fetch_youdo_ephemeral(
+                return fetch_youdo_html_browser(
                     url,
                     user_agent=user_agent,
                     timeout_sec=timeout_sec,
                     proxy_url=proxy_url,
+                    stage="listing",
                 )
             return fetch_listing_html_browser(
                 source,
@@ -419,11 +745,14 @@ def fetch_listing_html_browser_slots(
                 hint,
                 exc,
             )
+            if source == "youdo" and youdo_one_slot_per_cycle():
+                break
     detail = str(last_exc) if last_exc else "unknown"
     raise HtmlFetchError(f"{source}: all browser slots failed ({len(slots)}): {detail}")
 
 
 def reset_browser_contexts_for_tests() -> None:
+    reset_youdo_warm_state_for_tests()
     with _LOCK:
         for key in list(_CONTEXTS):
             _close_context(key)

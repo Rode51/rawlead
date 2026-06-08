@@ -62,7 +62,7 @@ from src.rank import (
 )
 from src.ai_analyze import draft_stats_24h, ai_last_error, draft_fail_per_hour
 from src.stars_billing import stars_available
-from src.draft_async import draft_response_body, poll_draft, submit_draft
+from src.draft_async import draft_response_body, poll_draft, submit_draft, submit_warm
 from src.draft_limits import draft_rate_limit_detail
 from src.bot_auth import (
     BOT_AUTH_PREFIX,
@@ -385,11 +385,12 @@ def _feed_scan_limit(
     categories: list[str],
     skills: list[str],
     sort: str,
+    rank_filter: bool = False,
 ) -> int:
-    """O131: wide scan only when category filter or match+skills ranking needs it."""
+    """O131: wide scan when post-SQL ranking/filter needs a window."""
     if categories:
         return _ME_FEED_SCAN_LIMIT
-    if sort == "match" and skills:
+    if sort == "match" or rank_filter:
         return _ME_FEED_SCAN_LIMIT
     return limit + offset + 20
 
@@ -548,46 +549,47 @@ def _feed_page_time(
     if min_score >= 70:
         sql_min = effective_feed_min_score(min_score, "text")
     feed_where, feed_params = _feed_where_sql(apply_delay=apply_delay)
-    scan_limit = _feed_scan_limit(
-        limit=limit,
-        offset=offset,
-        categories=categories,
-        skills=skills,
-        sort="time",
-    )
-    today_sub, today_params = _feed_today_subquery_sql(
-        skills=skills, apply_delay=apply_delay
-    )
-    today_select = f", {today_sub} AS _today_count" if not categories else ""
-    cur.execute(
-        f"""
-        SELECT {_SELECT_COLS}{today_select}
-        FROM leads
-        WHERE {feed_where}
-          AND (ai_score IS NULL OR ai_score >= %s)
-          {cat_sql}
-        ORDER BY created_at DESC
-        LIMIT %s
-        """,
-        (
-            *feed_params,
-            *((today_params) if not categories else ()),
-            sql_min,
-            *cat_params,
-            scan_limit,
-        ),
-    )
-    rows = cur.fetchall()
-    today_count: int | None = None
-    if not categories:
-        if rows:
-            today_count = int(rows[0][-1] or 0)
-            rows = [r[:-1] for r in rows]
-        else:
-            today_count = _feed_today_count_standalone(
-                cur, skills=skills, apply_delay=apply_delay
-            )
     if min_match and tag_weights:
+        scan_limit = _feed_scan_limit(
+            limit=limit,
+            offset=offset,
+            categories=categories,
+            skills=skills,
+            sort="time",
+            rank_filter=True,
+        )
+        today_sub, today_params = _feed_today_subquery_sql(
+            skills=skills, apply_delay=apply_delay
+        )
+        today_select = f", {today_sub} AS _today_count" if not categories else ""
+        cur.execute(
+            f"""
+            SELECT {_SELECT_COLS}{today_select}
+            FROM leads
+            WHERE {feed_where}
+              AND (ai_score IS NULL OR ai_score >= %s)
+              {cat_sql}
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (
+                *feed_params,
+                *((today_params) if not categories else ()),
+                sql_min,
+                *cat_params,
+                scan_limit,
+            ),
+        )
+        rows = cur.fetchall()
+        today_count: int | None = None
+        if not categories:
+            if rows:
+                today_count = int(rows[0][-1] or 0)
+                rows = [r[:-1] for r in rows]
+            else:
+                today_count = _feed_today_count_standalone(
+                    cur, skills=skills, apply_delay=apply_delay
+                )
         ranked = _rank_feed_rows(
             rows,
             tag_weights,
@@ -601,6 +603,76 @@ def _feed_page_time(
         page = ranked[offset : offset + limit]
         _finalize_feed_items(cur, page, user_id=user_id)
         return page, len(page), today_count
+
+    if categories:
+        scan_limit = _feed_scan_limit(
+            limit=limit,
+            offset=offset,
+            categories=categories,
+            skills=skills,
+            sort="time",
+            rank_filter=True,
+        )
+        today_sub, today_params = _feed_today_subquery_sql(
+            skills=skills, apply_delay=apply_delay
+        )
+        today_select = f", {today_sub} AS _today_count" if not categories else ""
+        cur.execute(
+            f"""
+            SELECT {_SELECT_COLS}{today_select}
+            FROM leads
+            WHERE {feed_where}
+              AND (ai_score IS NULL OR ai_score >= %s)
+              {cat_sql}
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (
+                *feed_params,
+                *((today_params) if not categories else ()),
+                sql_min,
+                *cat_params,
+                scan_limit,
+            ),
+        )
+        rows = cur.fetchall()
+        today_count = None
+    else:
+        today_sub, today_params = _feed_today_subquery_sql(
+            skills=skills, apply_delay=apply_delay
+        )
+        today_select = f", {today_sub} AS _today_count"
+        cur.execute(
+            f"""
+            SELECT {_SELECT_COLS}{today_select}
+            FROM leads
+            WHERE {feed_where}
+              AND (ai_score IS NULL OR ai_score >= %s)
+              {cat_sql}
+            ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            (
+                *feed_params,
+                *today_params,
+                sql_min,
+                *cat_params,
+                limit,
+                offset,
+            ),
+        )
+        rows = cur.fetchall()
+        today_count = None
+
+    if categories:
+        pass
+    elif rows:
+        today_count = int(rows[0][-1] or 0)
+        rows = [r[:-1] for r in rows]
+    else:
+        today_count = _feed_today_count_standalone(
+            cur, skills=skills, apply_delay=apply_delay
+        )
     items: list[dict[str, Any]] = []
     for r in rows:
         if categories and not _passes_category_filter(r, categories):
@@ -713,63 +785,114 @@ def _personal_feed_page(
     extra, extra_params = _skills_sql(skills)
     cat_sql, cat_params = _category_sql(categories)
     feed_where, feed_params = _feed_where_sql()
-    scan_limit = _feed_scan_limit(
-        limit=limit,
-        offset=offset,
-        categories=categories,
-        skills=skills,
-        sort=sort,
-    )
     today_sub, today_params = _feed_today_subquery_sql(skills=skills, apply_delay=False)
     today_select = f", {today_sub} AS _today_count" if not categories else ""
-    cur.execute(
-        f"""
-        SELECT {_SELECT_COLS}{today_select}
-        FROM leads
-        WHERE {feed_where}
-          {extra}{cat_sql}
-        ORDER BY created_at DESC
-        LIMIT %s
-        """,
-        (
-            *feed_params,
-            *((today_params) if not categories else ()),
-            *extra_params,
-            *cat_params,
-            scan_limit,
-        ),
-    )
-    raw_rows = cur.fetchall()
-    today_count: int | None = None
-    if not categories:
-        if raw_rows:
-            today_count = int(raw_rows[0][-1] or 0)
-            raw_rows = [r[:-1] for r in raw_rows]
-        else:
-            today_count = _feed_today_count_standalone(
-                cur, skills=skills, apply_delay=False
-            )
-    rows = raw_rows
+
     if sort == "time":
+        if categories:
+            scan_limit = _feed_scan_limit(
+                limit=limit,
+                offset=offset,
+                categories=categories,
+                skills=skills,
+                sort="time",
+                rank_filter=True,
+            )
+            cur.execute(
+                f"""
+                SELECT {_SELECT_COLS}{today_select}
+                FROM leads
+                WHERE {feed_where}
+                  {extra}{cat_sql}
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                (
+                    *feed_params,
+                    *extra_params,
+                    *cat_params,
+                    scan_limit,
+                ),
+            )
+            raw_rows = cur.fetchall()
+            today_count = None
+        else:
+            cur.execute(
+                f"""
+                SELECT {_SELECT_COLS}{today_select}
+                FROM leads
+                WHERE {feed_where}
+                  {extra}{cat_sql}
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                (
+                    *feed_params,
+                    *today_params,
+                    *extra_params,
+                    *cat_params,
+                    limit,
+                    offset,
+                ),
+            )
+            raw_rows = cur.fetchall()
+            today_count = None
+            if raw_rows:
+                today_count = int(raw_rows[0][-1] or 0)
+                raw_rows = [r[:-1] for r in raw_rows]
+            else:
+                today_count = _feed_today_count_standalone(
+                    cur, skills=skills, apply_delay=False
+                )
         ranked: list[dict[str, Any]] = []
-        for row in rows:
+        for row in raw_rows:
             if categories and not _passes_category_filter(row, categories):
                 continue
             tags = _canonical_lead_tags(row[8])
-            if has_profile:
-                km = keyword_match(tags, user_tags)
-                if not _passes_min_match(km, min_match):
-                    continue
-            else:
-                km = 0
+            km = keyword_match(tags, user_tags) if has_profile else 0
             fr = final_rank(row[6], km)
             ranked.append(
                 _row_to_item(row, keyword_match_val=km, final_rank_val=fr, feed_delayed=False)
             )
-        ranked.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        page = ranked[offset : offset + limit] if categories else ranked
     else:
+        scan_limit = _feed_scan_limit(
+            limit=limit,
+            offset=offset,
+            categories=categories,
+            skills=skills,
+            sort="match",
+            rank_filter=True,
+        )
+        cur.execute(
+            f"""
+            SELECT {_SELECT_COLS}{today_select}
+            FROM leads
+            WHERE {feed_where}
+              {extra}{cat_sql}
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (
+                *feed_params,
+                *((today_params) if not categories else ()),
+                *extra_params,
+                *cat_params,
+                scan_limit,
+            ),
+        )
+        raw_rows = cur.fetchall()
+        today_count = None
+        if not categories:
+            if raw_rows:
+                today_count = int(raw_rows[0][-1] or 0)
+                raw_rows = [r[:-1] for r in raw_rows]
+            else:
+                today_count = _feed_today_count_standalone(
+                    cur, skills=skills, apply_delay=False
+                )
         ranked = _rank_feed_rows(
-            rows,
+            raw_rows,
             user_tags,
             min_score=min_score,
             sort="match",
@@ -777,7 +900,7 @@ def _personal_feed_page(
             feed_delayed=False,
             categories=categories,
         )
-    page = ranked[offset : offset + limit]
+        page = ranked[offset : offset + limit]
     _finalize_feed_items(cur, page, user_id=user_id)
     return page, len(page), today_count
 
@@ -960,6 +1083,11 @@ if _cors:
 
 @app.on_event("startup")
 def _log_db_connection_mode() -> None:
+    # uvicorn leaves root at WARNING — app logger.info (draft:trace) never reached journal.
+    logging.getLogger().setLevel(logging.INFO)
+    for name in ("match_push", "draft_async", "draft_trace", "ai_analyze", "config"):
+        logging.getLogger(name).setLevel(logging.INFO)
+
     from config import openrouter_proxy_hint
 
     logger.info("db: %s", _db_connection_mode())
@@ -1353,8 +1481,12 @@ def feed(
 
 
 @app.get("/v1/leads/{lead_id}")
-def get_lead(lead_id: int) -> dict[str, Any]:
-    """Одна карточка лида по id."""
+def get_lead(
+    lead_id: int,
+    authorization: str = Header(default="", alias="Authorization"),
+) -> dict[str, Any]:
+    """Одна карточка лида по id; Bearer → keyword_match для deep link ?lead=."""
+    user_id = _try_user_from_bearer(authorization)
     try:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
@@ -1363,13 +1495,23 @@ def get_lead(lead_id: int) -> dict[str, Any]:
                     (lead_id,),
                 )
                 row = cur.fetchone()
+                if row is None:
+                    raise HTTPException(status_code=404, detail="not found")
+                km: int | None = None
+                if user_id:
+                    user_tags = _load_user_tags(cur, user_id)
+                    tags, _ = lead_tags_for_feed(row[8])
+                    km = keyword_match(tags, user_tags) if user_tags else 0
+                item = _row_to_item(row, keyword_match_val=km)
+                if user_id:
+                    _attach_personal_replies(cur, user_id, [item])
+                else:
+                    item["reply_draft"] = ""
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("get_lead %d: %s", lead_id, exc)
         raise HTTPException(status_code=500, detail="db error")
-    if row is None:
-        raise HTTPException(status_code=404, detail="not found")
-    item = _row_to_item(row)
-    item["reply_draft"] = ""
     return item
 
 
@@ -1705,6 +1847,40 @@ def me_lead_draft(
         raise HTTPException(status_code=500, detail="db error") from exc
 
     return _me_lead_draft_response(resp, lead_id=lead_id)
+
+
+@app.post("/v1/me/leads/{lead_id}/draft/warm")
+def me_lead_draft_warm(
+    lead_id: int,
+    user_id: str = Depends(_resolve_user_id),
+) -> Any:
+    """O148: pre-warm shared L2 on premium expand — no user_lead_replies."""
+    cfg = load_config()
+    if not cfg.ai_active:
+        raise HTTPException(status_code=503, detail="ai unavailable")
+
+    try:
+        resp = submit_warm(
+            cfg,
+            user_id=user_id,
+            lead_id=lead_id,
+            log_prefix=f"lenta:draft:warm:{lead_id}:",
+        )
+    except DraftError as exc:
+        if exc.code == "rate_limit":
+            raise HTTPException(
+                status_code=429,
+                detail={"detail": exc.detail or "warm rate limit"},
+            ) from exc
+        raise _draft_http_error(exc, lead_id=lead_id) from exc
+    except Exception as exc:
+        logger.error("me_lead_draft_warm %d: %s", lead_id, exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+    body = draft_response_body(resp)
+    if resp.status == "ready":
+        return JSONResponse(status_code=200, content=body)
+    return JSONResponse(status_code=202, content=body)
 
 
 @app.get("/v1/me/replies")

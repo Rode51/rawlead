@@ -848,7 +848,7 @@ add_action('rest_api_init', static function (): void {
 
             $id = (int) $request->get_param('id');
 
-            $data = rawlead_api_get('/v1/leads/' . $id);
+            $data = rawlead_api_get('/v1/leads/' . $id, [], false, $request);
 
             if (is_wp_error($data)) {
 
