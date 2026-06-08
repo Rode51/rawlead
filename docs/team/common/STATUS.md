@@ -70,7 +70,8 @@
 | **6c** | **O131-PERF** | ✅ deploy · load@20 p95 **2549 ms** ⏸ |
 | 7 | **Wave 2 rerun** · sign-off · ads | **⏸** до **O132 deploy + 24h** |
 | **7a** | **O132-STABILITY** | **deploy ✅** · 24h watch |
-| **7b** | **O134-INGEST-SLA** — скорость ленты FL/Kwork | **deploy ✅ 2026-06-08** · мониторинг ≤5m |
+| **7b** | **O134-INGEST-SLA** | **deploy ✅** |
+| **7c** | **O135-DRAFT** — отклик L2-only · draft restart · OR proxy | **deploy ✅ 2026-06-08** |
 
 **Owner фон:** **45.152.197.25** — починить/заменить у провайдера (сейчас acc1+бот на **38.154** spare).
 
@@ -95,7 +96,8 @@
 | **Perf** | load@20 p95 **2549 ms** post-O131 | rerun stress · app pool backlog |
 | **O129-W2** | orchestrator ✅ · journey **9/10** | **⏸** Wave 2 |
 | **O132** | deploy ✅ · MemoryMax · browser cleanup | 24h watch 0 oom-kill |
-| **O134-INGEST-SLA** | deploy ✅ **2026-06-08** · fresh-only · /ops/ SLA | мониторинг ≤5m 24h |
+| **O134-INGEST-SLA** | deploy ✅ · fresh-only · /ops/ SLA | мониторинг ≤5m |
+| **O135-DRAFT** | L2-only 1-й · draft restart · OR proxy env | **deploy ✅** · owner: OR proxy smoke |
 
 ---
 

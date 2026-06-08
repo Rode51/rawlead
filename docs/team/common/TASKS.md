@@ -27,16 +27,18 @@
 | **10** | **Stress Wave 1** (PREPROD) | owner | ✅ **2026-06-07** |
 | **10b** | **O129 stress v2** orchestrator + journey harness | @coder | ✅ pytest · journey partial |
 | **10c** | **O131-PERF** | @coder + Lead deploy | ✅ **2026-06-07** |
-| **11** | **Wave 2 rerun** · sign-off · **ads** | **⏸** O132 deploy |
-| **11a** | **O132-STABILITY** radar OOM | **код ✅** · **owner deploy** |
+| **11** | **Wave 2 rerun** · sign-off · **ads** | **⏸** после draft smoke |
+| **11a** | **O132-STABILITY** radar OOM | **deploy ✅** |
+| **11b** | **O134-INGEST-SLA** | **deploy ✅** |
+| **11c** | **O135-DRAFT** отклик timeout | **deploy ✅** · owner OR proxy |
 
 ---
 
 ## L2 smoke (owner, после deploy)
 
-1. Premium → лид **без** `reply_draft` → «Написать отклик» → tools + draft за ≤30s
-2. Повторный клик → cache, без LLM
-3. `/ops/` → radar active · env `TOOLS_BACKLOG_DRAIN=0` · models = `gemini-2.5-pro`
+1. Premium → лид **без** `reply_draft` → «Написать отклик» → cold L2 **≤ 90s** (1-й user L2-only)
+2. Повторный клик / 2-й user → cache или L3 **≤ 20s**
+3. `/ops/` → radar active · `openrouter:proxy=direct|host:port` в api log
 
 ---
 

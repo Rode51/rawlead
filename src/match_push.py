@@ -446,6 +446,7 @@ def _analyze_shared_ondemand(
                 errors=ai_errors,
                 log_prefix=log_prefix,
                 timeout_sec=90.0,
+                max_attempts=2,
             )
             if draft:
                 return draft
@@ -688,22 +689,18 @@ def generate_and_store_lead_draft(
                 """,
                 (reply, lead_id),
             )
-            # Shared L2 remains in leads.reply_draft; each user gets unique cached variant.
-            reply_personal, fallback_shared = _build_personalized_reply(
-                cfg,
-                user_id=user_id,
-                lead_id=lead_id,
-                shared_reply=reply,
-                ai_errors=ai_errors,
-                log_prefix=prefix,
-            )
-            _insert_user_draft(cur, user_id, lead_id, reply_personal)
+            # O135: first user on cold lead — store shared L2 as-is (skip L3 uniquify).
+            _insert_user_draft(cur, user_id, lead_id, reply)
             conn.commit()
+            logger.info(
+                "%sfirst_user_l2_only lead=%s user=%s",
+                prefix,
+                lead_id,
+                user_id[:8],
+            )
 
     note_draft_request(True)
-    if fallback_shared:
-        logger.warning("%sfallback_shared lead=%s user=%s", prefix, lead_id, user_id[:8])
-    return DraftResult(reply_draft=reply_personal, tools_required=tools, keyword_match=km)
+    return DraftResult(reply_draft=reply, tools_required=tools, keyword_match=km)
 
 
 def _send_tg_draft_result(

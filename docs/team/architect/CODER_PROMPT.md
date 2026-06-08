@@ -1,10 +1,111 @@
 # Coder — горячий контур (активное)
 
-**→ Сейчас:** **O132 deploy** (код ✅) · Wave 2 **⏸** · O131 ✅
+**→ Сейчас:** **O135 ✅ deploy** · owner smoke draft + OR proxy env · Wave 2 **⏸**
 
 ---
 
-## § O132-STABILITY — radar OOM (**→ Coder**)
+## § O135-DRAFT ✅ (2026-06-08)
+
+| A L2-only 1-й | B draft_async restart | C OR proxy | Deploy |
+|---------------|----------------------|------------|--------|
+| skip L3 cold · `first_user_l2_only` | `lead_draft_jobs` + `draft:restart` | `OPENROUTER_HTTP_PROXY` / `OPENROUTER_PROXY_URLS` | **`deploy-o135-vps.py` ✅** |
+
+**Verify Lead:** pytest **18/18** (o135 + draft_async + shared_draft) · spec **5/5** ✅
+
+**Owner next:** опц. `OPENROUTER_HTTP_PROXY=<1-й YOUDO_PROXY_URLS>` · smoke `/lenta/?lead=15146` · `preprod_draft_burst --max-leads 3`
+
+---
+
+## § O135-DRAFT — archive spec (**✅ закрыто**)
+
+**Симптом owner 2026-06-08:** Premium `/lenta/?lead=15146` → **«ИИ не успел — повторите»** (poll 120s) · lead #15146 kwork OK visible · `reply_draft` NULL · log `Черновик ещё не запущен` после restart API.
+
+**Корень (Lead):**
+1. **1-й пользователь:** L2 (human, pro) + **лишний L3** → p95 ~105s · UI timeout
+2. **draft_async:** in-memory worker теряется при restart API · GET poll → failed «не запущен»
+3. **OpenRouter:** `DIRECT_REQUESTS_PROXIES` с IP Beget VPS · без прокси · возможен latency/rate-limit
+
+**Решение owner:** 1-й Premium = **только L2** · 2-й+ = L3 · OpenRouter proxy **без новых покупок** — `YOUDO_PROXY_URLS` (residential RU) или **acc2/acc3** Telethon · **не** bot `TG_PROXY_URL`.
+
+### Copy-paste для @coder
+
+```
+@coder O135-DRAFT
+
+Спека: docs/team/architect/CODER_PROMPT.md § O135-DRAFT
+Lead verify: lead #15146 · journalctl rawlead-api | grep lenta:draft
+
+Контекст: L2 уже human (l3_human_style shared L2). Сейчас 1-й user = L2+L3 = слишком долго.
+Не трогать: FL/Kwork listing proxy · radar ingest · WP theme copy · mass regen.
+
+## A — 1-й пользователь: L2-only (skip L3)
+Файл: src/match_push.py `generate_and_store_lead_draft`
+
+После успешного cold L2 + UPDATE leads.reply_draft:
+- INSERT user_lead_replies с **текстом L2 as-is**
+- **НЕ** вызывать `_build_personalized_reply` для первого user на этом lead
+- Log: `lenta:draft:{id}:first_user_l2_only`
+
+2-й+ без изменений: `shared` есть → только L3 (`fast_shared`).
+
+DoD: cold lead p95 target **< 75s** (1 LLM) · warm **< 20s** (L3 only).
+
+## B — draft_async: не терять job после restart
+Файл: src/draft_async.py (+ api_server если нужно)
+
+1. `poll_draft` GET: status failed «Черновик ещё не запущен» → **pending + auto `_start_worker`** (или 202, не terminal fail)
+2. POST idempotent: если `lead_draft_jobs.pending` и worker dead → restart worker
+3. Wire `_insert_lead_pending` / `_set_lead_job_failed` / `_delete_lead_job` (сейчас dead code)
+4. Worker `max_retries=2` (не 4) — как hot path O131
+
+Log: `draft:restart lead=N` · `draft:worker_done lead=N ms=M`
+
+## C — OpenRouter proxy (отдельный пул, owner без новых IP)
+
+Файлы: `src/config.py` · `src/ai_analyze.py` (`_openrouter_chat` + L3 POST)
+
+**Owner constraint:** новых прокси нет. Кандидаты (owner пропишет в `.env` **вручную**, код только читает):
+
+| Приоритет | Env | Откуда |
+|-----------|-----|--------|
+| **1** | `OPENROUTER_HTTP_PROXY=` | **1-й слот `YOUDO_PROXY_URLS`** (residential RU, node-proxy) |
+| **2** | `OPENROUTER_PROXY_URLS=` | `TELETHON_PROXY_ACC2` и/или `ACC3` (rotate on 429) |
+
+**Запрещено:**
+- автоподключать `tg_proxy_pool` / failover бота — OpenRouter **свой** пул, не трогает active Bot slot
+- **`TG_PROXY_URL` / acc1 primary** — бот живёт там
+- **`EXCHANGE_PROXY_URLS`** / FL listing pool
+- менять `.env` из кода
+
+Поведение:
+- L2/L3 on-demand → proxy если env · иначе DIRECT VPS
+- Startup API: `openrouter:proxy=hint|direct` (host:port без creds)
+- Log fail: `OpenRouter HTTP N via hint`
+
+Owner smoke после deploy: с `OPENROUTER_HTTP_PROXY=<youdo slot>` → draft #15146 < 90s. Если хуже direct — unset, оставить A+B.
+
+## D — hot path L2 trim (если всё ещё >75s)
+- `analyze_shared_reply_draft` on-demand: max **2** outer attempts (не 4) когда вызов из `generate_and_store_lead_draft`
+- `timeout_sec=90` оставить · smell-retry **1** retry max on hot path
+- Не трогать backlog/regen path
+
+## E — deploy + tests
+- scripts/deploy-o135-vps.py → rawlead-api restart
+- tests: first_user_l2_only skips L3 · poll restart · openrouter proxy from env (mock requests)
+- pytest O135 green
+
+## Verify owner (Lead)
+.venv\Scripts\python.exe -m pytest tests/test_o135_draft.py -q
+.venv\Scripts\python.exe scripts\deploy-o135-vps.py
+Premium smoke: /lenta/?lead=15146 → отклик **< 90s** · no «не успел»
+journalctl -u rawlead-api | grep -E 'first_user_l2_only|fast_shared|draft:restart'
+```
+
+**Не в scope:** pre-warm L2 на все visible · смена модели · Wave 2.
+
+---
+
+## § O132-STABILITY — radar OOM (**✅**)
 
 **Инцидент:** [`problems/2026-06-08-radar-oom-site-down.md`](../../problems/2026-06-08-radar-oom-site-down.md)
 

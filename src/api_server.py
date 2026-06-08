@@ -960,7 +960,10 @@ if _cors:
 
 @app.on_event("startup")
 def _log_db_connection_mode() -> None:
+    from config import openrouter_proxy_hint
+
     logger.info("db: %s", _db_connection_mode())
+    logger.info("openrouter:proxy=%s", openrouter_proxy_hint())
 
 
 @app.post("/v1/auth/telegram")

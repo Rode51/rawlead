@@ -630,6 +630,21 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 **→ Coder:** fix FL/Kwork `published_at` · ingest SLA в `/ops/` · fresh-only listing path.
 
+### § O135-DRAFT — отклик Premium (**✅ deploy 2026-06-08**)
+
+**Симптом:** «ИИ не успел — повторите» · lead #15146 · L2+L3 > 120s poll.
+
+**Coder ✅:** 1-й user **L2-only** (`first_user_l2_only`) · 2-й+ L3 (`fast_shared`) · `draft_async` restart после API reload · `OPENROUTER_HTTP_PROXY` / `OPENROUTER_PROXY_URLS` (отдельно от TG/FL pool).
+
+**Owner ops (опц., без новых покупок):**
+```env
+# 1-й слот YOUDO_PROXY_URLS (residential RU) — скопировать URL отдельно
+OPENROUTER_HTTP_PROXY=http://user:pass@host:port
+# fallback: TELETHON_PROXY_ACC2, ACC3 — не TG_PROXY_URL / acc1 bot
+# OPENROUTER_PROXY_URLS=...
+```
+Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unset.
+
 ### § O127 — Финальный UI unify: лента + фильтры + карточка (**P0**, 2026-06-07)
 
 **Запрос владельца:** функции ок, **вид не устраивает** — фильтры у anon/free/premium **выглядят по-разному**; карточки не «красиво и понятно»; нужен **финальный прогон Design**, потом owner руками в BrowserSync.

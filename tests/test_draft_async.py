@@ -17,7 +17,6 @@ from src.draft_async import (  # noqa: E402
     _run_generation,
     _user_facing_error,
     draft_response_body,
-    _run_generation,
     sanitize_draft_error_detail,
     submit_draft,
 )
@@ -98,10 +97,18 @@ class TestRunGenerationFail(unittest.TestCase):
         cfg.database_url = "postgresql://test"
         fail_exc = DraftError("ai_fail", "openrouter: timeout after 90s")
 
-        with patch(
-            "src.draft_async.generate_and_store_lead_draft",
-            side_effect=fail_exc,
+        with (
+            patch(
+                "src.draft_async.generate_and_store_lead_draft",
+                side_effect=fail_exc,
+            ),
+            patch("src.draft_async.psycopg.connect") as mock_connect,
         ):
+            mock_cur = MagicMock()
+            mock_conn = MagicMock()
+            mock_conn.__enter__.return_value = mock_conn
+            mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+            mock_connect.return_value = mock_conn
             from src import draft_async as da
             da._job_errors.clear()
             da._active_futures.clear()

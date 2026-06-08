@@ -171,19 +171,19 @@ class TestSharedDraftCache(unittest.TestCase):
             )
 
         analyze.assert_called_once()
-        rephrase.assert_called_once()
+        rephrase.assert_not_called()
         self.assertIsInstance(result, DraftResult)
-        self.assertEqual(result.reply_draft, "User A text")
+        self.assertEqual(result.reply_draft, "Fresh shared draft.")
 
     @patch("src.match_push.psycopg.connect")
     @patch("src.match_push._analyze_shared_ondemand", return_value="Fresh shared draft.")
-    @patch("src.match_push.rephrase_reply_draft_per_user", side_effect=["A text", "B text"])
+    @patch("src.match_push.rephrase_reply_draft_per_user", return_value="B uniquified")
     @patch("src.match_push.keyword_match", return_value=80)
     @patch("src.match_push._canonical_lead_tags", return_value=["python"])
     @patch("src.match_push._parse_ai_reasons", return_value=[])
     @patch("src.match_push._parse_tools_required", return_value=["python", "fastapi"])
     @patch("src.match_push._user_effective_access", return_value=True)
-    @patch("src.match_push._fetch_lead_row", return_value=_LEAD_ROW)
+    @patch("src.match_push._fetch_lead_row")
     @patch("src.match_push._fetch_saved_draft", return_value=None)
     @patch("src.match_push._load_user_tags", return_value={"python": 1.0})
     @patch("src.match_push.draft_rate_limit_retry_after", return_value=None)
@@ -196,7 +196,7 @@ class TestSharedDraftCache(unittest.TestCase):
         _rate: MagicMock,
         _tags: MagicMock,
         _saved: MagicMock,
-        _row: MagicMock,
+        fetch_row: MagicMock,
         _access: MagicMock,
         _parse_tools: MagicMock,
         _parse_reasons: MagicMock,
@@ -213,10 +213,22 @@ class TestSharedDraftCache(unittest.TestCase):
         cur = MagicMock()
         _connect.return_value.__enter__.return_value = conn
         conn.cursor.return_value.__enter__.return_value = cur
+        shared_row = _LEAD_ROW[:14] + ("Fresh shared draft.",)
+        cold = {"done": False}
+
+        def row_side_effect(*_a: object, **_k: object) -> tuple:
+            if not cold["done"]:
+                cold["done"] = True
+                return _LEAD_ROW
+            return shared_row
+
+        fetch_row.side_effect = row_side_effect
         with patch("src.match_push._insert_user_draft"):
             a = generate_and_store_lead_draft(cfg, user_id=_USER_A, lead_id=_LEAD_ID, enforce_rate_limit=False)
             b = generate_and_store_lead_draft(cfg, user_id=_USER_B, lead_id=_LEAD_ID, enforce_rate_limit=False)
-        self.assertNotEqual(a.reply_draft, b.reply_draft)
+        self.assertEqual(a.reply_draft, "Fresh shared draft.")
+        self.assertEqual(b.reply_draft, "B uniquified")
+        _rephrase.assert_called_once()
 
 
 if __name__ == "__main__":

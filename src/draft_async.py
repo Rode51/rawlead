@@ -225,17 +225,36 @@ def _poll_error_from_stored(stored: str) -> str:
     return sanitize_draft_error_detail(stored) if stored.strip() else _DRAFT_USER_FAIL
 
 
+def _worker_running(key: tuple[str, int]) -> bool:
+    with _jobs_lock:
+        fut = _active_futures.get(key)
+        return fut is not None and not fut.done()
+
+
+def _restart_worker(cfg: Config, user_id: str, lead_id: int, log_prefix: str) -> None:
+    key = (user_id, lead_id)
+    with _jobs_lock:
+        _job_errors.pop(key, None)
+    logger.info("draft:restart lead=%s", lead_id)
+    _start_worker(cfg, user_id, lead_id, log_prefix)
+
+
 def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) -> None:
     key = (user_id, lead_id)
+    t0 = time.monotonic()
     try:
         generate_and_store_lead_draft(
             cfg,
             user_id=user_id,
             lead_id=lead_id,
             log_prefix=log_prefix,
-            max_retries=4,
+            max_retries=2,
             enforce_rate_limit=False,
         )
+        with psycopg.connect(cfg.database_url) as conn:
+            with conn.cursor() as cur:
+                _delete_lead_job(cur, lead_id)
+            conn.commit()
         with _jobs_lock:
             _job_errors.pop(key, None)
     except DraftError as exc:
@@ -251,15 +270,25 @@ def _run_generation(cfg: Config, user_id: str, lead_id: int, log_prefix: str) ->
             exc.code,
             raw or exc.detail,
         )
+        with psycopg.connect(cfg.database_url) as conn:
+            with conn.cursor() as cur:
+                _set_lead_job_failed(cur, lead_id, stored)
+            conn.commit()
         with _jobs_lock:
             _job_errors[key] = stored
     except Exception as exc:
         logger.error("%serror %s", log_prefix, exc)
+        with psycopg.connect(cfg.database_url) as conn:
+            with conn.cursor() as cur:
+                _set_lead_job_failed(cur, lead_id, _DRAFT_USER_FAIL)
+            conn.commit()
         with _jobs_lock:
             _job_errors[key] = _DRAFT_USER_FAIL
     finally:
         with _jobs_lock:
             _active_futures.pop(key, None)
+        ms = int((time.monotonic() - t0) * 1000)
+        logger.info("draft:worker_done lead=%s ms=%s", lead_id, ms)
 
 
 def _start_worker(cfg: Config, user_id: str, lead_id: int, log_prefix: str) -> None:
@@ -279,31 +308,50 @@ def poll_draft(
     lead_id: int,
     log_prefix: str = "",
 ) -> DraftPollResponse:
-    """GET / draft — current status without starting work."""
+    """GET / draft — current status; O135: restart worker if job pending but process lost."""
     if not cfg.database_url.strip():
         return DraftPollResponse(status="failed", lead_id=lead_id, error=_DRAFT_USER_FAIL)
     prefix = log_prefix or f"lenta:draft:{lead_id}:"
+    key = (user_id, lead_id)
 
+    _ensure_draft_tables(cfg.database_url)
+    job: tuple[str, str] | None = None
     with psycopg.connect(cfg.database_url) as conn:
         with conn.cursor() as cur:
             saved = _fetch_saved_draft(cur, user_id, lead_id)
             if saved:
                 return _draft_to_poll(saved, lead_id)
+            _clear_stale_lead_pending(cur, lead_id)
+            job = _read_lead_job(cur, lead_id)
         conn.commit()
 
-    key = (user_id, lead_id)
     with _jobs_lock:
         fut = _active_futures.get(key)
         if fut is not None and not fut.done():
             return DraftPollResponse(status="pending", lead_id=lead_id)
         err = _job_errors.get(key, "")
+
     if err:
         return DraftPollResponse(
             status="failed",
             lead_id=lead_id,
             error=_poll_error_from_stored(err),
         )
-    return DraftPollResponse(status="failed", lead_id=lead_id, error="Черновик ещё не запущен")
+
+    if job:
+        status, stored_err = job
+        if status == "failed":
+            return DraftPollResponse(
+                status="failed",
+                lead_id=lead_id,
+                error=_poll_error_from_stored(stored_err),
+            )
+        if status == "pending" and not _worker_running(key):
+            _restart_worker(cfg, user_id, lead_id, prefix)
+        return DraftPollResponse(status="pending", lead_id=lead_id)
+
+    _restart_worker(cfg, user_id, lead_id, prefix)
+    return DraftPollResponse(status="pending", lead_id=lead_id)
 
 
 def submit_draft(
@@ -321,7 +369,9 @@ def submit_draft(
         raise DraftError("ai_unavailable")
 
     prefix = log_prefix or f"lenta:draft:{lead_id}:"
+    key = (user_id, lead_id)
 
+    _ensure_draft_tables(cfg.database_url)
     with psycopg.connect(cfg.database_url) as conn:
         with conn.cursor() as cur:
             saved = _fetch_saved_draft(cur, user_id, lead_id)
@@ -329,9 +379,17 @@ def submit_draft(
                 _delete_lead_job(cur, lead_id)
                 conn.commit()
                 return _draft_to_poll(saved, lead_id)
-        conn.commit()
 
-    _start_worker(cfg, user_id, lead_id, prefix)
+            _clear_stale_lead_pending(cur, lead_id)
+            job = _read_lead_job(cur, lead_id)
+            if job and job[0] == "failed":
+                _delete_lead_job(cur, lead_id)
+            if job is None or (job and job[0] == "failed"):
+                _insert_lead_pending(cur, lead_id)
+            conn.commit()
+
+    if not _worker_running(key):
+        _restart_worker(cfg, user_id, lead_id, prefix)
 
     deadline = time.monotonic() + max(0.0, quick_wait_sec)
     while time.monotonic() < deadline:

@@ -337,6 +337,59 @@ def telegram_requests_proxies(cfg: Config) -> dict[str, str | None]:
 # Явно без прокси — не брать HTTP_PROXY/HTTPS_PROXY из окружения ОС.
 DIRECT_REQUESTS_PROXIES: dict[str, None] = {"http": None, "https": None}
 
+_openrouter_proxy_cache: list[str] | None = None
+
+
+def _load_openrouter_proxy_urls() -> list[str]:
+    """O135: OpenRouter-only pool (OPENROUTER_HTTP_PROXY / OPENROUTER_PROXY_URLS)."""
+    urls: list[str] = []
+    single = os.environ.get("OPENROUTER_HTTP_PROXY", "").strip()
+    if single:
+        try:
+            urls.append(normalize_proxy_url(single))
+        except ValueError:
+            pass
+    multi = os.environ.get("OPENROUTER_PROXY_URLS", "").strip()
+    if multi:
+        for part in multi.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                urls.append(normalize_proxy_url(part))
+            except ValueError:
+                continue
+    return urls
+
+
+def openrouter_proxy_urls() -> list[str]:
+    global _openrouter_proxy_cache
+    if _openrouter_proxy_cache is None:
+        _openrouter_proxy_cache = _load_openrouter_proxy_urls()
+    return _openrouter_proxy_cache
+
+
+def openrouter_proxy_hint() -> str:
+    """Host:port for startup log — no credentials."""
+    urls = openrouter_proxy_urls()
+    if not urls:
+        return "direct"
+    try:
+        parsed = urlparse(urls[0])
+        host = parsed.hostname or "?"
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        return f"{host}:{port}"
+    except Exception:
+        return "set"
+
+
+def openrouter_requests_proxies(*, slot: int = 0) -> dict[str, str | None]:
+    urls = openrouter_proxy_urls()
+    if not urls:
+        return DIRECT_REQUESTS_PROXIES
+    url = urls[slot % len(urls)]
+    return {"http": url, "https": url}
+
 
 def radar_tz() -> ZoneInfo:
     """Часовой пояс логов и ночного окна TG (по умолчанию Asia/Irkutsk, UTC+8)."""

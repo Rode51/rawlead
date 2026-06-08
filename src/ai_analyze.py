@@ -15,7 +15,7 @@ from typing import Any
 import requests
 
 from budget import display_budget_text
-from config import DIRECT_REQUESTS_PROXIES, Config
+from config import DIRECT_REQUESTS_PROXIES, Config, openrouter_proxy_hint, openrouter_proxy_urls, openrouter_requests_proxies
 from rank import normalize_tags
 from reply_draft_strip import strip_reply_draft_price_deadline
 from lead_category import CATEGORIES, resolve_lead_category
@@ -1421,6 +1421,7 @@ def _openrouter_chat(
     timeout_sec: float,
     json_mode: bool,
     api_key: str | None = None,
+    use_draft_proxy: bool = False,
 ) -> str:
     token = (api_key or cfg.ai_api_key).strip()
     headers = {
@@ -1438,21 +1439,36 @@ def _openrouter_chat(
     if json_mode:
         body["response_format"] = {"type": "json_object"}
 
-    resp = requests.post(
-        _OPENROUTER_URL,
-        headers=headers,
-        json=body,
-        timeout=timeout_sec,
-        proxies=DIRECT_REQUESTS_PROXIES,
-    )
-    if resp.status_code != 200:
-        raise AiAnalyzeError(f"OpenRouter HTTP {resp.status_code}")
+    proxy_urls = openrouter_proxy_urls() if use_draft_proxy else []
+    slots = max(1, len(proxy_urls)) if use_draft_proxy else 1
+    last_status = 0
+    for slot in range(slots):
+        proxies = (
+            openrouter_requests_proxies(slot=slot)
+            if use_draft_proxy
+            else DIRECT_REQUESTS_PROXIES
+        )
+        resp = requests.post(
+            _OPENROUTER_URL,
+            headers=headers,
+            json=body,
+            timeout=timeout_sec,
+            proxies=proxies,
+        )
+        last_status = resp.status_code
+        if resp.status_code == 429 and use_draft_proxy and slot < slots - 1:
+            continue
+        if resp.status_code != 200:
+            via = openrouter_proxy_hint() if use_draft_proxy else "direct"
+            raise AiAnalyzeError(f"OpenRouter HTTP {resp.status_code} via {via}")
+        try:
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+            raise AiAnalyzeError("OpenRouter: неожиданный формат ответа.") from exc
 
-    try:
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
-        raise AiAnalyzeError("OpenRouter: неожиданный формат ответа.") from exc
+    via = openrouter_proxy_hint() if use_draft_proxy else "direct"
+    raise AiAnalyzeError(f"OpenRouter HTTP {last_status} via {via}")
 
 
 def _call_once(
@@ -1980,6 +1996,7 @@ def analyze_shared_reply_draft(
     timeout_sec: float = _DEFAULT_TIMEOUT_SEC,
     errors: list[str] | None = None,
     log_prefix: str = "",
+    max_attempts: int = 4,
 ) -> str | None:
     """O57: shared L2 — один отклик на lead, без profile_excerpt."""
     if not cfg.ai_active or cfg.ai_provider != "openrouter":
@@ -2008,7 +2025,8 @@ def analyze_shared_reply_draft(
     last_exc: BaseException | None = None
     retry_reason: str | None = None
     last_draft: str | None = None
-    for attempt in range(4):
+    attempts = max(1, min(int(max_attempts), 4))
+    for attempt in range(attempts):
         user_msg = user
         if retry_reason and attempt > 0:
             user_msg += reply_retry_user_suffix(
@@ -2022,6 +2040,7 @@ def analyze_shared_reply_draft(
                 user=user_msg,
                 timeout_sec=timeout_sec,
                 json_mode=True,
+                use_draft_proxy=True,
             )
             if not raw:
                 raise AiAnalyzeError("OpenRouter: пустой ответ")
@@ -2038,7 +2057,7 @@ def analyze_shared_reply_draft(
                 raise AiAnalyzeError(f"reply_draft: {vague}")
             last_draft = draft
             smell = reply_ai_smell_reason(draft)
-            if smell and attempt < 3:
+            if smell and attempt < attempts - 1:
                 retry_reason = smell
                 time.sleep(
                     _SHARED_DRAFT_BACKOFF_SEC[
@@ -2049,7 +2068,7 @@ def analyze_shared_reply_draft(
             from tz_attachments import reply_attachment_claim_reason
 
             attach_reason = reply_attachment_claim_reason(draft, description)
-            if attach_reason and attempt < 3:
+            if attach_reason and attempt < attempts - 1:
                 retry_reason = attach_reason
                 time.sleep(
                     _SHARED_DRAFT_BACKOFF_SEC[
@@ -2067,7 +2086,7 @@ def analyze_shared_reply_draft(
             AttributeError,
         ) as exc:
             last_exc = exc
-            if attempt < 3:
+            if attempt < attempts - 1:
                 time.sleep(_SHARED_DRAFT_BACKOFF_SEC[min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)])
                 continue
 
@@ -2153,16 +2172,31 @@ def rephrase_reply_draft_per_user(
                 "temperature": min(0.5, 0.38 + attempt * 0.08),
                 "response_format": {"type": "json_object"},
             }
-            resp = requests.post(
-                _OPENROUTER_URL,
-                headers=headers,
-                json=body,
-                timeout=timeout_sec,
-                proxies=DIRECT_REQUESTS_PROXIES,
-            )
-            if resp.status_code != 200:
-                raise AiAnalyzeError(f"OpenRouter HTTP {resp.status_code}")
-            raw = resp.json()["choices"][0]["message"]["content"]
+            proxy_urls = openrouter_proxy_urls()
+            slots = max(1, len(proxy_urls))
+            raw = ""
+            last_status = 0
+            for slot in range(slots):
+                resp = requests.post(
+                    _OPENROUTER_URL,
+                    headers=headers,
+                    json=body,
+                    timeout=timeout_sec,
+                    proxies=openrouter_requests_proxies(slot=slot)
+                    if proxy_urls
+                    else DIRECT_REQUESTS_PROXIES,
+                )
+                last_status = resp.status_code
+                if resp.status_code == 429 and slot < slots - 1:
+                    continue
+                if resp.status_code != 200:
+                    via = openrouter_proxy_hint() if proxy_urls else "direct"
+                    raise AiAnalyzeError(f"OpenRouter HTTP {resp.status_code} via {via}")
+                raw = resp.json()["choices"][0]["message"]["content"]
+                break
+            else:
+                via = openrouter_proxy_hint() if proxy_urls else "direct"
+                raise AiAnalyzeError(f"OpenRouter HTTP {last_status} via {via}")
             if not raw:
                 raise AiAnalyzeError("OpenRouter: пустой content")
             data = _extract_json_object(raw)
