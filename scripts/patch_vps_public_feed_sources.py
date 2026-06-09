@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Append youdo,freelance_ru to PUBLIC_FEED_SOURCES on VPS if missing."""
+"""Rebuild PUBLIC_FEED_SOURCES on VPS (O63 secondary + tg). Prefer deploy-o169-restore-secondary-vps.py."""
 from __future__ import annotations
 
 import sys
@@ -11,42 +11,43 @@ if str(_ROOT) not in sys.path:
 
 from scripts.deploy_vps_ssh import connect  # noqa: E402
 
-ENV_PATH = "/opt/rawlead/.env"
-MARKER = "PUBLIC_FEED_SOURCES="
+_SECONDARY = ("youdo", "freelance_ru", "freelancejob", "pchyol")
+
+
+def _build_feed() -> str:
+    from scripts.build_public_feed_sources import feed_sources_csv
+
+    return feed_sources_csv()
 
 
 def main() -> int:
+    feed = _build_feed()
+    missing = [s for s in _SECONDARY if s not in feed.split(",")]
+    if missing:
+        raise SystemExit(f"build missing secondary: {missing}")
     client = connect()
     try:
-        sftp = client.open_sftp()
-        with sftp.open(ENV_PATH, "r") as f:
-            raw = f.read().decode("utf-8", errors="replace")
-        lines = raw.splitlines(keepends=True)
-        new_lines: list[str] = []
-        changed = False
-        for ln in lines:
-            if ln.startswith(MARKER):
-                value = ln[len(MARKER) :].strip()
-                parts = [p.strip() for p in value.split(",") if p.strip()]
-                if "youdo" not in parts:
-                    parts.insert(min(2, len(parts)), "youdo")
-                if "freelance_ru" not in parts:
-                    idx = parts.index("youdo") + 1 if "youdo" in parts else min(2, len(parts))
-                    parts.insert(idx, "freelance_ru")
-                new_ln = MARKER + ",".join(parts) + ("\n" if ln.endswith("\n") else "")
-                if new_ln != ln:
-                    changed = True
-                new_lines.append(new_ln)
-            else:
-                new_lines.append(ln)
-        if not any(l.startswith(MARKER) for l in lines):
-            raise SystemExit(f"Missing {MARKER} in {ENV_PATH}")
-        if not changed:
-            print("ALREADY_OK")
-            return 0
-        with sftp.open(ENV_PATH, "w") as f:
-            f.write("".join(new_lines))
-        sftp.close()
+        for env_path in ("/opt/rawlead/.env.site", "/opt/rawlead/.env"):
+            sftp = client.open_sftp()
+            with sftp.open(env_path, "r") as f:
+                raw = f.read().decode("utf-8", errors="replace")
+            marker = "PUBLIC_FEED_SOURCES="
+            lines = raw.splitlines(keepends=True)
+            new_lines: list[str] = []
+            found = False
+            for ln in lines:
+                if ln.startswith(marker):
+                    found = True
+                    new_ln = marker + feed + ("\n" if ln.endswith("\n") else "")
+                    new_lines.append(new_ln)
+                else:
+                    new_lines.append(ln)
+            if not found:
+                new_lines.append(marker + feed + "\n")
+            with sftp.open(env_path, "w") as f:
+                f.write("".join(new_lines))
+            sftp.close()
+            print("UPDATED", env_path, "len", len(feed))
         stdin, stdout, stderr = client.exec_command(
             "systemctl restart rawlead-radar rawlead-api && sleep 2 && "
             "systemctl is-active rawlead-radar rawlead-api",
@@ -58,10 +59,6 @@ def main() -> int:
         code = stdout.channel.recv_exit_status()
         if code != 0:
             raise RuntimeError(f"restart failed {code}: {out}\n{err}")
-        for ln in new_lines:
-            if ln.startswith(MARKER):
-                print("UPDATED:", ln.strip()[:220])
-                break
         print("SERVICES:", out)
         return 0
     finally:

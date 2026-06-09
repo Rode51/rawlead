@@ -338,6 +338,28 @@ class TestL3HumanStyle(unittest.TestCase):
         good_section = body[idx : idx + 300]
         self.assertNotIn("предпочтение по стеку", good_section)
 
+    # --- O164-L2-PROMPT ---
+
+    def test_o164_attachment_offtopic_ignore_rule_present(self) -> None:
+        """O164: правило — off-topic вложение (юр. шаблон/портфолио) → игнорировать."""
+        body = build_shared_l2_system()
+        self.assertIn("Вложение off-topic", body)
+        self.assertIn("игнорируй вложение", body)
+        self.assertIn("юридический шаблон", body)
+
+    def test_o164_attachment_offtopic_examples_present(self) -> None:
+        """O164: примеры off-topic (оферта, приложение №, регламент) указаны в правиле."""
+        body = build_shared_l2_system()
+        self.assertIn("оферта", body)
+        self.assertIn("регламент", body)
+        self.assertIn("Приложение №", body)
+
+    def test_o164_attachment_extracted_rule_still_present(self) -> None:
+        """O164: правило о файлах/вложениях (базовое) не сломано."""
+        body = build_shared_l2_system()
+        self.assertIn("[TZ attachment — извлечено", body)
+        self.assertIn("Файлы и вложения", body)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -659,6 +659,95 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 **Правило:** запись в чат → сюда; **код** — когда этап активен в `ROADMAP` / шапка `CODER_PROMPT`. Срочно — только по слову «сейчас».
 
+### § O165-w — TG smoke: группа «Тест Ботов» (**P0**, owner **2026-06-09**)
+
+**Запрос:** все **3 acc** (acc1/acc2/acc3) в [https://t.me/+Z7HcnIAdSw9kY2U6](https://t.me/+Z7HcnIAdSw9kY2U6) · owner напишет вакансию · смотрим ленту.
+
+**→ Coder:** § **O165-TG-TEST-GROUP** · join + listen + `PUBLIC_FEED_SOURCES`
+
+**→ Owner:** после deploy/join — пост в группу · «вижу / не вижу» в `/lenta/`
+
+### § O166-w — Главная: шкалы совместимости пустые (**P1**, owner **2026-06-09**)
+
+**Симптом:** блок «ПОСЛЕДНИЕ ЗАКАЗЫ» — цифры 50/100/80%, полоски серые без fill.
+
+**→ Coder:** § **O166-HOME-MATCH-BAR**
+
+### § O167-w — Лента: биржи в выпадающей сортировке (**P1**, owner **2026-06-09**)
+
+**Запрос:** FL · Kwork · TG в **существующем** dropdown «Сортировка» · mobile + desktop (не отдельный hidden fieldset).
+
+**→ Coder:** § **O167-FEED-SOURCE-SORT**
+
+### § O168-w — Реклама рано: stress + L2 (**P0**, owner **2026-06-09**)
+
+**Решение:** ads **после** green stress + L2 quality · вчера stress FAIL (tier_matrix · p95) · L2 «хромает».
+
+**→ Coder:** § **O168-PRE-ADS-GATES** после O165–O167
+
+### § O165-w — TG smoke: группа «Тест Ботов» (**P0**, owner **2026-06-09**)
+
+**Запрос:** [https://t.me/+Z7HcnIAdSw9kY2U6](https://t.me/+Z7HcnIAdSw9kY2U6) — **все 3 акка** join+listen · owner напишет вакансию → проверим Neon + `/lenta/`.
+
+**Решение owner:** реклама **рано** — сначала TG + тесты + L2.
+
+**→ Coder:** § **O165-TG-TEST-GROUP**
+
+### § O166-w — Главная: шкалы совместимости пустые (**P1**, owner **2026-06-09**)
+
+**Симптом:** live-preview карточки — % есть, bar grey empty.
+
+**→ Coder:** § **O166-HOME-MATCH-BAR**
+
+### § O167-w — Сортировка по биржам в dropdown (**P1**, owner **2026-06-09**)
+
+**Запрос:** FL/Kwork/TG в выпадающую «Сортировка» (ПК + mobile), не отдельная полоса.
+
+**→ Coder:** § **O167-SORT-SOURCE** · source chips сейчас `is-visually-hidden`
+
+### § O168-w — До ads: stress + L2 (**P0**, owner **2026-06-09**)
+
+**Факт:** `preprod_stress_v2` FAIL tier_matrix + p95 · U10b draft fail · L2 gate 71.8% но quality хромает.
+
+**→ Coder:** § **O168-PRE-ADS-GATES** после O165–O167
+
+### § O162-w — L2 отклики: PDF/файлы/инструменты (**P0**, owner **2026-06-09**)
+
+**Симптом (скрин + [FL #5508756](https://www.fl.ru/projects/5508756/oformit-gotovuyu-prezentatsiyu.html)):** черновик «из приложенного PDF», «юридический документ» — в ТЗ **нет** PDF/Word/вложений; в tools — `telegram_bot_dev` + `powerpoint` (бот не из ТЗ).
+
+**Корень Lead (read-only):**
+
+| # | Причина |
+|---|---------|
+| 1 | O108 `reply_attachment_claim_reason` ловит в основном «вижу … pdf/zip», **не** «приложенного PDF», «из PDF-файла» |
+| 2 | На **последней** попытке L2 attach-check **пропускается** → bad draft уходит в Neon |
+| 3 | `sanitize_tools_for_tz` **не** режет `telegram_bot_dev` без маркеров TG в тексте |
+| 4 | FL-аккаунт **не** причина этого кейса — на листинге нет файла; модель **додумала** |
+
+**Owner:** тренинг L2 в Cursor (Sonnet), не OpenRouter сейчас · проверить качество откликов · спросил про FL-аккаунты для выкачивания ТЗ.
+
+**→ Coder:** § **O162-L2-GROUNDING** (валидаторы + tools guard + fail last attempt) **до** массового regen.
+
+**→ Owner + Lead:** бенч 10–15 лидов в Cursor по rubric judge (в т.ч. #5508756).
+
+### § O163-w — TG: сырой forward без ленты (**P0**, owner **2026-06-09**)
+
+**Симптом:** @FLPARSINGBOT — «Forwarded from …»: реклама ботов, CV «ищу проекты». В `/lenta/` **нет** (ok), но raw forward **есть** (плохо).
+
+**Корень:** лента = `feed_visible AND public_feed` (TG не в PUBLIC_FEED_SOURCES) · бот = только `feed_visible` · `forward_listing_to_owner` **до** карточки · L1 не режет promo/CV.
+
+**Решение owner:** пересылать **только** то, что в ленте · **формат как биржи** (карточка, без raw forward).
+
+**→ Coder § O163-TG-NOTIFY** после/рядом O162.
+
+### § O160-w — Факты на плашке ожидания отклика (**P2**, owner **2026-06-08**)
+
+**Идея:** пока генерируется отклик — на раскрытой карточке крутить короткие факты (фриланс / ИТ, лёгкий цинизм), не только label кнопки.
+
+**Статус:** **зафиксировано** · **тексты — потом** (owner 2026-06-08) · код/design — когда решим copy и дойдём до polish (не блокер ads).
+
+**Заметка Lead:** зона — expanded body, не кнопка · p95 draft ~69 s · черновик примеров — чат 2026-06-08.
+
 ### § O158-w — Match UX + дубли push (**P0**, owner **2026-06-08**)
 
 **Симптомы (скрин TG + /lenta/):**
@@ -835,7 +924,9 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 **Сейчас:** `tz_attachments.py` → `skipped_auth` / «нужен вход на биржу» без cookies.
 
-**→ Coder после O132:** `FL_TZ_SESSION` / `KWORK_TZ_SESSION` (cookies или Playwright persistent profile) · rate limit · **не** использовать для listing crawl.
+**Аккаунты owner 2026-06-09:** FL `hramovskihn@yandex.ru` · Kwork `AltCgamer43@yandex.ru` — в локальном `.env` (`FL_TZ_*` / `KWORK_TZ_*`). **На VPS** — те же ключи в `/opt/rawlead/.env` после deploy O133.
+
+**→ Coder после O162/O163:** login → `FL_TZ_SESSION` / `KWORK_TZ_SESSION` (cookies или Playwright persistent profile) · rate limit · **не** использовать для listing crawl.
 
 ### § O134-INGEST-SLA — FL/Kwork ≤5 мин (**P1**, 2026-06-08)
 
@@ -1162,8 +1253,15 @@ Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unse
 
 ## Журнал (хронология, кратко)
 
-| Дата | Мысль / запрос | Куда ушло |
+| Дата | Мысль / запрос | Kуда ушло |
 |------|----------------|-----------|
+| 2026-06-09 | **O169** secondary выпали из feed после O165 deploy — восстановить YouDo/FRU/… | **§ O169-SECONDARY-FEED** ✅ deploy |
+| 2026-06-09 | **Реклама рано** · stress/L2 сначала · TG тест-группа · home match bar · sort по биржам | **§ O165–O168** · CODER_PROMPT |
+| 2026-06-09 | **Реклама рано** — stress/L2/TG/UI сначала | **§ O168-w** · ads ⏸ |
+| 2026-06-09 | TG test group +Z7HcnIAdSw9kY2U6 · 3 акка · вакансия owner | **§ O165-w** |
+| 2026-06-09 | Главная match bar пустой · sort по биржам в dropdown | **§ O166-w** · **O167-w** |
+| 2026-06-09 | Freelancehunt **окончательно** убрать отовсюду | **§ DROP-FREELANCEHUNT** · CODER_PROMPT |
+| 2026-06-09 | TZ smoke: cookies Kwork+FL · VPS deploy · потом O164 | **§ O133-TZ-SMOKE** |
 | 2026-06-04 | **O116-W4** ✅ код · prod deploy ⏸ · email на contact — хвост R3 | **§ O116** W4 |
 | 2026-06-04 | **O116-b2** ✅ prod 1.18.13 · flip + `+n` · Lead verify | **§ O116** D5 |
 | 2026-06-04 | **O116 CABINET tail** ✅ 1.18.12 · R2 copy ЛК · FAQ trial без кнопки | **§ O116** R2 |

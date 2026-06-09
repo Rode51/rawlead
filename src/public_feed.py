@@ -73,26 +73,36 @@ def feed_visibility_where_sql(
     return sql, params
 
 
-def _normalize_tg_username(value: str) -> str:
-    s = (value or "").strip().lstrip("@").lower()
+def _tg_link_key(value: str) -> str:
+    """Username или invite-hash для сопоставления с allowlist / join queue."""
+    s = (value or "").strip()
+    if not s:
+        return ""
+    try:
+        from tg_join_lib import invite_hash, username_from_invite
+    except ModuleNotFoundError:
+        from src.tg_join_lib import invite_hash, username_from_invite  # type: ignore[no-redef]
+    user = username_from_invite(s)
+    if user:
+        return user.lower()
+    h = invite_hash(s)
+    if h:
+        return h.lower()
     m = _TME_RE.match(s)
     if m:
-        user = m.group(1).split("/")[0].strip().lower()
-        if user.startswith("+"):
-            return ""
-        return user
-    if s.startswith("+"):
-        return ""
-    return s
+        tail = m.group(1).split("/")[0].strip().lower()
+        if tail and not tail.startswith("+"):
+            return tail
+    return s.lstrip("@").lower()
 
 
 @lru_cache(maxsize=1)
-def _tg_allowlist_usernames() -> frozenset[str]:
+def _tg_allowlist_link_keys() -> frozenset[str]:
     out: set[str] = set()
     for line in _read_nonempty_lines(_ALLOWLIST_PATH):
-        user = _normalize_tg_username(line)
-        if user:
-            out.add(user)
+        key = _tg_link_key(line)
+        if key:
+            out.add(key)
     return frozenset(out)
 
 
@@ -105,14 +115,14 @@ def _tg_join_queue_path() -> Path:
 @lru_cache(maxsize=1)
 def tg_listen_allowed_chat_ids() -> frozenset[int]:
     """Peer/chat id: allowlist ∩ join queue (done). TG-A JSON и droplist не используются."""
-    allowed_users = set(_tg_allowlist_usernames())
-    if not allowed_users:
+    allowed_keys = set(_tg_allowlist_link_keys())
+    if not allowed_keys:
         return frozenset()
 
     try:
-        from tg_join_lib import read_queue_csv, username_from_invite
+        from tg_join_lib import read_queue_csv
     except ModuleNotFoundError:
-        from src.tg_join_lib import read_queue_csv, username_from_invite  # type: ignore[no-redef]
+        from src.tg_join_lib import read_queue_csv  # type: ignore[no-redef]
 
     ids: set[int] = set()
     _, rows = read_queue_csv(_tg_join_queue_path())
@@ -123,8 +133,8 @@ def tg_listen_allowed_chat_ids() -> frozenset[int]:
         if not raw_cid:
             continue
         link = row.get("link", "").strip()
-        user = username_from_invite(link) or _normalize_tg_username(link)
-        if not user or user.lower() not in allowed_users:
+        key = _tg_link_key(link)
+        if not key or key not in allowed_keys:
             continue
         try:
             ids.add(int(raw_cid))

@@ -314,6 +314,19 @@ def _fetch_source(
     *,
     storage: ProjectStorage | None = None,
 ) -> list[ListingProject] | None:
+    if storage is not None:
+        flag_key = f"restart_source_{label.strip().lower()}"
+        if storage.get_setting(flag_key, "0") == "1":
+            from exchange_browser_fetch import close_all_browser_contexts
+
+            close_all_browser_contexts()
+            storage.set_setting(flag_key, "0")
+            _append_log_line(
+                cfg.radar_log_path,
+                f"fetch:{label} restart_source → browser contexts closed",
+                echo=True,
+            )
+
     wall = _radar_source_fetch_wall_sec()
 
     def _run_fetch() -> list[ListingProject] | None:

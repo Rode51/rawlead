@@ -65,8 +65,6 @@ from filters import default_listing_filter
 
 from fl_parser import fetch_listing_projects
 
-from freelancehunt_parser import fetch_listing_projects as fetch_freelancehunt_listing
-
 from kwork_parser import fetch_listing_projects as fetch_kwork_listing
 
 from listing import ListingProject
@@ -87,8 +85,6 @@ _LIVE_FETCHERS: dict[str, object] = {
     "fl": fetch_listing_projects,
 
     "kwork": fetch_kwork_listing,
-
-    "freelancehunt": fetch_freelancehunt_listing,
 
 }
 

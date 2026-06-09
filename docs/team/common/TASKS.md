@@ -1,63 +1,39 @@
 # TASKS (активное)
 
-**Снимок:** [`STATUS.md`](STATUS.md) · **карта:** [`ROADMAP.md`](../architect/ROADMAP.md)
+**Снимок:** [`STATUS.md`](STATUS.md) · **бэклог:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md)
 
-**Фаза:** **Launch path** · prod theme **1.18.50**
+**Решение owner 2026-06-09:** **ads ⏸** · сначала TG smoke + UI + stress/L2
 
 ---
 
 ## Где мы
 
-**→ @owner:** 24h smoke ingest (O160) · `/ops/` YouDo **Сбросить баны** · после O161: добавить `OPS_PASSWORD=...` в `.env` на VPS
+**→ @coder:** § **O166-HOME-MATCH-BAR** → O167 sort source → O168 gates
 
-**→ @coder:** § **O161-OPS-PRO** — пароль · лайв-лог · русские статусы парсеров
+**→ @owner:** **сейчас** — пост вакансии в [Тест Ботов](https://t.me/+Z7HcnIAdSw9kY2U6) → Lead verify Neon
 
 ---
 
-## Шаги
+## Шаги (hot)
 
 | # | Что | Кто | Статус |
 |---|-----|-----|--------|
-| 1–11e | … · O139 | — | ✅ |
-| **11f** | **O141-EXCHANGE-PARITY** | @coder + Lead deploy | ✅ **2026-06-08** |
-| **12** | **O144-RFP-COMPLY** | @coder | ✅ код · deploy ⏸ |
-| **12a** | **O145-FEED-CAT** | @coder | ✅ код · deploy ⏸ |
-| **12b** | **Wave 2 rerun** | owner | **⚠️** J5 ✅ · J4 flake |
-| **13** | **O146-DRAFT-CARD-UX** flip · pending · btn glow | @coder | ✅ код · accept ⏸ |
-| **13a** | **O147-FEED-FLIP-MATCH** | @coder | ✅ deploy · **flip → O149** |
-| **13c** | **O148-DRAFT-OR** warm · tools tz · btn 40s | @coder | ✅ deploy · owner smoke ⏸ |
-| **13d** | **O149-NO-FLIP** inline expand | @coder | ✅ deploy · smoke → O150 |
-| **13e** | **O150-DRAFT-UX-POLISH** | @coder + Lead | ✅ deploy ✅ |
-| **13f** | **O151-OR-ACC2-UX** | @coder + Lead | ✅ deploy ✅ |
-| **14a** | **O153-CARD-CHIPS** | @coder | **✅ Lead smoke** |
-| **14a2** | **O154-GRID-NEIGHBOR** | @coder | **✅ Lead smoke** |
-| **14b** | **O152-EXCHANGE-TRACE** | @coder | **deploy ✅** · owner `/ops/` ⏸ |
-| **14c–e** | **O155–O157** HC · YouDo human · traffic | @coder + Lead | **deploy ✅** |
-| **14f** | **O158-MATCH-UX** дубли push · шкала · ?lead= | @coder + Lead | **deploy ✅ 2026-06-08** |
-| **14h** | **O159-DRAFT-BURST** 3× parallel draft | @coder + Lead | **✅ 3/3 burst 2026-06-08** |
-| **14i** | **O160-RADAR-INGEST** ingest stability | @coder + Lead | **✅ deploy 2026-06-09** · 24h smoke ⏸ |
-| **14j** | **O161-OPS-PRO** профессиональный пульт | @coder + Lead | **→ active** |
-| **14g** | **O121-w2b** `/ops/` clear-bans | @coder + Lead | **✅ owner 2026-06-08** |
-| **13b** | **Wave 2** journey 10/10 | owner | ⏸ после O147 |
-| **14** | **ads + portfolio** | owner | **последним** |
+| **15a** | **O165-TG-TEST-GROUP** join 3 acc + feed | **owner post** → Lead Neon | **→ smoke** join+feed ✅ |
+| **15b** | **O166-HOME-MATCH-BAR** главная полоски | @coder | **→ active** (не сдано) |
+| **15c** | **O167-SORT-SOURCE** биржи в dropdown | @coder | **→ next** |
+| **15d** | **O168-PRE-ADS-GATES** stress + L2 | @coder | ⏸ |
+| **14** | **ads + portfolio** | owner | **⏸ до gates** |
+
+Закрыто O131–O164 → см. [`STATUS.md`](STATUS.md)
 
 ---
 
-## Owner checklist (Wave 2)
+## Owner checklist (O165 smoke)
 
-1. Premium → lead без draft → отклик **≤90s**
-2. `/ops/` → FL row: `listing: 30 parsed · N fresh` (после O139 fresh>0 при новых)
-3. Premium feed → sort **date** показывает все visible, не 10 cap
-4. `preprod_draft_burst --max-leads 3`
-5. `preprod_ux_journey` full → **10/10**
-6. Опц. `OPENROUTER_HTTP_PROXY` если OR direct медленный
+1. ~~Join 3 acc~~ ✅ `5177575757` · peer в feed
+2. Написать **тестовую вакансию** в группу (как реальный заказ, не CV/promo)
+3. Сообщить Lead — проверим Neon + `/lenta/?source=tg`
 
 ---
 
-## ⏸ После ads
-
-O113 · O123-w2 · O105-w2 · **O133** TZ downloader · **O142** split `ai_analyze` · **O143** split `api_server`
-
----
-
-_O144 active **2026-06-08** · Wave 2 ⏸ до deploy_
+_O166 active **2026-06-09** · O165 smoke ждёт пост owner_

@@ -615,6 +615,7 @@
   var DRAFT_POLL_MS = 2000;
   var DRAFT_POLL_MAX_MS = 180000;
   var DRAFT_BTN_SLOW_MS = 20000;
+  var DRAFT_BTN_QUEUE_RU = "В очереди…";
   var DRAFT_BTN_SLOW_RU = "Сложный бриф, ИИ полирует отклик...";
   var DRAFT_FAIL_RU = "ИИ временно недоступен — повторите";
   var draftLastPollStatus = {};
@@ -664,6 +665,15 @@
           draftLastPollStatus[leadId] =
             (data && data.status) ||
             (data && data.reply_draft ? "ready" : "pending");
+          if (data && data.queued && state.draftInflight[leadId]) {
+            state.draftInflight[leadId].queued = true;
+            var qCard = document.querySelector(
+              '.rl-lead-card[data-id="' + leadId + '"]'
+            );
+            if (qCard) {
+              syncDraftGeneratingUi(qCard);
+            }
+          }
           var ready = draftReadyPayload(data);
           if (ready) {
             delete draftLastPollStatus[leadId];
@@ -3099,7 +3109,13 @@
     var inflight = state.draftInflight[id];
     var slow =
       inflight && Date.now() - inflight.startedMs > DRAFT_BTN_SLOW_MS;
-    setReplyBtnGenerating(btn, true, null, slow ? DRAFT_BTN_SLOW_RU : null);
+    var queued = inflight && inflight.queued;
+    var label = slow
+      ? DRAFT_BTN_SLOW_RU
+      : queued
+        ? DRAFT_BTN_QUEUE_RU
+        : null;
+    setReplyBtnGenerating(btn, true, null, label);
     card.classList.add("rl-lead-card--draft-pending");
     if (card.classList.contains("is-expanded") && state.itemsById[id]) {
       setDraftPendingBody(card, state.itemsById[id]);

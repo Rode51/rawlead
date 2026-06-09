@@ -6,6 +6,18 @@
 
 ---
 
+# Перенесено из hot **2026-06-09** (O133-FILTER FL + O146–O159 + O160 summary)
+
+## § O133-FILTER ✅ FL (Lead verify 2026-06-09)
+
+**DoD:** `_FL_LEGAL_PATH_RE` · `_is_fl_site_legal_attachment` · `_is_fl_legal_boilerplate` · skip in `find_attachment_urls` + enrich · pytest **48/48** · **без Neon backfill**
+
+**Bug:** #19954 FL #5508777 — `appendix_2_regulations.pdf` (328 FL leads polluted) · real customer `.docx` skipped
+
+**Хвост:** Kwork legal + VPS deploy → hot § O133-FILTER-KW
+
+---
+
 # Перенесено из hot **2026-06-09** (O146–O159 + O160 summary)
 
 ## § O160-RADAR-INGEST ✅ Lead 2026-06-09

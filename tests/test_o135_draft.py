@@ -12,7 +12,12 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "src"))
 
-from src.draft_async import DraftPollResponse, poll_draft, submit_draft  # noqa: E402
+from src.draft_async import (  # noqa: E402
+    DraftPollResponse,
+    draft_response_body,
+    poll_draft,
+    submit_draft,
+)
 from src.match_push import generate_and_store_lead_draft  # noqa: E402
 
 _USER = "00000000-0000-0000-0000-000000000201"
@@ -241,6 +246,69 @@ class TestO135OpenRouterProxy(unittest.TestCase):
 
         kwargs = mock_chat.call_args.kwargs
         self.assertTrue(kwargs.get("use_draft_proxy"))
+
+
+class TestO159DraftOrConcurrency(unittest.TestCase):
+    def test_draft_or_concurrency_single_proxy(self) -> None:
+        import config as config_mod
+        from src.ai_analyze import draft_or_concurrency
+
+        config_mod._openrouter_proxy_cache = None
+        with patch.dict(
+            os.environ,
+            {"OPENROUTER_HTTP_PROXY": "http://38.154.16.60:8000:user:pass"},
+            clear=False,
+        ):
+            config_mod._openrouter_proxy_cache = None
+            self.assertEqual(draft_or_concurrency(), 1)
+
+    def test_draft_or_concurrency_two_proxies(self) -> None:
+        import config as config_mod
+        from src.ai_analyze import draft_or_concurrency
+
+        config_mod._openrouter_proxy_cache = None
+        with patch.dict(
+            os.environ,
+            {
+                "OPENROUTER_PROXY_URLS": (
+                    "http://p1:8000:u:p,http://p2:8000:u:p"
+                )
+            },
+            clear=False,
+        ):
+            config_mod._openrouter_proxy_cache = None
+            self.assertEqual(draft_or_concurrency(), 2)
+
+    def test_poll_pending_includes_queue_ahead(self) -> None:
+        cfg = MagicMock()
+        cfg.database_url = "postgresql://test"
+
+        with (
+            patch("src.draft_async._ensure_draft_tables"),
+            patch("src.draft_async._fetch_saved_draft", return_value=None),
+            patch("src.draft_async._clear_stale_lead_pending"),
+            patch("src.draft_async._read_lead_job", return_value=("pending", "")),
+            patch("src.draft_async._worker_running", return_value=True),
+            patch("src.draft_async._draft_queue_ahead", return_value=2),
+            patch("src.draft_async.psycopg.connect") as mock_connect,
+        ):
+            mock_cur = MagicMock()
+            mock_conn = MagicMock()
+            mock_conn.__enter__.return_value = mock_conn
+            mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+            mock_connect.return_value = mock_conn
+
+            resp = poll_draft(
+                cfg,
+                user_id=_USER,
+                lead_id=_LEAD_ID,
+            )
+
+        self.assertEqual(resp.status, "pending")
+        self.assertEqual(resp.queue_ahead, 2)
+        body = draft_response_body(resp)
+        self.assertTrue(body.get("queued"))
+        self.assertEqual(body.get("queue_ahead"), 2)
 
 
 if __name__ == "__main__":

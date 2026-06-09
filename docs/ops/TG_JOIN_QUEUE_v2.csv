@@ -29,3 +29,6 @@ wave,account,status,name,link,chat_id,notes
 7,acc2,done,edit_zp,https://t.me/edit_zp,1778078635,tier-a-pdf
 7,acc3,done,glvrd_job,https://t.me/glvrd_job,1242204231,tier-a-pdf
 8,acc1,done,forallmedia,https://t.me/forallmedia,1208902810,tier-a-pdf
+test,acc1,done,test_bots,https://t.me/+Z7HcnIAdSw9kY2U6,5177575757,owner-smoke
+test,acc2,done,test_bots,https://t.me/+Z7HcnIAdSw9kY2U6,5177575757,owner-smoke
+test,acc3,done,test_bots,https://t.me/+Z7HcnIAdSw9kY2U6,5177575757,owner-smoke

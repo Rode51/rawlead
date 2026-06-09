@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import logging
 import os
 import re
 import subprocess
@@ -13,6 +14,8 @@ from typing import Any
 
 import psycopg
 from src.storage import ProjectStorage
+
+logger = logging.getLogger(__name__)
 
 _LOG_TS = re.compile(
     r"^(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?)"
@@ -53,8 +56,8 @@ th{background:#121820} .err{color:var(--bad)} .btn{font-size:.75rem;padding:.2re
 .ctl-status.is-ok .dot{background:var(--ok)}
 .ctl-status.is-bad .dot{background:var(--bad)}
 @keyframes rlPulse{0%{opacity:.45}50%{opacity:1}100%{opacity:.45}}
-.ops-nav{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:.35rem;padding:.55rem 0;margin:0 0 .85rem;background:var(--bg);border-bottom:1px solid var(--line)}
-.ops-nav .chip{font-size:.78rem;padding:.45rem .65rem;min-height:44px;border-radius:999px;border:1px solid var(--line);background:#121820;color:var(--muted);cursor:pointer}
+.ops-nav{position:sticky;top:0;z-index:20;display:flex;flex-wrap:nowrap;gap:.35rem;padding:.55rem 0;margin:0 0 .85rem;background:var(--bg);border-bottom:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ops-nav .chip{font-size:.78rem;padding:.45rem .65rem;min-height:44px;border-radius:999px;border:1px solid var(--line);background:#121820;color:var(--muted);cursor:pointer;flex-shrink:0}
 .ops-nav .chip.is-active{background:#243044;color:var(--txt);border-color:#3d5166}
 .ops-proxy-toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.65rem}
 .ops-proxy-badge{font-size:.75rem;padding:.25rem .55rem;border-radius:999px;background:#132a1a;color:#86efac;border:1px solid #22543d}
@@ -74,6 +77,30 @@ th{background:#121820} .err{color:var(--bad)} .btn{font-size:.75rem;padding:.2re
 .login-box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem;margin:1rem 0}
 .login-box ol{margin:.5rem 0 0 1.1rem;padding:0}
 .login-box a{color:#7dd3fc}
+.login-page{max-width:420px;margin:2rem auto}
+.login-logo{font-size:1.5rem;font-weight:700;margin:0 0 1rem;text-align:center}
+.login-form label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:.35rem}
+.login-form input[type=password]{width:100%;padding:.55rem .65rem;border-radius:8px;border:1px solid var(--line);background:#121820;color:var(--txt);font-size:1rem;margin-bottom:.75rem}
+.login-form button[type=submit]{width:100%;padding:.55rem;border-radius:8px;border:0;background:#2563eb;color:#fff;font-size:1rem;cursor:pointer}
+.login-err{color:var(--bad);font-size:.85rem;margin:0 0 .65rem}
+.ops-header{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;margin-bottom:.35rem}
+.ops-header h1{margin:0;flex:1 1 auto}
+.ops-header .sub{margin:0}
+.ops-header .btn-logout{font-size:.75rem;padding:.3rem .55rem;margin-left:auto}
+.ops-log-toolbar{display:flex;gap:.5rem;align-items:center;margin-bottom:.45rem}
+.ops-log-pre{font-family:ui-monospace,monospace;font-size:.72rem;line-height:1.35;background:#0a0e14;border:1px solid var(--line);border-radius:8px;padding:.55rem;height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin:0}
+.ops-log-pre .log-cycle{color:#60a5fa;font-weight:700}
+.ops-log-pre .log-fetch{color:#fb923c}
+.ops-log-pre .log-listing{color:#4ade80}
+.ops-log-pre .log-warn{color:#f87171;font-weight:700}
+.ops-log-pre .log-err{color:#ef4444}
+.ops-log-pre .log-tg{color:#c084fc}
+.ops-log-pre .log-neon{color:#86efac;font-weight:400}
+.exchange-card .exchange-title{font-size:1rem;font-weight:700;margin:0 0 .35rem}
+.exchange-card .exchange-meta{font-size:.82rem;color:var(--muted);margin:.25rem 0}
+.exchange-card .exchange-actions{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.55rem}
+.rl-toast{position:fixed;bottom:1rem;right:1rem;z-index:100;max-width:min(360px,calc(100vw - 2rem));padding:.65rem .85rem;border-radius:10px;background:#1e293b;border:1px solid #334155;color:var(--txt);font-size:.85rem;box-shadow:0 8px 24px rgba(0,0,0,.35);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none}
+.rl-toast.is-visible{opacity:1;transform:translateY(0)}
 @media (max-width:640px){
   .ops-proxy-table-wrap{display:none}
   .ops-proxy-cards{display:grid}
@@ -81,7 +108,11 @@ th{background:#121820} .err{color:var(--bad)} .btn{font-size:.75rem;padding:.2re
 </style>
 </head>
 <body>
+<div class="ops-header">
 <h1>Пульт RawLead</h1>
+__HEADER_META__
+__LOGOUT_BTN__
+</div>
 __LOGIN_BLOCK__
 <nav class="ops-nav" id="rl-ops-mini-nav" aria-label="Разделы пульта">
 <button type="button" class="chip is-active" data-target="ops-summary">Сводка</button>
@@ -89,6 +120,7 @@ __LOGIN_BLOCK__
 <button type="button" class="chip" data-target="ops-exchanges">Биржи</button>
 <button type="button" class="chip" data-target="ops-proxies">Прокси</button>
 <button type="button" class="chip" data-target="ops-controls">Управление</button>
+<button type="button" class="chip" data-target="ops-logs">Логи</button>
 <button type="button" class="chip" data-target="ops-leads">Лента</button>
 </nav>
 <section id="ops-summary">
@@ -107,6 +139,13 @@ __LOGIN_BLOCK__
 __PROXIES__
 </section>
 <section id="ops-controls"><h3>Управление</h3><div class="ctl" id="rl-ops-controls">__CONTROLS__</div><p class="sub" id="rl-ops-delist-stats" style="margin:.35rem 0 0">__DELIST_STATS__</p><div id="rl-ops-control-status" class="ctl-status"><span class="dot"></span><span>Ожидание команд</span></div></section>
+<section id="ops-logs"><h3>Логи радара</h3>
+<div class="ops-log-toolbar">
+<button type="button" class="btn" id="rl-ops-log-pause">⏸ Пауза</button>
+<span class="sub" id="rl-ops-log-status">Live</span>
+</div>
+<pre id="rl-ops-log" class="ops-log-pre" aria-live="polite"></pre>
+</section>
 <section id="ops-leads"><h3>Последние заказы в ленте</h3>
 <table id="rl-ops-leads"><thead><tr><th>#</th><th>Источник</th><th>Заголовок</th><th></th></tr></thead><tbody>__LEADS__</tbody></table>
 </section>
@@ -118,9 +157,119 @@ __PROXIES__
 <p class="sub" style="margin-top:0">Ответ уходит в окно «Поддержка» на сайте у пользователя.</p>
 <div id="rl-ops-support"></div>
 </section>
+<div id="rl-toast" class="rl-toast" role="status" aria-live="polite"></div>
 __SCRIPT__
 </body>
 </html>"""
+
+
+_OPS_LOGIN_PAGE = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>RawLead — вход в пульт</title>
+<style>
+:root{--bad:#ef4444;--bg:#0f1419;--card:#1a2332;--line:#2a3544;--txt:#e8eaed;--muted:#94a3b8}
+*{box-sizing:border-box} body{font-family:system-ui,sans-serif;margin:0;padding:1.25rem;background:var(--bg);color:var(--txt)}
+.login-page{max-width:420px;margin:2rem auto}
+.login-logo{font-size:1.5rem;font-weight:700;margin:0 0 1rem;text-align:center}
+.login-form label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:.35rem}
+.login-form input[type=password]{width:100%;padding:.55rem .65rem;border-radius:8px;border:1px solid var(--line);background:#121820;color:var(--txt);font-size:1rem;margin-bottom:.75rem}
+.login-form button[type=submit]{width:100%;padding:.55rem;border-radius:8px;border:0;background:#2563eb;color:#fff;font-size:1rem;cursor:pointer}
+.login-err{color:var(--bad);font-size:.85rem;margin:0 0 .65rem}
+</style>
+</head>
+<body>
+<div class="login-page">
+<p class="login-logo">RawLead</p>
+<div class="login-form">
+__ERROR__
+<form method="post" action="/ops/login">
+<label for="rl-ops-password">Пароль</label>
+<input id="rl-ops-password" type="password" name="password" autocomplete="current-password" required autofocus/>
+<button type="submit">Войти</button>
+</form>
+</div>
+</div>
+</body>
+</html>"""
+
+
+def ops_login_html(*, show_error: bool = False) -> str:
+    err = '<p class="login-err">Неверный пароль</p>' if show_error else ""
+    return _OPS_LOGIN_PAGE.replace("__ERROR__", err)
+
+
+def _human_ago(ts: float | None) -> str:
+    if ts is None:
+        return "нет данных"
+    delta = max(0, time.time() - ts)
+    if delta < 60:
+        return "только что"
+    mins = int(delta // 60)
+    if mins < 60:
+        return f"{mins} минут назад"
+    hours = int(mins // 60)
+    if hours < 24:
+        return f"{hours} часов назад"
+    return "больше суток назад (!)"
+
+
+def _human_error_text(err: str, kind: str) -> str:
+    low = (err or "").lower()
+    k = (kind or "").lower()
+    if k == "403" or "403" in low or "forbidden" in low:
+        return "403 — заблокирован прокси"
+    if k == "timeout" or "timeout" in low or "timed out" in low or "wall-clock" in low:
+        return "timeout — завис, перезапустил"
+    if k == "antibot" or "antibot" in low or "captcha" in low:
+        return "antibot — сайт распознал бота"
+    if err.strip():
+        return err.strip()[:120]
+    return ""
+
+
+def _exchange_status_from_ok_at(ok_epoch: float | None) -> tuple[str, str, str]:
+    if ok_epoch is None:
+        return "bad", "🔴", "Не отвечает — нужна проверка"
+    mins = max(0, int((time.time() - ok_epoch) // 60))
+    if mins < 15:
+        return "ok", "🟢", "Работает"
+    if mins <= 60:
+        return "warn", "🟡", "Задержка — ждём следующего цикла"
+    return "bad", "🔴", "Не отвечает — нужна проверка"
+
+
+def _last_log_line_for_source(source_id: str) -> str:
+    path = _resolve_log_path()
+    if path is None:
+        return ""
+    needles = {
+        "fl": ("fetch:fl", "listing:fl"),
+        "kwork": ("fetch:kwork", "listing:kwork"),
+        "youdo": ("fetch:youdo", "listing:youdo"),
+        "tg": ("тг:", "tg:"),
+    }
+    keys = needles.get(source_id, (f"fetch:{source_id}", f"listing:{source_id}"))
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+    for line in reversed(lines[-800:]):
+        if any(n in line for n in keys):
+            return line.strip()[:160]
+    return ""
+
+
+def _parse_health_ok_epoch(health: dict[str, Any]) -> float | None:
+    try:
+        from exchange_health import _parse_ts_epoch
+
+        ok_ts = str(health.get("last_ok_at") or "").strip()
+        return _parse_ts_epoch(ok_ts) if ok_ts else None
+    except Exception:
+        return None
 
 
 _OPS_LOGIN_BLOCK = """<div class="login-box">
@@ -140,63 +289,77 @@ _OPS_SCRIPT_SSR = """<script>
     if (body && typeof body.message === "string" && body.message) return body.message;
     return "HTTP " + r.status;
   }
+  function showToast(msg, isErr) {
+    var el = document.getElementById("rl-toast");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.style.borderColor = isErr ? "#7f1d1d" : "#334155";
+    el.classList.add("is-visible");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function () { el.classList.remove("is-visible"); }, 3000);
+  }
+  function postControl(body, btn, statusEl) {
+    if (statusEl) {
+      statusEl.className = "ctl-status is-working";
+      statusEl.innerHTML = '<span class="dot"></span><span>Выполняем…</span>';
+    }
+    if (btn) btn.disabled = true;
+    var old = btn ? btn.textContent : "";
+    if (btn) btn.textContent = "…";
+    return fetch(API + "/control", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (data) {
+        if (!r.ok) throw new Error(ctlFetchErr(r, data));
+        return data;
+      });
+    }).then(function (data) {
+      var msg = (data && data.message) ? data.message : "Команда отправлена";
+      if (statusEl) {
+        statusEl.className = "ctl-status is-ok";
+        statusEl.innerHTML = '<span class="dot"></span><span>' + msg + "</span>";
+      }
+      showToast(msg, false);
+      return data;
+    }).catch(function (e) {
+      var msg = (e && e.message) || "Команда не выполнена";
+      if (statusEl) {
+        statusEl.className = "ctl-status is-bad";
+        statusEl.innerHTML = '<span class="dot"></span><span>' + msg + "</span>";
+      }
+      showToast(msg, true);
+      throw e;
+    }).finally(function () {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    });
+  }
   document.querySelectorAll(".rl-ctl").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var action = btn.getAttribute("data-action") || "";
       var target = btn.getAttribute("data-target") || "";
       if (!action || !target) return;
       var ctl = document.getElementById("rl-ops-control-status");
-      if (ctl) {
-        ctl.className = "ctl-status is-working";
-        ctl.innerHTML = '<span class="dot"></span><span>Выполняем: ' + target + " / " + action + "</span>";
-      }
-      btn.disabled = true;
-      var old = btn.textContent;
-      btn.textContent = "…";
-      fetch(API + "/ops/control", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + (localStorage.getItem("rawlead_access_token") || "")
-        },
-        body: JSON.stringify({ action: action, target: target })
-      }).then(function (r) {
-        return r.json().catch(function () { return null; }).then(function (body) {
-          if (!r.ok) throw new Error(ctlFetchErr(r, body));
-          return body;
-        });
-      }).then(function (data) {
-        if (ctl) {
-          ctl.className = "ctl-status is-ok";
-          ctl.innerHTML = '<span class="dot"></span><span>' + ((data && data.message) ? data.message : "Команда отправлена") + "</span>";
-        }
-        var st = document.getElementById("rl-ops-status");
-        if (st) {
-          st.textContent = (data && data.message) ? data.message : "Команда отправлена";
-          st.className = "sub";
-        }
-      }).catch(function (e) {
-        if (ctl) {
-          ctl.className = "ctl-status is-bad";
-          ctl.innerHTML = '<span class="dot"></span><span>' + (((e && e.message) || "Команда не выполнена")) + "</span>";
-        }
-        var st = document.getElementById("rl-ops-status");
-        if (st) {
-          st.textContent = (e && e.message) || "Команда не выполнена";
-          st.className = "err";
-        }
-      }).finally(function () {
-        btn.disabled = false;
-        btn.textContent = old;
-      });
+      postControl({ action: action, target: target }, btn, ctl);
+    });
+  });
+  document.querySelectorAll(".rl-restart-source").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var target = btn.getAttribute("data-target") || "";
+      if (!target) return;
+      postControl({ action: "restart_source", target: target }, btn, null);
     });
   });
   document.querySelectorAll(".rl-hide").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var id = btn.getAttribute("data-id");
       btn.disabled = true;
-      fetch(API + "/ops/leads/" + id + "/hide", {
+      fetch(API + "/leads/" + id + "/hide", {
         method: "POST",
         credentials: "same-origin"
       }).then(function (r) {
@@ -210,11 +373,8 @@ _OPS_SCRIPT_SSR = """<script>
   });
   var supportEl = document.getElementById("rl-ops-support");
   if (supportEl) {
-    var token = "";
-    try { token = localStorage.getItem("rawlead_access_token") || ""; } catch (e) { token = ""; }
-    fetch(API + "/ops/support/tickets", {
-      credentials: "same-origin",
-      headers: { "Authorization": "Bearer " + token }
+    fetch(API + "/support/tickets", {
+      credentials: "same-origin"
     }).then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
@@ -239,13 +399,10 @@ _OPS_SCRIPT_SSR = """<script>
           var text = area ? area.value.trim() : "";
           if (!text) return;
           btn.disabled = true;
-          fetch(API + "/ops/support/tickets/" + id + "/reply", {
+          fetch(API + "/support/tickets/" + id + "/reply", {
             method: "POST",
             credentials: "same-origin",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": "Bearer " + token
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ message: text })
           }).then(function (r) {
             if (!r.ok) throw new Error("HTTP " + r.status);
@@ -258,9 +415,97 @@ _OPS_SCRIPT_SSR = """<script>
         });
       });
     }).catch(function () {
-      supportEl.innerHTML = "<p class=\\"err\\">Поддержка: войди в кабинет владельца.</p>";
+      supportEl.innerHTML = "<p class=\\"err\\">Поддержка: ошибка загрузки.</p>";
     });
   }
+  function logClass(line) {
+    var s = line || "";
+    if (s.indexOf("── Цикл ──") >= 0) return "log-cycle";
+    if (/fetch:(fl|kwork|youdo)/.test(s)) return "log-fetch";
+    if (/listing:(fl|kwork|youdo).*parsed=/.test(s)) return "log-listing";
+    if (/wall-clock|watchdog|timeout/i.test(s)) return "log-warn";
+    if (/ошибка|error|err=|HTTP [45]/i.test(s)) return "log-err";
+    if (/тг:|tg:/i.test(s)) return "log-tg";
+    if (/neon_insert/.test(s)) return "log-neon";
+    return "";
+  }
+  function appendLogLine(pre, line, stick) {
+    if (!pre || !line) return;
+    var span = document.createElement("span");
+    var cls = logClass(line);
+    if (cls) span.className = cls;
+    span.textContent = line + "\\n";
+    pre.appendChild(span);
+    while (pre.childNodes.length > 800) pre.removeChild(pre.firstChild);
+    if (stick !== false) pre.scrollTop = pre.scrollHeight;
+  }
+  function bindLogStream() {
+    var pre = document.getElementById("rl-ops-log");
+    var pauseBtn = document.getElementById("rl-ops-log-pause");
+    var statusEl = document.getElementById("rl-ops-log-status");
+    if (!pre) return;
+    var paused = false;
+    var userScrolled = false;
+    pre.addEventListener("scroll", function () {
+      userScrolled = pre.scrollTop + pre.clientHeight < pre.scrollHeight - 40;
+    });
+    if (pauseBtn) {
+      pauseBtn.addEventListener("click", function () {
+        paused = !paused;
+        pauseBtn.textContent = paused ? "▶ Live" : "⏸ Пауза";
+        if (statusEl) statusEl.textContent = paused ? "Пауза" : "Live";
+        if (!paused) connect();
+      });
+    }
+    var es = null;
+    function connect() {
+      if (paused || typeof EventSource === "undefined") return;
+      if (es) { try { es.close(); } catch (e) {} es = null; }
+      es = new EventSource("/ops/log/stream");
+      es.onmessage = function (ev) {
+        if (paused) return;
+        var stick = !userScrolled;
+        appendLogLine(pre, ev.data || "", stick);
+      };
+      es.onerror = function () {
+        if (es) { try { es.close(); } catch (e) {} es = null; }
+        if (!paused) setTimeout(connect, 2000);
+      };
+    }
+    connect();
+  }
+  function refreshSummary() {
+    fetch(API + "/dashboard", { credentials: "same-origin" })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (data) {
+        var cards = document.getElementById("rl-ops-cards");
+        if (!cards || !data) return;
+        var t = data.today || {};
+        var radar = data.radar || {};
+        var feed = data.feed || {};
+        var bot = data.bot || {};
+        var prob = data.problems || {};
+        function setCard(idx, val, hint) {
+          var card = cards.children[idx];
+          if (!card) return;
+          var valEl = card.querySelector(".val");
+          var hintEl = card.querySelector(".hint");
+          if (valEl) valEl.textContent = val;
+          if (hintEl && hint) hintEl.textContent = hint;
+        }
+        setCard(0, (t.visits || 0) + " просмотров",
+          "Уникальных: " + (t.unique_visits || 0) + " · Новых: " + (t.new_users || 0));
+        setCard(1, radar.status_label || "—", radar.hint || "");
+        setCard(2, (feed.visible_count || 0) + " заказов", "Видимых на /lenta/");
+        setCard(3, (bot.push_subscribers || 0) + " с push", "@rawlead_bot / @FLPARSINGBOT");
+        setCard(4, (prob.auth_errors_24h || 0) + " вход · " + (prob.fetch_errors_24h || 0) + " парсер",
+          "Детали — radar.log");
+        var updated = document.getElementById("rl-ops-updated");
+        if (updated) updated.textContent = "Обновлено " + new Date().toLocaleString("ru-RU");
+      }).catch(function () {});
+  }
+  bindLogStream();
+  setInterval(refreshSummary, 30000);
   __NAV_PROXY_JS__
 })();
 </script>"""
@@ -270,7 +515,7 @@ _OPS_NAV_PROXY_JS = r"""
     var nav = document.getElementById("rl-ops-mini-nav");
     if (!nav) return;
     var chips = nav.querySelectorAll(".chip");
-    var sections = ["ops-summary","ops-bots","ops-exchanges","ops-proxies","ops-controls","ops-leads"];
+    var sections = ["ops-summary","ops-bots","ops-exchanges","ops-proxies","ops-controls","ops-logs","ops-leads"];
     function setActive(id) {
       chips.forEach(function (c) {
         c.classList.toggle("is-active", c.getAttribute("data-target") === id);
@@ -319,17 +564,12 @@ _OPS_NAV_PROXY_JS = r"""
       + (https.target ? " → " + https.target : "");
   }
   function postProxyControl(body, btn) {
-    var token = "";
-    try { token = localStorage.getItem("rawlead_access_token") || ""; } catch (e) { token = ""; }
     setProxyStatus("working", "Выполняем…");
     if (btn) btn.disabled = true;
-    return fetch(API + "/ops/control", {
+    return fetch(API + "/control", {
       method: "POST",
       credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + token
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     }).then(function (r) {
       return r.json().catch(function () { return null; }).then(function (data) {
@@ -342,6 +582,7 @@ _OPS_NAV_PROXY_JS = r"""
         return data;
       }
       setProxyStatus("ok", (data && data.message) ? data.message : "Готово");
+      showToast((data && data.message) ? data.message : "Готово", false);
       if (data && data.probe && body.group && body.slot) {
         showProbeResult(body.group, body.slot, data.probe);
       }
@@ -356,13 +597,15 @@ _OPS_NAV_PROXY_JS = r"""
       return data;
     }).catch(function (e) {
       setProxyStatus("bad", (e && e.message) || "Ошибка");
+      showToast((e && e.message) || "Ошибка", true);
       throw e;
     }).finally(function () {
       if (btn) btn.disabled = false;
     });
   }
   function bindProxyControls() {
-    document.querySelectorAll(".rl-proxy-probe").forEach(function (btn) {
+    document.querySelectorAll(".rl-proxy-probe:not([data-bound])").forEach(function (btn) {
+      btn.setAttribute("data-bound", "1");
       btn.addEventListener("click", function () {
         postProxyControl({
           target: "proxy",
@@ -372,7 +615,8 @@ _OPS_NAV_PROXY_JS = r"""
         }, btn);
       });
     });
-    document.querySelectorAll(".rl-proxy-switch").forEach(function (btn) {
+    document.querySelectorAll(".rl-proxy-switch:not([data-bound])").forEach(function (btn) {
+      btn.setAttribute("data-bound", "1");
       btn.addEventListener("click", function () {
         if (btn.disabled) return;
         postProxyControl({
@@ -383,18 +627,18 @@ _OPS_NAV_PROXY_JS = r"""
         }, btn);
       });
     });
-    var allBtn = document.querySelector(".rl-proxy-probe-all");
-    if (allBtn) {
+    document.querySelectorAll(".rl-proxy-probe-all:not([data-bound])").forEach(function (allBtn) {
+      allBtn.setAttribute("data-bound", "1");
       allBtn.addEventListener("click", function () {
         postProxyControl({ target: "proxy", action: "probe-all" }, allBtn);
       });
-    }
-    var clearBtn = document.querySelector(".rl-proxy-clear-bans");
-    if (clearBtn) {
+    });
+    document.querySelectorAll(".rl-proxy-clear-bans:not([data-bound])").forEach(function (clearBtn) {
+      clearBtn.setAttribute("data-bound", "1");
       clearBtn.addEventListener("click", function () {
         postProxyControl({ target: "proxy", action: "clear-bans" }, clearBtn);
       });
-    }
+    });
   }
   bindMiniNav();
   bindProxyControls();
@@ -541,7 +785,7 @@ _OPS_SCRIPT_CLIENT = """<script>
       btn.addEventListener("click", function () {
         var id = btn.getAttribute("data-id");
         btn.disabled = true;
-        fetch(API + "/ops/leads/" + id + "/hide", {
+        fetch(API + "/leads/" + id + "/hide", {
           method: "POST",
           credentials: "same-origin",
           headers: { "Authorization": "Bearer " + token }
@@ -1179,14 +1423,28 @@ def _exchange_ops_rows() -> list[dict[str, Any]]:
         health = all_health.get(sid) or {}
         st = summary.sources.get(sid) if summary else None
         fetch_failed = bool(st and st.fetch_error)
-        rows.append(
-            build_ops_exchange_row(
-                sid,
-                health,
-                ingest.get(sid),
-                fetch_failed=fetch_failed,
-            )
+        row = build_ops_exchange_row(
+            sid,
+            health,
+            ingest.get(sid),
+            fetch_failed=fetch_failed,
         )
+        ok_epoch = _parse_health_ok_epoch(health)
+        row["last_ok_ago"] = _human_ago(ok_epoch)
+        row["today_new_ids"] = int(health.get("last_new_ids", 0) or 0)
+        row["last_log_line"] = _last_log_line_for_source(sid)
+        row["error_kind"] = str(health.get("last_error_kind") or "ok")
+        row["error_short"] = str(health.get("last_error_short") or "")
+        lvl, icon, status_ru = _exchange_status_from_ok_at(ok_epoch)
+        row["exchange_level"] = lvl
+        row["exchange_icon"] = icon
+        row["exchange_status_ru"] = status_ru
+        err_human = _human_error_text(row["error_short"], row["error_kind"])
+        if err_human and lvl != "ok":
+            row["error_human"] = err_human
+        else:
+            row["error_human"] = ""
+        rows.append(row)
     return rows
 
 
@@ -1464,63 +1722,35 @@ def _render_exchanges(data: dict[str, Any]) -> str:
     if not rows:
         return '<div class="card"><p class="hint">Нет данных о биржах (SQLite или Neon недоступны)</p></div>'
     parts: list[str] = []
+    restart_sources = {"fl", "kwork", "youdo", "tg"}
     for row in rows:
-        level = str(row.get("level") or "warn")
-        name = str(row.get("name") or "—")
-        status = str(row.get("status_label") or "—")
-        gap = int(row.get("last_insert_ago_min") or 0)
-        last_ins = str(row.get("last_insert_at") or "").strip()
-        insert_hint = f"{last_ins} ({gap} мин назад)" if last_ins else "ещё не было"
-        ingest_min = row.get("ingest_p50_min")
-        feed_min = row.get("feed_p50_min")
-        within_5m = row.get("feed_within_5m")
-        within_pct = row.get("feed_within_5m_pct")
-        lag_parts: list[str] = []
-        if ingest_min is not None:
-            lag_parts.append(f"На бирже → к нам: {ingest_min} мин")
-        if feed_min is not None:
-            lag_parts.append(f"К нам → в ленту: {feed_min} мин")
-        if within_5m is not None and within_pct is not None:
-            lag_parts.append(f"≤5 мин: {within_5m} ({within_pct}%)")
-        lag_hint = " · ".join(lag_parts) if lag_parts else "Тайминги — после накопления данных"
-        what = html.escape(str(row.get("what_happened") or "—"))
-        what_full = html.escape(str(row.get("what_happened_full") or what))
-        listing_line = str(row.get("listing_line") or "").strip()
-        sub = html.escape(listing_line) if listing_line else ""
-        hint = html.escape(f"Последний заказ: {insert_hint} · {lag_hint} · {what}")
-        trace_lines = row.get("trace_lines") or []
-        if str(row.get("source_id") or "") == "tg" and not trace_lines:
-            try:
-                from exchange_trace import recent_pipeline_lines
-
-                trace_lines = recent_pipeline_lines(
-                    _resolve_log_path(),
-                    source="tg",
-                    limit=3,
-                )
-            except Exception:
-                trace_lines = []
-        trace_block = ""
-        if trace_lines:
-            trace_items = "".join(
-                f"<li>{html.escape(str(line))}</li>" for line in trace_lines[:10]
+        sid = str(row.get("source_id") or "")
+        name = html.escape(str(row.get("name") or "—"))
+        icon = html.escape(str(row.get("exchange_icon") or "🟡"))
+        status_ru = html.escape(str(row.get("exchange_status_ru") or "—"))
+        level = str(row.get("exchange_level") or row.get("level") or "warn")
+        ago = html.escape(str(row.get("last_ok_ago") or "нет данных"))
+        today_new = int(row.get("today_new_ids") or 0)
+        last_line = html.escape(str(row.get("last_log_line") or row.get("listing_line") or "—"))
+        err_human = html.escape(str(row.get("error_human") or ""))
+        err_block = f'<p class="exchange-meta err">{err_human}</p>' if err_human else ""
+        restart_btn = ""
+        if sid in restart_sources:
+            restart_btn = (
+                f'<button type="button" class="btn rl-restart-source" data-target="{html.escape(sid)}">'
+                f"Перезапустить источник</button>"
             )
-            trace_block = (
-                f'<p class="hint"><strong>Последний trace</strong></p>'
-                f'<ul class="hint rl-ops-trace">{trace_items}</ul>'
-            )
-        card = _card_html(name, status, hint, level)
-        if what_full and what_full != what:
-            card = card.replace(
-                '<p class="hint">',
-                f'<p class="hint" title="{what_full}">',
-                1,
-            )
-        if sub:
-            card = card.replace("</h2>", f"</h2><p class=\"hint\">{sub}</p>", 1)
-        if trace_block:
-            card = card.replace("</div>", f"{trace_block}</div>", 1)
-        parts.append(card)
+        parts.append(
+            f'<div class="card exchange-card">'
+            f'<h2>{_dot_html(level)}</h2>'
+            f'<p class="exchange-title">{icon} {name} — {status_ru}</p>'
+            f'<p class="exchange-meta">Последний цикл: {ago}</p>'
+            f'<p class="exchange-meta">Сегодня найдено новых заказов: {today_new}</p>'
+            f'<p class="exchange-meta">Последнее: {last_line}</p>'
+            f"{err_block}"
+            f'<div class="exchange-actions">{restart_btn}</div>'
+            f"</div>"
+        )
     return "".join(parts)
 
 
@@ -1843,20 +2073,21 @@ def run_ops_control(
 
         result = run_proxy_control(action=a, group=group, slot=slot)
         if result.get("ok") and a == "clear-bans":
-            ok_radar, msg_radar = _run_systemctl("restart", "rawlead-radar")
-            ok_bot, msg_bot = _restart_bot_poll()
+            import threading
+
+            def _restart_after_clear_bans() -> None:
+                ok_radar, msg_radar = _run_systemctl("restart", "rawlead-radar")
+                ok_bot, msg_bot = _restart_bot_poll()
+                if not ok_radar:
+                    logger.warning("ops clear-bans: radar restart failed: %s", msg_radar)
+                if not ok_bot:
+                    logger.warning("ops clear-bans: bot restart failed: %s", msg_bot)
+
+            threading.Thread(target=_restart_after_clear_bans, daemon=True).start()
             result = dict(result)
             parts = [str(result.get("message") or "")]
-            if ok_radar:
-                parts.append("Радар перезапущен.")
-            else:
-                parts.append(f"Радар: {msg_radar}")
-            if ok_bot:
-                parts.append("Бот перезапущен.")
-            else:
-                parts.append(f"Бот: {msg_bot}")
+            parts.append("Радар и бот перезапускаются в фоне (~30 с).")
             result["message"] = " ".join(p for p in parts if p)
-            # Свежий снимок после clear (радар подхватит файл/SQLite при рестарте)
             from proxy_ops import collect_proxies_payload
 
             result["proxies"] = strip_internal_urls(collect_proxies_payload())
@@ -1894,6 +2125,22 @@ def run_ops_control(
     if t == "delist" and a == "run":
         ok, msg = _run_delist_batch_ops()
         return {"ok": ok, "message": msg}
+    if a == "restart_source" and t in {"fl", "kwork", "youdo", "tg"}:
+        sqlite = _resolve_sqlite_path()
+        if sqlite is None:
+            return {"ok": False, "message": "SQLite not found for restart_source"}
+        storage = ProjectStorage(sqlite)
+        storage.set_setting(f"restart_source_{t}", "1")
+        labels = {
+            "fl": "FL.ru",
+            "kwork": "Kwork",
+            "youdo": "YouDo",
+            "tg": "Telegram",
+        }
+        return {
+            "ok": True,
+            "message": f"{labels[t]} перезапустится на следующем цикле (~2 мин)",
+        }
     return {"ok": False, "message": "Unsupported control target/action"}
 
 
@@ -2063,17 +2310,28 @@ def _proxy_shell_html() -> str:
     )
 
 
-def ops_html(*, api_base: str, data: dict[str, Any] | None = None) -> str:
-    base = (api_base or "").strip().rstrip("/") or "/wp-json/rawlead/v1"
+def ops_html(
+    *,
+    api_base: str,
+    data: dict[str, Any] | None = None,
+    ops_authenticated: bool = False,
+) -> str:
+    base = (api_base or "").strip().rstrip("/") or "/ops"
     base_esc = html.escape(base, quote=True)
     nav_js = _OPS_NAV_PROXY_JS
+    logout_btn = (
+        '<a href="/ops/logout" class="btn btn-logout">Выйти</a>' if ops_authenticated else ""
+    )
     if data is not None:
         updated = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
+        header_meta = f'<p class="sub" id="rl-ops-updated">Обновлено {updated}</p>'
         script = (
             _OPS_SCRIPT_SSR.replace("__API_BASE__", base_esc).replace("__NAV_PROXY_JS__", nav_js)
         )
         return (
             _OPS_HTML.replace("__LOGIN_BLOCK__", "")
+            .replace("__HEADER_META__", header_meta)
+            .replace("__LOGOUT_BTN__", logout_btn)
             .replace("__STATUS__", f"Обновлено {updated}")
             .replace("__CARDS__", _render_cards(data))
             .replace("__BOTS__", _render_bots(data))
@@ -2094,6 +2352,8 @@ def ops_html(*, api_base: str, data: dict[str, Any] | None = None) -> str:
     )
     return (
         _OPS_HTML.replace("__LOGIN_BLOCK__", _OPS_LOGIN_BLOCK)
+        .replace("__HEADER_META__", '<p class="sub" id="rl-ops-updated">Нужен вход</p>')
+        .replace("__LOGOUT_BTN__", "")
         .replace("__STATUS__", "Нужен вход в кабинет (см. шаги ниже)")
         .replace("__CARDS__", "")
         .replace("__BOTS__", "")

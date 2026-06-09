@@ -1073,10 +1073,25 @@ async def process_new_listing_from_tg(
     account: str = "",
     chat_title: str = "",
 ) -> tuple[bool, bool]:
-    """TG: acc→бот (Telethon), карточка ИИ; relay владельцу — sync или poll."""
-    from tg_forward import format_tg_acc_label, forward_listing_to_owner
+    """TG: ingest → L1 → карточка владельцу только при gate feed_visible+public_feed.
+
+    Raw Telethon forward убран (O163-DoD2).
+    Gate (O163-DoD1): слать только если лид прошёл бы в /lenta/:
+        _is_visible_lite(lite) AND is_public_feed_source(source).
+    Пока TG ∉ PUBLIC_FEED_SOURCES — никакого уведомления владельцу.
+    """
+    from pg_storage import _is_visible_lite
+    from tg_spam_filter import is_tg_spam
 
     from l1_pool import L1Pool
+
+    # Pre-L1: отсечь promo-бот рекламу, CV «ищу проект», партнёрки
+    snippet = (project.listing_snippet or project.title or "").strip()
+    if is_tg_spam(project.title, snippet):
+        errors.append(
+            f"{project.source}:id={project.project_id} skip:tg_spam"
+        )
+        return False, False
 
     if pg is not None:
         with L1Pool(cfg, pg, errors=errors, stats=stats) as pool:
@@ -1103,17 +1118,19 @@ async def process_new_listing_from_tg(
     if plan is None:
         return was_new, False
 
-    acc_label = format_tg_acc_label(account, chat_title) if account else ""
-    forwarded_ok = await forward_listing_to_owner(
-        client,
-        message,
-        cfg,
-        errors=errors,
-        account=account,
-        chat_title=chat_title,
-    )
-    if not forwarded_ok:
+    # Gate: owner notify только если лид попал бы в ленту
+    lite = plan.lite_analysis
+    if not (_is_visible_lite(lite) and is_public_feed_source(plan.project.source)):
+        errors.append(
+            f"{plan.project.source}:id={plan.project.project_id} "
+            "skip:tg_gate_not_public_feed"
+        )
         return was_new, False
+
+    # Форматированная карточка (без raw Telethon forward)
+    from tg_forward import format_tg_acc_label
+
+    acc_label = format_tg_acc_label(account, chat_title) if account else ""
     if acc_label:
         plan = ListingNotifyPlan(
             project=plan.project,

@@ -84,6 +84,8 @@
 
 **Пароль пульта:** `RAWLEAD_OPS_KEY` или `OPS_PASSWORD` в `.env` на VPS (не в git).
 
+**Аккаунты FL/Kwork для ТЗ (O133):** `FL_TZ_EMAIL` / `KWORK_TZ_EMAIL` в локальном `.env` ✅ · на VPS — добавить в `/opt/rawlead/.env` когда Coder подключит downloader.
+
 ---
 
 ## L1 и очередь без разбора

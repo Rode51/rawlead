@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 import psycopg
 
+from ai_analyze import draft_or_concurrency
 from config import Config
 from draft_trace import DraftTimer, log_draft_stage
 from match_push import (
@@ -56,6 +57,7 @@ class DraftPollResponse:
     tools_required: list[str] | None = None
     keyword_match: int | None = None
     error: str = ""
+    queue_ahead: int = 0
 
 
 def _ensure_draft_tables(database_url: str) -> None:
@@ -237,6 +239,26 @@ def _worker_running(key: tuple[str, int]) -> bool:
     with _jobs_lock:
         fut = _active_futures.get(key)
         return fut is not None and not fut.done()
+
+
+def _draft_queue_ahead() -> int:
+    """O159: workers beyond OR L2 slots ≈ queue wait for this poll."""
+    slots = draft_or_concurrency()
+    if slots <= 0:
+        return 0
+    with _jobs_lock:
+        running = sum(
+            1 for fut in _active_futures.values() if fut is not None and not fut.done()
+        )
+    return max(0, running - slots)
+
+
+def _pending_poll(lead_id: int) -> DraftPollResponse:
+    return DraftPollResponse(
+        status="pending",
+        lead_id=lead_id,
+        queue_ahead=_draft_queue_ahead(),
+    )
 
 
 def _lead_worker_running(lead_id: int) -> bool:
@@ -512,6 +534,7 @@ def submit_warm(
         )
         _start_warm_worker(cfg, lead_id, prefix)
 
+    pending = _pending_poll(lead_id)
     log_draft_stage(
         prefix,
         stage="submit_done",
@@ -519,9 +542,10 @@ def submit_warm(
         lead_id=lead_id,
         status="pending",
         path="warm",
+        queue_ahead=pending.queue_ahead or None,
         user_id=user_id[:8],
     )
-    return DraftPollResponse(status="pending", lead_id=lead_id)
+    return pending
 
 
 def poll_draft(
@@ -559,9 +583,11 @@ def poll_draft(
 
     with _jobs_lock:
         fut = _active_futures.get(key)
-        if fut is not None and not fut.done():
-            return DraftPollResponse(status="pending", lead_id=lead_id)
-        err = _job_errors.get(key, "")
+        worker_busy = fut is not None and not fut.done()
+        err = "" if worker_busy else _job_errors.get(key, "")
+
+    if worker_busy:
+        return _pending_poll(lead_id)
 
     if err:
         trace = DraftTimer()
@@ -606,7 +632,7 @@ def poll_draft(
                 user_id=user_id[:8],
             )
             _restart_worker(cfg, user_id, lead_id, prefix)
-        return DraftPollResponse(status="pending", lead_id=lead_id)
+        return _pending_poll(lead_id)
 
     trace = DraftTimer()
     log_draft_stage(
@@ -618,7 +644,7 @@ def poll_draft(
         user_id=user_id[:8],
     )
     _restart_worker(cfg, user_id, lead_id, prefix)
-    return DraftPollResponse(status="pending", lead_id=lead_id)
+    return _pending_poll(lead_id)
 
 
 def submit_draft(
@@ -698,19 +724,24 @@ def submit_draft(
             return resp
         time.sleep(0.35)
 
+    pending = _pending_poll(lead_id)
     log_draft_stage(
         prefix,
         stage="submit_done",
         timer=trace,
         lead_id=lead_id,
         status="pending",
+        queue_ahead=pending.queue_ahead or None,
         user_id=user_id[:8],
     )
-    return DraftPollResponse(status="pending", lead_id=lead_id)
+    return pending
 
 
 def draft_response_body(resp: DraftPollResponse) -> dict[str, Any]:
     body: dict[str, Any] = {"status": resp.status, "lead_id": resp.lead_id, "id": resp.lead_id}
+    if resp.status == "pending" and resp.queue_ahead > 0:
+        body["queued"] = True
+        body["queue_ahead"] = resp.queue_ahead
     if resp.status == "ready":
         body["reply_draft"] = resp.reply_draft
         body["tools_required"] = resp.tools_required or []

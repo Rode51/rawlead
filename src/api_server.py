@@ -17,6 +17,7 @@ import hashlib
 import logging
 import os
 import secrets
+from urllib.parse import parse_qs
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 from uuid import UUID, uuid4
@@ -24,7 +25,7 @@ from uuid import UUID, uuid4
 import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 from src.config import load_config, load_radar_env
 
@@ -86,9 +87,11 @@ from src.owner_admin import (
     hide_lead,
     is_owner_db_user,
     ops_html,
+    ops_login_html,
     record_pageview,
     run_ops_control,
 )
+from src.ops_log_stream import iter_radar_log_sse
 from src.support_tickets import (
     admin_list_tickets,
     admin_reply,
@@ -2342,12 +2345,38 @@ def _require_owner_user(
     return user_id
 
 
+def _ops_gate_key() -> str:
+    return (os.getenv("RAWLEAD_OPS_KEY") or os.getenv("OPS_PASSWORD") or "").strip()
+
+
+def _ops_password_match(supplied: str, gate: str) -> bool:
+    if not supplied or not gate:
+        return False
+    if len(supplied) != len(gate):
+        return False
+    return secrets.compare_digest(supplied, gate)
+
+
 def _ops_access_granted(request: Request, key: str = "") -> bool:
-    gate = os.getenv("RAWLEAD_OPS_KEY", "").strip()
+    gate = _ops_gate_key()
     if not gate:
         return True
     supplied = (key or request.cookies.get("rl_ops_key", "")).strip()
-    return bool(supplied) and secrets.compare_digest(supplied, gate)
+    return _ops_password_match(supplied, gate)
+
+
+def _ops_cookie_kwargs() -> dict[str, Any]:
+    return {
+        "httponly": True,
+        "secure": True,
+        "samesite": "lax",
+        "max_age": 86400 * 30,
+    }
+
+
+def _require_ops_access(request: Request) -> None:
+    if not _ops_access_granted(request):
+        raise HTTPException(status_code=401, detail="ops auth required")
 
 
 def _ops_jwt_from_request(request: Request) -> str:
@@ -2374,29 +2403,153 @@ def _owner_dashboard_data(jwt: str) -> dict[str, Any] | None:
         return None
 
 
+class OpsControlPayload(BaseModel):
+    target: str
+    action: str
+    group: str | None = None
+    slot: int | None = None
+
+
+class SupportAdminReplyPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    message: str
+
+
 @app.get("/ops/", response_class=HTMLResponse)
 def ops_dashboard_page(
     request: Request,
     key: str = Query(default=""),
 ) -> HTMLResponse:
-    """O45/O78: owner admin — SSR при cookie rl_access, иначе инструкция + JS fallback."""
-    if not _ops_access_granted(request, key):
-        raise HTTPException(status_code=404, detail="Not found")
-    jwt = _ops_jwt_from_request(request)
-    data = _owner_dashboard_data(jwt)
-    api_base = os.getenv("RAWLEAD_OPS_API_BASE", "/wp-json/rawlead/v1").strip()
-    resp = HTMLResponse(ops_html(api_base=api_base, data=data))
-    gate = os.getenv("RAWLEAD_OPS_KEY", "").strip()
+    """O45/O78/O161: password cookie → SSR; иначе форма входа."""
+    gate = _ops_gate_key()
+    if gate and not _ops_access_granted(request, key):
+        show_err = request.query_params.get("err") == "1"
+        return HTMLResponse(ops_login_html(show_error=show_err))
+    data: dict[str, Any] | None = None
+    if _ops_access_granted(request, key):
+        try:
+            data = fetch_dashboard(_db_url())
+        except Exception as exc:
+            logger.warning("ops SSR dashboard: %s", exc)
+    elif not gate:
+        jwt = _ops_jwt_from_request(request)
+        data = _owner_dashboard_data(jwt)
+    api_base = "/ops" if gate else os.getenv("RAWLEAD_OPS_API_BASE", "/wp-json/rawlead/v1").strip()
+    resp = HTMLResponse(
+        ops_html(api_base=api_base, data=data, ops_authenticated=_ops_access_granted(request, key))
+    )
     if gate and key == gate:
-        resp.set_cookie(
-            "rl_ops_key",
-            gate,
-            httponly=True,
-            secure=True,
-            samesite="lax",
-            max_age=86400 * 30,
-        )
+        resp.set_cookie("rl_ops_key", gate, **_ops_cookie_kwargs())
     return resp
+
+
+@app.post("/ops/login")
+async def ops_login(request: Request) -> RedirectResponse:
+    gate = _ops_gate_key()
+    if not gate:
+        raise HTTPException(status_code=404, detail="Not found")
+    password = ""
+    ct = (request.headers.get("content-type") or "").lower()
+    if "application/json" in ct:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                password = str(body.get("password") or "")
+        except Exception:
+            password = ""
+    else:
+        raw = (await request.body()).decode("utf-8", errors="replace")
+        password = parse_qs(raw).get("password", [""])[0]
+    supplied = (password or "").strip()
+    if not _ops_password_match(supplied, gate):
+        return RedirectResponse(url="/ops/?err=1", status_code=303)
+    resp = RedirectResponse(url="/ops/", status_code=303)
+    resp.set_cookie("rl_ops_key", gate, **_ops_cookie_kwargs())
+    return resp
+
+
+@app.get("/ops/logout")
+def ops_logout() -> RedirectResponse:
+    resp = RedirectResponse(url="/ops/", status_code=303)
+    resp.delete_cookie("rl_ops_key")
+    return resp
+
+
+@app.get("/ops/log/stream")
+def ops_log_stream(request: Request) -> StreamingResponse:
+    """O161: SSE tail radar_site.log — same-origin or rl_ops_key cookie."""
+    gate = _ops_gate_key()
+    if gate and not _ops_access_granted(request):
+        raise HTTPException(status_code=401, detail="ops auth required")
+    return StreamingResponse(
+        iter_radar_log_sse(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/ops/dashboard")
+def ops_dashboard_json(request: Request) -> dict[str, Any]:
+    _require_ops_access(request)
+    return fetch_dashboard(_db_url())
+
+
+@app.post("/ops/control")
+def ops_control_route(request: Request, payload: OpsControlPayload) -> dict[str, Any]:
+    _require_ops_access(request)
+    result = run_ops_control(
+        target=payload.target,
+        action=payload.action,
+        group=payload.group or "",
+        slot=payload.slot,
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("message", "control failed"))
+    return result
+
+
+@app.post("/ops/leads/{lead_id}/hide")
+def ops_hide_lead(request: Request, lead_id: int) -> dict[str, Any]:
+    _require_ops_access(request)
+    if lead_id <= 0:
+        raise HTTPException(status_code=400, detail="invalid lead id")
+    if not hide_lead(_db_url(), lead_id):
+        raise HTTPException(status_code=404, detail="lead not found or already hidden")
+    return {"ok": True, "lead_id": lead_id}
+
+
+@app.get("/ops/support/tickets")
+def ops_support_tickets(
+    request: Request,
+    limit: int = Query(default=30, ge=1, le=100),
+) -> dict[str, Any]:
+    _require_ops_access(request)
+    try:
+        return {"tickets": admin_list_tickets(_db_url(), limit=limit)}
+    except Exception as exc:
+        logger.error("ops_support_tickets: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+@app.post("/ops/support/tickets/{ticket_id}/reply")
+def ops_support_ticket_reply(
+    request: Request,
+    ticket_id: int,
+    payload: SupportAdminReplyPayload,
+) -> dict[str, Any]:
+    _require_ops_access(request)
+    try:
+        return admin_reply(_db_url(), ticket_id=ticket_id, body=payload.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("ops_support_ticket_reply: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
 
 
 @app.get("/v1/admin/dashboard")
@@ -2441,13 +2594,6 @@ def admin_pageview_beacon(payload: PageviewPayload, request: Request) -> Respons
     return Response(status_code=204)
 
 
-class OpsControlPayload(BaseModel):
-    target: str
-    action: str
-    group: str | None = None
-    slot: int | None = None
-
-
 @app.get("/v1/admin/proxies")
 def admin_proxies(_owner: str = Depends(_require_owner_user)) -> dict[str, Any]:
     del _owner
@@ -2481,12 +2627,6 @@ def admin_control(
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("message", "control failed"))
     return result
-
-
-class SupportAdminReplyPayload(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    message: str
 
 
 @app.get("/v1/admin/support/tickets")

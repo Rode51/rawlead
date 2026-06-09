@@ -8,13 +8,17 @@
 # -------------------------------------|----------------------------------|---------------
 fl                                   | https://www.fl.ru/projects/          | ✅ активен
 kwork                                | https://kwork.ru/projects            | ✅ активен
+youdo                                | https://youdo.com/                   | ✅ O63 · owner 2026-06-04
+freelance_ru                         | https://freelance.ru/project/        | ✅ O63 · owner 2026-06-04
+freelancejob                         | https://www.freelancejob.ru/projects/ | ✅ O63 · owner 2026-06-04
+pchyol                               | https://pchel.net/jobs/              | ✅ O63 · owner 2026-06-04
 freelancehunt                        | https://freelancehunt.com/projects   | ⏸ отключён 2026-05-28
 vc_ru                                | https://vc.ru/jobs                   | ⏸ отложен (job-лента)
 habr_career                          | https://career.habr.com/vacancies    | ⏸ отложен (вакансии)
 # habr_freelance — HTTP 410 (сайт закрыт), не в PUBLIC_FEED_SOURCES
 #
 # Env для публички (пример):
-# PUBLIC_FEED_SOURCES=fl,kwork  (+ tg:-100… из build_public_feed_sources.py)
+# PUBLIC_FEED_SOURCES=fl,kwork,youdo,freelance_ru,freelancejob,pchyol  (+ tg:-100… build_public_feed_sources.py)
 #
 # Парсеры vc_ru / habr_career — оставить в src/, не вызывать если source_id нет в env.
 # Включить снова — добавить в PUBLIC_FEED_SOURCES + отдельное ТЗ (вакансии).
@@ -22,8 +26,4 @@ habr_career                          | https://career.habr.com/vacancies    | �
 # Не в публичку: старые MVP-TG-чаты, TG без allowlist.
 # TG для ленты — отдельно: docs/ops/TG_PUBLIC_FEED_ALLOWLIST.txt
 #
-# ── O63 w1 ✅ · w2 📋 (URL 2026-06-01) ──
-# youdo          | https://youdo.com/                   | ✅ w1
-# freelance_ru   | https://freelance.ru/project/        | ✅ w1
-# freelancejob   | https://www.freelancejob.ru/projects/ | 📋 w2 · только page1/new
-# pchyol         | https://pchel.net/jobs/              | 📋 w2 · skip Закрыт/В работе · page1
+# O63 secondary — активные строки выше; build_public_feed_sources.py дублирует guard _SECONDARY_WEB.

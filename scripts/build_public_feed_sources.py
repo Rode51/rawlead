@@ -21,22 +21,46 @@ _QUEUE = _ROOT / "docs" / "ops" / "TG_JOIN_QUEUE_v2.csv"
 _WEB = _ROOT / "docs" / "ops" / "PUBLIC_FEED_WEB_SOURCES.txt"
 _TME = re.compile(r"^https?://t\.me/(?:joinchat/)?([A-Za-z0-9_+/-]+)/?$", re.I)
 
+# O63 secondary — всегда в ленте (owner 2026-06-04); guard от deploy-regress (O165 и т.п.)
+_SECONDARY_WEB: tuple[str, ...] = (
+    "youdo",
+    "freelance_ru",
+    "freelancejob",
+    "pchyol",
+)
 
-def _username(value: str) -> str:
+
+def _invite_hash(link: str) -> str | None:
+    for prefix in ("https://t.me/+", "http://t.me/+", "t.me/+"):
+        if link.startswith(prefix):
+            return link[len(prefix) :].split("?")[0].strip("/").lower()
+    if "/+" in link:
+        return link.split("/+", 1)[1].split("?")[0].strip("/").lower()
+    return None
+
+
+def _link_key(value: str) -> str:
     s = (value or "").strip()
     m = _TME.match(s)
     if m:
         user = m.group(1).split("/")[0].strip().lower()
-        return "" if user.startswith("+") else user
+        if user and not user.startswith("+"):
+            return user
+    h = _invite_hash(s)
+    if h:
+        return h
     return s.lstrip("@").lower()
 
 
-def _allowlist_usernames() -> frozenset[str]:
+def _allowlist_link_keys() -> frozenset[str]:
     out: set[str] = set()
     for line in _ALLOWLIST.read_text(encoding="utf-8").splitlines():
-        user = _username(line)
-        if user:
-            out.add(user)
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        key = _link_key(s)
+        if key:
+            out.add(key)
     return frozenset(out)
 
 
@@ -64,6 +88,17 @@ def _web_sources() -> list[str]:
     return out or ["fl", "kwork"]
 
 
+def _canonical_web_sources() -> list[str]:
+    """Web-биржи: файл + обязательный O63 secondary (без дублей, порядок файла)."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for src in _web_sources() + list(_SECONDARY_WEB):
+        if src and src not in seen:
+            seen.add(src)
+            out.append(src)
+    return out
+
+
 def _tg_peer_source(chat_id: str) -> str:
     n = int(chat_id)
     peer = n if n < 0 else int(f"-100{n}")
@@ -71,7 +106,7 @@ def _tg_peer_source(chat_id: str) -> str:
 
 
 def build_sources() -> list[str]:
-    allowed = _allowlist_usernames()
+    allowed = _allowlist_link_keys()
     tg: list[str] = []
     with _QUEUE.open(encoding="utf-8", newline="") as fh:
         for row in csv.DictReader(fh):
@@ -80,11 +115,11 @@ def build_sources() -> list[str]:
             cid = row.get("chat_id", "").strip()
             if not cid:
                 continue
-            user = _username(row.get("link", ""))
-            if user not in allowed:
+            key = _link_key(row.get("link", ""))
+            if key not in allowed:
                 continue
             tg.append(_tg_peer_source(cid))
-    web = _web_sources()
+    web = _canonical_web_sources()
     seen: set[str] = set()
     out: list[str] = []
     for src in web + sorted(set(tg), key=lambda x: int(x.split(":")[1])):
@@ -92,6 +127,11 @@ def build_sources() -> list[str]:
             seen.add(src)
             out.append(src)
     return out
+
+
+def feed_sources_csv() -> str:
+    """Значение для PUBLIC_FEED_SOURCES= (без префикса)."""
+    return ",".join(build_sources())
 
 
 def main() -> int:

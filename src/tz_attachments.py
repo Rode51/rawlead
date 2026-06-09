@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import os
 import re
@@ -19,6 +20,12 @@ from config import Config
 from exchange_proxy import exchange_fetch_begin, exchange_get, request_timeout_tuple
 
 logger = logging.getLogger(__name__)
+
+
+def _is_html_bytes(data: bytes) -> bool:
+    head = (data or b"")[:64].lstrip().lower()
+    return head.startswith(b"<!doctype") or head.startswith(b"<html")
+
 
 ATTACHMENT_EXTRACTED_MARKER = "[TZ attachment — извлечено"
 SKIPPED_MARKER_PREFIX = "[TZ attachment — файл на странице"
@@ -38,7 +45,9 @@ _FILE_CLAIM_RE = re.compile(
     r"готов\w*\s+в[её]рстк|"
     r"готов\w*\s+html|"
     r"прикрепл\w*\s+(?:файл|архив|tz|тз)"
-    r")",
+    r")|"
+    r"приложенн\w*\s+pdf|"
+    r"из\s+pdf[-\s]файл",
     re.I,
 )
 _ATTACHMENT_PROMISE_RE = re.compile(
@@ -230,6 +239,97 @@ def _skipped_marker(size_mb: float, *, reason: str = "размера") -> str:
     )
 
 
+# O133-FILTER: FL footer/legal PDFs (site rules, cookies) — not project TZ.
+_FL_LEGAL_PATH_RE = re.compile(
+    r"/about/(?:appendix|documents|offer|privacy|terms|rules|agreement|cookie)",
+    re.I,
+)
+_FL_LEGAL_NAME_RE = re.compile(
+    r"(?:^|/)(?:appendix_\d+_|cookie_accept|user_agreement|privacy_policy|"
+    r"offer|regulations)(?:\.|$)",
+    re.I,
+)
+
+
+def _is_fl_page(page_url: str) -> bool:
+    return "fl.ru" in urlparse(page_url).netloc.casefold()
+
+
+def _is_fl_site_legal_attachment(abs_url: str, filename: str, page_url: str) -> bool:
+    if not _is_fl_page(page_url):
+        return False
+    parsed = urlparse(abs_url)
+    path = unescape(parsed.path or "").casefold()
+    url_low = abs_url.casefold()
+    name = (filename or "").casefold()
+    if "st.fl.ru/about/" in url_low:
+        return True
+    if _FL_LEGAL_PATH_RE.search(path):
+        return True
+    if "/about/" in path and path.endswith(".pdf"):
+        return True
+    if _FL_LEGAL_NAME_RE.search(name) or _FL_LEGAL_NAME_RE.search(path):
+        return True
+    return False
+
+
+def _is_fl_legal_boilerplate(text: str) -> bool:
+    head = (text or "")[:800].casefold().replace("\n", " ")
+    return "приложение №2" in head and "правила пользования сайтом" in head
+
+
+# O133-FILTER-KW: Kwork footer/legal PDFs — not project TZ.
+_KWORK_LEGAL_PATH_RE = re.compile(
+    r"/(?:pages/)?(?:offer|privacy|terms|agreement|policy|rules|"
+    r"user_agreement|oferta|personal_data)(?:/|$|[_\-.])",
+    re.I,
+)
+_KWORK_LEGAL_NAME_RE = re.compile(
+    r"(?:^|/)(?:offer|privacy|terms|agreement|policy|rules|user_agreement|"
+    r"oferta|personal_data|privacy_policy|terms_of_service|"
+    r"public_offer)(?:[_\-.]|\.|$)",
+    re.I,
+)
+
+
+def _is_kwork_page(page_url: str) -> bool:
+    host = urlparse(page_url).netloc.casefold()
+    return host == "kwork.ru" or host.endswith(".kwork.ru")
+
+
+def _is_kwork_host(netloc: str) -> bool:
+    host = (netloc or "").casefold()
+    return host == "kwork.ru" or host.endswith(".kwork.ru")
+
+
+def _is_kwork_site_legal_attachment(abs_url: str, filename: str, page_url: str) -> bool:
+    if not _is_kwork_page(page_url):
+        return False
+    parsed = urlparse(abs_url)
+    if not _is_kwork_host(parsed.netloc):
+        return False
+    path = unescape(parsed.path or "").casefold()
+    name = (filename or "").casefold()
+    if _KWORK_LEGAL_PATH_RE.search(path):
+        return True
+    if _KWORK_LEGAL_NAME_RE.search(name) or _KWORK_LEGAL_NAME_RE.search(path):
+        return True
+    return False
+
+
+def _is_kwork_legal_boilerplate(text: str) -> bool:
+    head = (text or "")[:800].casefold().replace("\n", " ")
+    if "публичная оферта" in head and "kwork" in head:
+        return True
+    if "пользовательское соглашение" in head and (
+        "kwork" in head or "политика конфиденциальности" in head
+    ):
+        return True
+    if "политика обработки персональных данных" in head:
+        return True
+    return False
+
+
 def find_attachment_urls(html: str, page_url: str) -> list[tuple[str, str]]:
     if not (html or "").strip():
         return []
@@ -266,11 +366,96 @@ def find_attachment_urls(html: str, page_url: str) -> list[tuple[str, str]]:
         if parsed.netloc and page_host and parsed.netloc.casefold() != page_host:
             if not any(low_path.endswith(ext) for ext in ALLOWED_SUFFIXES):
                 continue
+        if _is_fl_site_legal_attachment(abs_url, name or label, page_url):
+            continue
+        if _is_kwork_site_legal_attachment(abs_url, name or label, page_url):
+            continue
         if abs_url in seen:
             continue
         seen.add(abs_url)
         out.append((abs_url, _safe_filename(name or label)))
     return out[:3]
+
+
+_KWORK_EMBEDDED_FILE_URL_RE = re.compile(
+    r'"url"\s*:\s*"(https://kwork\.ru/files/uploaded/[^"]+\.(?:pdf|docx|txt|zip|rar))"',
+    re.I,
+)
+_KWORK_EMBEDDED_FNAME_RE = re.compile(r'"fname"\s*:\s*"((?:\\.|[^"\\])*)"')
+
+
+def find_kwork_embedded_attachment_urls(
+    html: str,
+    page_url: str,
+) -> list[tuple[str, str]]:
+    """Kwork SPA: file URLs in page JSON, not always in <a href> (O133-KW-AUTH-HTML)."""
+    if not (html or "").strip():
+        return []
+    seen: set[str] = set()
+    out: list[tuple[str, str]] = []
+    for m in _KWORK_EMBEDDED_FILE_URL_RE.finditer(html):
+        abs_url = m.group(1)
+        if abs_url in seen:
+            continue
+        chunk = html[max(0, m.start() - 400) : m.end() + 120]
+        fname_m = _KWORK_EMBEDDED_FNAME_RE.search(chunk)
+        if fname_m:
+            try:
+                name = json.loads(f'"{fname_m.group(1)}"')
+            except json.JSONDecodeError:
+                name = fname_m.group(1).replace("\\/", "/")
+            name = _safe_filename(str(name))
+        else:
+            name = _safe_filename(unescape(urlparse(abs_url).path.split("/")[-1]))
+        if _is_kwork_site_legal_attachment(abs_url, name or "", page_url):
+            continue
+        seen.add(abs_url)
+        out.append((abs_url, name or "file"))
+    return out[:3]
+
+
+def _attachment_links_from_html(
+    source: str,
+    html: str,
+    page_url: str,
+) -> list[tuple[str, str]]:
+    links = find_attachment_urls(html, page_url)
+    if "kwork" in (source or "").lower():
+        seen = {u for u, _ in links}
+        for url, name in find_kwork_embedded_attachment_urls(html, page_url):
+            if url not in seen:
+                links.append((url, name))
+                seen.add(url)
+    return links[:3]
+
+
+def _should_auth_fetch_detail(source: str, base_text: str, page_html: str) -> bool:
+    key = (source or "").lower()
+    if "kwork" not in key and key != "fl" and not key.startswith("fl"):
+        return False
+    return body_promises_attachment(base_text) or body_promises_attachment(page_html)
+
+
+def _resolve_attachment_page_and_links(
+    source: str,
+    page_html: str,
+    base_text: str,
+    page_url: str,
+) -> tuple[str, list[tuple[str, str]]]:
+    html = page_html or ""
+    links = _attachment_links_from_html(source, html, page_url)
+    if links or not _should_auth_fetch_detail(source, base_text, html):
+        return html, links
+    from tz_session import fetch_detail_html_with_auth
+
+    auth_html = fetch_detail_html_with_auth(page_url, source)
+    if not auth_html.strip():
+        return html, links
+    return auth_html, _attachment_links_from_html(source, auth_html, page_url)
+
+
+def _is_site_legal_boilerplate(text: str) -> bool:
+    return _is_fl_legal_boilerplate(text) or _is_kwork_legal_boilerplate(text)
 
 
 def probe_content_length(
@@ -326,11 +511,17 @@ def _extract_docx(data: bytes) -> str:
 
 
 def _extract_pdf(data: bytes) -> str:
+    if _is_html_bytes(data):
+        return ""
     try:
         from pypdf import PdfReader
     except ImportError:
         return ""
-    reader = PdfReader(io.BytesIO(data))
+    try:
+        reader = PdfReader(io.BytesIO(data))
+    except Exception:
+        logger.debug("tz_attachment pdf parse fail", exc_info=True)
+        return ""
     chunks: list[str] = []
     for page in reader.pages[:20]:
         t = (page.extract_text() or "").strip()
@@ -416,7 +607,10 @@ def download_attachment(
     filename: str = "",
     timeout_sec: float = 30.0,
 ) -> tuple[bytes | None, str | None]:
-    """GET file; returns (data, error_reason). error_reason: auth | None."""
+    """GET file; returns (data, error_reason). error_reason: auth | None.
+
+    Falls back to authenticated session (O133) on 401/403.
+    """
     headers = {"User-Agent": cfg.http_user_agent}
     try:
         resp = exchange_get(source, url, headers=headers, timeout_sec=timeout_sec)
@@ -424,10 +618,23 @@ def download_attachment(
         logger.debug("tz_attachment download fail %s: %s", url[:80], exc)
         return None, None
     if resp.status_code in (401, 403):
-        return None, "auth"
+        # O133: try authenticated session fallback
+        from tz_session import download_with_auth_session
+        data, err = download_with_auth_session(url, source, timeout_sec=timeout_sec)
+        if err == "no_session":
+            return None, "auth"
+        return data, err
     if resp.status_code != 200:
         return None, None
-    return resp.content or b"", None
+    data = resp.content or b""
+    if _is_html_bytes(data):
+        from tz_session import download_with_auth_session
+
+        auth_data, err = download_with_auth_session(url, source, timeout_sec=timeout_sec)
+        if err == "no_session":
+            return None, "auth"
+        return auth_data, err
+    return data, None
 
 
 def enrich_body_with_attachments(
@@ -443,7 +650,9 @@ def enrich_body_with_attachments(
     if not tz_attachments_enabled():
         return TzEnrichment(body=body, attachment_extracted=False, attachment_files=())
 
-    links = find_attachment_urls(page_html, page_url)
+    page_html, links = _resolve_attachment_page_and_links(
+        source, page_html, base_text, page_url
+    )
     if not links:
         return TzEnrichment(body=body, attachment_extracted=False, attachment_files=())
 
@@ -459,6 +668,74 @@ def enrich_body_with_attachments(
         size_bytes = head_len if head_len and head_len > 0 else 0
 
         if head_len == -1:
+            # O133: try authenticated session before marking skipped_auth
+            from tz_session import download_with_auth_session, enforce_rate_limit
+            enforce_rate_limit(source)
+            auth_data, auth_err = download_with_auth_session(url, source)
+            if auth_data and auth_err is None:
+                # Auth download succeeded — inject into normal processing flow
+                actual_len = len(auth_data)
+                if actual_len > limit:
+                    _sz = _size_mb(actual_len)
+                    if safe_name.casefold().endswith(".zip"):
+                        listing, names = _zip_namelist(auth_data)
+                        all_files.extend(names)
+                        _blk = _skipped_marker(_sz)
+                        if listing:
+                            _blk = f"{_blk}\n{listing}"
+                        skipped_blocks.append(_blk)
+                    else:
+                        skipped_blocks.append(_skipped_marker(_sz))
+                    tz_meta = TzAttachmentMeta(
+                        status="skipped_size",
+                        filename=safe_name,
+                        size_mb=_sz,
+                        reason="size",
+                    )
+                    if errors is not None:
+                        errors.append(f"tz_attachment:skipped_size:{safe_name}:{_sz}MB")
+                    continue
+                text, files = extract_attachment_text(auth_data, safe_name)
+                all_files.extend(files)
+                if not text.strip():
+                    reason = "пустой_pdf" if safe_name.casefold().endswith(".pdf") else "empty"
+                    skipped_blocks.append(
+                        f"{SKIPPED_MARKER_PREFIX}, файл без текста, "
+                        f"текст не извлечён ({reason})]"
+                    )
+                    tz_meta = TzAttachmentMeta(
+                        status="skipped_empty",
+                        filename=safe_name,
+                        size_mb=_size_mb(actual_len),
+                        reason=reason,
+                    )
+                    if errors is not None:
+                        errors.append(f"tz_attachment:skipped_empty:{safe_name}")
+                    continue
+                if _is_site_legal_boilerplate(text):
+                    if errors is not None:
+                        tag = (
+                            "skip_fl_legal"
+                            if _is_fl_legal_boilerplate(text)
+                            else "skip_kwork_legal"
+                        )
+                        errors.append(f"tz_attachment:{tag}:{safe_name}")
+                    continue
+                if len(text) > MAX_EXTRACT_CHARS:
+                    text = text[: MAX_EXTRACT_CHARS - 1] + "…"
+                extracted_blocks.append(
+                    f"{ATTACHMENT_EXTRACTED_MARKER} из {safe_name}]\n{text}"
+                )
+                tz_meta = TzAttachmentMeta(
+                    status="extracted",
+                    filename=safe_name,
+                    size_mb=_size_mb(actual_len),
+                    reason="extracted",
+                )
+                if errors is not None:
+                    errors.append(f"tz_attachment:ok:{safe_name}")
+                continue
+            # No session or auth still denied
             block = (
                 f"{SKIPPED_MARKER_PREFIX}, нужен вход на биржу, "
                 "текст не извлечён]"
@@ -549,6 +826,15 @@ def enrich_body_with_attachments(
                 errors.append(f"tz_attachment:skipped_empty:{safe_name}")
             continue
 
+        if _is_site_legal_boilerplate(text):
+            if errors is not None:
+                tag = (
+                    "skip_fl_legal"
+                    if _is_fl_legal_boilerplate(text)
+                    else "skip_kwork_legal"
+                )
+                errors.append(f"tz_attachment:{tag}:{safe_name}")
+            continue
         if len(text) > MAX_EXTRACT_CHARS:
             text = text[: MAX_EXTRACT_CHARS - 1] + "…"
         extracted_blocks.append(
