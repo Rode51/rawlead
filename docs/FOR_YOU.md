@@ -1,16 +1,88 @@
 # Для тебя
 
-## Сейчас — E2E → vault (ingest O99 ✅ на VPS)
+## Cursor — прокси на ПК (2026-06-09)
+
+**Зачем:** из РФ без прокси Cursor/модели часто дают region error. Прокси **только для Cursor на твоём ПК** — VPS и сайт работают сами.
+
+### Как у нас устроено (простыми словами)
+
+| Часть | Что делает |
+|-------|------------|
+| **`.env`** | `CURSOR_PROXY_ENABLED=1` — прокси включён · `CURSOR_PROXY_RELAY=1` — режим **relay** |
+| **Relay** | Маленькая программа на ПК: Cursor ходит на `127.0.0.1:18777`, relay сам выбирает живой IP из пула |
+| **Автосмена** | `CURSOR_PROXY_AUTO_FALLBACK=1` — перед включением проверяет TCP · relay каждые ~1 мин перепроверяет пул |
+| **Если все мертвы** | `CURSOR_PROXY_DISABLE_IF_DEAD=1` — скрипт **выключает** прокси в Cursor (чтобы IDE не висел) |
+
+**Сейчас на ПК:** Cursor → `http://127.0.0.1:18777` (relay). Пул из 5 IP в `CURSOR_PROXY_POOL_URLS` — relay берёт **первый живой** (часто один, остальные могут быть down — это норм, relay переключится).
+
+---
+
+### Быстрые команды (из корня `uisness`)
+
+| Что нужно | Команда |
+|-----------|---------|
+| **Включить прокси + найти живой IP** | Двойной клик `scripts\cursor-proxy-recovery.bat` |
+| **То же (короткий путь)** | `scripts\sync-cursor-proxy.bat` |
+| **Только проверить, кто жив** | `.venv\Scripts\python.exe scripts\sync_cursor_proxy.py --probe-only` |
+| **Проверить пул relay (5 IP)** | `.venv\Scripts\python.exe scripts\cursor_proxy_relay.py --probe-only` |
+| **Выключить прокси в Cursor** | `.venv\Scripts\python.exe scripts\sync_cursor_proxy.py --off` |
+| **Запустить/перезапустить relay** | Двойной клик `scripts\start-cursor-proxy-relay.bat` — **окно не закрывай** (можно свернуть) |
+
+После **первого** включения relay или смены режима: **полностью выйди из Cursor** (File → Quit / Закрыть из трея), открой снова.  
+При работе relay **перезапуск Cursor не нужен** — IP меняется сам.
+
+---
+
+### Пошагово: включить прокси обратно
+
+1. Открой PowerShell или cmd в папке `uisness`.
+2. Запусти: `scripts\start-cursor-proxy-relay.bat`  
+   — должно появиться окно relay (или проверь, что порт `18777` слушается).
+3. Запусти: `scripts\cursor-proxy-recovery.bat`  
+   — в выводе ищи строку `OK` у одного из IP (не обязательно первый).
+4. **Quit Cursor** полностью → открой снова.
+5. Проверка: новый чат, любая модель — нет «region» / «not available in your region».
+
+**Лог relay** (если что-то ломается): `data\cursor_proxy_relay.log` — там видно, на какой IP переключился и ошибки к `api2.cursor.sh`.
+
+---
+
+### Пошагово: временно **без** прокси
+
+Когда нужно: отладка «это прокси или Cursor», или все IP мертвы и хочешь попробовать direct.
+
+1. `.venv\Scripts\python.exe scripts\sync_cursor_proxy.py --off`
+2. Quit Cursor → открой снова.
+3. Окно relay можно закрыть.
+
+Вернуть прокси — снова § «включить прокси обратно».
+
+---
+
+### Если «поломалось» — чеклист
+
+| Симптом | Что сделать |
+|---------|-------------|
+| Region error / модели не грузятся | `cursor-proxy-recovery.bat` → relay запущен? → Quit Cursor |
+| Скрипт пишет «все прокси недоступны → ВЫКЛЮЧЕН» | 4 из 5 IP могут быть down — relay всё равно работает, если **хотя бы один OK** в `--probe-only` |
+| Cursor висит на запросах | Закрой relay, `--off`, Quit Cursor, снова recovery |
+| Менял `.env` (новый IP) | Перезапусти relay (`start-cursor-proxy-relay.bat`) + `cursor-proxy-recovery.bat` |
+| Не уверен, через прокси ли сейчас | `%APPDATA%\Cursor\User\settings.json` → `http.proxy` должен быть `http://127.0.0.1:18777` при relay |
+
+**Не путать:** прокси Cursor **≠** прокси VPS (биржи/TG). Биржи на сервере — отдельные `EXCHANGE_*` / `/ops/`.
+
+---
+
+## Сейчас — prod + O161 ops
 
 | Шаг | Что |
 |-----|-----|
-| 1 | **O97 + O99 ingest** ✅ — API/radar на VPS, browser FL/Kwork, hot L1 |
-| 2 | **E2E** — Playwright + твой smoke на rawlead.ru |
-| 3 | **Отклики (L2)** — отдельный чат: regen/judge, **не трогай** пока идёт `regen_shared_reply_drafts.py` |
+| 1 | **O160 ingest** ✅ — радар с watchdog на VPS |
+| 2 | **O161 `/ops/`** ✅ — пароль, лайв-лог, статусы бирж · https://rawlead.ru/ops/ |
+| 3 | **Ingest 24h smoke** — смотреть, что лента не замирает >15 мин |
+| 4 | **Perf @50** — после smoke |
 
-**Прокси v2 + O99 browser** — на VPS. При `pool_exhausted` — `scripts/clear-vps-proxy-bans.py`, не путать с regen откликов.
-
-**Runbook 2026-06-03** (L1 хвост · TG acc2 · YouDo): [`problems/2026-06-03-ingest-l1-tg-youdo.md`](problems/2026-06-03-ingest-l1-tg-youdo.md).
+**Пароль пульта:** `RAWLEAD_OPS_KEY` или `OPS_PASSWORD` в `.env` на VPS (не в git).
 
 ---
 
@@ -92,4 +164,4 @@ Deploy: `scripts/deploy-youdo-browser-vps.py` · диагностика: `script
 
 ---
 
-_Lead · 2026-06-03_
+_Lead · 2026-06-09_
