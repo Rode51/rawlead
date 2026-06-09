@@ -100,3 +100,10 @@ def ping_after_site_cycle(summary, storage=None) -> None:
     fail = _fail_url()
     if fail:
         _fire_get(fail)
+
+
+def ping_cycle_overrun() -> None:
+    """Fail ping when site cycle exceeds RADAR_CYCLE_WALL_SEC (O160 L6b)."""
+    fail = _fail_url()
+    if fail:
+        _fire_get(fail)

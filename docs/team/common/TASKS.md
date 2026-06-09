@@ -2,15 +2,15 @@
 
 **Снимок:** [`STATUS.md`](STATUS.md) · **карта:** [`ROADMAP.md`](../architect/ROADMAP.md)
 
-**Фаза:** **Launch path** · prod theme **1.18.49**
+**Фаза:** **Launch path** · prod theme **1.18.50**
 
 ---
 
 ## Где мы
 
-**→ @owner:** `/ops/` **Сбросить баны** (после deploy) · Wave 2 sign-off ✅
+**→ @owner:** 24h smoke ingest (O160) · `/ops/` YouDo **Сбросить баны** · настроить `HEALTHCHECKS_SITE_FAIL_URL` в `.env`
 
-**→ @coder:** фон — perf gate · O133 TZ (после ads)
+**→ @coder:** ⏸ ждём 24h smoke O160 · следующее: perf p95 @50 VU
 
 ---
 
@@ -34,7 +34,9 @@
 | **14b** | **O152-EXCHANGE-TRACE** | @coder | **deploy ✅** · owner `/ops/` ⏸ |
 | **14c–e** | **O155–O157** HC · YouDo human · traffic | @coder + Lead | **deploy ✅** |
 | **14f** | **O158-MATCH-UX** дубли push · шкала · ?lead= | @coder + Lead | **deploy ✅ 2026-06-08** |
-| **14g** | **O121-w2b** `/ops/` clear-bans fetch | @coder + Lead | **✅ код · deploy ⏸ owner smoke** |
+| **14h** | **O159-DRAFT-BURST** 3× parallel draft | @coder + Lead | **✅ 3/3 burst 2026-06-08** |
+| **14i** | **O160-RADAR-INGEST** ingest stability | @coder + Lead | **✅ deploy 2026-06-09** · 24h smoke ⏸ |
+| **14g** | **O121-w2b** `/ops/` clear-bans | @coder + Lead | **✅ owner 2026-06-08** |
 | **13b** | **Wave 2** journey 10/10 | owner | ⏸ после O147 |
 | **14** | **ads + portfolio** | owner | **последним** |
 

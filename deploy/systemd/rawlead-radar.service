@@ -4,7 +4,8 @@ After=network-online.target rawlead-api.service
 Wants=network-online.target
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=all
 User=rawlead
 Group=rawlead
 WorkingDirectory=/opt/rawlead
@@ -15,6 +16,7 @@ Environment=PYTHONPATH=/opt/rawlead/src
 ExecStart=/opt/rawlead/deploy/run-radar-site.sh
 Restart=on-failure
 RestartSec=30
+WatchdogSec=660
 MemoryMax=1400M
 MemoryHigh=1200M
 OOMScoreAdjust=200

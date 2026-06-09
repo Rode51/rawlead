@@ -23,7 +23,8 @@ from html_fetch import HtmlFetchError, _playwright_proxy
 logger = logging.getLogger(__name__)
 
 _LOCK = threading.Lock()
-_FETCH_LOCK = threading.Lock()
+_FETCH_LOCKS_GUARD = threading.Lock()
+_FETCH_LOCKS: dict[str, threading.Lock] = {}
 _CONTEXTS: dict[str, Any] = {}
 _PLAYWRIGHT = None
 _PW_LOCK = threading.Lock()
@@ -64,6 +65,37 @@ def _data_root() -> Path:
     if raw:
         return Path(raw)
     return Path(__file__).resolve().parent.parent / "data" / "browser_profiles"
+
+
+def _fetch_lock(source: str) -> threading.Lock:
+    """Per-source fetch lock — FL hang must not block Kwork (O160)."""
+    key = (source or "unknown").strip().lower() or "unknown"
+    with _FETCH_LOCKS_GUARD:
+        lock = _FETCH_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _FETCH_LOCKS[key] = lock
+        return lock
+
+
+def _radar_stage_log_enabled() -> bool:
+    return os.getenv("RADAR_STAGE_LOG", "0").strip().lower() in ("1", "true", "yes")
+
+
+def _stage_log(source: str, stage: str, *, proxy_url: str = "", detail: str = "") -> None:
+    if not _radar_stage_log_enabled():
+        return
+    hint = _hint_from_url(proxy_url) if proxy_url else ""
+    proxy_part = f" proxy={hint}" if hint else ""
+    extra = f" {detail}" if detail else ""
+    logger.info(
+        "fetch:%s stage=%s started_at=%s%s%s",
+        source,
+        stage,
+        time.strftime("%H:%M:%S"),
+        proxy_part,
+        extra,
+    )
 
 
 def listing_browser_enabled() -> bool:
@@ -539,7 +571,7 @@ def _fetch_youdo_ephemeral(
     stage: str = "listing",
 ) -> str:
     """YouDo legacy: ephemeral Chromium (YOUDO_EPHEMERAL=1)."""
-    with _FETCH_LOCK:
+    with _fetch_lock("youdo"):
         ua = pick_browser_user_agent(user_agent)
         timeout_ms = max(int(timeout_sec * 1000), 5000)
         _youdo_jitter_sleep()
@@ -599,7 +631,7 @@ def fetch_listing_html_browser(
     proxy_url: str | None = None,
 ) -> str:
     """GET листинга через Chromium persistent context (cookies на слот прокси)."""
-    with _FETCH_LOCK:
+    with _fetch_lock(source):
         proxy = (proxy_url or "").strip() or exchange_primary_proxy_url(source)
         key = _profile_key(source, proxy)
         ua = pick_browser_user_agent(user_agent)
@@ -632,12 +664,29 @@ def fetch_listing_html_browser(
 
         page = ctx.new_page()
         t0 = time.monotonic()
+        _stage_log(source, "goto", proxy_url=proxy)
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
             page.wait_for_timeout(min(1500, timeout_ms // 4))
             html = page.content()
+            elapsed = time.monotonic() - t0
+            if _radar_stage_log_enabled():
+                logger.info(
+                    "fetch:%s stage=goto elapsed=%.1fs ok%s",
+                    source,
+                    elapsed,
+                    f" proxy={_hint_from_url(proxy)}" if proxy else "",
+                )
             _log_browser_trace(source, proxy, "browser_goto", t0, http=200)
         except Exception as exc:
+            elapsed = time.monotonic() - t0
+            if _radar_stage_log_enabled():
+                logger.info(
+                    "fetch:%s stage=goto elapsed=%.1fs err=%s",
+                    source,
+                    elapsed,
+                    type(exc).__name__,
+                )
             _log_browser_trace(source, proxy, "browser_goto", t0, err=type(exc).__name__)
             raise
         finally:
@@ -692,8 +741,63 @@ def fetch_listing_html_browser_wall_clock(
             source,
             int(wall),
         )
+        if _radar_stage_log_enabled():
+            logger.info(
+                "fetch:%s stage=goto elapsed=%.1fs TIMEOUT → wall-clock kill",
+                source,
+                wall,
+            )
         with _LOCK:
             _close_context(key)
+        raise HtmlFetchError(f"wall-clock timeout after {int(wall)}s ({source})")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
+def fetch_listing_html_browser_slots_wall_clock(
+    source: str,
+    url: str,
+    *,
+    user_agent: str,
+    timeout_sec: float = 45.0,
+    wall_clock_sec: float = 120.0,
+    proxy_urls: list[str] | None = None,
+) -> str:
+    """Hard cap on slots browser fetch — O160 YouDo hang guard."""
+    wall = max(float(wall_clock_sec), 1.0)
+    per_op = min(float(timeout_sec), wall)
+
+    def _run() -> str:
+        return fetch_listing_html_browser_slots(
+            source,
+            url,
+            user_agent=user_agent,
+            timeout_sec=per_op,
+            proxy_urls=proxy_urls,
+        )
+
+    pool = ThreadPoolExecutor(max_workers=1)
+    fut = pool.submit(_run)
+    try:
+        return fut.result(timeout=wall)
+    except FuturesTimeout:
+        proxy = exchange_primary_proxy_url(source) or ""
+        logger.warning(
+            "%s_listing: slots wall-clock timeout after %ss — closing browser context",
+            source,
+            int(wall),
+        )
+        if _radar_stage_log_enabled():
+            logger.info(
+                "fetch:%s stage=goto elapsed=%.1fs TIMEOUT → wall-clock kill",
+                source,
+                wall,
+            )
+        with _LOCK:
+            if proxy:
+                _close_context(_profile_key(source, proxy))
+                if source == "youdo":
+                    _close_context(_youdo_profile_key(proxy))
         raise HtmlFetchError(f"wall-clock timeout after {int(wall)}s ({source})")
     finally:
         pool.shutdown(wait=False, cancel_futures=True)

@@ -6,51 +6,28 @@ alwaysApply: false
 
 ---
 
-
-
 # Coder
 
-
-
 Ты — **исполнитель**. Контекст продукта и нишу знают Lead / Product / Design — **тебе не нужны** `PRODUCT_VISION`, `KAK_ETO`, `FOR_YOU`.
-
-
 
 **Один источник задачи:** [`CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) — **§ в шапке** + § «Файлы», «Как проверить». **Новый чат = одна задача.**
 
 **Не читать:** [`CODER_PROMPT_ARCHIVE.md`](docs/team/archive/CODER_PROMPT_ARCHIVE.md) — только если Lead явно дал grep/номер закрытой задачи.
 
-
-
 ## Включение (владелец)
-
-
 
 **Первое сообщение** — только: `@coder` или `@.cursor/rules/coder.mdc`.
 
-
-
 ### Обязательно Read (минимум)
 
-
-
 | # | Файл |
-
 |---|------|
-
-| 1 | **`docs/team/architect/CODER_PROMPT.md`** — **§ в шапке** (O63-FIX и т.д.) + § «Файлы», «Как проверить» · **не** архив целиком |
-
+| 1 | **`docs/team/architect/CODER_PROMPT.md`** — **§ в шапке** + § «Файлы», «Как проверить» · **не** архив целиком |
 | 2 | `docs/team/common/STATUS.md` — hot (~80 строк), блокеры · **не** `STATUS_ARCHIVE` |
-
-
 
 `PROJECT_MAP` § «Зоны» — **только** если в промпте нет § «Файлы» или сомневаешься в пути.
 
-
-
 Остальное (`CODE_STRUCTURE`, `ops/FILTERS.md`, …) — **только** если **явно** в промпте.
-
-
 
 **Первый ответ:** `Прочитал: CODER_PROMPT, STATUS` → что делаешь по § промпта. Без vision/roadmap в чате.
 
@@ -60,21 +37,12 @@ alwaysApply: false
 
 ## Структура кода (жёстко)
 
-
-
 | Правило | Деталь |
-
 |---------|--------|
-
 | **Без простыней** | Не лить в `tg_monitor.py` / `config.py` — отдельный модуль |
-
 | **Один файл — одна роль** | см. [`CODE_STRUCTURE.md`](docs/team/architect/CODE_STRUCTURE.md) по ссылке из промпта |
-
 | **Перенос папок** | Только по TZ Lead в `CODER_PROMPT` |
-
 | **После сессии** | `STATUS.md` → Сделано / Файлы / Как проверить |
-
-
 
 ## Эскалация к Mechanic (редко, дорого)
 
@@ -90,26 +58,13 @@ alwaysApply: false
 
 Если промпт ведёт в тупик — **остановись**, коротко аргументируй риск владельцу/Lead; не долби код вслепую.
 
-
-
 ## Запрещено
 
-
-
 - Читать «для общего понимания» vision, roadmap, product/design промпты, **CODER_PROMPT_ARCHIVE**
-
 - `TASKS.md`, `FOR_YOU.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `OWNER_INTENT.md` без Lead
-
 - Файлы **вне** § «Файлы» в активном § `CODER_PROMPT.md` — **стоп**, спросить Lead
-
 - Правки в `src/`, `scripts/`, `wordpress/`, `deploy/`, `sql/` без пункта в § «Файлы»
-
 - **Новые `.md` в `docs/`** — кроме `STATUS.md` · `docs-guard.mdc`
-
 - **`git commit` / `push`** — Lead Architect
 
-
-
 `economy.mdc` · `code-guard.mdc`
-
-

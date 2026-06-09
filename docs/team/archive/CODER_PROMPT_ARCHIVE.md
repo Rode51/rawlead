@@ -4,6 +4,105 @@
 
 Перенесено **2026-05-30** (~4300 строк). Grep по O71, O37c, WAVE-2 и т.д.
 
+---
+
+# Перенесено из hot **2026-06-09** (O146–O159 + O160 summary)
+
+## § O160-RADAR-INGEST ✅ Lead 2026-06-09
+
+**DoD:** per-source locks · FL/YouDo wall-clock · `_CycleWatchdog` · `WatchdogSec=660` `NotifyAccess=all` · `ping_cycle_overrun` · pytest **4/4** · deploy VPS ✅ · active · cycles running.
+
+**Root cause:** global `_FETCH_LOCK` held by hung FL thread → Kwork starved. Wall-clock alone insufficient without per-source isolation.
+
+---
+
+## § O159-DRAFT-BURST ✅ Lead 2026-06-08
+
+**DoD:** concurrency 3 → **3/3 ready** · p95 **69.4s** · pytest **9/9** · deploy ✅
+
+**Coder:** OR L2 sem (1×proxy) · poll `queued`/`queue_ahead` · feed «В очереди…»
+
+**Lead hotfix:** `poll_draft` — не вызывать `_pending_poll` под `_jobs_lock` (deadlock POST >30s)
+
+---
+
+## § O158-MATCH-UX ✅ deploy 2026-06-08
+
+**DoD:** pytest **7/7** · theme deploy · owner smoke ⏸
+
+**Coder:** match push dedup `(user_id, source, external_id)` · `syncMatchFill` fix · ?lead= Bearer proxy · `1.18.49`
+
+---
+
+## § O157-YOUDO-TRAFFIC ✅ deploy 2026-06-08
+
+**DoD:** pytest **7/7** · detail min 300 chars · `YOUDO_FETCH_EVERY_N_CYCLES=4` · warm TTL 45m · lean abort
+
+---
+
+## § O156-YOUDO-HUMAN ✅ deploy 2026-06-08
+
+**DoD:** pytest **6/6** · browser-only YouDo · persistent profile · 1 slot/cycle · cooldown 30m
+
+---
+
+## § O155-EXTERNAL-PULSE ✅ deploy 2026-06-08
+
+**DoD:** HC ping after ok-cycle · `ping_after_site_cycle` · fail URL · pytest **5/5**
+
+---
+
+## § O154-GRID-NEIGHBOR ✅ Lead smoke 2026-06-08
+
+**DoD:** `align-items: start` · no height jump · `1.18.48`
+
+---
+
+## § O153-CARD-CHIPS ✅ Lead smoke 2026-06-08
+
+**DoD:** `syncCardChips` fix for O149 no-flip · expanded→all chips · `1.18.48`
+
+---
+
+## § O152-EXCHANGE-TRACE ✅ deploy 2026-06-08
+
+**DoD:** `exchange_trace.jsonl` · `/ops/` last trace · FL lamp fix · pytest **12/12**
+
+---
+
+## § O151-OR-ACC2-UX ✅ deploy 2026-06-08
+
+**DoD:** L2 draft proxy · hideFeedBanner · no «ИИ пишет…» · `1.18.47` · pytest **7/7**
+
+---
+
+## § O150-DRAFT-UX-POLISH ✅ deploy 2026-06-08
+
+**DoD:** pending body keeps task_summary · 20s slow btn · neo-brutalist banner · fonts preload · `1.18.46`
+
+---
+
+## § O149-NO-FLIP ✅ deploy 2026-06-08
+
+**DoD:** no `rotateY` · inline expand · `renderExpandedBody` in `.rl-feed-card__body-inner` · `1.18.45`
+
+---
+
+## § O148-DRAFT-OR ✅ deploy 2026-06-08
+
+**DoD:** `POST /draft/warm` · `tools_from_tz_text` (0 LLM) · `DRAFT_WARM_HOURLY_CAP=30` · btn >40s copy
+
+---
+
+## § O147-FEED-FLIP-MATCH ✅ (flip → O149, match+trial kept) deploy 2026-06-08
+
+**DoD:** `syncMatchFill` · trial hide guard · `1.18.44`
+
+---
+
+## § O146-DRAFT-CARD-UX ✅ код 2026-06-08 (регресс → O147)
+
+**DoD:** flip lock · `draftInflight` · btn shimmer · `1.18.39`
 
 ---
 

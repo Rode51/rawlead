@@ -5,13 +5,17 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
 from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
 from bs4 import BeautifulSoup
 
 from config import Config
-from exchange_browser_fetch import fetch_listing_html_browser, listing_browser_enabled
+from exchange_browser_fetch import (
+    fetch_listing_html_browser_wall_clock,
+    listing_browser_enabled,
+)
 from exchange_proxy import exchange_fetch_begin, exchange_fetch_end, exchange_get, proxy_log_hint
 from html_fetch import HtmlFetchError
 from ingest_published_at import parse_fl_published_at
@@ -36,6 +40,14 @@ _PAGE_PATH_RE = re.compile(r"/page-\d+/?")
 
 class FlListingError(RuntimeError):
     """Не удалось разобрать ленту (пустой ответ, смена вёрстки, блокировка бота)."""
+
+
+def _fl_listing_wall_clock_sec() -> float:
+    raw = os.getenv("FL_LISTING_TIMEOUT_SEC", "120").strip()
+    try:
+        return max(float(raw), 10.0)
+    except ValueError:
+        return 120.0
 
 
 def _fl_listing_page_url(base_url: str, page: int) -> str:
@@ -167,23 +179,41 @@ def _fetch_listing_html(
     page: int,
 ) -> str | None:
     hint = proxy_log_hint("fl")
+    html: str | None = None
     if listing_browser_enabled():
+        wall = _fl_listing_wall_clock_sec()
         try:
-            return fetch_listing_html_browser(
+            html = fetch_listing_html_browser_wall_clock(
                 "fl",
                 url,
                 user_agent=cfg.http_user_agent,
-                timeout_sec=timeout_sec,
+                timeout_sec=min(timeout_sec, wall),
+                wall_clock_sec=wall,
             )
         except HtmlFetchError as exc:
-            logger.warning(
-                "fl_listing: Playwright failed (%s) — httpx fallback (%s)",
-                exc,
-                hint,
+            if "timeout" in str(exc).lower():
+                logger.warning(
+                    "fl_listing: timeout after %ss — httpx fallback (%s)",
+                    int(wall),
+                    hint,
+                )
+            else:
+                logger.warning(
+                    "fl_listing: Playwright failed (%s) — httpx fallback (%s)",
+                    exc,
+                    hint,
+                )
+    if html is None:
+        fb_t0 = time.monotonic() if os.getenv("RADAR_STAGE_LOG", "0").strip() in ("1", "true", "yes") else 0.0
+        html = _fetch_listing_html_requests(
+            url, cfg, timeout_sec=timeout_sec, page=page
+        )
+        if fb_t0 and html is not None:
+            logger.info(
+                "fetch:fl stage=fallback httpx elapsed=%.1fs",
+                time.monotonic() - fb_t0,
             )
-    return _fetch_listing_html_requests(
-        url, cfg, timeout_sec=timeout_sec, page=page
-    )
+    return html
 
 
 def fetch_listing_projects(

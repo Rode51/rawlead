@@ -5,9 +5,12 @@ from __future__ import annotations
 import os
 import inspect
 import random
+import socket
 import sys
+import threading
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -84,6 +87,81 @@ from telegram_control import send_control_panel
 # Опрос getUpdates между циклами и во время run_cycle (не ждать POLL_INTERVAL).
 _TG_POLL_INTERVAL_SEC = 2
 _FEED_RETENTION_LAST_RUN_KEY = "feed_retention_last_run_epoch"
+
+
+class CycleWatchdogError(RuntimeError):
+    """Site cycle exceeded RADAR_CYCLE_WALL_SEC (O160)."""
+
+
+def _env_float(name: str, default: float, *, minimum: float = 0.0) -> float:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        return max(float(raw), minimum)
+    except ValueError:
+        return default
+
+
+def _radar_source_fetch_wall_sec() -> float:
+    return _env_float("RADAR_SOURCE_FETCH_WALL_SEC", 180.0, minimum=1.0)
+
+
+def _radar_cycle_wall_sec() -> float:
+    return _env_float("RADAR_CYCLE_WALL_SEC", 600.0, minimum=0.0)
+
+
+def _sd_notify(message: str) -> None:
+    """systemd sd_notify — no-op without NOTIFY_SOCKET (O160 L6a)."""
+    addr = os.environ.get("NOTIFY_SOCKET", "").strip()
+    if not addr:
+        return
+    if addr[0] == "@":
+        addr = "\0" + addr[1:]
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        sock.connect(addr)
+        sock.sendall(message.encode())
+        sock.close()
+    except OSError:
+        pass
+
+
+class _CycleWatchdog:
+    def __init__(self, wall_sec: float, log_path: Path) -> None:
+        self._wall = wall_sec
+        self._log_path = log_path
+        self._fired = threading.Event()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        if self._wall <= 0:
+            return
+        self._thread = threading.Thread(
+            target=self._run,
+            daemon=True,
+            name="radar-cycle-watchdog",
+        )
+        self._thread.start()
+
+    def _run(self) -> None:
+        if self._stop.wait(self._wall):
+            return
+        from exchange_browser_fetch import close_all_browser_contexts
+
+        close_all_browser_contexts()
+        msg = f"{radar_timestamp()} цикл:watchdog:kill elapsed>{int(self._wall)}s"
+        _append_log_line(self._log_path, msg, echo=True)
+        self._fired.set()
+
+    def check(self) -> None:
+        if self._fired.is_set():
+            raise CycleWatchdogError(f"cycle watchdog after {int(self._wall)}s")
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+
 
 _LISTING_ERRORS = (
     FlListingError,
@@ -236,23 +314,47 @@ def _fetch_source(
     *,
     storage: ProjectStorage | None = None,
 ) -> list[ListingProject] | None:
+    wall = _radar_source_fetch_wall_sec()
+
+    def _run_fetch() -> list[ListingProject] | None:
+        try:
+            kwargs: dict[str, object] = {}
+            if storage is not None and "storage" in inspect.signature(fetch_fn).parameters:
+                kwargs["storage"] = storage
+            return fetch_fn(cfg, **kwargs)
+        except _LISTING_ERRORS as exc:
+            msg = short_err(exc)
+            errors.append(f"{label}:fetch:{msg}")
+            if stats is not None:
+                stats.fetch_error = msg
+            return None
+        except Exception as exc:
+            msg = short_err(exc)
+            errors.append(f"{label}:fetch:{msg}")
+            if stats is not None:
+                stats.fetch_error = msg
+            return None
+
+    pool = ThreadPoolExecutor(max_workers=1)
+    fut = pool.submit(_run_fetch)
     try:
-        kwargs: dict[str, object] = {}
-        if storage is not None and "storage" in inspect.signature(fetch_fn).parameters:
-            kwargs["storage"] = storage
-        return fetch_fn(cfg, **kwargs)
-    except _LISTING_ERRORS as exc:
-        msg = short_err(exc)
+        return fut.result(timeout=wall)
+    except FuturesTimeout:
+        from exchange_browser_fetch import close_all_browser_contexts
+
+        close_all_browser_contexts()
+        msg = f"source wall-clock {int(wall)}s"
         errors.append(f"{label}:fetch:{msg}")
         if stats is not None:
             stats.fetch_error = msg
+        _append_log_line(
+            cfg.radar_log_path,
+            f"fetch:{label} TIMEOUT → wall-clock kill after {int(wall)}s",
+            echo=True,
+        )
         return None
-    except Exception as exc:
-        msg = short_err(exc)
-        errors.append(f"{label}:fetch:{msg}")
-        if stats is not None:
-            stats.fetch_error = msg
-        return None
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def _log_source_line(log_path: Path, stats: SourceCycleStats) -> None:
@@ -357,6 +459,47 @@ def run_cycle(
     errors: list[str] = []
     summary = CycleSummary(ts=ts)
     enabled_sources = set(public_feed_sources())
+    watchdog = _CycleWatchdog(_radar_cycle_wall_sec(), cfg.radar_log_path)
+    watchdog.start()
+
+    try:
+        _run_cycle_body(
+            cfg,
+            storage,
+            word_filter,
+            pg,
+            ts=ts,
+            cycle_t0=cycle_t0,
+            errors=errors,
+            summary=summary,
+            enabled_sources=enabled_sources,
+            watchdog=watchdog,
+        )
+    finally:
+        from exchange_browser_fetch import (
+            cleanup_stale_browser_processes,
+            close_all_browser_contexts,
+        )
+
+        close_all_browser_contexts()
+        cleanup_stale_browser_processes()
+        watchdog.stop()
+
+
+def _run_cycle_body(
+    cfg: Config,
+    storage: ProjectStorage,
+    word_filter: ListingWordFilter,
+    pg: NeonLeadStorage | None,
+    *,
+    ts: str,
+    cycle_t0: float,
+    errors: list[str],
+    summary: CycleSummary,
+    enabled_sources: set[str],
+    watchdog: _CycleWatchdog,
+) -> None:
+    """Inner site cycle — separated for O160 watchdog try/finally."""
 
     _append_log_line(cfg.radar_log_path, summary.format_header(), echo=True)
 
@@ -404,6 +547,7 @@ def run_cycle(
         _log_source_line(cfg.radar_log_path, stats_fl)
         _record_source_health(storage, "fl", stats_fl, ts=ts)
 
+    watchdog.check()
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
     if "kwork" in enabled_sources:
@@ -437,6 +581,7 @@ def run_cycle(
         _log_source_line(cfg.radar_log_path, stats_kwork)
         _record_source_health(storage, "kwork", stats_kwork, ts=ts)
 
+    watchdog.check()
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
     if l1_pool is not None:
@@ -449,6 +594,7 @@ def run_cycle(
             )
 
     fetch_secondary = _should_fetch_secondary(storage)
+    watchdog.check()
     if not fetch_secondary:
         _append_log_line(
             cfg.radar_log_path,
@@ -487,6 +633,7 @@ def run_cycle(
             summary.total_to_bot += notify
         _log_source_line(cfg.radar_log_path, stats_web)
         _record_source_health(storage, source_label, stats_web, ts=ts)
+        watchdog.check()
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)
 
@@ -585,14 +732,6 @@ def run_cycle(
         )
     if cfg.radar_profile == "site":
         _maybe_log_site_rollup(cfg, storage)
-
-    from exchange_browser_fetch import (
-        cleanup_stale_browser_processes,
-        close_all_browser_contexts,
-    )
-
-    close_all_browser_contexts()
-    cleanup_stale_browser_processes()
 
 
 def _poll_and_log_tg_commands(cfg: Config, storage: ProjectStorage) -> None:
@@ -777,6 +916,8 @@ def main() -> None:
     if cfg.radar_profile == "site":
         reset_site_rollup_emit_clock()
 
+    _sd_notify("READY=1")
+
     try:
         send_control_panel(cfg)
     except Exception as exc:
@@ -806,10 +947,17 @@ def main() -> None:
 
         try:
             run_cycle(cfg, storage, word_filter, pg)
+        except CycleWatchdogError as exc:
+            ts = radar_timestamp()
+            from healthchecks import ping_cycle_overrun
+
+            ping_cycle_overrun()
+            _log_failed_cycle(cfg.radar_log_path, storage, ts, exc)
         except Exception as exc:
             ts = radar_timestamp()
             _log_failed_cycle(cfg.radar_log_path, storage, ts, exc)
 
+        _sd_notify("WATCHDOG=1")
         _sleep_with_tg_poll(cfg, storage, interval_sec)
 
 

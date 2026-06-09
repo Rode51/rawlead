@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 from config import Config
 from exchange_browser_fetch import (
     fetch_listing_html_browser_slots,
+    fetch_listing_html_browser_slots_wall_clock,
     fetch_youdo_detail_html,
     listing_browser_enabled,
     youdo_browser_only,
@@ -42,6 +43,14 @@ _ANTIBOT_MARKERS = ("noscript", "exhkqyad", "just a moment", "checking your brow
 
 class YoudoListingError(RuntimeError):
     """Не удалось разобрать ленту YouDo."""
+
+
+def _youdo_listing_wall_clock_sec() -> float:
+    raw = os.getenv("YOUDO_LISTING_TIMEOUT_SEC", "120").strip()
+    try:
+        return max(float(raw), 10.0)
+    except ValueError:
+        return 120.0
 
 
 def _youdo_cooldown_min() -> int:
@@ -259,12 +268,14 @@ def _fetch_listing_html_browser(
     storage,
 ) -> str:
     """Browser-only (O63/O156): primary slot, warm human path."""
+    wall = _youdo_listing_wall_clock_sec()
     try:
-        html = fetch_listing_html_browser_slots(
+        html = fetch_listing_html_browser_slots_wall_clock(
             "youdo",
             url,
             user_agent=cfg.http_user_agent,
-            timeout_sec=timeout_sec,
+            timeout_sec=min(timeout_sec, wall),
+            wall_clock_sec=wall,
         )
     except HtmlFetchError as exc:
         msg = f"browser_fail={exc}"
