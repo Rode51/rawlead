@@ -8,9 +8,9 @@
 
 ## Где мы
 
-**→ @owner:** 24h smoke ingest (O160) · `/ops/` YouDo **Сбросить баны** · настроить `HEALTHCHECKS_SITE_FAIL_URL` в `.env`
+**→ @owner:** 24h smoke ingest (O160) · `/ops/` YouDo **Сбросить баны** · после O161: добавить `OPS_PASSWORD=...` в `.env` на VPS
 
-**→ @coder:** ⏸ ждём 24h smoke O160 · следующее: perf p95 @50 VU
+**→ @coder:** § **O161-OPS-PRO** — пароль · лайв-лог · русские статусы парсеров
 
 ---
 
@@ -36,6 +36,7 @@
 | **14f** | **O158-MATCH-UX** дубли push · шкала · ?lead= | @coder + Lead | **deploy ✅ 2026-06-08** |
 | **14h** | **O159-DRAFT-BURST** 3× parallel draft | @coder + Lead | **✅ 3/3 burst 2026-06-08** |
 | **14i** | **O160-RADAR-INGEST** ingest stability | @coder + Lead | **✅ deploy 2026-06-09** · 24h smoke ⏸ |
+| **14j** | **O161-OPS-PRO** профессиональный пульт | @coder + Lead | **→ active** |
 | **14g** | **O121-w2b** `/ops/` clear-bans | @coder + Lead | **✅ owner 2026-06-08** |
 | **13b** | **Wave 2** journey 10/10 | owner | ⏸ после O147 |
 | **14** | **ads + portfolio** | owner | **последним** |
