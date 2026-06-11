@@ -29,6 +29,24 @@ def db_connection_mode(url: str) -> str:
     return "direct"
 
 
+def to_pooler_url(url: str) -> str:
+    """Neon direct → pooler (:6543 or *-pooler host). Idempotent."""
+    u = (url or "").strip()
+    if not u or db_connection_mode(u) == "pooler":
+        return u
+    out = u.replace(":5432/", ":6543/", 1).replace(":5432?", ":6543?", 1)
+    if "pooler" not in out.casefold():
+        import re
+
+        out = re.sub(
+            r"@(ep-[^./@]+)(\.)",
+            r"@\1-pooler\2",
+            out,
+            count=1,
+        )
+    return out
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Check Neon pooler in DATABASE_URL")
     parser.add_argument(
@@ -36,7 +54,14 @@ def main() -> int:
         action="store_true",
         help="exit 1 when URL is not pooler (CI / pre-load gate)",
     )
+    parser.add_argument(
+        "--require-pooler",
+        action="store_true",
+        help="alias for --strict (O168 load gate)",
+    )
     args = parser.parse_args()
+    if args.require_pooler:
+        args.strict = True
     url = os.getenv("DATABASE_URL", "").strip()
     mode = db_connection_mode(url)
     if mode == "pooler":

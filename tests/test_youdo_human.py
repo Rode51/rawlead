@@ -81,7 +81,7 @@ class TestYoudoHuman(unittest.TestCase):
     @patch("exchange_browser_fetch.fetch_youdo_html_browser")
     @patch("exchange_browser_fetch.exchange_primary_proxy_url", return_value="http://u:p@1.2.3.4:8000")
     @patch("exchange_browser_fetch.exchange_alive_proxy_urls")
-    def test_one_slot_uses_primary_only(
+    def test_one_slot_uses_primary_on_success(
         self,
         mock_alive: MagicMock,
         _mock_primary: MagicMock,
@@ -102,6 +102,110 @@ class TestYoudoHuman(unittest.TestCase):
             mock_human.call_args.kwargs.get("proxy_url"),
             "http://u:p@1.2.3.4:8000",
         )
+
+    @patch("exchange_browser_fetch._abort_playwright_worker")
+    @patch("exchange_browser_fetch._fetch_youdo_ephemeral")
+    @patch("exchange_browser_fetch.fetch_youdo_html_browser")
+    @patch("exchange_browser_fetch.exchange_primary_proxy_url", return_value="http://u:p@1.2.3.4:8000")
+    @patch("exchange_browser_fetch.exchange_alive_proxy_urls")
+    @patch("exchange_browser_fetch.invalidate_browser_slot")
+    def test_one_slot_retries_next_on_timeout(
+        self,
+        _mock_inv: MagicMock,
+        mock_alive: MagicMock,
+        _mock_primary: MagicMock,
+        mock_human: MagicMock,
+        mock_ephemeral: MagicMock,
+        mock_abort: MagicMock,
+    ) -> None:
+        from html_fetch import HtmlFetchError
+
+        mock_alive.return_value = [
+            "http://u:p@1.2.3.4:8000",
+            "http://u:p@5.6.7.8:8000",
+        ]
+        mock_human.side_effect = HtmlFetchError("Page.goto: Timeout 45000ms exceeded")
+        mock_ephemeral.return_value = "<html>" + "x" * 600 + "</html>"
+        fetch_listing_html_browser_slots(
+            "youdo",
+            "https://youdo.com/tasks-all-opened-all",
+            user_agent="Mozilla/5.0 Chrome/122",
+        )
+        mock_human.assert_called_once()
+        mock_ephemeral.assert_called_once()
+        self.assertEqual(
+            mock_ephemeral.call_args.kwargs.get("proxy_url"),
+            "http://u:p@5.6.7.8:8000",
+        )
+        mock_abort.assert_called_once()
+
+    @patch("exchange_browser_fetch._abort_playwright_worker")
+    @patch("exchange_browser_fetch._fetch_youdo_ephemeral")
+    @patch("exchange_browser_fetch.fetch_youdo_html_browser")
+    @patch("exchange_browser_fetch.exchange_primary_proxy_url", return_value="http://u:p@1.2.3.4:8000")
+    @patch("exchange_browser_fetch.exchange_alive_proxy_urls")
+    @patch("exchange_browser_fetch.invalidate_browser_slot")
+    def test_playwright_timeout_error_triggers_slot_retry(
+        self,
+        _mock_inv: MagicMock,
+        mock_alive: MagicMock,
+        _mock_primary: MagicMock,
+        mock_human: MagicMock,
+        mock_ephemeral: MagicMock,
+        mock_abort: MagicMock,
+    ) -> None:
+        from html_fetch import HtmlFetchError
+
+        mock_alive.return_value = [
+            "http://u:p@1.2.3.4:8000",
+            "http://u:p@5.6.7.8:8000",
+        ]
+        mock_human.side_effect = HtmlFetchError("TimeoutError: Page.goto: Timeout 90000ms exceeded")
+        mock_ephemeral.return_value = "<html>" + "x" * 600 + "</html>"
+        fetch_listing_html_browser_slots(
+            "youdo",
+            "https://youdo.com/tasks-all-opened-all",
+            user_agent="Mozilla/5.0 Chrome/122",
+        )
+        mock_human.assert_called_once()
+        mock_ephemeral.assert_called_once()
+        self.assertEqual(
+            mock_ephemeral.call_args.kwargs.get("proxy_url"),
+            "http://u:p@5.6.7.8:8000",
+        )
+        mock_abort.assert_called_once()
+
+    @patch("exchange_browser_fetch._abort_playwright_worker")
+    @patch("exchange_browser_fetch._fetch_youdo_ephemeral")
+    @patch("exchange_browser_fetch.fetch_youdo_html_browser")
+    @patch("exchange_browser_fetch.exchange_primary_proxy_url", return_value="http://u:p@1.2.3.4:8000")
+    @patch("exchange_browser_fetch.exchange_alive_proxy_urls")
+    @patch("exchange_browser_fetch.invalidate_browser_slot")
+    def test_one_slot_retries_next_on_antibot(
+        self,
+        _mock_inv: MagicMock,
+        mock_alive: MagicMock,
+        _mock_primary: MagicMock,
+        mock_human: MagicMock,
+        mock_ephemeral: MagicMock,
+        mock_abort: MagicMock,
+    ) -> None:
+        from html_fetch import HtmlFetchError
+
+        mock_alive.return_value = [
+            "http://u:p@1.2.3.4:8000",
+            "http://u:p@5.6.7.8:8000",
+        ]
+        mock_human.side_effect = HtmlFetchError("403 Forbidden (youdo)")
+        mock_ephemeral.return_value = "<html>" + "x" * 600 + "</html>"
+        fetch_listing_html_browser_slots(
+            "youdo",
+            "https://youdo.com/tasks-all-opened-all",
+            user_agent="Mozilla/5.0 Chrome/122",
+        )
+        mock_human.assert_called_once()
+        mock_ephemeral.assert_called_once()
+        mock_abort.assert_called_once()
 
     def test_set_and_check_cooldown(self) -> None:
         storage = MagicMock()

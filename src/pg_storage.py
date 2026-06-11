@@ -925,7 +925,7 @@ class NeonLeadStorage:
         limit: int = 20,
         errors: list[str] | None = None,
     ) -> list[NeonLeadRow]:
-        """Visible leads без tools_required (Site L2 backfill)."""
+        """Visible leads без tools_required или с <2 slug (Site L2 backfill)."""
         if not self.enabled:
             return []
         sources = sorted(public_feed_sources())
@@ -948,7 +948,7 @@ class NeonLeadStorage:
                           AND (
                             tools_required IS NULL
                             OR tools_required = '[]'::jsonb
-                            OR jsonb_array_length(tools_required) = 0
+                            OR jsonb_array_length(tools_required) < 2
                           )
                           AND COALESCE(task_summary, '') <> ''
                         ORDER BY id DESC

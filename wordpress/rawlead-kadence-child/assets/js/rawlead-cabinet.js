@@ -29,6 +29,7 @@
 
   var TOKEN_KEY = "rawlead_access_token";
   var TAGS_SYNC_KEY = "rawlead_user_tags_rev";
+  var INBOX_SYNC_KEY = "rawlead_inbox_rev";
   var AUTH_COOKIE = "rl_access";
   var AUTH_COOKIE_MAX_AGE = 7 * 24 * 3600;
 
@@ -1727,9 +1728,9 @@
 
     offset: 0,
 
-    limit: 20,
+    limit: 10,
 
-    minMatch: 80,
+    minMatch: 0,
 
     sort: "time",
 
@@ -4189,10 +4190,7 @@
   }
 
   function passesInboxMinMatch(item) {
-    if (!hasUserSkills() || !state.minMatch) {
-      return true;
-    }
-    return inboxMatchPct(item) >= state.minMatch;
+    return true;
   }
 
   function sortInboxItems(items) {
@@ -5022,6 +5020,12 @@
       if (e.key === TAGS_SYNC_KEY) {
 
         reloadTagsFromSync();
+
+      }
+
+      if (e.key === INBOX_SYNC_KEY) {
+
+        resetAndLoad();
 
       }
 

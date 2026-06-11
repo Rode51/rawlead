@@ -28,6 +28,57 @@ _FETCH_LOCKS: dict[str, threading.Lock] = {}
 _CONTEXTS: dict[str, Any] = {}
 _PLAYWRIGHT = None
 _PW_LOCK = threading.Lock()
+_PW_THREAD_PREFIX = "rawlead-playwright"
+_PW_EXECUTOR: ThreadPoolExecutor | None = None
+_PW_EXECUTOR_LOCK = threading.Lock()
+
+
+def _on_playwright_thread() -> bool:
+    return threading.current_thread().name.startswith(_PW_THREAD_PREFIX)
+
+
+def _pw_executor() -> ThreadPoolExecutor:
+    global _PW_EXECUTOR
+    with _PW_EXECUTOR_LOCK:
+        if _PW_EXECUTOR is None:
+            _PW_EXECUTOR = ThreadPoolExecutor(
+                max_workers=1,
+                thread_name_prefix=_PW_THREAD_PREFIX,
+            )
+        return _PW_EXECUTOR
+
+
+def _playwright_sync(func, /, *args, **kwargs):
+    if _on_playwright_thread():
+        return func(*args, **kwargs)
+    fut = _pw_executor().submit(lambda: func(*args, **kwargs))
+    return fut.result()
+
+
+def _playwright_sync_timed(func, timeout_sec: float):
+    if _on_playwright_thread():
+        return func()
+    fut = _pw_executor().submit(func)
+    return fut.result(timeout=max(float(timeout_sec), 1.0))
+
+
+def _abort_playwright_worker() -> None:
+    """Drop a hung Playwright worker; next fetch spawns a fresh dedicated thread."""
+    global _PW_EXECUTOR, _PLAYWRIGHT
+    _WARMED_YOUDO_KEYS.clear()
+    with _LOCK:
+        _CONTEXTS.clear()
+    with _PW_EXECUTOR_LOCK:
+        if _PW_EXECUTOR is not None:
+            _PW_EXECUTOR.shutdown(wait=False, cancel_futures=True)
+            _PW_EXECUTOR = None
+    with _PW_LOCK:
+        if _PLAYWRIGHT is not None:
+            try:
+                _PLAYWRIGHT.stop()
+            except Exception:
+                pass
+            _PLAYWRIGHT = None
 
 _STALE_BROWSER_MARKERS = (
     "chrome-headless",
@@ -132,6 +183,112 @@ def youdo_ephemeral() -> bool:
     )
 
 
+def youdo_warm_home_enabled() -> bool:
+    """O177: warm youdo.com/ often hangs 45s on VPS proxy — listing SSR needs no warm."""
+    return os.getenv("YOUDO_WARM_HOME", "0").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _youdo_listing_goto_timeout_ms(timeout_sec: float) -> int:
+    raw = os.getenv("YOUDO_GOTO_TIMEOUT_SEC", "").strip()
+    if raw:
+        try:
+            return max(int(float(raw) * 1000), 5000)
+        except ValueError:
+            pass
+    return max(int(float(timeout_sec) * 1000), 5000)
+
+
+def _youdo_warm_goto_timeout_ms() -> int:
+    raw = os.getenv("YOUDO_WARM_TIMEOUT_SEC", "20").strip()
+    try:
+        return max(int(float(raw) * 1000), 5000)
+    except ValueError:
+        return 20_000
+
+
+def _youdo_slot_retry_max() -> int:
+    raw = os.getenv("YOUDO_SLOT_RETRY_ON_TIMEOUT", "3").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 3
+
+
+def _is_timeout_error(exc: BaseException) -> bool:
+    msg = f"{type(exc).__name__} {exc}".casefold()
+    return "timeout" in msg or "timed out" in msg
+
+
+def _wrap_youdo_browser_error(exc: BaseException) -> HtmlFetchError:
+    """Slot retry catches HtmlFetchError only — wrap Playwright TimeoutError (O177b)."""
+    if isinstance(exc, HtmlFetchError):
+        return exc
+    return HtmlFetchError(f"{type(exc).__name__}: {exc}")
+
+
+def _youdo_goto_wait_until() -> str:
+    raw = os.getenv("YOUDO_GOTO_WAIT_UNTIL", "domcontentloaded").strip().casefold()
+    if raw in ("commit", "domcontentloaded", "load", "networkidle"):
+        return raw
+    return "domcontentloaded"
+
+
+def _youdo_goto_wait_until_for_attempt(slot_attempt: int) -> str:
+    """Slot 2+ uses lighter wait (commit) — domcontentloaded often never fires on proxy (O179)."""
+    if slot_attempt > 1:
+        raw = os.getenv("YOUDO_RETRY_GOTO_WAIT_UNTIL", "commit").strip().casefold()
+        if raw in ("commit", "domcontentloaded", "load", "networkidle"):
+            return raw
+        return "commit"
+    return _youdo_goto_wait_until()
+
+
+def _youdo_lean_route_on_attempt(slot_attempt: int) -> bool:
+    """Full page load on retry — lean abort can block SSR hydration through node-proxy."""
+    if slot_attempt <= 1:
+        return True
+    return os.getenv("YOUDO_LEAN_ON_RETRY", "0").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _is_youdo_slot_retryable(exc: HtmlFetchError) -> bool:
+    if _is_timeout_error(exc):
+        return True
+    msg = str(exc).casefold()
+    markers = (
+        "antibot",
+        "короткий",
+        "cloudflare",
+        "forbidden",
+        "empty html",
+        "403",
+    )
+    return any(m in msg for m in markers)
+
+
+def _save_youdo_debug_html(html: str, *, tag: str = "youdo_fail") -> str:
+    root = _data_root().parent / "debug_listings"
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / f"{tag}_{int(time.time())}.html"
+    path.write_text((html or "")[:500_000], encoding="utf-8", errors="replace")
+    return str(path)
+
+
+def _youdo_ephemeral_on_slot_retry() -> bool:
+    return os.getenv("YOUDO_EPHEMERAL_ON_RETRY", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
 def _youdo_jitter_ms() -> tuple[int, int]:
     raw = os.getenv("YOUDO_JITTER_MS", "2000,8000").strip()
     parts = [p.strip() for p in raw.split(",") if p.strip()]
@@ -175,6 +332,14 @@ def invalidate_browser_slot(
     wipe_disk: bool | None = None,
 ) -> None:
     """Close Playwright context (+ optional profile dir) after ban/challenge (O110-B)."""
+    if not _on_playwright_thread():
+        _playwright_sync(
+            invalidate_browser_slot,
+            source,
+            proxy_url,
+            wipe_disk=wipe_disk,
+        )
+        return
     proxy = (proxy_url or "").strip()
     if not proxy:
         return
@@ -224,6 +389,32 @@ def _log_browser_trace(
             ms=int((time.monotonic() - t0) * 1000),
             proxy=_hint_from_url(proxy_url),
             **fields,
+        )
+    except Exception:
+        pass
+
+
+def _log_youdo_browser_trace(
+    *,
+    launch_ms: int,
+    goto_ms: int,
+    status: str,
+    html_len: int = 0,
+    antibot_hit: bool = False,
+    debug_path: str = "",
+) -> None:
+    try:
+        from youdo_parser import log_youdo_trace_path
+
+        log_youdo_trace_path(
+            None,
+            "browser",
+            launch_ms=launch_ms,
+            goto_ms=goto_ms,
+            status=status,
+            html_len=html_len,
+            antibot_hit=1 if antibot_hit else 0,
+            debug_path=debug_path or "",
         )
     except Exception:
         pass
@@ -341,6 +532,8 @@ def _maybe_warm_youdo_home(
     *,
     timeout_ms: int,
 ) -> None:
+    if not youdo_warm_home_enabled():
+        return
     if key in _WARMED_YOUDO_KEYS:
         return
     if _youdo_warm_recent(key):
@@ -366,6 +559,9 @@ def _close_context(key: str) -> None:
 
 def close_all_browser_contexts() -> None:
     """Close every open Playwright persistent context (O132 cycle teardown)."""
+    if not _on_playwright_thread():
+        _playwright_sync(close_all_browser_contexts)
+        return
     _WARMED_YOUDO_KEYS.clear()
     with _LOCK:
         for key in list(_CONTEXTS):
@@ -481,6 +677,10 @@ def _warm_youdo_home(page, proxy_url: str, *, timeout_ms: int) -> None:
 
 def _validate_youdo_html(html: str, proxy_url: str) -> None:
     low = html.lower()
+    if not html.strip():
+        raise HtmlFetchError("empty HTML after goto (youdo)")
+    if "403 forbidden" in low[:3000]:
+        raise HtmlFetchError("403 Forbidden (youdo)")
     if "cloudflare" in low and ("challenge" in low or "blocked" in low):
         raise HtmlFetchError(f"Cloudflare challenge (youdo, {_hint_from_url(proxy_url)})")
     if len(html.strip()) < 500:
@@ -496,8 +696,21 @@ def fetch_youdo_html_browser(
     timeout_sec: float,
     proxy_url: str,
     stage: str = "listing",
-) -> str:
+    slot_attempt: int = 1,
+    with_final_url: bool = False,
+) -> str | tuple[str, str]:
     """O156: warm human Playwright path for YouDo listing/detail."""
+    if not _on_playwright_thread():
+        return _playwright_sync(
+            fetch_youdo_html_browser,
+            url,
+            user_agent=user_agent,
+            timeout_sec=timeout_sec,
+            proxy_url=proxy_url,
+            stage=stage,
+            slot_attempt=slot_attempt,
+            with_final_url=with_final_url,
+        )
     if youdo_ephemeral():
         return _fetch_youdo_ephemeral(
             url,
@@ -505,20 +718,51 @@ def fetch_youdo_html_browser(
             timeout_sec=timeout_sec,
             proxy_url=proxy_url,
             stage=stage,
+            slot_attempt=slot_attempt,
         )
 
     _youdo_jitter_sleep()
     timeout_ms = max(int(timeout_sec * 1000), 5000)
+    launch_t0 = time.monotonic()
     ctx, key = _launch_youdo_persistent_context(proxy_url, user_agent=user_agent)
+    launch_ms = int((time.monotonic() - launch_t0) * 1000)
     page = ctx.new_page()
-    t0 = time.monotonic()
+    goto_t0 = time.monotonic()
+    listing_timeout_ms = _youdo_listing_goto_timeout_ms(timeout_sec)
+    html = ""
+    final_url = url
     try:
-        if key not in _WARMED_YOUDO_KEYS:
-            _maybe_warm_youdo_home(page, proxy_url, key, timeout_ms=timeout_ms)
-        page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+        if stage == "listing" and key not in _WARMED_YOUDO_KEYS and youdo_warm_home_enabled():
+            try:
+                _maybe_warm_youdo_home(
+                    page,
+                    proxy_url,
+                    key,
+                    timeout_ms=_youdo_warm_goto_timeout_ms(),
+                )
+            except Exception as warm_exc:
+                logger.warning(
+                    "youdo: warm_home failed (%s) — listing direct",
+                    warm_exc,
+                )
+                _log_browser_trace(
+                    "youdo",
+                    proxy_url,
+                    "warm_home_fail",
+                    time.monotonic(),
+                    err=type(warm_exc).__name__,
+                )
+        page.goto(
+            url,
+            wait_until=_youdo_goto_wait_until_for_attempt(slot_attempt),
+            timeout=listing_timeout_ms,
+        )
         if stage == "listing":
             try:
-                page.wait_for_selector('a[data-id][href*="/t"]', timeout=min(45000, timeout_ms))
+                page.wait_for_selector(
+                    'a[data-id][href*="/t"]',
+                    timeout=min(45000, listing_timeout_ms),
+                )
             except Exception:
                 page.wait_for_timeout(5000)
             else:
@@ -526,21 +770,74 @@ def fetch_youdo_html_browser(
         else:
             page.wait_for_timeout(min(2000, timeout_ms // 4))
         html = page.content()
+        final_url = page.url or url
+        goto_ms = int((time.monotonic() - goto_t0) * 1000)
         bytes_est = len(html.encode("utf-8", errors="replace"))
         _log_browser_trace(
-            "youdo", proxy_url, stage, t0, http=200, bytes_est=bytes_est
+            "youdo", proxy_url, stage, goto_t0, http=200, bytes_est=bytes_est
+        )
+        _log_youdo_browser_trace(
+            launch_ms=launch_ms,
+            goto_ms=goto_ms,
+            status="200",
+            html_len=len(html),
+            antibot_hit=False,
         )
     except Exception as exc:
-        _log_browser_trace("youdo", proxy_url, stage, t0, err=type(exc).__name__)
-        raise
+        goto_ms = int((time.monotonic() - goto_t0) * 1000)
+        err_status = "timeout" if _is_timeout_error(exc) else type(exc).__name__
+        _log_browser_trace("youdo", proxy_url, stage, goto_t0, err=type(exc).__name__)
+        _log_youdo_browser_trace(
+            launch_ms=launch_ms,
+            goto_ms=goto_ms,
+            status=err_status,
+            html_len=len(html),
+            antibot_hit=False,
+        )
+        raise _wrap_youdo_browser_error(exc) from exc
     finally:
         try:
             page.close()
         except Exception:
             pass
 
-    _validate_youdo_html(html, proxy_url)
+    try:
+        _validate_youdo_html(html, proxy_url)
+    except HtmlFetchError as val_exc:
+        if stage == "detail" and _youdo_delist_html_ok(html, final_url):
+            if with_final_url:
+                return html, final_url
+            return html
+        debug_path = ""
+        if html.strip():
+            debug_path = _save_youdo_debug_html(html, tag="youdo_antibot")
+        _log_youdo_browser_trace(
+            launch_ms=launch_ms,
+            goto_ms=int((time.monotonic() - goto_t0) * 1000),
+            status="antibot",
+            html_len=len(html),
+            antibot_hit=True,
+            debug_path=debug_path,
+        )
+        raise val_exc
+    if with_final_url:
+        return html, final_url
     return html
+
+
+def _youdo_delist_html_ok(html: str, final_url: str) -> bool:
+    """Allow short/gone YouDo detail pages through delist validation."""
+    low = (html or "").casefold()
+    fin = (final_url or "").casefold()
+    if "page-deleted" in fin:
+        return True
+    gone_bits = (
+        "страница была удалена",
+        "удалена или доступ к ней ограничен",
+        "задание закрыто",
+        "задание не найдено",
+    )
+    return any(m in low for m in gone_bits)
 
 
 def fetch_youdo_detail_html(
@@ -562,6 +859,51 @@ def fetch_youdo_detail_html(
     )
 
 
+def fetch_youdo_detail_snapshot(
+    url: str,
+    *,
+    user_agent: str,
+    timeout_sec: float = 60.0,
+    proxy_url: str | None = None,
+) -> tuple[str, str]:
+    """O180 delist: Playwright detail page + final URL after redirects."""
+    if (proxy_url or "").strip():
+        candidates = [proxy_url.strip()]
+    else:
+        candidates = exchange_alive_proxy_urls("youdo")
+        if not candidates:
+            primary = exchange_primary_proxy_url("youdo")
+            if primary:
+                candidates = [primary]
+    if not candidates:
+        raise HtmlFetchError("youdo: no proxy for detail fetch")
+
+    last_err: HtmlFetchError | None = None
+    for proxy in candidates:
+        try:
+            # Ephemeral detail fetch — persistent ctx often hangs on VPS delist (O180).
+            html = _fetch_youdo_ephemeral(
+                url,
+                user_agent=user_agent,
+                timeout_sec=timeout_sec,
+                proxy_url=proxy,
+                stage="detail",
+            )
+            final_url = url
+            low = html.casefold()
+            if "page-deleted" in low:
+                final_url = "https://youdo.com/?page-deleted"
+            return html, final_url
+        except HtmlFetchError as exc:
+            last_err = exc
+            logger.warning(
+                "youdo: detail snapshot failed proxy=%s err=%s",
+                _hint_from_url(proxy),
+                exc,
+            )
+    raise last_err or HtmlFetchError("youdo: detail snapshot failed")
+
+
 def _fetch_youdo_ephemeral(
     url: str,
     *,
@@ -569,6 +911,7 @@ def _fetch_youdo_ephemeral(
     timeout_sec: float,
     proxy_url: str,
     stage: str = "listing",
+    slot_attempt: int = 1,
 ) -> str:
     """YouDo legacy: ephemeral Chromium (YOUDO_EPHEMERAL=1)."""
     with _fetch_lock("youdo"):
@@ -580,8 +923,11 @@ def _fetch_youdo_ephemeral(
         launch_kw: dict[str, Any] = {"headless": True}
         if px:
             launch_kw["proxy"] = px
+        launch_t0 = time.monotonic()
         browser = pw.chromium.launch(**launch_kw)
-        t0 = time.monotonic()
+        launch_ms = int((time.monotonic() - launch_t0) * 1000)
+        goto_t0 = time.monotonic()
+        html = ""
         try:
             ctx = browser.new_context(
                 user_agent=ua,
@@ -589,18 +935,34 @@ def _fetch_youdo_ephemeral(
                 timezone_id="Europe/Moscow",
                 viewport={"width": 1366, "height": 768},
             )
-            ctx.route("**/*", _abort_youdo_lean_route)
+            if _youdo_lean_route_on_attempt(slot_attempt):
+                ctx.route("**/*", _abort_youdo_lean_route)
             page = ctx.new_page()
-            _maybe_warm_youdo_home(
-                page,
-                proxy_url,
-                _youdo_profile_key(proxy_url),
-                timeout_ms=timeout_ms,
+            listing_timeout_ms = _youdo_listing_goto_timeout_ms(timeout_sec)
+            if stage == "listing" and youdo_warm_home_enabled():
+                try:
+                    _maybe_warm_youdo_home(
+                        page,
+                        proxy_url,
+                        _youdo_profile_key(proxy_url),
+                        timeout_ms=_youdo_warm_goto_timeout_ms(),
+                    )
+                except Exception as warm_exc:
+                    logger.warning(
+                        "youdo: warm_home failed (%s) — listing direct",
+                        warm_exc,
+                    )
+            page.goto(
+                url,
+                wait_until=_youdo_goto_wait_until_for_attempt(slot_attempt),
+                timeout=listing_timeout_ms,
             )
-            page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
             if stage == "listing":
                 try:
-                    page.wait_for_selector('a[data-id][href*="/t"]', timeout=min(45000, timeout_ms))
+                    page.wait_for_selector(
+                        'a[data-id][href*="/t"]',
+                        timeout=min(45000, listing_timeout_ms),
+                    )
                 except Exception:
                     page.wait_for_timeout(5000)
                 else:
@@ -608,17 +970,50 @@ def _fetch_youdo_ephemeral(
             else:
                 page.wait_for_timeout(min(2000, timeout_ms // 4))
             html = page.content()
+            goto_ms = int((time.monotonic() - goto_t0) * 1000)
             bytes_est = len(html.encode("utf-8", errors="replace"))
             _log_browser_trace(
-                "youdo", proxy_url, stage, t0, http=200, bytes_est=bytes_est
+                "youdo", proxy_url, stage, goto_t0, http=200, bytes_est=bytes_est
+            )
+            _log_youdo_browser_trace(
+                launch_ms=launch_ms,
+                goto_ms=goto_ms,
+                status="200",
+                html_len=len(html),
+                antibot_hit=False,
             )
         except Exception as exc:
-            _log_browser_trace("youdo", proxy_url, stage, t0, err=type(exc).__name__)
-            raise
+            goto_ms = int((time.monotonic() - goto_t0) * 1000)
+            err_status = "timeout" if _is_timeout_error(exc) else type(exc).__name__
+            _log_browser_trace("youdo", proxy_url, stage, goto_t0, err=type(exc).__name__)
+            _log_youdo_browser_trace(
+                launch_ms=launch_ms,
+                goto_ms=goto_ms,
+                status=err_status,
+                html_len=len(html),
+                antibot_hit=False,
+            )
+            raise _wrap_youdo_browser_error(exc) from exc
         finally:
             browser.close()
 
-    _validate_youdo_html(html, proxy_url)
+    try:
+        _validate_youdo_html(html, proxy_url)
+    except HtmlFetchError as val_exc:
+        if stage == "detail" and _youdo_delist_html_ok(html, url):
+            return html
+        debug_path = ""
+        if html.strip():
+            debug_path = _save_youdo_debug_html(html, tag="youdo_antibot")
+        _log_youdo_browser_trace(
+            launch_ms=launch_ms,
+            goto_ms=int((time.monotonic() - goto_t0) * 1000),
+            status="antibot",
+            html_len=len(html),
+            antibot_hit=True,
+            debug_path=debug_path,
+        )
+        raise val_exc
     return html
 
 
@@ -631,6 +1026,15 @@ def fetch_listing_html_browser(
     proxy_url: str | None = None,
 ) -> str:
     """GET листинга через Chromium persistent context (cookies на слот прокси)."""
+    if not _on_playwright_thread():
+        return _playwright_sync(
+            fetch_listing_html_browser,
+            source,
+            url,
+            user_agent=user_agent,
+            timeout_sec=timeout_sec,
+            proxy_url=proxy_url,
+        )
     with _fetch_lock(source):
         proxy = (proxy_url or "").strip() or exchange_primary_proxy_url(source)
         key = _profile_key(source, proxy)
@@ -729,13 +1133,9 @@ def fetch_listing_html_browser_wall_clock(
             proxy_url=proxy_url,
         )
 
-    pool = ThreadPoolExecutor(max_workers=1)
-    fut = pool.submit(_run)
     try:
-        return fut.result(timeout=wall)
+        return _playwright_sync_timed(_run, wall)
     except FuturesTimeout:
-        proxy = (proxy_url or "").strip() or exchange_primary_proxy_url(source)
-        key = _profile_key(source, proxy)
         logger.warning(
             "%s_listing: wall-clock timeout after %ss — closing browser context",
             source,
@@ -747,11 +1147,8 @@ def fetch_listing_html_browser_wall_clock(
                 source,
                 wall,
             )
-        with _LOCK:
-            _close_context(key)
+        _abort_playwright_worker()
         raise HtmlFetchError(f"wall-clock timeout after {int(wall)}s ({source})")
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def fetch_listing_html_browser_slots_wall_clock(
@@ -776,12 +1173,9 @@ def fetch_listing_html_browser_slots_wall_clock(
             proxy_urls=proxy_urls,
         )
 
-    pool = ThreadPoolExecutor(max_workers=1)
-    fut = pool.submit(_run)
     try:
-        return fut.result(timeout=wall)
+        return _playwright_sync_timed(_run, wall)
     except FuturesTimeout:
-        proxy = exchange_primary_proxy_url(source) or ""
         logger.warning(
             "%s_listing: slots wall-clock timeout after %ss — closing browser context",
             source,
@@ -793,14 +1187,8 @@ def fetch_listing_html_browser_slots_wall_clock(
                 source,
                 wall,
             )
-        with _LOCK:
-            if proxy:
-                _close_context(_profile_key(source, proxy))
-                if source == "youdo":
-                    _close_context(_youdo_profile_key(proxy))
+        _abort_playwright_worker()
         raise HtmlFetchError(f"wall-clock timeout after {int(wall)}s ({source})")
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def fetch_listing_html_browser_slots(
@@ -812,26 +1200,74 @@ def fetch_listing_html_browser_slots(
     proxy_urls: list[str] | None = None,
 ) -> str:
     """Browser fetch с перебором живых слотов (O63 YouDo — без httpx fallback)."""
+    if not _on_playwright_thread():
+        return _playwright_sync(
+            fetch_listing_html_browser_slots,
+            source,
+            url,
+            user_agent=user_agent,
+            timeout_sec=timeout_sec,
+            proxy_urls=proxy_urls,
+        )
     if proxy_urls is not None:
         slots = proxy_urls
     elif source == "youdo" and youdo_one_slot_per_cycle():
         primary = exchange_primary_proxy_url("youdo")
-        slots = [primary] if primary else []
+        alive = exchange_alive_proxy_urls(source)
+        if primary and alive:
+            # O177: primary first; on timeout retry other alive slots (up to cap).
+            slots = [primary] + [u for u in alive if u != primary]
+            slots = slots[: _youdo_slot_retry_max()]
+        elif primary:
+            slots = [primary]
+        else:
+            slots = []
     else:
         slots = exchange_alive_proxy_urls(source)
     if not slots:
         raise HtmlFetchError(f"{source}: no alive proxy slots for browser")
     last_exc: HtmlFetchError | None = None
+    slots_tried = 0
+    retry_cap = _youdo_slot_retry_max() if source == "youdo" else 1
     for proxy_url in slots:
+        slots_tried += 1
         hint = _hint_from_url(proxy_url) or "direct"
+        use_ephemeral = (
+            source == "youdo"
+            and slots_tried > 1
+            and _youdo_ephemeral_on_slot_retry()
+        )
+        if source == "youdo" and slots_tried > 1:
+            try:
+                from youdo_parser import log_youdo_trace_path
+
+                log_youdo_trace_path(
+                    None,
+                    "slot_retry",
+                    slot=slots_tried,
+                    proxy_hint=hint,
+                    ephemeral=1 if use_ephemeral else 0,
+                )
+            except Exception:
+                pass
         try:
             if source == "youdo":
+                if youdo_ephemeral() or use_ephemeral:
+                    return _fetch_youdo_ephemeral(
+                        url,
+                        user_agent=user_agent,
+                        timeout_sec=timeout_sec,
+                        proxy_url=proxy_url,
+                        stage="listing",
+                        slot_attempt=slots_tried,
+                    )
                 return fetch_youdo_html_browser(
                     url,
                     user_agent=user_agent,
                     timeout_sec=timeout_sec,
                     proxy_url=proxy_url,
                     stage="listing",
+                    slot_attempt=slots_tried,
                 )
             return fetch_listing_html_browser(
                 source,
@@ -850,13 +1286,27 @@ def fetch_listing_html_browser_slots(
                 exc,
             )
             if source == "youdo" and youdo_one_slot_per_cycle():
+                if (
+                    _is_youdo_slot_retryable(exc)
+                    and slots_tried < min(len(slots), retry_cap)
+                ):
+                    _abort_playwright_worker()
+                    continue
                 break
     detail = str(last_exc) if last_exc else "unknown"
     raise HtmlFetchError(f"{source}: all browser slots failed ({len(slots)}): {detail}")
 
 
 def reset_browser_contexts_for_tests() -> None:
+    if not _on_playwright_thread():
+        _playwright_sync(reset_browser_contexts_for_tests)
+        return
     reset_youdo_warm_state_for_tests()
     with _LOCK:
         for key in list(_CONTEXTS):
             _close_context(key)
+
+
+def reset_playwright_thread_for_tests() -> None:
+    """Tear down dedicated Playwright thread between unit tests."""
+    _abort_playwright_worker()

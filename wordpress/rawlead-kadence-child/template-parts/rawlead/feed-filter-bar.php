@@ -20,14 +20,13 @@ $cabinet_login = esc_url(rawlead_cabinet_login_url());
 	<div class="rl-filter-bar__inner" id="rl-feed-sidebar-scroll">
 		<fieldset class="rl-feed-filter rl-feed-filter--source is-visually-hidden">
 			<legend><?php esc_html_e('Источник', 'rawlead-kadence-child'); ?></legend>
-			<label class="rl-feed-chip is-active"><input type="radio" name="source" value="" checked> <?php esc_html_e('Все', 'rawlead-kadence-child'); ?></label>
-			<label class="rl-feed-chip"><input type="radio" name="source" value="fl"> FL.ru</label>
-			<label class="rl-feed-chip"><input type="radio" name="source" value="kwork"> Kwork</label>
-			<label class="rl-feed-chip"><input type="radio" name="source" value="youdo"> YouDo</label>
-			<label class="rl-feed-chip"><input type="radio" name="source" value="freelance_ru"> Freelance.ru</label>
-			<label class="rl-feed-chip"><input type="radio" name="source" value="freelancejob"> FreelanceJob</label>
-			<label class="rl-feed-chip"><input type="radio" name="source" value="pchyol"> Пчёл.нет</label>
-			<label class="rl-feed-chip"><input type="radio" name="source" value="tg"> Telegram</label>
+			<label class="rl-feed-chip"><input type="checkbox" name="source" value="fl"> FL.ru</label>
+			<label class="rl-feed-chip"><input type="checkbox" name="source" value="kwork"> Kwork</label>
+			<label class="rl-feed-chip"><input type="checkbox" name="source" value="youdo"> YouDo</label>
+			<label class="rl-feed-chip"><input type="checkbox" name="source" value="freelance_ru"> Freelance.ru</label>
+			<label class="rl-feed-chip"><input type="checkbox" name="source" value="freelancejob"> FreelanceJob</label>
+			<label class="rl-feed-chip"><input type="checkbox" name="source" value="pchyol"> Пчёл.нет</label>
+			<label class="rl-feed-chip"><input type="checkbox" name="source" value="tg"> Telegram</label>
 		</fieldset>
 		<div class="rl-filter-bar__chips">
 			<fieldset class="rl-feed-filter rl-feed-filter--category rl-filter-bar__cats">

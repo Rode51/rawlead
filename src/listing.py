@@ -17,9 +17,20 @@ SOURCE_HABR_FREELANCE = "habr_freelance"
 SOURCE_HABR_CAREER = "habr_career"
 
 
+def canonical_tg_peer(chat_id: int) -> int:
+    """Supergroup/channel peer как в PUBLIC_FEED_SOURCES (tg:-100…)."""
+    cid = int(chat_id)
+    s = str(cid)
+    if s.startswith("-100"):
+        return cid
+    if cid < 0:
+        return int(f"-100{abs(cid)}")
+    return int(f"-100{cid}")
+
+
 def telegram_source(chat_id: int) -> str:
-    """Ключ дедупа в SQLite: один чат — свой source."""
-    return f"tg:{chat_id}"
+    """Ключ дедупа в SQLite / Neon: один чат — канонический tg:-100… peer."""
+    return f"tg:{canonical_tg_peer(chat_id)}"
 
 
 @dataclass(frozen=True)

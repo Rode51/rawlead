@@ -25,6 +25,7 @@ $year = (int) gmdate('Y');
 			<span class="rl-footer__byline"><?php esc_html_e('RawLead · by Rode51', 'rawlead-kadence-child'); ?></span>
 			· © <?php echo esc_html((string) $year); ?>
 		</p>
+		<p class="rl-footer__legal">Храмовских Никита Евгеньевич · ИНН 384903841000</p>
 	</div>
 </footer>
 <button type="button" class="rl-support-fab" id="rl-support-fab" aria-label="<?php esc_attr_e('Поддержка', 'rawlead-kadence-child'); ?>" title="<?php esc_attr_e('Поддержка', 'rawlead-kadence-child'); ?>">

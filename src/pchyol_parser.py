@@ -246,6 +246,71 @@ def fetch_project_detail(
     return text, html, detail_ok
 
 
+_PCHYOL_GONE_MARKERS = (
+    "проект закрыт",
+    "заказ закрыт",
+    "исполнитель выбран",
+    "исполнитель уже выбран",
+    "исполнитель найден",
+    "страница не найдена",
+    "проект не найден",
+    "в архиве",
+    "закрыт для откликов",
+)
+
+_PCHYOL_ID_RE = re.compile(r"/jobs/[^/]+/[^/]+-(\d+)/", re.I)
+
+
+def _pchyol_redirected_away(original: str, final: str) -> bool:
+    orig = (original or "").strip()
+    fin = final.strip() if isinstance(final, str) else ""
+    if not orig or not fin or orig.casefold() == fin.casefold():
+        return False
+    m = _PCHYOL_ID_RE.search(orig)
+    if not m:
+        return False
+    pid = m.group(1)
+    return f"-{pid}/" not in fin.casefold()
+
+
+def check_project_page_gone(
+    project_url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float = 20.0,
+) -> bool | None:
+    """O180: True — заказ снят/404; False — жив; None — не удалось проверить."""
+    url = (project_url or "").strip()
+    if not url:
+        return None
+    headers = {
+        "User-Agent": cfg.http_user_agent,
+        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+    }
+    try:
+        resp = exchange_get("pchyol", url, headers=headers, timeout_sec=timeout_sec)
+    except requests.RequestException:
+        return None
+
+    if resp.status_code == 404:
+        return True
+    if resp.status_code != 200:
+        return None
+
+    raw_final = getattr(resp, "url", None)
+    final_url = raw_final.strip() if isinstance(raw_final, str) and raw_final.strip() else url
+    if _pchyol_redirected_away(url, final_url):
+        return True
+
+    encoding = resp.encoding or "utf-8"
+    html = resp.content.decode(encoding, errors="replace").casefold()
+    if any(m in html for m in _PCHYOL_GONE_MARKERS):
+        return True
+    if "project-text" in html or "project-block-cont" in html or "project-description" in html:
+        return False
+    return None
+
+
 def fetch_listing_projects(
     cfg: Config, *, timeout_sec: float = 45.0
 ) -> list[ListingProject]:

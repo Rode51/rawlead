@@ -2,10 +2,37 @@
 
 **Дата:** 2026-05-24 · с владельцем  
 **Принято Lead Architect:** 2026-05-24 — `ROADMAP.md`, `LEAD_DESIGN_PROMPT.md`, ревизия `TASKS`/`STATUS`/`CODER_PROMPT`  
-**→ Статус:** **§ O116-COPY — ✅ R1–R3 approve (2026-06-04)** · → W2 @lead-designer · **§ O105-COPY — ✅ PM approve (2026-06-03)** · Design → Coder ожидает
+**→ Статус:** § **O174-COPY — → now (W1 PM · 2026-06-10)** · § O116-COPY — ✅ R1–R3 approve (2026-06-04) · § O105-COPY — ✅ PM approve (2026-06-03)
 
 **Ставка:** **B — Открытая площадка + ИИ-агент по подписке** (согласовано в чате `@lead-product` 2026-05-24, замена ставки A)  
 **Vision:** [`PRODUCT_VISION.md`](PRODUCT_VISION.md) **v0.12** (Premium 790 ₽ · O105 · O101)
+
+---
+
+## § O174-COPY — YooKassa · trial · автопродление (**W1 PM · → now · 2026-06-10**)
+
+**Канон owner:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md) § **O174-w**
+
+**Цифры (не менять без owner):**
+
+| | |
+|--|--|
+| Trial | **1 ₽** · **3 дня** Premium · **1 раз** на аккаунт |
+| Далее | **790 ₽/мес** · **автопродление** через ЮKassa |
+| Способы | Карта / СБП **только через ЮKassa** |
+| Убрать | Stars · USDT/TON · «перевод на телефон» · `/pay` в боте как оплата |
+
+**Deliverables (RU copy, таблица old → new):**
+
+1. **`/pricing/`** — hero, bullets, CTA, мелкий legal про автопродление и отмену
+2. **`#pricing-preview`** на главной — те же цифры, короче
+3. **`/faq/`** — Q про оплату, trial, автопродление, возврат (без crypto/Stars)
+4. **`/cabinet/`** — статусы подписки + одна CTA
+5. **Footer legal** — только FIO+ИНН (O174a, без PM)
+
+**Tone:** как O116/O105 — коротко, без юридической простыни; автопродление — явно, но не пугающе.
+
+**Handoff:** approve → `@lead-designer` § O174-D → `@coder` § O174b.
 
 ---
 

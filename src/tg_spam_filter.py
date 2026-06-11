@@ -1,7 +1,7 @@
-"""O163: pre-L1 фильтр TG-спама (promo-бот реклама, CV фрилансера, партнёрки).
+"""O163/O170: pre-L1 фильтр TG-спама + post-L1 guard для TG-источников.
 
-Вызывается в lead_pipeline.process_new_listing_from_tg до ingest_with_l1.
-Возвращает is_tg_spam() → bool или tg_spam_lite_analysis() → AiLiteAnalysis|None.
+Pre-L1 (is_tg_spam):  promo-бот реклама, CV фрилансера, партнёрки, реклама услуг (O170).
+Post-L1 guard (is_tg_order_post): True если пост содержит маркеры заказа заказчик→исполнитель.
 """
 
 from __future__ import annotations
@@ -45,6 +45,80 @@ _PROMO_PHRASES: tuple[str, ...] = (
     "#реклама",
 )
 
+# ── O170: реклама услуг / seller-voice ───────────────────────────────────────
+
+_SELLER_VOICE_PHRASES: tuple[str, ...] = (
+    "мы предлагаем",
+    "наша команда",
+    "наши услуги",
+    "предлагаем услуги",
+    "предлагаю услуги",
+    "берём проекты",
+    "берем проекты",
+    "принимаем заявки",
+    "принимаем заказы",
+    "осталось мест",
+    "осталось слотов",
+    "записывайтесь",
+    "запишитесь",
+    "бесплатная консультация",
+    "бесплатный аудит",
+    "пишите в лс",
+    "пишите в личку",
+    "пишите нам",
+    "пишите мне",
+    "стоимость от",
+    "цена от",
+    "портфолио:",
+    "примеры работ:",
+    "кейсы:",
+    "наш сайт:",
+    "работаем с",
+    "сотрудничаем с",
+    "делаем под ключ",
+    "разрабатываем под ключ",
+    "создаём под ключ",
+    "создаем под ключ",
+    "производим под ключ",
+    "оказываем услуги",
+    "наш telegram",
+    "наш телеграм",
+    "обращайтесь",
+    "обращайтесь к нам",
+    "мы создаём",
+    "мы создаем",
+    "мы разрабатываем",
+    "мы делаем",
+    "мы помогаем",
+    "мы занимаемся",
+    "мы специализируемся",
+    "наша компания",
+    "наше агентство",
+    "наша студия",
+)
+
+_INFOBIZ_PHRASES: tuple[str, ...] = (
+    "лид-магнит",
+    "воронка продаж",
+    "запускаю курс",
+    "запуск курса",
+    "онлайн-школа",
+    "онлайн школа",
+    "марафон",
+    "наставничество",
+    "менторство",
+    "коучинг",
+    "инфопродукт",
+    "инфобиз",
+    "прогрев",
+)
+
+# Regex: "N из N мест" / "N из N слотов" — scarcity tactics
+_SCARCITY_RE = re.compile(
+    r"осталось\s+\d+\s+(?:из\s+\d+\s+)?(?:мест|слотов|человек|участников)",
+    re.I,
+)
+
 # ── CV / «ищу проект» ────────────────────────────────────────────────────────
 
 _CV_ANCHOR_RE = re.compile(
@@ -81,6 +155,20 @@ _CV_PHRASES: tuple[str, ...] = (
     "опыт работы:",
 )
 
+# ── O170: маркеры реального заказа (заказчик → исполнитель) ──────────────────
+
+_ORDER_MARKER_RE = re.compile(
+    r"нужен|нужна|нужно|нужны|"
+    r"ищу\s+(?:разработчик|дизайнер|фрилансер|копирайтер|программист|исполнитель|специалист|верстальщик|автор)|"
+    r"ищем\s+(?:разработчик|дизайнер|фрилансер|копирайтер|программист|исполнитель|специалист)|"
+    r"требуется|требуются|"
+    r"бюджет\s*[:—\s]|оплата\s*[:—\s]|ставка\s*[:—\s]|"
+    r"срок\s*[:—\s]|дедлайн|"
+    r"\bТЗ\b|техническое\s+задание|"
+    r"заказ\s+(?:на|по)|ищу\s+подрядчика",
+    re.I,
+)
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -102,31 +190,65 @@ def _is_cv_post(hay: str) -> bool:
     return any(p.casefold() in hay for p in _CV_PHRASES)
 
 
+def _is_seller_offer(hay: str) -> bool:
+    """True если: пост рекламирует услуги (seller-voice), а не ищет исполнителя."""
+    if any(p.casefold() in hay for p in _SELLER_VOICE_PHRASES):
+        return True
+    if any(p.casefold() in hay for p in _INFOBIZ_PHRASES):
+        return True
+    if _SCARCITY_RE.search(hay):
+        return True
+    return False
+
+
 # ── public API ────────────────────────────────────────────────────────────────
 
 
 def is_tg_spam(title: str, body: str = "") -> bool:
-    """True — прomo-бот реклама, CV фрилансера или партнёрка; не показывать в ленте."""
+    """True — promo-бот, CV фрилансера, партнёрка или реклама услуг (O170); не показывать."""
     if not title and not body:
         return False
     hay = _haystack(title, body)
-    return _is_bot_promo(hay) or _is_cv_post(hay)
+    return _is_bot_promo(hay) or _is_cv_post(hay) or _is_seller_offer(hay)
+
+
+def is_tg_order_post(title: str, body: str = "") -> bool:
+    """True если TG-пост содержит маркер заказа «заказчик → исполнитель».
+
+    Используется как post-L1 guard (O170-t4): если L1 вернул feed_visible=True
+    для TG-источника, но маркеров заказа нет — значит реклама услуг прошла L1.
+    """
+    if not title and not body:
+        return False
+    hay = _haystack(title, body)
+    return bool(_ORDER_MARKER_RE.search(hay))
 
 
 def tg_spam_lite_analysis(title: str, body: str = "") -> "AiLiteAnalysis | None":
-    """Готовый L1-результат без OpenRouter, если TG-пост — спам/CV."""
+    """Готовый L1-результат без OpenRouter, если TG-пост — спам/CV/реклама услуг."""
     if not is_tg_spam(title, body):
         return None
     from ai_analyze import AiLiteAnalysis
 
-    return AiLiteAnalysis(
-        feed_visible=False,
-        task_summary="TG-спам / CV фрилансера — не фриланс-заказ",
-        lead_tags=(),
-        ai_reasons=(
+    hay = _haystack(title, body)
+    if _is_seller_offer(hay):
+        summary = "TG-реклама услуг / self-promo — не фриланс-заказ"
+        reasons: tuple[str, ...] = (
+            "Продажа услуг (seller-voice): «мы предлагаем», «наша команда», «под ключ» и т.д.",
+            "Нет маркеров заказа (нужен/требуется/бюджет/ТЗ)",
+        )
+    else:
+        summary = "TG-спам / CV фрилансера — не фриланс-заказ"
+        reasons = (
             "Promo-бот реклама, CV «ищу проект/заказчиков» или партнёрка",
             "Не является заказом фрилансера",
-        ),
+        )
+
+    return AiLiteAnalysis(
+        feed_visible=False,
+        task_summary=summary,
+        lead_tags=(),
+        ai_reasons=reasons,
         complexity=1,
         primary_category="",
     )

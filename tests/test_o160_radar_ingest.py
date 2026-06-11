@@ -16,7 +16,7 @@ import exchange_browser_fetch as ebf  # noqa: E402
 from exchange_browser_fetch import (  # noqa: E402
     _fetch_lock,
     fetch_listing_html_browser_wall_clock,
-    reset_browser_contexts_for_tests,
+    reset_playwright_thread_for_tests,
 )
 from html_fetch import HtmlFetchError  # noqa: E402
 from main import _fetch_source, run_cycle  # noqa: E402
@@ -24,7 +24,7 @@ from main import _fetch_source, run_cycle  # noqa: E402
 
 class TestO160PerSourceLocks(unittest.TestCase):
     def tearDown(self) -> None:
-        reset_browser_contexts_for_tests()
+        reset_playwright_thread_for_tests()
         if ebf._PLAYWRIGHT is not None:
             try:
                 ebf._PLAYWRIGHT.stop()
@@ -89,6 +89,18 @@ class TestO160SourceFetchWallClock(unittest.TestCase):
         self.assertLess(elapsed_fl, 5.0)
         self.assertLess(total, 8.0)
         self.assertTrue(any("fl:fetch:" in e for e in errors))
+
+    @patch("exchange_browser_fetch.close_all_browser_contexts")
+    def test_youdo_radar_wall_at_least_internal_budget(self, _mock_close: MagicMock) -> None:
+        os.environ["RADAR_SOURCE_FETCH_WALL_SEC"] = "180"
+        os.environ.pop("YOUDO_LISTING_TIMEOUT_SEC", None)
+        os.environ["YOUDO_GOTO_TIMEOUT_SEC"] = "90"
+        os.environ["YOUDO_SLOT_RETRY_ON_TIMEOUT"] = "3"
+        from main import _radar_source_fetch_wall_sec
+
+        youdo_wall = _radar_source_fetch_wall_sec("youdo")
+        self.assertGreaterEqual(youdo_wall, 330.0)
+        self.assertEqual(_radar_source_fetch_wall_sec("kwork"), 180.0)
 
 
 class TestO160CycleHangKworkRuns(unittest.TestCase):

@@ -101,8 +101,17 @@ def _env_float(name: str, default: float, *, minimum: float = 0.0) -> float:
         return default
 
 
-def _radar_source_fetch_wall_sec() -> float:
-    return _env_float("RADAR_SOURCE_FETCH_WALL_SEC", 180.0, minimum=1.0)
+def _radar_source_fetch_wall_sec(source: str = "") -> float:
+    """Per-source wall must cover internal browser retry budget (O179 YouDo 330s)."""
+    base = _env_float("RADAR_SOURCE_FETCH_WALL_SEC", 180.0, minimum=1.0)
+    if (source or "").strip().lower() == "youdo":
+        try:
+            from youdo_parser import youdo_source_fetch_wall_sec
+
+            return max(base, youdo_source_fetch_wall_sec())
+        except Exception:
+            pass
+    return base
 
 
 def _radar_cycle_wall_sec() -> float:
@@ -327,7 +336,7 @@ def _fetch_source(
                 echo=True,
             )
 
-    wall = _radar_source_fetch_wall_sec()
+    wall = _radar_source_fetch_wall_sec(label)
 
     def _run_fetch() -> list[ListingProject] | None:
         try:
@@ -380,6 +389,7 @@ def _record_source_health(
     stats: SourceCycleStats,
     *,
     ts: str,
+    cfg: Config | None = None,
 ) -> None:
     ok = not stats.fetch_error
     parsed_cards = stats.parsed_cards if ok and stats.parsed_cards >= 0 else None
@@ -393,6 +403,13 @@ def _record_source_health(
         parsed_cards=parsed_cards,
         ts=ts,
     )
+    if source == "youdo" and cfg is not None:
+        try:
+            from youdo_parser import log_youdo_fetch_end
+
+            log_youdo_fetch_end(cfg, stats, health)
+        except Exception:
+            pass
     try:
         from exchange_trace import log_exchange_trace
 
@@ -558,7 +575,7 @@ def _run_cycle_body(
             stats_fl.to_bot = notify
             summary.total_to_bot += notify
         _log_source_line(cfg.radar_log_path, stats_fl)
-        _record_source_health(storage, "fl", stats_fl, ts=ts)
+        _record_source_health(storage, "fl", stats_fl, ts=ts, cfg=cfg)
 
     watchdog.check()
     _tg_poll_if_due(cfg, storage, tg_poll_state)
@@ -592,7 +609,7 @@ def _run_cycle_body(
                 stats_kwork.to_bot = notify
                 summary.total_to_bot += notify
         _log_source_line(cfg.radar_log_path, stats_kwork)
-        _record_source_health(storage, "kwork", stats_kwork, ts=ts)
+        _record_source_health(storage, "kwork", stats_kwork, ts=ts, cfg=cfg)
 
     watchdog.check()
     _tg_poll_if_due(cfg, storage, tg_poll_state)
@@ -645,7 +662,7 @@ def _run_cycle_body(
             stats_web.to_bot = notify
             summary.total_to_bot += notify
         _log_source_line(cfg.radar_log_path, stats_web)
-        _record_source_health(storage, source_label, stats_web, ts=ts)
+        _record_source_health(storage, source_label, stats_web, ts=ts, cfg=cfg)
         watchdog.check()
 
     _tg_poll_if_due(cfg, storage, tg_poll_state)

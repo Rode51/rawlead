@@ -12,6 +12,14 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "src"))
 
+from src.ai_analyze import (  # noqa: E402
+    _build_shared_reply_user,
+    _reply_draft_false_truncation_reason,
+    _shared_reply_system,
+    _shared_snippet_for_l2,
+    validate_stored_l2_draft,
+)
+from src.ai_analyze import AiLiteAnalysis  # noqa: E402
 from src.draft_async import (  # noqa: E402
     DraftPollResponse,
     draft_response_body,
@@ -246,6 +254,127 @@ class TestO135OpenRouterProxy(unittest.TestCase):
 
         kwargs = mock_chat.call_args.kwargs
         self.assertTrue(kwargs.get("use_draft_proxy"))
+
+
+class TestO168L2Gates(unittest.TestCase):
+    def test_shared_reply_prompt_requires_all_tools(self) -> None:
+        sys_prompt = _shared_reply_system(cabinet=False)
+        self.assertIn("все", sys_prompt.casefold())
+        self.assertIn("photoshop + illustrator", sys_prompt.casefold())
+
+    def test_shared_reply_user_lists_tools_for_enumeration(self) -> None:
+        lite = AiLiteAnalysis(
+            task_summary="Нарисовать спрайты по референсам",
+            feed_visible=True,
+            lead_tags=("design",),
+            ai_reasons=(),
+            complexity=2,
+            primary_category="design",
+        )
+        user = _build_shared_reply_user(
+            title="Спрайты",
+            budget_text="5000",
+            lite=lite,
+            tools_required=["photoshop", "illustrator"],
+        )
+        self.assertIn("photoshop", user.casefold())
+        self.assertIn("illustrator", user.casefold())
+        self.assertIn("каждый", user.casefold())
+
+    def test_forbidden_word_fails_auto_audit(self) -> None:
+        fails = validate_stored_l2_draft(
+            verdict="брать",
+            reply_draft="Здравствуйте! Сделаю через ChatGPT за 2 дня.",
+            tools_required=["python", "javascript"],
+            title="API",
+            description="Нужен REST API",
+        )
+        self.assertTrue(any(f.startswith("L2:") for f in fails))
+
+    def test_tools_min_2_required(self) -> None:
+        draft = (
+            "Здравствуйте! Настрою лендинг на Tilda по ТЗ. "
+            "Подскажите, есть ли готовый контент?"
+        )
+        fails = validate_stored_l2_draft(
+            verdict="брать",
+            reply_draft=draft,
+            tools_required=["figma"],
+            title="Tilda",
+            description="лендинг Tilda",
+        )
+        self.assertIn("tools:min_2_required", fails)
+
+    def test_valid_draft_passes(self) -> None:
+        draft = (
+            "Здравствуйте! Сверстаю лендинг на Tilda по макету Figma. "
+            "Подскажите, макет в Figma или PDF?"
+        )
+        fails = validate_stored_l2_draft(
+            verdict="брать",
+            reply_draft=draft,
+            tools_required=["figma", "javascript"],
+            title="Tilda",
+            description="лендинг Tilda + Figma",
+        )
+        self.assertEqual(fails, [])
+
+    def test_shared_reply_user_adds_trunc_note_when_snippet_cut(self) -> None:
+        long_desc = "А" * 2500
+        lite = AiLiteAnalysis(task_summary="Парсинг базы", feed_visible=True)
+        user = _build_shared_reply_user(
+            title="Парсинг",
+            budget_text="10000",
+            lite=lite,
+            tools_required=["python"],
+            description=long_desc,
+        )
+        self.assertIn("[Описание обрезано", user)
+        snippet, truncated = _shared_snippet_for_l2(long_desc)
+        self.assertTrue(truncated)
+        self.assertTrue(snippet.endswith("…"))
+
+    def test_fl5508904_false_truncation_fails_audit(self) -> None:
+        """O168 g1c: FL #5508904 — полное предложение, ложный «обрывается»."""
+        description = (
+            "Нужно выкачать базу рецептов из игры. "
+            "Рецепты хранятся на сервере игры. "
+            "Формат выгрузки — JSON или CSV."
+        )
+        bad_draft = (
+            "Здравствуйте! Вижу задачу по выгрузке рецептов. "
+            "Фраза «Рецепты хранятся на…» обрывается — подскажите, где именно лежит база?"
+        )
+        self.assertIsNotNone(
+            _reply_draft_false_truncation_reason(bad_draft, description)
+        )
+        fails = validate_stored_l2_draft(
+            verdict="брать",
+            reply_draft=bad_draft,
+            tools_required=["python", "postgresql"],
+            title="Выкачать базу рецептов из игры",
+            description=description,
+        )
+        self.assertTrue(any("false_truncation_claim" in f for f in fails))
+
+    def test_fl5508904_good_draft_passes(self) -> None:
+        description = (
+            "Нужно выкачать базу рецептов из игры. "
+            "Рецепты хранятся на сервере игры. "
+            "Формат выгрузки — JSON или CSV."
+        )
+        good_draft = (
+            "Здравствуйте! Выгружу базу рецептов с сервера игры в JSON или CSV. "
+            "Уточните, нужен ли доступ к API или дамп из клиента?"
+        )
+        fails = validate_stored_l2_draft(
+            verdict="брать",
+            reply_draft=good_draft,
+            tools_required=["python", "postgresql"],
+            title="Выкачать базу рецептов из игры",
+            description=description,
+        )
+        self.assertEqual(fails, [])
 
 
 class TestO159DraftOrConcurrency(unittest.TestCase):

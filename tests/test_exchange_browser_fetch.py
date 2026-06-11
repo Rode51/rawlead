@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -18,13 +20,15 @@ from exchange_browser_fetch import (  # noqa: E402
     _abort_heavy_route,
     _fetch_youdo_ephemeral,
     _is_stale_browser_process,
+    _on_playwright_thread,
     _should_abort_playwright_request,
     cleanup_stale_browser_processes,
     close_all_browser_contexts,
     fetch_listing_html_browser,
+    fetch_listing_html_browser_slots_wall_clock,
     invalidate_browser_slot,
     pick_browser_user_agent,
-    reset_browser_contexts_for_tests,
+    reset_playwright_thread_for_tests,
 )
 
 
@@ -34,13 +38,7 @@ def _html_ok() -> str:
 
 class TestExchangeBrowserFetch(unittest.TestCase):
     def tearDown(self) -> None:
-        reset_browser_contexts_for_tests()
-        if ebf._PLAYWRIGHT is not None:
-            try:
-                ebf._PLAYWRIGHT.stop()
-            except Exception:
-                pass
-        ebf._PLAYWRIGHT = None
+        reset_playwright_thread_for_tests()
 
     @patch("exchange_browser_fetch._youdo_jitter_sleep")
     @patch("exchange_browser_fetch._warm_youdo_home")
@@ -243,6 +241,46 @@ class TestExchangeBrowserFetch(unittest.TestCase):
                     wipe_disk=True,
                 )
         self.assertFalse(key_dir.exists())
+
+    @patch("exchange_browser_fetch._youdo_jitter_sleep")
+    @patch("exchange_browser_fetch._maybe_warm_youdo_home")
+    @patch("exchange_browser_fetch._playwright_proxy", return_value=None)
+    @patch(
+        "exchange_browser_fetch.exchange_primary_proxy_url",
+        return_value="http://u:p@1.2.3.4:8000",
+    )
+    @patch("exchange_browser_fetch.fetch_youdo_html_browser")
+    def test_slots_wall_clock_from_foreign_thread(
+        self,
+        mock_fetch: MagicMock,
+        _mock_primary: MagicMock,
+        _mock_px: MagicMock,
+        _mock_warm: MagicMock,
+        _mock_jitter: MagicMock,
+    ) -> None:
+        mock_fetch.return_value = _html_ok()
+        pw_threads: list[bool] = []
+
+        def run_from_ephemeral() -> str:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(
+                    fetch_listing_html_browser_slots_wall_clock,
+                    "youdo",
+                    "https://youdo.com/tasks-all-opened-all",
+                    user_agent=_DEFAULT_UA,
+                    timeout_sec=30.0,
+                    wall_clock_sec=60.0,
+                ).result()
+
+        with patch("exchange_browser_fetch._get_playwright") as get_pw:
+            get_pw.side_effect = lambda: (
+                pw_threads.append(_on_playwright_thread()) or MagicMock()
+            )
+            html = run_from_ephemeral()
+
+        self.assertEqual(html, mock_fetch.return_value)
+        self.assertTrue(all(pw_threads))
+        mock_fetch.assert_called_once()
 
 
 if __name__ == "__main__":

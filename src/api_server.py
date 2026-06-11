@@ -17,6 +17,9 @@ import hashlib
 import logging
 import os
 import secrets
+import threading
+import time
+from contextlib import contextmanager
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
@@ -24,6 +27,11 @@ from uuid import UUID, uuid4
 
 import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+
+try:
+    from psycopg_pool import ConnectionPool
+except ImportError:
+    ConnectionPool = None  # type: ignore[misc, assignment]
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict
@@ -46,8 +54,11 @@ from src.skills_catalog import (
     user_tags_input_count,
 )
 from src.public_feed import (
+    feed_source_filter_sql,
     feed_visibility_where_sql,
+    inbox_replies_where_sql,
     is_public_feed_source,
+    parse_feed_source_param,
     public_feed_source_sql,
 )
 from src.jwt_auth import decode_access_token, issue_access_token
@@ -151,6 +162,17 @@ def _feed_base_where_sql(*, alias: str = "") -> tuple[str, list[Any]]:
     return f"{prefix}is_visible = TRUE" + src_sql, src_params
 
 
+def _feed_where_with_sources(
+    *,
+    alias: str = "",
+    apply_delay: bool = False,
+    source_keys: list[str] | None = None,
+) -> tuple[str, list[Any]]:
+    feed_where, feed_params = _feed_where_sql(alias=alias, apply_delay=apply_delay)
+    src_sql, src_params = feed_source_filter_sql(source_keys or [], alias=alias)
+    return feed_where + src_sql, feed_params + src_params
+
+
 def _feed_where_sql(*, alias: str = "", apply_delay: bool = False) -> tuple[str, list[Any]]:
     delay = _FEED_DELAY_MINUTES if apply_delay else None
     return feed_visibility_where_sql(
@@ -178,6 +200,20 @@ def _db_connection_mode() -> str:
     if "pooler" in url or ":6543" in url:
         return "pooler"
     return "direct"
+
+
+_DB_POOL: Any = None
+
+
+@contextmanager
+def _db_conn():
+    """O168: reuse TCP sessions on hot read paths (load@50)."""
+    if _DB_POOL is not None:
+        with _DB_POOL.connection() as conn:
+            yield conn
+    else:
+        with psycopg.connect(_db_url()) as conn:
+            yield conn
 
 
 def _bot_login_username() -> str:
@@ -487,6 +523,14 @@ def _rank_feed_rows(
     return ranked
 
 
+_FEED_TODAY_COUNT_CACHE: dict[tuple[Any, ...], tuple[float, int]] = {}
+_FEED_TODAY_COUNT_TTL_SEC = 180.0
+_FEED_TODAY_COUNT_LOCK = threading.Lock()
+_SKILLS_CATALOG_CACHE: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
+_SKILLS_CATALOG_TTL_SEC = 120.0
+_SKILLS_CATALOG_LOCK = threading.Lock()
+
+
 def _feed_today_count(
     cur: Any,
     *,
@@ -534,6 +578,59 @@ def _feed_today_count(
     return count
 
 
+def _feed_today_count_cached(
+    cur: Any,
+    *,
+    skills: list[str],
+    categories: list[str],
+    apply_delay: bool = False,
+) -> int:
+    """O168: TTL cache — load@50 hammers today_count on every /v1/feed."""
+    key = (tuple(skills), tuple(categories), apply_delay)
+    now = time.monotonic()
+    hit = _FEED_TODAY_COUNT_CACHE.get(key)
+    if hit and now - hit[0] < _FEED_TODAY_COUNT_TTL_SEC:
+        return hit[1]
+    with _FEED_TODAY_COUNT_LOCK:
+        hit = _FEED_TODAY_COUNT_CACHE.get(key)
+        if hit and now - hit[0] < _FEED_TODAY_COUNT_TTL_SEC:
+            return hit[1]
+        val = _feed_today_count(
+            cur, skills=skills, categories=categories, apply_delay=apply_delay
+        )
+        _FEED_TODAY_COUNT_CACHE[key] = (now, val)
+        return val
+
+
+def _feed_today_count_standalone_cached(
+    cur: Any,
+    *,
+    skills: list[str],
+    apply_delay: bool,
+) -> int:
+    key = ("standalone", tuple(skills), apply_delay)
+    now = time.monotonic()
+    hit = _FEED_TODAY_COUNT_CACHE.get(key)
+    if hit and now - hit[0] < _FEED_TODAY_COUNT_TTL_SEC:
+        return hit[1]
+    with _FEED_TODAY_COUNT_LOCK:
+        hit = _FEED_TODAY_COUNT_CACHE.get(key)
+        if hit and now - hit[0] < _FEED_TODAY_COUNT_TTL_SEC:
+            return hit[1]
+        val = _feed_today_count_standalone(cur, skills=skills, apply_delay=apply_delay)
+        _FEED_TODAY_COUNT_CACHE[key] = (now, val)
+        return val
+
+
+def _feed_score_sql(min_score: int) -> tuple[str, list[Any]]:
+    if min_score <= 0:
+        return "", []
+    sql_min = min_score
+    if min_score >= 70:
+        sql_min = effective_feed_min_score(min_score, "text")
+    return " AND (ai_score IS NULL OR ai_score >= %s)", [sql_min]
+
+
 def _feed_page_time(
     cur: Any,
     *,
@@ -546,12 +643,14 @@ def _feed_page_time(
     apply_delay: bool = False,
     user_id: str | None = None,
     min_match: int | None = None,
+    source_keys: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], int, int | None]:
     cat_sql, cat_params = _category_sql(categories)
-    sql_min = min_score
-    if min_score >= 70:
-        sql_min = effective_feed_min_score(min_score, "text")
-    feed_where, feed_params = _feed_where_sql(apply_delay=apply_delay)
+    score_sql, score_params = _feed_score_sql(min_score)
+    feed_where, feed_params = _feed_where_with_sources(
+        apply_delay=apply_delay,
+        source_keys=source_keys,
+    )
     if min_match and tag_weights:
         scan_limit = _feed_scan_limit(
             limit=limit,
@@ -570,15 +669,14 @@ def _feed_page_time(
             SELECT {_SELECT_COLS}{today_select}
             FROM leads
             WHERE {feed_where}
-              AND (ai_score IS NULL OR ai_score >= %s)
-              {cat_sql}
+              {score_sql}{cat_sql}
             ORDER BY created_at DESC
             LIMIT %s
             """,
             (
-                *feed_params,
                 *((today_params) if not categories else ()),
-                sql_min,
+                *feed_params,
+                *score_params,
                 *cat_params,
                 scan_limit,
             ),
@@ -590,7 +688,7 @@ def _feed_page_time(
                 today_count = int(rows[0][-1] or 0)
                 rows = [r[:-1] for r in rows]
             else:
-                today_count = _feed_today_count_standalone(
+                today_count = _feed_today_count_standalone_cached(
                     cur, skills=skills, apply_delay=apply_delay
                 )
         ranked = _rank_feed_rows(
@@ -601,7 +699,7 @@ def _feed_page_time(
             min_match=min_match,
             feed_delayed=apply_delay,
             categories=categories,
-        )
+        ),
         ranked.sort(key=lambda x: x.get("created_at") or "", reverse=True)
         page = ranked[offset : offset + limit]
         _finalize_feed_items(cur, page, user_id=user_id)
@@ -625,15 +723,14 @@ def _feed_page_time(
             SELECT {_SELECT_COLS}{today_select}
             FROM leads
             WHERE {feed_where}
-              AND (ai_score IS NULL OR ai_score >= %s)
-              {cat_sql}
+              {score_sql}{cat_sql}
             ORDER BY created_at DESC
             LIMIT %s
             """,
             (
-                *feed_params,
                 *((today_params) if not categories else ()),
-                sql_min,
+                *feed_params,
+                *score_params,
                 *cat_params,
                 scan_limit,
             ),
@@ -641,41 +738,30 @@ def _feed_page_time(
         rows = cur.fetchall()
         today_count = None
     else:
-        today_sub, today_params = _feed_today_subquery_sql(
-            skills=skills, apply_delay=apply_delay
-        )
-        today_select = f", {today_sub} AS _today_count"
         cur.execute(
             f"""
-            SELECT {_SELECT_COLS}{today_select}
+            SELECT {_SELECT_COLS}
             FROM leads
             WHERE {feed_where}
-              AND (ai_score IS NULL OR ai_score >= %s)
-              {cat_sql}
+              {score_sql}{cat_sql}
             ORDER BY created_at DESC
             LIMIT %s OFFSET %s
             """,
             (
                 *feed_params,
-                *today_params,
-                sql_min,
+                *score_params,
                 *cat_params,
                 limit,
                 offset,
             ),
         )
         rows = cur.fetchall()
-        today_count = None
+        today_count = _feed_today_count_cached(
+            cur, skills=skills, categories=categories, apply_delay=apply_delay
+        )
 
     if categories:
         pass
-    elif rows:
-        today_count = int(rows[0][-1] or 0)
-        rows = [r[:-1] for r in rows]
-    else:
-        today_count = _feed_today_count_standalone(
-            cur, skills=skills, apply_delay=apply_delay
-        )
     items: list[dict[str, Any]] = []
     for r in rows:
         if categories and not _passes_category_filter(r, categories):
@@ -715,9 +801,13 @@ def _feed_page_match(
     apply_delay: bool = False,
     user_id: str | None = None,
     min_match: int | None = None,
+    source_keys: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], int, int | None]:
     cat_sql, cat_params = _category_sql(categories)
-    feed_where, feed_params = _feed_where_sql(apply_delay=apply_delay)
+    feed_where, feed_params = _feed_where_with_sources(
+        apply_delay=apply_delay,
+        source_keys=source_keys,
+    )
     scan_limit = _feed_scan_limit(
         limit=limit,
         offset=offset,
@@ -739,8 +829,8 @@ def _feed_page_match(
         LIMIT %s
         """,
         (
-            *feed_params,
             *((today_params) if not categories else ()),
+            *feed_params,
             *cat_params,
             scan_limit,
         ),
@@ -752,7 +842,7 @@ def _feed_page_match(
             today_count = int(raw_rows[0][-1] or 0)
             raw_rows = [r[:-1] for r in raw_rows]
         else:
-            today_count = _feed_today_count_standalone(
+            today_count = _feed_today_count_standalone_cached(
                 cur, skills=skills, apply_delay=apply_delay
             )
     ranked = _rank_feed_rows(
@@ -780,6 +870,7 @@ def _personal_feed_page(
     skills: list[str],
     categories: list[str],
     sort: str,
+    source_keys: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], int, int | None]:
     user_tags = _load_user_tags(cur, user_id)
     has_profile = bool(user_tags)
@@ -787,7 +878,7 @@ def _personal_feed_page(
         sort = "time"
     extra, extra_params = _skills_sql(skills)
     cat_sql, cat_params = _category_sql(categories)
-    feed_where, feed_params = _feed_where_sql()
+    feed_where, feed_params = _feed_where_with_sources(source_keys=source_keys)
     today_sub, today_params = _feed_today_subquery_sql(skills=skills, apply_delay=False)
     today_select = f", {today_sub} AS _today_count" if not categories else ""
 
@@ -830,8 +921,8 @@ def _personal_feed_page(
                 LIMIT %s OFFSET %s
                 """,
                 (
-                    *feed_params,
                     *today_params,
+                    *feed_params,
                     *extra_params,
                     *cat_params,
                     limit,
@@ -844,7 +935,7 @@ def _personal_feed_page(
                 today_count = int(raw_rows[0][-1] or 0)
                 raw_rows = [r[:-1] for r in raw_rows]
             else:
-                today_count = _feed_today_count_standalone(
+                today_count = _feed_today_count_standalone_cached(
                     cur, skills=skills, apply_delay=False
                 )
         ranked: list[dict[str, Any]] = []
@@ -877,8 +968,8 @@ def _personal_feed_page(
             LIMIT %s
             """,
             (
-                *feed_params,
                 *((today_params) if not categories else ()),
+                *feed_params,
                 *extra_params,
                 *cat_params,
                 scan_limit,
@@ -891,7 +982,7 @@ def _personal_feed_page(
                 today_count = int(raw_rows[0][-1] or 0)
                 raw_rows = [r[:-1] for r in raw_rows]
             else:
-                today_count = _feed_today_count_standalone(
+                today_count = _feed_today_count_standalone_cached(
                     cur, skills=skills, apply_delay=False
                 )
         ranked = _rank_feed_rows(
@@ -1093,8 +1184,44 @@ def _log_db_connection_mode() -> None:
 
     from config import openrouter_proxy_hint
 
+    global _DB_POOL
     logger.info("db: %s", _db_connection_mode())
+    if ConnectionPool is not None:
+        _DB_POOL = ConnectionPool(
+            _db_url(),
+            min_size=4,
+            max_size=40,
+            timeout=10.0,
+            max_waiting=80,
+            open=True,
+        )
+        logger.info("db: app_pool min=4 max=40")
+        try:
+            with _db_conn() as conn:
+                with conn.cursor() as cur:
+                    _feed_today_count_cached(
+                        cur,
+                        skills=[],
+                        categories=[],
+                        apply_delay=True,
+                    )
+            _skills_catalog_popular_cached(
+                category_list=[],
+                days=_SKILLS_CATALOG_DAYS,
+                limit=_SKILLS_CATALOG_LIMIT,
+            )
+            logger.info("db: feed/catalog cache warmed")
+        except Exception as exc:
+            logger.warning("db: cache warm failed: %s", exc)
     logger.info("openrouter:proxy=%s", openrouter_proxy_hint())
+
+
+@app.on_event("shutdown")
+def _close_db_pool() -> None:
+    global _DB_POOL
+    if _DB_POOL is not None:
+        _DB_POOL.close()
+        _DB_POOL = None
 
 
 @app.post("/v1/auth/telegram")
@@ -1323,6 +1450,87 @@ def public_site_stats() -> dict[str, Any]:
 # 3c2 ─────────────────────────────────────────────────────────────────────────
 
 
+def _trim_skills_catalog(
+    groups: list[dict[str, Any]],
+    skills: list[dict[str, Any]],
+    *,
+    limit: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    if limit >= len(skills):
+        return groups, skills
+    skills = skills[:limit]
+    allowed = {s["tag"] for s in skills}
+    trimmed_groups: list[dict[str, Any]] = []
+    for group in groups:
+        g_skills = [s for s in group.get("skills", []) if s.get("tag") in allowed]
+        if g_skills:
+            trimmed_groups.append({**group, "skills": g_skills})
+    return trimmed_groups, skills
+
+
+def _skills_catalog_popular_cached(
+    *,
+    category_list: list[str],
+    days: int,
+    limit: int,
+) -> dict[str, Any]:
+    """O168: TTL cache — load@50 hammers jsonb unnest on /v1/skills/catalog."""
+    key = (tuple(category_list), days, limit)
+    now = time.monotonic()
+    hit = _SKILLS_CATALOG_CACHE.get(key)
+    if hit and now - hit[0] < _SKILLS_CATALOG_TTL_SEC:
+        return hit[1]
+    with _SKILLS_CATALOG_LOCK:
+        hit = _SKILLS_CATALOG_CACHE.get(key)
+        if hit and now - hit[0] < _SKILLS_CATALOG_TTL_SEC:
+            return hit[1]
+        return _skills_catalog_popular_fetch(
+            category_list=category_list,
+            days=days,
+            limit=limit,
+            key=key,
+            now=now,
+        )
+
+
+def _skills_catalog_popular_fetch(
+    *,
+    category_list: list[str],
+    days: int,
+    limit: int,
+    key: tuple[Any, ...],
+    now: float,
+) -> dict[str, Any]:
+    base_where, base_params = _feed_base_where_sql()
+    catalog_where = base_where.replace("is_visible", "l.is_visible").replace(
+        "source =", "l.source =",
+    )
+    with _db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT tag, COUNT(*)::int AS cnt
+                FROM leads l,
+                     jsonb_array_elements_text(COALESCE(l.lead_tags, '[]'::jsonb)) AS tag
+                WHERE {catalog_where}
+                  AND l.created_at >= NOW() - make_interval(days => %s)
+                GROUP BY tag
+                ORDER BY cnt DESC, tag
+                LIMIT %s
+                """,
+                (*base_params, days, limit * 4),
+            )
+            rows = cur.fetchall()
+    groups, skills = build_dynamic_catalog_groups(
+        [(str(t), int(c)) for t, c in rows],
+        categories=category_list or None,
+    )
+    groups, skills = _trim_skills_catalog(groups, skills, limit=limit)
+    payload = {"groups": groups, "skills": skills}
+    _SKILLS_CATALOG_CACHE[key] = (now, payload)
+    return payload
+
+
 @app.get("/v1/skills/catalog")
 def skills_catalog(
     limit: int = Query(default=_SKILLS_CATALOG_LIMIT, ge=1, le=200),
@@ -1339,54 +1547,17 @@ def skills_catalog(
             categories=category_list or None,
             ui_only=False,
         )
-        if limit < len(skills):
-            skills = skills[:limit]
-            allowed = {s["tag"] for s in skills}
-            trimmed_groups: list[dict[str, Any]] = []
-            for group in groups:
-                g_skills = [s for s in group.get("skills", []) if s.get("tag") in allowed]
-                if g_skills:
-                    trimmed_groups.append({**group, "skills": g_skills})
-            groups = trimmed_groups
+        groups, skills = _trim_skills_catalog(groups, skills, limit=limit)
         return {"groups": groups, "skills": skills}
-    base_where, base_params = _feed_base_where_sql()
-    catalog_where = base_where.replace("is_visible", "l.is_visible").replace(
-        "source =", "l.source =",
-    )
     try:
-        with psycopg.connect(_db_url()) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    f"""
-                    SELECT tag, COUNT(*)::int AS cnt
-                    FROM leads l,
-                         jsonb_array_elements_text(COALESCE(l.lead_tags, '[]'::jsonb)) AS tag
-                    WHERE {catalog_where}
-                      AND l.created_at >= NOW() - make_interval(days => %s)
-                    GROUP BY tag
-                    ORDER BY cnt DESC, tag
-                    LIMIT %s
-                    """,
-                    (*base_params, days, limit * 4),
-                )
-                rows = cur.fetchall()
-        groups, skills = build_dynamic_catalog_groups(
-            [(str(t), int(c)) for t, c in rows],
-            categories=category_list or None,
+        return _skills_catalog_popular_cached(
+            category_list=category_list,
+            days=days,
+            limit=limit,
         )
-        if limit < len(skills):
-            skills = skills[:limit]
-            allowed = {s["tag"] for s in skills}
-            trimmed_groups: list[dict[str, Any]] = []
-            for group in groups:
-                g_skills = [s for s in group.get("skills", []) if s.get("tag") in allowed]
-                if g_skills:
-                    trimmed_groups.append({**group, "skills": g_skills})
-            groups = trimmed_groups
     except Exception as exc:
         logger.error("skills_catalog: %s", exc)
         raise HTTPException(status_code=500, detail="catalog error")
-    return {"groups": groups, "skills": skills}
 
 
 @app.get("/v1/feed")
@@ -1398,6 +1569,7 @@ def feed(
     skills: str = Query(default=""),
     category: str = Query(default=""),
     sort: str = Query(default="time"),
+    source: str = Query(default=""),
     authorization: str = Header(default="", alias="Authorization"),
 ) -> dict[str, Any]:
     """Лента: is_visible=true; anon → delay 15m; any valid JWT → instant."""
@@ -1407,6 +1579,7 @@ def feed(
         raise HTTPException(status_code=400, detail="min_match must be 0, 50, 60, 70, 80, or 90")
     skill_list = _parse_skills_param(skills)
     category_list = parse_category_param(category)
+    source_keys = parse_feed_source_param(source)
     tag_weights = tags_as_weights(skill_list)
     apply_delay = True
     user_id = _try_user_from_bearer(authorization)
@@ -1416,7 +1589,7 @@ def feed(
         apply_delay = False
         feed_user_id = user_id
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 if user_id and not skill_list:
                     items, count, today_count = _personal_feed_page(
@@ -1429,6 +1602,7 @@ def feed(
                         skills=skill_list,
                         categories=category_list,
                         sort=sort,
+                        source_keys=source_keys,
                     )
                 elif sort == "match":
                     items, count, today_count = _feed_page_match(
@@ -1442,6 +1616,7 @@ def feed(
                         apply_delay=apply_delay,
                         user_id=feed_user_id,
                         min_match=min_match if min_match > 0 else None,
+                        source_keys=source_keys,
                     )
                 else:
                     items, count, today_count = _feed_page_time(
@@ -1455,9 +1630,10 @@ def feed(
                         apply_delay=apply_delay,
                         user_id=feed_user_id,
                         min_match=min_match if min_match > 0 else None,
+                        source_keys=source_keys,
                     )
                 if today_count is None:
-                    today_count = _feed_today_count(
+                    today_count = _feed_today_count_cached(
                         cur,
                         skills=skill_list,
                         categories=category_list,
@@ -1476,6 +1652,7 @@ def feed(
         "min_match": min_match,
         "skills": skill_list,
         "category": category_list,
+        "source": source_keys,
         "feed_delayed": apply_delay,
     }
 
@@ -1568,7 +1745,7 @@ def me_tags_put(
 
 
 def _default_feed_prefs() -> dict[str, Any]:
-    return {"sort": "time", "min_match": 80, "category": "", "updated_at": None}
+    return {"sort": "time", "min_match": 80, "category": "", "source": "", "updated_at": None}
 
 
 def _normalize_feed_prefs(raw: Any) -> dict[str, Any]:
@@ -1585,6 +1762,9 @@ def _normalize_feed_prefs(raw: Any) -> dict[str, Any]:
     if min_match not in _FEED_PREFS_MIN_MATCH:
         min_match = 80
     category = str(raw.get("category") or "").strip()
+    source = str(raw.get("source") or "").strip()
+    if source:
+        source = ",".join(parse_feed_source_param(source))
     updated_at = raw.get("updated_at")
     if updated_at is not None:
         updated_at = str(updated_at)
@@ -1592,6 +1772,7 @@ def _normalize_feed_prefs(raw: Any) -> dict[str, Any]:
         "sort": sort,
         "min_match": min_match,
         "category": category,
+        "source": source,
         "updated_at": updated_at,
     }
 
@@ -1623,6 +1804,7 @@ class FeedPrefsPayload(BaseModel):
     sort: str | None = None
     min_match: int | None = None
     category: str | None = None
+    source: str | None = None
 
 
 @app.get("/v1/me/feed-prefs")
@@ -1655,6 +1837,8 @@ def me_feed_prefs_put(
                     current["min_match"] = payload.min_match
                 if payload.category is not None:
                     current["category"] = str(payload.category).strip()
+                if payload.source is not None:
+                    current["source"] = ",".join(parse_feed_source_param(str(payload.source)))
                 saved = _save_feed_prefs(cur, user_id, current)
             conn.commit()
         return saved
@@ -1892,8 +2076,8 @@ def me_replies(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
-    """Inbox откликов для /cabinet/ (без soft-deleted)."""
-    feed_where, feed_params = _feed_where_sql(alias="l")
+    """Inbox откликов для /cabinet/ (без soft-deleted; 7d по replied_at)."""
+    inbox_where, inbox_params = inbox_replies_where_sql(alias="ulr")
     try:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
@@ -1904,12 +2088,11 @@ def me_replies(
                     FROM user_lead_replies ulr
                     INNER JOIN leads l ON l.id = ulr.lead_id
                     WHERE ulr.user_id = %s::uuid
-                      AND ulr.deleted_at IS NULL
-                      AND {feed_where}
+                      AND {inbox_where}
                     ORDER BY ulr.created_at DESC
                     LIMIT %s OFFSET %s
                     """,
-                    (user_id, *feed_params, limit, offset),
+                    (user_id, *inbox_params, limit, offset),
                 )
                 rows = cur.fetchall()
                 cur.execute(
@@ -1918,10 +2101,9 @@ def me_replies(
                     FROM user_lead_replies ulr
                     INNER JOIN leads l ON l.id = ulr.lead_id
                     WHERE ulr.user_id = %s::uuid
-                      AND ulr.deleted_at IS NULL
-                      AND {feed_where}
+                      AND {inbox_where}
                     """,
-                    (user_id, *feed_params),
+                    (user_id, *inbox_params),
                 )
                 total = int(cur.fetchone()[0])
     except Exception as exc:

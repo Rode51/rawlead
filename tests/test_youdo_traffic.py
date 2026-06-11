@@ -17,11 +17,15 @@ from exchange_browser_fetch import (  # noqa: E402
     _should_abort_youdo_request,
     _youdo_warm_recent,
     reset_youdo_warm_state_for_tests,
+    youdo_warm_home_enabled,
 )
 from lead_pipeline import _resolve_ingest_body  # noqa: E402
 from listing import SOURCE_YOUDO, ListingProject  # noqa: E402
 from youdo_parser import (  # noqa: E402
     YOUDO_FETCH_CYCLE_KEY,
+    YOUDO_FAIL_STREAK_KEY,
+    YOUDO_TRAFFIC_GUARD_UNTIL_KEY,
+    YOUDO_COOLDOWN_KEY,
     fetch_listing_projects,
 )
 
@@ -120,6 +124,44 @@ class TestYoudoTraffic(unittest.TestCase):
         req = MagicMock(resource_type="fetch", url="https://mc.yandex.ru/watch/123")
         self.assertTrue(_should_abort_youdo_request(req))
 
+    def test_listing_wall_clock_covers_slot_retries(self) -> None:
+        os.environ.pop("YOUDO_LISTING_TIMEOUT_SEC", None)
+        os.environ["YOUDO_GOTO_TIMEOUT_SEC"] = "90"
+        os.environ["YOUDO_SLOT_RETRY_ON_TIMEOUT"] = "3"
+        from youdo_parser import _youdo_listing_wall_clock_sec, youdo_source_fetch_wall_sec
+
+        self.assertGreaterEqual(_youdo_listing_wall_clock_sec(), 90 * 3)
+        self.assertEqual(youdo_source_fetch_wall_sec(), _youdo_listing_wall_clock_sec())
+
+    @patch("youdo_parser._fetch_listing_html")
+    def test_traffic_guard_skips_after_n_fails(self, mock_fetch: MagicMock) -> None:
+        os.environ["YOUDO_TRAFFIC_GUARD_FAILS"] = "3"
+        os.environ["YOUDO_TRAFFIC_GUARD_COOLDOWN_MIN"] = "90"
+        os.environ["YOUDO_FETCH_EVERY_N_CYCLES"] = "1"
+        storage = MagicMock()
+        now = time.time()
+        storage.get_setting.side_effect = lambda key, default="": {
+            YOUDO_FETCH_CYCLE_KEY: "0",
+            YOUDO_COOLDOWN_KEY: "0",
+            YOUDO_FAIL_STREAK_KEY: "3",
+            YOUDO_TRAFFIC_GUARD_UNTIL_KEY: str(now + 3600),
+        }.get(key, default)
+        cfg = MagicMock()
+        cfg.radar_log_path = Path("/tmp/radar.log")
+        out = fetch_listing_projects(cfg, storage=storage)
+        self.assertEqual(out, [])
+        mock_fetch.assert_not_called()
+
+    def test_retry_goto_uses_commit(self) -> None:
+        from exchange_browser_fetch import (
+            _youdo_goto_wait_until,
+            _youdo_goto_wait_until_for_attempt,
+        )
+
+        os.environ.pop("YOUDO_RETRY_GOTO_WAIT_UNTIL", None)
+        self.assertEqual(_youdo_goto_wait_until_for_attempt(2), "commit")
+        self.assertEqual(_youdo_goto_wait_until_for_attempt(1), _youdo_goto_wait_until())
+
     @patch("exchange_browser_fetch._warm_youdo_home")
     @patch("exchange_browser_fetch._youdo_warm_recent", return_value=True)
     def test_warm_home_skip_when_recent(
@@ -127,6 +169,7 @@ class TestYoudoTraffic(unittest.TestCase):
         _mock_recent: MagicMock,
         mock_warm: MagicMock,
     ) -> None:
+        os.environ["YOUDO_WARM_HOME"] = "1"
         page = MagicMock()
         _maybe_warm_youdo_home(
             page,
@@ -135,6 +178,10 @@ class TestYoudoTraffic(unittest.TestCase):
             timeout_ms=5000,
         )
         mock_warm.assert_not_called()
+
+    def test_warm_home_disabled_by_default(self) -> None:
+        os.environ.pop("YOUDO_WARM_HOME", None)
+        self.assertFalse(youdo_warm_home_enabled())
 
 
 if __name__ == "__main__":

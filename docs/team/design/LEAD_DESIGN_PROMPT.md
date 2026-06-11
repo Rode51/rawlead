@@ -4,7 +4,7 @@
 
 | | |
 |--|--|
-| **→ Сейчас** | — (idle) |
+| **→ Сейчас** | § **O174-D** — pricing + cabinet pay (YooKassa-only wire, до Coder O174b) |
 | **O127-D** | ✅ Filter Bar v2 + Lead Card v3 · **2026-06-07** → **@coder O127-WP** |
 | **O121-D** | ✅ wireframes `/ops/` прокси + IA · **2026-06-05** → **@lead-architect** → Coder **O121-w1** |
 | **O116-D** | ✅ Lead Design 2026-06-04 |
@@ -16,7 +16,30 @@
 | **O105-D** | **✅ Lead verify 2026-06-03 · → @coder** (CODER_PROMPT § O105-WP · O106) |
 | **Vision** | [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.12** |
 
-**Gate:** O127-D → O127-WP → owner BrowserSync → E2E/stress → ads.
+**Gate:** O174-D → O174-COPY approve → Coder O174b · owner YooKassa keys.
+
+---
+
+## § O174-D — YooKassa-only pay UI (**→ now · W2 @lead-designer · 2026-06-10**)
+
+**Контекст owner:** единственная оплата — **ЮKassa** · trial **1 ₽ / 3 дня** → **790 ₽/мес автопродление** · Stars/crypto/SBP-ручной — **убрать из UI**. Footer legal — **O174a** (Coder, без Design).
+
+**Риск owner:** «не проебать UI/UX» на `/pricing/`, `#pricing-preview`, блок подписки в `/cabinet/`.
+
+**Scope wireframes (ASCII или канвас):**
+
+| Зона | Что показать |
+|------|----------------|
+| **D1 `/pricing/`** | Одна карточка Premium · CTA «Оформить» / «Попробовать за 1 ₽» · мелкий текст **автопродление** · способ оплаты «Карта / СБП через ЮKassa» · **нет** блоков Stars, crypto, «перевод на телефон» |
+| **D2 `#pricing-preview`** | Те же цифры · одна кнопка · без старых pay-методов |
+| **D3 `/cabinet/` subscription** | Состояния: anon / free / trial active / premium / expired · одна pay-CTA · cancel auto-renew copy (placeholder до PM) |
+| **D4 Mobile 390px** | CTA full-width · legal/autorenew не ломает карточку |
+
+**Не трогать:** Filter Bar O127 · Lead Card · lenta strip O116 — только pay-блоки.
+
+**Референс live:** `pricing-card.php`, `pricing-preview.php`, `rawlead-cabinet.js` subscription section · канон bullets O116-Z3.
+
+**Handoff:** `@lead-product` § O174-COPY → approve → `@lead-architect` → `@coder` § O174b.
 
 ---
 

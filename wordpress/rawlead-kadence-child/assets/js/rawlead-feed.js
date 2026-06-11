@@ -18,6 +18,7 @@
   var cfg = window.rawleadFeed;
   var TOKEN_KEY = "rawlead_access_token";
   var PREFS_KEY = "rawlead_feed_prefs";
+  var INBOX_SYNC_KEY = "rawlead_inbox_rev";
   var TAGS_SYNC_KEY = "rawlead_user_tags_rev";
   var MIN_MATCH_OPTIONS = [50, 60, 70, 80, 90];
   var SLOT_TOOLTIP =
@@ -123,7 +124,7 @@
   var state = {
     offset: 0,
     limit: 20,
-    source: "",
+    sources: [],
     draftCategories: [],
     appliedCategories: [],
     sort: "time",
@@ -296,11 +297,36 @@
     return isNaN(t) ? 0 : t;
   }
 
+  function sourcesFromPrefs(prefs) {
+    if (!prefs) {
+      return [];
+    }
+    if (Array.isArray(prefs.sources)) {
+      return prefs.sources.filter(function (s) {
+        return typeof s === "string" && s;
+      });
+    }
+    if (typeof prefs.source === "string" && prefs.source) {
+      return prefs.source.split(",").filter(Boolean);
+    }
+    return [];
+  }
+
+  function hasSourceFilter() {
+    return state.sources.length > 0;
+  }
+
+  function sourcesQueryParam() {
+    return state.sources.length ? state.sources.join(",") : "";
+  }
+
   function normalizeFeedPrefs(prefs) {
     var out = {
       sort: "time",
       min_match: 80,
       category: "",
+      source: "",
+      sources: [],
       updated_at: prefs && prefs.updated_at ? prefs.updated_at : null,
     };
     if (!prefs) {
@@ -316,7 +342,59 @@
     if (typeof prefs.category === "string") {
       out.category = prefs.category;
     }
+    out.sources = sourcesFromPrefs(prefs);
+    out.source = out.sources.join(",");
     return out;
+  }
+
+  function syncSidebarSources(sources) {
+    if (!sidebar) {
+      return;
+    }
+    sidebar.querySelectorAll('input[name="source"]').forEach(function (inp) {
+      if (!inp.value) {
+        return;
+      }
+      var checked = sources.indexOf(inp.value) >= 0;
+      inp.checked = checked;
+      if (inp.parentElement) {
+        inp.parentElement.classList.toggle("is-active", checked);
+      }
+    });
+  }
+
+  function readSidebarSources() {
+    if (!sidebar) {
+      return state.sources.slice();
+    }
+    var sources = [];
+    sidebar.querySelectorAll('input[name="source"]:checked').forEach(function (inp) {
+      if (inp.value) {
+        sources.push(inp.value);
+      }
+    });
+    return sources;
+  }
+
+  function readSortPanelSources(root, name) {
+    var sources = [];
+    if (!root) {
+      return sources;
+    }
+    root.querySelectorAll('input[name="' + name + '"]:checked').forEach(function (inp) {
+      if (inp.value) {
+        sources.push(inp.value);
+      }
+    });
+    return sources;
+  }
+
+  function notifyInboxRefresh() {
+    try {
+      localStorage.setItem(INBOX_SYNC_KEY, String(Date.now()));
+    } catch (err) {
+      // ignore
+    }
   }
 
   function applyFeedPrefsToState(prefs) {
@@ -330,6 +408,8 @@
         state.draftCategories = cats.slice();
       }
     }
+    state.sources = p.sources.slice();
+    syncSidebarSources(state.sources);
   }
 
   function currentFeedPrefsPayload() {
@@ -337,6 +417,8 @@
       sort: state.sort,
       min_match: state.min_match,
       category: state.appliedCategories.join(","),
+      source: sourcesQueryParam(),
+      sources: state.sources.slice(),
       updated_at: new Date().toISOString(),
     };
   }
@@ -355,6 +437,7 @@
         sort: payload.sort,
         min_match: payload.min_match,
         category: payload.category,
+        source: payload.source,
       }),
     })
       .then(function (res) {
@@ -505,8 +588,11 @@
     if (sortTrigger) {
       var tier = getFeedTier();
       var active =
-        tier === "premium" &&
-        (state.sort === "match" || state.min_match !== 80);
+        tier !== "anon" &&
+        (
+          hasSourceFilter() ||
+          (tier === "premium" && (state.sort === "match" || state.min_match !== 80))
+        );
       sortTrigger.classList.toggle("rl-filter-btn--active", active);
     }
   }
@@ -820,11 +906,11 @@
     return { key: "other", label: source || "—", cls: "other" };
   }
 
-  function matchSource(item, filter) {
-    if (!filter) {
+  function matchSourceKey(item, filterKey) {
+    if (!filterKey) {
       return true;
     }
-    return sourceLabel(item.source).key === filter;
+    return sourceLabel(item.source).key === filterKey;
   }
 
   function formatTime(iso) {
@@ -1866,6 +1952,11 @@
         state.min_match = pctVal;
       }
     }
+    var srcPicked = sortPanelEl.querySelectorAll('input[name="rl-feed-sort-source"]:checked');
+    if (srcPicked.length || sortPanelEl.querySelector('input[name="rl-feed-sort-source"]')) {
+      state.sources = readSortPanelSources(sortPanelEl, "rl-feed-sort-source");
+      syncSidebarSources(state.sources);
+    }
     if (sortDdEl) {
       sortDdEl.open = false;
     }
@@ -1928,6 +2019,16 @@
     return body && body.querySelector(".rl-sheet-block") ? body : null;
   }
 
+  var SORT_SOURCES = [
+    { val: "fl", label: "FL.ru" },
+    { val: "kwork", label: "Kwork" },
+    { val: "tg", label: "Telegram" },
+    { val: "youdo", label: "YouDo" },
+    { val: "freelance_ru", label: "Freelance.ru" },
+    { val: "freelancejob", label: "FreelanceJob" },
+    { val: "pchyol", label: "Пчёл.нет" },
+  ];
+
   function buildSortOptionsHtml(radioName, includeApply) {
     var html =
       '<label class="rl-sort-option' +
@@ -1963,6 +2064,24 @@
           "%</button>";
       }
       html += "</div></div>";
+    }
+    html += '<p class="rl-sort-panel__divider">ИСТОЧНИК:</p>';
+    var srcName = radioName + "-source";
+    for (var si = 0; si < SORT_SOURCES.length; si++) {
+      var src = SORT_SOURCES[si];
+      var srcActive = state.sources.indexOf(src.val) >= 0;
+      html +=
+        '<label class="rl-sort-option' +
+        (srcActive ? " is-active" : "") +
+        '"><input type="checkbox" name="' +
+        srcName +
+        '" value="' +
+        src.val +
+        '"' +
+        (srcActive ? " checked" : "") +
+        "> " +
+        src.label +
+        "</label>";
     }
     if (includeApply) {
       html +=
@@ -2015,6 +2134,11 @@
         state.min_match = pctVal;
       }
     }
+    var srcPicked = sheetBody.querySelector('input[name="rl-sheet-sort-source"]');
+    if (srcPicked !== null && sidebar) {
+      state.sources = readSortPanelSources(sheetBody, "rl-sheet-sort-source");
+      syncSidebarSources(state.sources);
+    }
     enforceFeedSortTier();
     renderSortPanel();
     updateSortTriggerLabel();
@@ -2038,7 +2162,7 @@
     }
     btn.classList.toggle(
       "has-selection",
-      filterCount > 0 || state.source !== "" || state.sort !== "time"
+      filterCount > 0 || hasSourceFilter() || state.sort !== "time"
     );
     btn.hidden = !mobile;
   }
@@ -2096,10 +2220,9 @@
     if (!sidebar) {
       return;
     }
-    var src = sidebar.querySelector('input[name="source"]:checked');
-    state.source = src ? src.value : "";
+    state.sources = readSidebarSources();
     var dirty =
-      state.source !== "" ||
+      hasSourceFilter() ||
       state.appliedCategories.length > 0 ||
       state.appliedTags.length > 0 ||
       state.sort !== "time" ||
@@ -2904,6 +3027,7 @@
 
   function resetAndLoad() {
     state.loadGeneration += 1;
+    hideFeedBanner();
     state.offset = 0;
     state.done = false;
     state.totalShown = 0;
@@ -2962,6 +3086,10 @@
     if (state.appliedCategories.length) {
       params.category = state.appliedCategories.join(",");
     }
+    var sourceParam = sourcesQueryParam();
+    if (sourceParam) {
+      params.source = sourceParam;
+    }
     var url = apiUrl(params);
 
     fetch(url, { credentials: "same-origin", headers: authHeaders() })
@@ -2975,9 +3103,8 @@
         if (gen !== state.loadGeneration) {
           return;
         }
-        var items = (data.items || []).filter(function (item) {
-          return matchSource(item, state.source);
-        });
+        hideFeedBanner();
+        var items = data.items || [];
         if (data.total != null) {
           state.total = parseInt(data.total, 10) || 0;
         }
@@ -2993,11 +3120,11 @@
           listEl.innerHTML = "";
         }
         if (items.length === 0 && state.offset === 0) {
-          if (state.appliedCategories.length && !state.source && !state.appliedTags.length) {
+          if (state.appliedCategories.length && !hasSourceFilter() && !state.appliedTags.length) {
             listEl.innerHTML = categoryEmptyMessage();
             bindEmptyCta();
           } else if (
-            state.source ||
+            hasSourceFilter() ||
             state.appliedCategories.length ||
             state.appliedTags.length
           ) {
@@ -3243,6 +3370,7 @@
     card.classList.remove("rl-lead-card--draft-pending");
     card.classList.add("rl-lead-card--draft-done");
     updateCardDraftCta(card, item);
+    notifyInboxRefresh();
     var replyEl = card.querySelector("[data-reply-text]");
     if (replyEl) {
       replyEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -3657,17 +3785,22 @@
       }
     });
     sortDdEl.addEventListener("change", function (e) {
-      if (
-        e.target &&
-        e.target.name === "rl-feed-sort" &&
-        sortPanelEl &&
-        sortPanelEl.contains(e.target)
-      ) {
-        sortPanelEl.querySelectorAll(".rl-sort-option").forEach(function (opt) {
-          var inp = opt.querySelector("input");
-          opt.classList.toggle("is-active", inp && inp.checked);
+      if (!e.target || !sortPanelEl || !sortPanelEl.contains(e.target)) {
+        return;
+      }
+      if (e.target.name === "rl-feed-sort") {
+        sortPanelEl.querySelectorAll('input[name="rl-feed-sort"]').forEach(function (inp) {
+          if (inp.parentElement) {
+            inp.parentElement.classList.toggle("is-active", inp.checked);
+          }
         });
         updateSortPanelPctVisibility();
+      } else if (e.target.name === "rl-feed-sort-source") {
+        sortPanelEl.querySelectorAll('input[name="rl-feed-sort-source"]').forEach(function (inp) {
+          if (inp.parentElement) {
+            inp.parentElement.classList.toggle("is-active", inp.checked);
+          }
+        });
       }
     });
     sortDdEl.addEventListener("click", function (e) {
@@ -3676,11 +3809,20 @@
         var sortInp = sortOpt.querySelector('input[name="rl-feed-sort"]');
         if (sortInp) {
           sortInp.checked = true;
-          sortPanelEl.querySelectorAll(".rl-sort-option").forEach(function (opt) {
-            var inp = opt.querySelector("input");
-            opt.classList.toggle("is-active", inp && inp.checked);
+          sortPanelEl.querySelectorAll('input[name="rl-feed-sort"]').forEach(function (inp) {
+            if (inp.parentElement) {
+              inp.parentElement.classList.toggle("is-active", inp.checked);
+            }
           });
           updateSortPanelPctVisibility();
+        }
+        var srcInp = sortOpt.querySelector('input[name="rl-feed-sort-source"]');
+        if (srcInp) {
+          sortPanelEl.querySelectorAll('input[name="rl-feed-sort-source"]').forEach(function (inp) {
+            if (inp.parentElement) {
+              inp.parentElement.classList.toggle("is-active", inp.checked);
+            }
+          });
         }
       }
       var pctBtn = e.target.closest("[data-feed-min-match]");
@@ -3853,7 +3995,13 @@
     });
     if (resetBtn) {
       resetBtn.addEventListener("click", function () {
-        sidebar.querySelector('input[name="source"][value=""]').checked = true;
+        sidebar.querySelectorAll('input[name="source"]').forEach(function (inp) {
+          inp.checked = false;
+          if (inp.parentElement) {
+            inp.parentElement.classList.remove("is-active");
+          }
+        });
+        state.sources = [];
         sidebar.querySelectorAll('input[name="category"]').forEach(function (inp) {
           inp.checked = inp.value === "";
         });
@@ -4003,11 +4151,20 @@
         var sortInp = sortOpt.querySelector('input[name="rl-sheet-sort"]');
         if (sortInp) {
           sortInp.checked = true;
-          sheetBody.querySelectorAll(".rl-sheet-block--sort .rl-sort-option").forEach(function (opt) {
-            var radio = opt.querySelector("input");
-            opt.classList.toggle("is-active", radio && radio.checked);
+          sheetBody.querySelectorAll('input[name="rl-sheet-sort"]').forEach(function (inp) {
+            if (inp.parentElement) {
+              inp.parentElement.classList.toggle("is-active", inp.checked);
+            }
           });
           updateSheetSortPctVisibility();
+        }
+        var srcInp = sortOpt.querySelector('input[name="rl-sheet-sort-source"]');
+        if (srcInp) {
+          sheetBody.querySelectorAll('input[name="rl-sheet-sort-source"]').forEach(function (inp) {
+            if (inp.parentElement) {
+              inp.parentElement.classList.toggle("is-active", inp.checked);
+            }
+          });
         }
       }
       var pctBtn = e.target.closest(".rl-sheet-block--sort [data-feed-min-match]");
@@ -4218,6 +4375,15 @@
 
   hideFeedBanner();
 
+  function parseUrlSource() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      return params.get("source") || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
   Promise.all([
     loadSubscription(),
     isLoggedIn() ? mergeFeedPrefsOnLogin() : Promise.resolve(),
@@ -4230,6 +4396,11 @@
       state.draftCategories = readCategoriesFrom();
       state.appliedCategories = cloneCategories(state.draftCategories);
       state.sort = "time";
+    }
+    var urlSource = parseUrlSource();
+    if (urlSource) {
+      state.sources = urlSource.split(",").filter(Boolean);
+      syncSidebarSources(state.sources);
     }
     applyFeedTierUi();
     renderSkillsCatalog();

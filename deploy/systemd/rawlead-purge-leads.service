@@ -1,5 +1,5 @@
 [Unit]
-Description=RawLead purge leads older than 7 days
+Description=RawLead purge old + delisted leads (7d retention + DELIST_PURGE_DAYS)
 After=network-online.target
 
 [Service]

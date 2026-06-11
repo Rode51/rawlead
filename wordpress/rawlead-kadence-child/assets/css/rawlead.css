@@ -1927,6 +1927,15 @@ section.rl-flow.rl-section {
   font-size: 0.8125rem;
 }
 
+.rl-footer__legal {
+  width: 100%;
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--rl-text-muted);
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
 /* Inner pages — общий каркас */
 body.rawlead-inner .content-area,
 body.rawlead-inner .site-main,
@@ -5944,7 +5953,8 @@ section.rl-section--alt[aria-labelledby="rl-flow-title"] {
 }
 
 .rl-feed-list .rl-lead-card .rl-match__fill,
-#rl-cabinet-list .rl-lead-card .rl-match__fill {
+#rl-cabinet-list .rl-lead-card .rl-match__fill,
+.rl-live-preview .rl-match__fill {
   width: var(--match-value, 0%);
   transition: width 600ms ease-out;
 }
@@ -6171,7 +6181,8 @@ body.page-contact .rl-contact-form {
   }
 
   .rl-feed-list .rl-lead-card .rl-match__fill,
-  #rl-cabinet-list .rl-lead-card .rl-match__fill {
+  #rl-cabinet-list .rl-lead-card .rl-match__fill,
+  .rl-live-preview .rl-match__fill {
     width: var(--match-value, 0%);
     transition: none;
   }

@@ -10,9 +10,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from config import Config
-from fl_parser import check_project_page_gone as fl_page_gone
-from kwork_parser import check_project_page_gone as kwork_page_gone
-from listing import SOURCE_FL, SOURCE_KWORK
+from exchange_delist import check_source_page_gone
 from pg_storage import NeonLeadStorage
 
 if TYPE_CHECKING:
@@ -23,9 +21,9 @@ logger = logging.getLogger(__name__)
 DELIST_LAST_RUN_KEY = "delist_last_run_epoch"
 DELIST_LAST_STATS_KEY = "delist_last_stats_json"
 
-_DEFAULT_BATCH_LIMIT = 40
-_DEFAULT_INTERVAL_SEC = 1800
-_DELIST_GRACE_HOURS = 6
+_DEFAULT_BATCH_LIMIT = 80
+_DEFAULT_INTERVAL_SEC = 900
+_DEFAULT_GRACE_HOURS = 6
 
 
 def delist_batch_limit() -> int:
@@ -42,6 +40,14 @@ def delist_interval_sec() -> int:
         return max(300, min(86400, int(raw)))
     except ValueError:
         return _DEFAULT_INTERVAL_SEC
+
+
+def delist_grace_hours() -> int:
+    raw = os.environ.get("DELIST_GRACE_HOURS", str(_DEFAULT_GRACE_HOURS)).strip()
+    try:
+        return max(1, min(72, int(raw)))
+    except ValueError:
+        return _DEFAULT_GRACE_HOURS
 
 
 def load_delist_last_stats(storage: ProjectStorage) -> dict[str, Any]:
@@ -96,15 +102,6 @@ def _format_epoch(epoch: float) -> str:
     )
 
 
-def _check_gone(source: str, url: str, cfg: Config) -> bool | None:
-    src = (source or "").strip().lower()
-    if src == SOURCE_FL or src.startswith("fl:"):
-        return fl_page_gone(url, cfg)
-    if src == SOURCE_KWORK or src.startswith("kwork:"):
-        return kwork_page_gone(url, cfg)
-    return None
-
-
 def run_delist_batch(
     cfg: Config,
     pg: NeonLeadStorage,
@@ -117,11 +114,11 @@ def run_delist_batch(
     batch_limit = delist_batch_limit() if limit is None else max(1, int(limit))
     stats = {"checked": 0, "delisted": 0, "skipped": 0}
     rows = pg.fetch_visible_for_source_recheck(
-        limit=batch_limit, grace_hours=_DELIST_GRACE_HOURS, errors=err
+        limit=batch_limit, grace_hours=delist_grace_hours(), errors=err
     )
     for lead_id, source, url in rows:
         stats["checked"] += 1
-        gone = _check_gone(source, url, cfg)
+        gone = check_source_page_gone(source, url, cfg)
         if gone is None:
             pg.mark_source_checked(lead_id, errors=err)
             stats["skipped"] += 1

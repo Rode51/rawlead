@@ -25,6 +25,7 @@ KIND_LABELS: dict[str, str] = {
     "403": "403 запрещено",
     "browser": "Браузер не открыл страницу",
     "parse": "Страница открылась, разбор не смог",
+    "parse_empty": "Листинг пуст — карточек нет",
     "proxy": "Прокси кончились / в бане",
     "timeout": "Таймаут",
     "unknown": "Неизвестная ошибка",
@@ -83,7 +84,9 @@ def classify_error(msg: str) -> str:
         return "proxy"
     if any(x in s for x in ("timeout", "timed out", "таймаут", "read timed out")):
         return "timeout"
-    if any(x in s for x in ("parse", "разбор", "empty", "no cards", "no tasks", "selector")):
+    if any(x in s for x in ("parse_empty", "нет карточек", "no cards", "no tasks")):
+        return "parse_empty"
+    if any(x in s for x in ("parse", "разбор", "empty", "selector", "вёрстка")):
         return "parse"
     return "unknown"
 

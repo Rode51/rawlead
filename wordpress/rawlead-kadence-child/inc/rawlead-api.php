@@ -778,6 +778,8 @@ add_action('rest_api_init', static function (): void {
 
             'category'  => ['type' => 'string', 'default' => ''],
 
+            'source'    => ['type' => 'string', 'default' => ''],
+
             'sort'      => ['type' => 'string', 'default' => 'time'],
 
             'min_match' => ['type' => 'integer', 'default' => 0, 'minimum' => 0, 'maximum' => 100],
@@ -813,6 +815,14 @@ add_action('rest_api_init', static function (): void {
             if ($category !== '') {
 
                 $query['category'] = $category;
+
+            }
+
+            $source = trim((string) $request->get_param('source'));
+
+            if ($source !== '') {
+
+                $query['source'] = $source;
 
             }
 

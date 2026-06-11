@@ -76,11 +76,12 @@ class TestFeedPageTimeInlineToday(unittest.TestCase):
     @patch("src.api_server.passes_score_filter", return_value=True)
     @patch("src.api_server.resolve_lead_category", return_value="dev")
     @patch("src.api_server._canonical_lead_tags", return_value=[])
-    def test_single_execute_includes_today_count(
+    @patch("src.api_server._feed_today_count_cached", return_value=7)
+    def test_default_path_uses_cached_today_count(
         self, *_mocks: MagicMock
     ) -> None:
         cur = MagicMock()
-        row = tuple(range(15)) + (7,)
+        row = tuple(range(15))
         cur.fetchall.return_value = [row]
 
         page, count, today = _feed_page_time(
@@ -98,16 +99,23 @@ class TestFeedPageTimeInlineToday(unittest.TestCase):
         self.assertEqual(count, len(page))
         self.assertEqual(cur.execute.call_count, 1)
         query = cur.execute.call_args[0][0]
-        self.assertIn("_today_count", query)
+        self.assertNotIn("_today_count", query)
         self.assertIn("OFFSET", query)
 
 
 class TestDbConnectionMode(unittest.TestCase):
-    def test_pooler_host(self) -> None:
-        self.assertEqual(
-            _db_connection_mode(),
-            "direct",
-        )
+    def test_unset_or_direct_when_no_pooler_in_url(self) -> None:
+        import os
+
+        old = os.environ.get("DATABASE_URL")
+        try:
+            os.environ["DATABASE_URL"] = "postgresql://u:p@ep-foo.eu-west.aws.neon.tech/db"
+            self.assertEqual(_db_connection_mode(), "direct")
+        finally:
+            if old is None:
+                os.environ.pop("DATABASE_URL", None)
+            else:
+                os.environ["DATABASE_URL"] = old
 
     def test_pooler_detection(self) -> None:
         import os
