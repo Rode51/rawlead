@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-06-12 — O190 ingest DoD + hot slim
+
+**Закрыто:** O190-t0j YouDo ingest · Lead verify VPS · `fetch_end parsed=50`.
+
+**Hot:** CODER_PROMPT **~85** строк · STATUS **~55** · TASKS slim · O191 active.
+
+**Урок:** Lead push только `docs/**` пока Coder на O191 — без конфликта с `src/`.
+
+---
+
 ## 2026-06-05 — Docs sync + infra hot closed
 
 **Закрыто:** O117-deploy · O120-deploy · O121-w0 · O116 full · O72e gate.

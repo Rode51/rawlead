@@ -6,6 +6,97 @@
 
 ---
 
+# Перенесено из hot **2026-06-12** (O190 YouDo ingest DoD — full chronicle)
+
+## § O190-YOUDO-CAMOUFOX ✅ Lead 2026-06-12
+
+**DoD:** subprocess `youdo_fetch_worker.py` · t0j cycle gate · `fetch_end parsed=50` · `health:youdo ok` · deploy `deploy-o190-t0e-vps.py` · next: **O191** proxy · **O193** FL worker
+
+**Root cause (t0i):** uvicorn/anyio infects threads — 5 asyncio approaches failed — **process isolation** via subprocess worker.
+
+| Step | Result |
+|------|--------|
+| t0a–t0b | camoufox env · patchright ❌ |
+| t0c | firefox deps ✅ |
+| t0d | proxy failover · asyncio on listing ❌ |
+| t0e–t0h | loop guards · AsyncCamoufox · all ❌ ingest |
+| t0i | subprocess ✅ 50 cards |
+| t0j | `_safe_close_browser_contexts` · `_commit_youdo_fetch_gate` · delist cap **10** · ✅ cycle ~50s |
+
+Detail + Mechanic notes → [`problems/2026-06-12-youdo-antibot-permanent.md`](../../problems/2026-06-12-youdo-antibot-permanent.md)
+
+---
+
+# Перенесено из hot **2026-06-12** (O185 t5b reset-btn hotfix)
+
+## § O185-t5b-reset-btn ✅ Lead 2026-06-12
+
+**DoD:** `readFilters()` at end of `updateFilterBarUi()` — reset button reappears after sort/source/category change without F5 · skills still kept on reset · theme **1.18.75** · deploy `deploy-o185-w3-vps.py`
+
+---
+
+# Перенесено из hot **2026-06-12** (O185 wave 3)
+
+## § O185-w3-PRELAUNCH ✅ Lead 2026-06-12 (t6 tail → Mechanic)
+
+**t5b ✅** — `rawlead-feed.js` reset: source/category/sort/min_match only · **no** `persistTags([])` · explicit clearSkills unchanged · theme **1.18.74** · deploy `deploy-o185-w3-vps.py`
+
+**t8 ✅** — `rawlead-purge-leads.timer` **active** · dry-run **162** rows >7d (**2.3%**) · Neon **7113** total · policy OK
+
+**t6 ⚠️ partial** — `_looks_like_antibot` `<4000` + task-id SSR guard on VPS · pytest youdo/health **32/32** · **ingest still broken**: `empty HTML after goto` · traffic_guard streak 13 · `health:youdo ok parsed=0` on skip cycles · **→ @mechanic** `2026-06-12-youdo-antibot-permanent.md` (t6b ops honesty · t6c wait_until/stealth)
+
+---
+
+# Перенесено из hot **2026-06-12** (O185 wave 2)
+
+## § O185-w2-PRELAUNCH ✅ Lead 2026-06-12
+
+**DoD:** t3 `user_avatar.py` — cache on login · `/v1/me` + `/v1/me/avatar` · octet-stream guard · VPS `rawlead-avatars/` · t4 `rank.keyword_match` lead-coverage only (extra user tags no penalty) · cabinet `refreshUserProfile` + header sync · theme **1.18.73** · deploy `deploy-o185-w2-vps.py` · pytest match+avatar **29/29**
+
+**Point fixes:** image magic-byte check · avatar `onerror` hide · CSS empty `[src]` · sessionStorage cabinet sort/min_match
+
+**Gap → t5b:** `/lenta/` «Сбросить фильтры» must **not** clear skills (owner confirmed **2026-06-12**)
+
+---
+
+# Перенесено из hot **2026-06-12** (O185 t1b)
+
+## § O185-t1b-SMOKE-PRICE ✅ Lead 2026-06-12
+
+**DoD:** `PAY_PREMIUM_RUB=10` VPS smoke · owner subscription checkout ✅ · revert **790** + cabinet copy · hide «Продлить» on active Premium · `rawlead-cabinet.js` · script `_tmp_o185_t1b_smoke_price.py`
+
+---
+
+# Перенесено из hot **2026-06-12** (O185 wave 1)
+
+## § O185-w1-PAY ✅ Lead 2026-06-12
+
+**DoD:** t1 trial→790 checkout (`validate_checkout` + UI «Подключить Premium») · t2 remove push hint under toggle · t7 `_claim_payment_row` + Neon `022_yookassa_processing_status.sql` · pytest **16/16** · theme **1.18.66** · `deploy-o185-vps.py`
+
+**Owner:** smoke 790 ₽ on active trial
+
+---
+
+# Перенесено из hot **2026-06-12** (O174 pay)
+
+## § O174c-PAY-SMOKE ✅ Lead 2026-06-12
+
+**DoD:** `.cursorignore` (venv/target/data/playwright/audit PNGs) · `confirmSubscriptionOnReturn()` only on `?pay=return` · owner trial **1 ₽** ✅ · Neon `plan=trial` `active_until=2026-06-15` · payment **#6 succeeded** · pytest **12/12** · theme **1.18.65**
+
+**Do not (deferred):** manual trial grant · cancel UI · `YOOKASSA_SAVE_PAYMENT_METHOD=1` → **O174d**
+
+---
+
+## § O174b-HOTFIX ✅ Lead 2026-06-11
+
+**Delivered:** `confirm_pending_payment` · `POST /v1/me/subscription/confirm` · `POST /v1/me/subscription/cancel` (API) · `POST /v1/webhooks/yookassa` · WP confirm proxy · theme **1.18.65** · pytest **21/21**
+
+**Owner:** webhook URL + events in YooKassa LK ✅ · VPS keys ✅ · **`YOOKASSA_SAVE_PAYMENT_METHOD=0`** · webhook POST → **200**
+
+**Gap fixed in O174c:** confirm on every cabinet load → only `?pay=return`
+
+---
+
 # Перенесено из hot **2026-06-09** (O133-FILTER FL + O146–O159 + O160 summary)
 
 ## § O133-FILTER ✅ FL (Lead verify 2026-06-09)

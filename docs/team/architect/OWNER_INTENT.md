@@ -675,7 +675,7 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 | **Pricing / ЛК** | Одна оплата — **ЮKassa** (карта / СБП через кассу) · убрать Stars, USDT/TON, «перевод на телефон» |
 | **Бот @rawlead_bot** | Убрать `/pay` ветки crypto · Stars · manual SBP · оставить поддержку/лента/deep-link на сайт |
 | **Trial** | **1 ₽** → **3 дня** Premium (1× на аккаунт) · далее **790 ₽/мес** **автопродление** (recurring ЮKassa) |
-| **Owner** | Ключи ЮKassa в `.env` VPS · webhook URL → API · **ещё не финализировал подключение** |
+| **Owner** | Ключи ЮKassa в `.env` VPS · webhook URL → API · **договор ✅ 2026-06-11** · ждём shop_id + secret |
 | **Порядок** | **1)** footer ✅ owner **2026-06-10** · **2)** ЮKassa на проверке — **prep** код/копирайт · **3)** ключи owner · **4)** включить оплату |
 | **O175** | **Фильтр бирж (multi) + ЛК откликов + пагинация 10** | § **O175-w** |
 
@@ -717,6 +717,37 @@ Cron runbook Green без LLM; Red → тикет. **После** O171.
 ### § O173-w — Draft wait UX B+C (**P1**, owner **2026-06-10**)
 
 Token-stream L2 + второй юзер без общего стрима · O160-w факты **❌** · см. § **O173-DRAFT-WAIT-UX** · **после O168**
+
+### § O191-w — YouDo: DC primary + residential fallback (**P1**, owner **2026-06-12**)
+
+**Owner:** попробовать **наши обычные (DC) прокси** первым слотом · **residential** — подстраховка на retry · общий трафик node-proxy — **не** резать число слотов ради «экономии» · listing **не** реже (наоборот — свежесть важнее).
+
+**Lead:** экономия GB — не `fetch_every_n` ↑ и не меньше слотов, а **меньше байт на fetch** (detail skip, delist реже) + DC дешевле residential когда camoufox пропускает.
+
+**Порядок:** только **после** O190 ingest DoD (`fetch_end parsed>=50`) · smoke DC slot → env order DC→RU → deploy · rollback RU-only одной строкой.
+
+**→ @coder:** § **O191-YOUDO-PROXY-MIX** (в `CODER_PROMPT` после t0d-ingest ✅)
+
+### § O193-w — FL listing: subprocess worker (**P1**, owner **2026-06-12**)
+
+**Контекст:** O190 t0i — YouDo listing через `scripts/youdo_fetch_worker.py` (отдельный процесс) снял asyncio contamination в uvicorn-процессе. FL listing сейчас in-process Playwright + httpx fallback в том же цикле.
+
+**Решение owner (вариант B, не A):**
+
+| | Вариант | Статус |
+|---|---------|--------|
+| **A** | FL listing **httpx-primary**, browser только fallback | **❌ отклонено** |
+| **B** | FL listing → **`fl_fetch_worker.py`** subprocess (паттерн как YouDo worker) | **✅ принято** |
+
+**Границы:**
+- **`tz_session.py` не трогать** — скачивание ТЗ (auth cookies / persistent profile) отдельно от listing crawl
+- Kwork — **не в этом решении**; аналог B возможен позже отдельным §
+
+**Lead:** process isolation = упрощение стабильности radar-цикла, не over-engineering.
+
+**Порядок:** только **после** O190 ingest DoD (`fetch_end parsed>=50` + `health:youdo ok`) · зафиксировать subprocess-паттерн на YouDo · затем FL worker · **O191** (YouDo proxy mix) не блокируется — параллельно или после FL по приоритету ingest SLA
+
+**→ @coder:** § **O193-FL-SUBPROCESS-WORKER** (в `CODER_PROMPT` после t0j ✅)
 
 ### § O165-w — TG smoke: группа «Тест Ботов» (**P0**, owner **2026-06-09**)
 
@@ -1333,6 +1364,16 @@ Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unse
 
 | Дата | Мысль / запрос | Kуда ушло |
 |------|----------------|-----------|
+| 2026-06-12 | **FL listing — вариант B** · subprocess worker как YouDo · **не** httpx-primary · **`tz_session` не трогать** | **§ O193-w** · Coder после O190 t0j ✅ |
+| 2026-06-12 | **VPS апгрейд** — **4 GB / 2 vCPU** (было 2 GB / 1 vCPU) · camoufox + FL Chromium + L1 ×3 + tg_main влезают без OOM · до рекламы | owner сделал 2026-06-12 19:30 UTC+8 |
+| 2026-06-12 | **Stability first** — заморозить antibot-эксперименты после t0e; ingest SLA 48h; deploy-gate: smoke + grep после каждого деплоя | **§ O192-STABILITY** (Coder) после t0e |
+| 2026-06-12 | **YouDo proxy mix** — owner: **DC primary + residential fallback** (не только RU res) · **не** реже listing (`fetch_every_n` ↑) · node-proxy **общий трафик** на пул — число слотов ≠ экономия GB | **§ O191-w** после O190 ingest ✅ |
+| 2026-06-12 | **YouDo RU proxy list** — owner прислал экспорт node-proxy RU ×25 (gate…10000–10024) для `YOUDO_PROXY_URLS` | owner ops → `.env.site` + `deploy-youdo-residential-vps.py` · Coder t0d — smoke failover |
+| 2026-06-12 | **YouDo P2 camoufox** — после O189 ❌ · owner: Firefox ok если прикрыть хвосты patchright/t6 | **§ O190** t0b |
+| 2026-06-12 | **Аудит логики** — owner: «может Sonata проверит» / баг в join-очереди | Lead verify O188 → v2/v3 рассинхрон · **Mechanic** TG state или **@coder** O188 fix · не O186 security |
+| 2026-06-12 | **YouDo P1 patchright** — owner «давай пробовать» после Mechanic CDP analysis | **§ O189** ✅ code · ❌ ingest |
+| 2026-06-12 | **TG wave 4:** 127 чатов (@agile_jobs …) · **10 join/час** · split acc1/2/3 · **логи per acc** когда/куда вступил | **§ O188** · `TG_JOIN_QUEUE_v3.csv` · CODER_PROMPT |
+| 2026-06-12 | **С рекламой не торопимся** — стабильности парсинга нет (YouDo 🔴, TG мало) · ускорять парсеры не приоритет | **ads ⏸** подтверждено · очередь: YouDo t6c → TG join/чаты → **O187-stability** (ingest SLA) · не speed-up |
 | 2026-06-09 | **TG лента:** много рекламы услуг · жёстче L1+pre-filter только для TG | **§ O170-TG-L1-FILTER** P0 |
 | 2026-06-09 | **O169** secondary выпали из feed после O165 deploy — восстановить YouDo/FRU/… | **§ O169-SECONDARY-FEED** ✅ deploy |
 | 2026-06-09 | **Реклама рано** · stress/L2 сначала · TG тест-группа · home match bar · sort по биржам | **§ O165–O168** · CODER_PROMPT |
@@ -1684,6 +1725,22 @@ _Заменено решением v1.1 B+C выше._
 
 ---
 
+| 2026-06-12 | **Smoke price 10 ₽** | prod smoke subscription ✅ owner · revert **790** | **✅ O185 t1b** |
+| 2026-06-12 | **Trial → buy 790 during trial** | сейчас «Уже есть Premium» | O185 t1 |
+| 2026-06-12 | **Match logic** | больше навыков ≠ ниже % · Python job + Py+Java user = 100% | O185 t4 + PRODUCT_CANON §3 |
+| 2026-06-12 | **Reset btn visibility** | кнопка после повторного фильтра без F5 | **✅ O185-t5b-reset-btn** |
+| 2026-06-12 | **PRODUCT_CANON.md** | единый файл лимитов/тарифов для PM audit | `@lead-product` |
+| 2026-06-12 | **TG AuthKey owner PC** | случайный вход с ПК → session refresh VPS only | **→ Mechanic** |
+| 2026-06-12 | **Neon 80%** | автоочистка — **есть** (7d purge timer); не менять политику — verify timer | O185 t8 |
+| 2026-06-12 | **Cabinet copy** | убрать «Premium — оплата… Push — /start…» | O185 t2 |
+| 2026-06-12 | **Avatar broken** | фото в шапке кабинета | O185 t3 |
+| 2026-06-12 | **YouDo again broken** | закрыть навсегда | O185 t6 + Mechanic |
+| 2026-06-12 | **O174c trial smoke ✅** | owner **1 ₽** → Premium в `/cabinet/` · Neon trial до **15.06** · payment **#6 succeeded** | **O174d** ⏸ |
+| 2026-06-12 | **MiMo Code (Xiaomi)** | облачный coding agent — **попробовать позже**, после стабилизации RawLead | backlog research |
+| 2026-06-11 | **O174 defer cancel/autopay** | красная «Отменить» + recurring **после первых пользователей** | **O174d** backlog |
+| 2026-06-11 | **Webhook ЛК ЮKassa** | URL ✅ · events `payment.succeeded` + `payment.canceled` · backend live POST 200 | owner retest pay |
+| 2026-06-11 | **`.cursorignore`** | нет в repo · ~8.9 GB `desktop/src-tauri/target` · → Coder t0 | token hygiene |
+| 2026-06-11 | **O174b smoke FAIL** | 1₽ YooKassa succeeded · Neon pending · webhook/confirm gap | § O174b-HOTFIX |
 | 2026-06-11 | **O182 delist in-progress** | YouDo **«Выполняется»** / SBR «Зарезервировано» — не откликнуться · smoke `t14827772` / #16149 | **→ @coder** § O182 |
 | 2026-06-11 | **O181 delist closed** | YouDo «**Закрыто для откликов**» + purge delisted · smoke #16797 | **✅ smoke** · purge apply **306+964** |
 | 2026-06-11 | **O180 delist** | Мёртвые/удалённые на ленте — delist web + backfill | **✅ smoke** #17048 |

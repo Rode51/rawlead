@@ -8,7 +8,24 @@
 
 ---
 
-## § 2026-06-05 — перенос из hot STATUS (Lead slim)
+## § 2026-06-12 — перенос из hot STATUS (Lead slim O190)
+
+_O175b–O190 footnotes moved from hot STATUS **2026-06-12**._
+
+| Ticket | Сводка |
+|--------|--------|
+| O175b | WP REST source proxy · theme **1.18.55** |
+| O176 | `youdo:trace` funnel |
+| O178 | feed source/sort · **1.18.56** |
+| O179 | traffic_guard · goto_attempt=3 |
+| O181–O182 | delist markers · #16797 · #16149 |
+| O182b | import hotfix · no NameError |
+| O185 | pay trial/checkout · theme **1.18.66–75** |
+| O188 | TG join wave4 · 28/127 |
+| O189 | patchright smoke ❌ html_len=39 |
+| O190 t0a–t0j | camoufox → subprocess → cycle gate · **ingest DoD ✅** |
+
+---
 
 Детали O116 · O72e волны · O109 · O114 · O115 · PRE-RELEASE-AUDIT — были в hot STATUS до sync.
 

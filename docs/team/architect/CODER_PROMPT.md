@@ -1,134 +1,82 @@
 # Coder — hot queue (active)
 
-**→ Now:** § **O174b-YOOKASSA-PAY** prep ⏸ keys · YouDo ingest monitor
+**→ Now:** § **O191-YOUDO-PROXY-MIX** · § **O188** wave (no code unless stuck) · **O186** backlog
+
+**O190:** ✅ Lead verify **2026-06-12** · ingest DoD closed · chronicle → [`CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) · **O193** FL subprocess after O191
 
 **Archive:** [`CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md)
 
 ---
 
-## § O182b-YOUDO-IMPORT-HOTFIX (**✅ smoke 2026-06-11**)
+## § O191-YOUDO-PROXY-MIX (owner **2026-06-12** — § O191-w)
 
-**Lead verify:** import on VPS · pytest **43/43** · deploy `deploy-o182b-vps.py` · post-deploy **no NameError** · listing still flaky (`health:youdo fail kind=browser` antibot on US slots) — separate from import.
+**Context:** O190 ingest ✅ · `fetch_end parsed=50` · `health:youdo ok` · subprocess worker stable · prod `YOUDO_PROXY_URLS` = residential RU (node-proxy).
 
----
+**Goal:** **DC proxy primary** · **residential RU fallback** on slot retry · **do not** slow listing (`fetch_every_n` unchanged) · shared node-proxy traffic — slot count ≠ GB savings.
 
-## § O182-DELIST-INPROGRESS (**✅ smoke 2026-06-11**)
+**Steps:**
+- `t1` — owner/ops: prepend **DC slot(s)** to `YOUDO_PROXY_URLS` in `/opt/rawlead/.env.site` (keep RU slots after) · document order in deploy script comment only (no secrets in git)
+- `t2` — smoke subprocess worker with DC slot: `smoke_youdo_t6c_vps.py` or worker CLI · log `html_len` + `parsed>=50`
+- `t3` — radar 1–2 cycles · gate: `fetch_end parsed>=50` · `health:youdo ok` · no new asyncio/cycle abort
+- `t4` — rollback = restore RU-only order one env line
 
-**Owner pain (2026-06-11):** YouDo **«Выполняется»** — исполнитель выбран, отклик недоступен, страница **жива** · smoke `https://youdo.com/t14827772` · Neon **#16149** `is_visible=true` · last recheck **2026-06-10** → alive.
+**Do not:** merge YouDo pool with FL/Kwork · cut slot count for “savings” · raise `YOUDO_FETCH_EVERY_N`
 
-**Not covered by O181:** «Закрыто для откликов» ≠ status **«Выполняется»** + **«Зарезервировано … ₽»** (SBR escrow).
+**DoD:** DC-first order on VPS · smoke + radar `parsed>=50` · failover to RU visible in trace when DC antibot/refused
 
-**Root cause:** `_YOUDO_GONE_MARKERS` has «исполнитель выбран/найден» but page shows **«Выполняется»** without those strings · `__next_data__` → false alive.
-
-**False-positive guard:** do **not** add bare substring `выполняется` — open tasks say «работа выполняется удаленно» in body (regression on live listings).
-
-### t1 — YouDo in-progress / completed detection
-
-Prefer **`__NEXT_DATA__` task status** if present (status enum / `isOpenForOffers` / similar — inspect t14827772 HTML).
-
-Fallback markers (casefold), at least:
-- **`зарезервировано`** (SBR reserved — strong in-progress signal)
-- **`завершено`** / **`задание завершено`** if YouDo shows completed
-- status-chip phrases **without** bare `выполняется` — e.g. regex `>выполняется<` or JSON field only
-
-Tests:
-- `test_youdo_in_progress_sbr` — HTML from t14827772 (`Выполняется` + `Зарезервировано` + `__NEXT_DATA__`) → `check_project_page_gone` **True**
-- `test_youdo_live_description_not_gone` — body contains «выполняется удаленно» but **no** status/escrow → **False**
-
-Deploy + targeted backfill / recheck · smoke **#16149** delisted · not in `/v1/feed?source=youdo`.
-
-**DoD:** #16149 `source_gone` · pytest green · deploy VPS · owner Ctrl+F5 card gone
-
-**Lead verify:** #**16149** `is_visible=false` · `delist_reason=source_gone` · **not in** feed · markers `isInProcess`/`зарезервировано` on VPS · pytest **21/21** · **ingest regression** → § O182b.
+**Files:** `scripts/patch-vps-youdo-proxy-env.py` or new `deploy-o191-youdo-proxy-vps.py` · `scripts/smoke_youdo_t6c_vps.py` · `src/exchange_proxy.py` (only if slot order logic needs code)
 
 ---
 
-**Lead verify (O181):** #**16797** `source_gone` · not in feed · markers on VPS · pytest **19/19** · purge **apply 2026-06-11:** `purge_delisted` **306** + age **964** deleted.
+## § O188-TG-JOIN-WAVE4 (owner **2026-06-12** — wave ⏳)
 
-**Backlog:** youdo visible **923** · `source_gone` **3** · nightly timer purges delisted after 1d when `--apply`.
+**Facts (Lead verify):** v3 **`28 done` / `94 pending` / `5 fail`** · **`61`** `тг:join:` in log · round-robin acc1/2/3 ✅ · ~10/h/account · mechanism ✅
 
----
+**Goal:** join **127** channels · rate **10/h/account** · per-acc logs in `radar_site.log` + `tg_join.log`
 
-## § O180-DELIST-WEB (**✅ smoke 2026-06-11**)
+**Inputs:** [`TG_CHANNELS_OWNER_2026-06-12.txt`](../../ops/TG_CHANNELS_OWNER_2026-06-12.txt) · [`TG_JOIN_QUEUE_v3.csv`](../../ops/TG_JOIN_QUEUE_v3.csv)
 
-**Lead verify:** #**17048** `is_visible=false` · `delist_reason=source_gone` · **not in** `/v1/feed?source=youdo` (918 scanned) · VPS `checked=80` · markers `page-deleted` on VPS · pytest **18/18**.
+**Env (VPS `.env.site`):** `TG_JOIN_QUEUE_CSV` · `TG_JOIN_MAX_PER_HOUR=10` · `TG_JOIN_IN_TG_MAIN=1` · `TELETHON_MONITOR_ACCOUNTS=acc1,acc2,acc3`
 
-**Backlog:** youdo visible **925** · `source_gone` **1** · batch skip **~73/80** (proxy) — scheduled delist + repeat backfill по мере живых proxy.
+**Rules:** merge VPS CSV on deploy (preserve `done`+`chat_id`) · **never** blind overwrite · **no** parallel `tg_join_queue.py` CLI (database locked)
 
----
+**DoD (wave):** v3 progress · `grep 'тг:join:acc' radar_site.log` · 3 acc ready · TG Neon 24h smoke
 
-## § O179-YOUDO-WALL (**✅ deploy 2026-06-11**)
-
-Listing OK post-deploy · details → ticket `2026-06-11-youdo-timeout-antibot.md`
+**Files:** `src/tg_join_runner.py` · `scripts/tg_join_queue.py` · deploy env only unless stuck
 
 ---
 
-## § O174b-YOOKASSA-PAY (**prep ⏸**, P0)
+## § O190-YOUDO-CAMOUFOX ✅ closed (Lead **2026-06-12**)
 
-**Start when:** owner YooKassa keys **+** `@lead-designer` § **O174-D** + `@lead-product` § **O174-COPY** · **prep now OK** (routes/env stubs, no prod keys).
+| Milestone | Result |
+|-----------|--------|
+| t0i subprocess | `youdo_fetch_worker.py` · listing **50 cards** · no asyncio |
+| t0j cycle gate | `_safe_close_browser_contexts` · `_commit_youdo_fetch_gate` · `YOUDO_DELIST_MAX_PER_CYCLE=10` |
+| Ingest DoD | **22:46** `fetch_end parsed=50` · `health:youdo ok` · cycle **~50s** |
+| Deploy | `deploy-o190-t0e-vps.py` · pytest delist **22/22** |
 
-**Owner decision 2026-06-10:** YooKassa is the **only** payment channel. Drop Stars, crypto, manual SBP/transfers in WP + `@rawlead_bot`.
+Full t0a–t0j chronicle · abandoned async paths → [`CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) · [`problems/2026-06-12-youdo-antibot-permanent.md`](../../problems/2026-06-12-youdo-antibot-permanent.md)
 
-### Product
-
-| Item | Value |
-|------|--------|
-| Trial | **1 ₽** · **3 days** Premium · **once per account** · via YooKassa |
-| After trial | **790 ₽/month** · **auto-renewal** (YooKassa recurring) |
-| Footer (legal) | ✅ O174a |
-
-### t1 — YooKassa backend
-
-- Integrate YooKassa API: create payment (trial 1 ₽, subscription 790 ₽), webhook `payment.succeeded` / recurring · map to existing `subscriptions` / trial flags in Neon (reuse O107 trial fields where possible).
-- Env on VPS (owner fills): `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, return URL, webhook secret — document keys in deploy comment only, not in repo.
-- Disable or gate legacy: `stars_billing`, `premium_pay` SBP/crypto/Stars paths — **no user-facing entry**.
-
-### t2 — WP pricing + cabinet (**follow O174-D wire + O174-COPY**)
-
-- Redesign `/pricing/` + `pricing-card.php` + `rawlead-cabinet.js` subscription block: **single CTA** → YooKassa checkout (trial vs full price by `trial_used`).
-- Remove copy/UI for Stars, USDT/TON, manual SBP, `@rawlead_bot /pay` deep-links for pay.
-- Home `pricing-preview` — same single price story (**790 ₽/мес**, trial **1 ₽ / 3 дня**, **автопродление** copy from PM).
-- **UI gate:** no ship without Design spec — owner flagged UX regression risk.
-
-### t3 — Bot @rawlead_bot
-
-- Remove pay menu: `pay:sbp`, `pay:crypto`, `pay:stars`, manual approve flows · `/pay` → redirect or inline «Оплата на сайте → rawlead.ru/pricing».
-- Keep: auth, support, feed deep-links — **do not break** O165/O170.
-
-### t4 — Copy source
-
-- UI strings from `@lead-product` § **O174-COPY**. Until PM ships: owner numbers only; no Stars/crypto mentions.
-
-**Files:** `src/` billing (new `yookassa_billing.py` or extend `premium_pay.py`) · `api_server.py` webhook route · `wordpress/rawlead-kadence-child/` pricing/cabinet · `config.py` env · tests for trial gate + webhook idempotency
-
-**Do not break:** active subscriptions logic · TG login · `/lenta/` paid access · O168 perf
-
-**DoD:** owner smoke: trial 1 ₽ → 3d Premium → auto-renew 790 ₽ · bot has no crypto/Stars/SBP · FAQ/pricing aligned · footer ✅ O174a
+**Next owner backlog (not hot until Lead opens):** **O193** FL listing subprocess worker (§ O193-w)
 
 ---
 
-## § O168-PRE-ADS-GATES (**✅ accepted 2026-06-10**)
+## § O186-SECURITY-AUDIT (**→ backlog**, after O185 ✅)
 
-| Gate | Result |
-|------|--------|
-| load p95 @50 | **1462 ms** ✅ (owner 09:46 UTC) |
-| l2_auto | **96.7%** draft/tools ✅ (n=30) |
-| l2_send | **80%** live judge ✅ (n=10) |
-
-Full stress parsers/journey — optional; ads gate met.
+Pentest JWT/IDOR/webhook/draft — deliver `docs/problems/…-security-audit.md`
 
 ---
 
-## § O165-TG-TEST-GROUP (**smoke**, P0)
+## § O174d-PAY-POST-USERS (**⏸ backlog**)
 
-join **3/3** ✅ · owner post in test group → Lead Neon verify
+Cancel UI + autopay — after first paying users.
 
 ---
 
 ## Closed ✅ (hot index)
 
-O181 delist closed · O180 delist smoke · O178 feed · O179 YouDo wall · O177 · O176 trace · O175/175b · O174a · O166–O168 — details → `CODER_PROMPT_ARCHIVE.md`
+O190 · O189 · O185-t5b · O185-w3/w2/w1 · O174c/b · O182b · O182/O181/O180 · O178 · O176 · O175 · O174a · O168 → `CODER_PROMPT_ARCHIVE.md`
 
 ## Background
 
-O171 ops rebuild · O173 draft stream B+C · O144–O145 deploy ⏸
+O171 · O173 · L2 judge · [`PRODUCT_CANON.md`](../product/PRODUCT_CANON.md)

@@ -2,15 +2,15 @@
 
 **Снимок:** [`STATUS.md`](STATUS.md) · **бэклог:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md)
 
-**Решение owner 2026-06-09:** **ads ⏸** · сначала TG smoke + UI + stress/L2
+**Решение owner 2026-06-09:** **ads ⏸** · stability ingest → TG → security → ads
 
 ---
 
 ## Где мы
 
-**→ @coder:** § **O174b-YOOKASSA** prep ⏸ keys · YouDo ingest monitor (US proxy + antibot)
+**→ @coder:** § **O191-YOUDO-PROXY-MIX** · § **O188** wave (code only if stuck)
 
-**→ @owner:** после deploy — Ctrl+F5 `/lenta/` · меньше битых ссылок
+**YouDo:** O190 ✅ · **O191** DC+res · **O193** FL subprocess (owner B, after O191) · **O188** TG join wave
 
 ---
 
@@ -18,37 +18,24 @@
 
 | # | Что | Кто | Статус |
 |---|-----|-----|--------|
-| **15a** | **O165-TG-TEST-GROUP** join 3 acc + feed | **owner post** → Lead Neon | **→ smoke** join+feed ✅ |
-| **15b** | **O170-TG-L1-FILTER** | Lead | ✅ deploy |
-| **15c** | **O166-HOME-MATCH-BAR** главная полоски | Lead | ✅ deploy **1.18.51** |
-| **15d** | **O167-SORT-SOURCE** биржи в dropdown | Lead | ✅ deploy **1.18.52** |
-| **15e** | **O168-PRE-ADS-GATES** | Lead | ✅ load **1462ms** · L2 **80%** judge **2026-06-10** |
-| **16a** | **O174a-FOOTER-LEGAL** FIO + ИНН | @coder | ✅ owner **2026-06-10** |
-| **16b** | **O174b-YOOKASSA** prep → keys → pay | @coder + PM + Design | **⏸** ЮKassa на проверке |
-| **17** | **O175-FEED-INBOX** + **O175b** | @coder | ✅ **2026-06-11** theme **1.18.55** |
-| **18** | **O176-YOUDO-TRACE** | @coder | ✅ trace on VPS **2026-06-11** |
-| **24** | **O182b-YOUDO-IMPORT** | ✅ **2026-06-11** · import hotfix · deploy VPS · pytest **43/43** |
-| **23** | **O182-DELIST-INPROGRESS** | ✅ **2026-06-11** · #16149 `source_gone` · pytest **21/21** |
-| **22** | **O181-DELIST-CLOSED** | ✅ **2026-06-11** · #16797 · purge apply **306+964** rows |
-| **21** | **O180-DELIST-WEB** | ✅ smoke **2026-06-11** · #17048 · backlog drain ongoing |
-| **19** | **O177/O179 YouDo** ingest | Lead | ✅ deploy · listing OK |
-| **20** | **O178-FEED-SOURCE-SORT** filter+banner | @coder | ✅ deploy **1.18.56** **2026-06-11** |
-| **15f** | **YouDo Playwright thread** | Mechanic | код ✅ · **deploy VPS ⏳** |
-| **15g** | **O171-OPS-ADMIN-REBUILD** `/ops/` + FLPARSING | @coder | **⏸ после O168** |
-| **15h** | **O172-OPS-GREEN-RED** runbook | @coder | **⏸ после O171** |
-| **15i** | **O173-DRAFT-WAIT-UX** stream B + 2-й юзер C | @coder + Design | **⏸ после O168** · O160-w ❌ |
-| **14** | **ads + portfolio** | owner | **→ после O174 smoke оплаты** |
+| **25** | **O191-YOUDO-PROXY-MIX** | @coder | **→ now** · DC primary env order |
+| **26** | **O193-FL-SUBPROCESS** | @coder | backlog · after O191 · § O193-w |
+| **24** | **O188-TG-JOIN-WAVE4** | radar | **⏳** 28/127 · mechanism ✅ |
+| **16f** | **O186-SECURITY-AUDIT** | @coder + Lead | после O185 |
+| **16g** | **PRODUCT-CANON-AUDIT** | @lead-product | copy/UI vs `PRODUCT_CANON.md` |
+| **15g–15i** | O171/O172/O173 | @coder | **⏸** после O168 |
+| **14** | **ads + portfolio** | owner | **⏸** после O186 |
 
-Закрыто O131–O164 → см. [`STATUS.md`](STATUS.md)
+Закрыто O131–O190 → [`STATUS.md`](STATUS.md) · [`TASKS_HISTORY.md`](../archive/TASKS_HISTORY.md)
 
 ---
 
-## Owner checklist (O165 smoke)
+## Owner checklist
 
-1. ~~Join 3 acc~~ ✅ `5177575757` · peer в feed
-2. Написать **тестовую вакансию** в группу (как реальный заказ, не CV/promo)
-3. Сообщить Lead — проверим Neon + `/lenta/?source=tg`
+1. **O191:** при необходимости — DC-слоты в node-proxy для prepend в `YOUDO_PROXY_URLS` (Lead/Coder подскажут порядок)
+2. **O165 smoke:** тестовая вакансия в TG test group → Lead проверит Neon + `/lenta/?source=tg`
+3. **ads ⏸** — не ускоряем до стабильного ingest + TG
 
 ---
 
-_O168 active **2026-06-09** · O167 deploy ✅ · O165 smoke ждёт пост owner_
+_O190 ✅ **2026-06-12** · hot slim Lead sync · next O191_

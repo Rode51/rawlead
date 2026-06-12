@@ -73,7 +73,20 @@
 
 ---
 
-## Сейчас — prod + O161 ops
+## Сейчас — stability ingest (2026-06-12)
+
+| Шаг | Что |
+|-----|-----|
+| **YouDo ✅** | **O190** ingest на VPS · subprocess worker · `health:youdo ok` · **O191** — DC+RU прокси (Coder) |
+| **Pay ✅** | Trial 1 ₽ smoke · prod **790 ₽** |
+| **TG ⏳** | O188 wave4 join **~28/127** · acc1/2/3 только на VPS |
+| **Дальше** | O191 → O193 FL subprocess · O186 security · **реклама ⏸** |
+
+Детали: [`STATUS.md`](team/common/STATUS.md) · [`PRODUCT_CANON.md`](team/product/PRODUCT_CANON.md)
+
+---
+
+## Prod + O161 ops (фон)
 
 | Шаг | Что |
 |-----|-----|
@@ -101,7 +114,7 @@
 ## TG acc2 и join
 
 - **Слушает** только чаты из `data/telethon_chat_ids_acc2.txt` (после join).
-- **Волна v2:** 6 чатов в [`docs/ops/TG_JOIN_QUEUE_v2.csv`](docs/ops/TG_JOIN_QUEUE_v2.csv) — join ~15 мин между чатами.
+- **Волна 4 (2026-06-12):** 127 чатов подготовлены Lead → [`TG_JOIN_QUEUE_v3.csv`](docs/ops/TG_JOIN_QUEUE_v3.csv) · **@coder ещё не давали** · сейчас идёт **v2 backlog** acc3 (~4 join/час) · логи: `data/tg_join.log` на VPS
 - **`TG_JOIN_IN_TG_MAIN=1`** обязателен на VPS (иначе join не крутится в radar).
 - Старые ~25 чатов из `TG_JOIN_QUEUE.csv` — отдельно: `tg_sync_chat_ids.py --account acc2`.
 
@@ -166,4 +179,4 @@ Deploy: `scripts/deploy-youdo-browser-vps.py` · диагностика: `script
 
 ---
 
-_Lead · 2026-06-09_
+_Lead · 2026-06-12_

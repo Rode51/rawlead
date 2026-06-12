@@ -6,31 +6,29 @@
 
 ---
 
-## Сейчас (2026-06-08)
+## Сейчас (2026-06-12)
 
-**Стадия:** продукт **на prod**, ingest/ops/draft **закрыты** · идём к **Wave 2 sign-off** → soft ads.
+**Стадия:** prod live · **YouDo ingest ✅ O190** · идём **O191 proxy** + **TG wave4** · **ads ⏸**
 
 ### ✅ Сделано (не возвращать в hot)
 
 | Блок | § / факт |
 |------|----------|
-| **Ingest + VPS** | O99 · P5-E2 · TG 21 каналов · **O134 fresh-only** · **O138 parsed/fresh** |
-| **Лента + ЛК** | O94–O97 · O116 · O123-w1 · O107 trial · **O137 feed sort** · theme **1.18.35** |
-| **ИИ quality** | O72e gate · O114 · O128 L2 voice · **O135 draft L2-only** |
-| **Support / ops** | O121 `/ops/` · O132 stability · O120 TG failover |
-| **Оплата** | O105-w1 Stars · pending approve |
+| **YouDo ingest** | **O190** subprocess worker · t0j cycle gate · `health:youdo ok` |
+| **Pay + pre-launch** | O174 ЮKassa smoke · O185 w1–w3/t5b/t6 |
+| **Feed + delist** | O175–O178 · O180–O182b |
+| **Ingest + VPS** | O99 · O160 locks · VPS **4 GB** |
+| **ИИ quality** | O72e gate · O164 L2 grounding |
 
 ### ⏳ До soft ads
 
-```
-код Launch sprint ✅ → Wave 2 owner (journey + draft burst + stress) → ads последним
-```
-
 | # | Что | Статус |
 |---|-----|--------|
-| 1–7 | O131–O138 deploy | ✅ |
-| 8 | **Wave 2 sign-off** | **→ owner** |
-| 9 | **ads + portfolio** | **последним** |
+| 1 | **O191** YouDo DC+RU proxy mix | **→ @coder** |
+| 2 | **O188** TG join 127 channels | wave ⏳ |
+| 3 | **O193** FL subprocess worker | after O191 · owner B |
+| 4 | **O186** security audit | backlog |
+| 5 | **ads + portfolio** | **последним** ⏸ |
 
 ### ⏸ После ads / фон
 
