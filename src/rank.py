@@ -64,7 +64,7 @@ def _expanded_user_keys(user_tags: dict[str, float]) -> set[str]:
 
 
 def keyword_match(lead_tags: list[str], user_tags: dict[str, float]) -> int:
-    """F2+: hybrid coverage (lead + user), synonyms → canonical_tag, O93 parent expand."""
+    """Lead-coverage %: matched lead tags / all lead tags (O185 t4)."""
     from skills_catalog import expand_user_tags_for_match
 
     lead_set = _canonical_tag_list(lead_tags)
@@ -77,16 +77,7 @@ def keyword_match(lead_tags: list[str], user_tags: dict[str, float]) -> int:
     matched = sum(1 for tag in lead_set if tag in user_expanded)
     if matched <= 0:
         return 0
-    coverage_lead = matched / len(lead_set)
-    cap = max(1, min(len(user_base), max(1, _USER_TAG_CAP)))
-    coverage_user = matched / cap
-    w_lead = max(0.0, _RANK_MATCH_LEAD_WEIGHT)
-    w_user = max(0.0, _RANK_MATCH_USER_WEIGHT)
-    w_sum = w_lead + w_user
-    if w_sum <= 0:
-        w_lead, w_user, w_sum = 0.65, 0.35, 1.0
-    score = 100.0 * (w_lead * coverage_lead + w_user * coverage_user) / w_sum
-    return min(100, round(score))
+    return min(100, round(100.0 * matched / len(lead_set)))
 
 
 def keyword_match_breakdown(lead_tags: list[str], user_tags: dict[str, float]) -> dict[str, int]:

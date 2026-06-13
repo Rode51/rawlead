@@ -2,15 +2,15 @@
 
 **Снимок:** [`STATUS.md`](STATUS.md) · **бэклог:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md)
 
-**Решение owner 2026-06-09:** **ads ⏸** · stability ingest → TG → security → ads
+**ads ⏸** · ingest **YouDo+FL ✅** (O194+O193) · **product: TINDER-ONBOARD → @coder**
 
 ---
 
 ## Где мы
 
-**→ @coder:** § **O191-YOUDO-PROXY-MIX** · § **O188** wave (code only if stuck)
+**→ @coder:** § **O195-TINDER-ONBOARD-w1** · § **O196-ASYNC-DRAFT** (параллельно)
 
-**YouDo:** O190 ✅ · **O191** DC+res · **O193** FL subprocess (owner B, after O191) · **O188** TG join wave
+**Ingest:** YouDo ✅ · FL ✅ · TG O188 ⏳ (radar auto)
 
 ---
 
@@ -18,24 +18,22 @@
 
 | # | Что | Кто | Статус |
 |---|-----|-----|--------|
-| **25** | **O191-YOUDO-PROXY-MIX** | @coder | **→ now** · DC primary env order |
-| **26** | **O193-FL-SUBPROCESS** | @coder | backlog · after O191 · § O193-w |
-| **24** | **O188-TG-JOIN-WAVE4** | radar | **⏳** 28/127 · mechanism ✅ |
-| **16f** | **O186-SECURITY-AUDIT** | @coder + Lead | после O185 |
-| **16g** | **PRODUCT-CANON-AUDIT** | @lead-product | copy/UI vs `PRODUCT_CANON.md` |
-| **15g–15i** | O171/O172/O173 | @coder | **⏸** после O168 |
-| **14** | **ads + portfolio** | owner | **⏸** после O186 |
+| **26a** | **O195-TINDER-ONBOARD-w1** (quiz+API+migration) | @coder | **→ now** |
+| **26b** | **O195-TINDER-ONBOARD-w2** (scoring+filter lock) | @coder | после w1 |
+| **27** | **O196-ASYNC-DRAFT** (instant отклик) | @coder | **→ now** |
+| **24** | **O188-TG-JOIN-WAVE4** | radar auto | **⏳** 28/127 |
+| **16f** | **O186-SECURITY-AUDIT** | @coder + Lead | backlog |
+| **14** | **ads + portfolio** | owner | **⏸** |
 
-Закрыто O131–O190 → [`STATUS.md`](STATUS.md) · [`TASKS_HISTORY.md`](../archive/TASKS_HISTORY.md)
+Закрыто O194 · O193 · O191 · O190 → [`STATUS.md`](STATUS.md)
 
 ---
 
 ## Owner checklist
 
-1. **O191:** при необходимости — DC-слоты в node-proxy для prepend в `YOUDO_PROXY_URLS` (Lead/Coder подскажут порядок)
-2. **O165 smoke:** тестовая вакансия в TG test group → Lead проверит Neon + `/lenta/?source=tg`
-3. **ads ⏸** — не ускоряем до стабильного ingest + TG
+1. **TG smoke:** тестовая вакансия в test group
+2. **ads ⏸** — после O186
 
 ---
 
-_O190 ✅ **2026-06-12** · hot slim Lead sync · next O191_
+_O193 ✅ Lead deploy **2026-06-12**_

@@ -8,13 +8,13 @@
 
 ## Сейчас (2026-06-12)
 
-**Стадия:** prod live · **YouDo ingest ✅ O190** · идём **O191 proxy** + **TG wave4** · **ads ⏸**
+**Стадия:** prod live · **YouDo+FL subprocess ✅** · **TG wave4** · **ads ⏸**
 
 ### ✅ Сделано (не возвращать в hot)
 
 | Блок | § / факт |
 |------|----------|
-| **YouDo ingest** | **O190** subprocess worker · t0j cycle gate · `health:youdo ok` |
+| **YouDo+FL ingest** | **O190+O191+O193** subprocess · stable cycles |
 | **Pay + pre-launch** | O174 ЮKassa smoke · O185 w1–w3/t5b/t6 |
 | **Feed + delist** | O175–O178 · O180–O182b |
 | **Ingest + VPS** | O99 · O160 locks · VPS **4 GB** |
@@ -24,11 +24,9 @@
 
 | # | Что | Статус |
 |---|-----|--------|
-| 1 | **O191** YouDo DC+RU proxy mix | **→ @coder** |
-| 2 | **O188** TG join 127 channels | wave ⏳ |
-| 3 | **O193** FL subprocess worker | after O191 · owner B |
-| 4 | **O186** security audit | backlog |
-| 5 | **ads + portfolio** | **последним** ⏸ |
+| 1 | **O188** TG join 127 channels | wave ⏳ |
+| 2 | **O186** security audit | backlog |
+| 3 | **ads + portfolio** | **последним** ⏸ |
 
 ### ⏸ После ads / фон
 

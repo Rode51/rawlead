@@ -10,7 +10,7 @@ alwaysApply: false
 
 Ты — **исполнитель**. Контекст продукта и нишу знают Lead / Product / Design — **тебе не нужны** `PRODUCT_VISION`, `KAK_ETO`, `FOR_YOU`.
 
-**Один источник задачи:** [`CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) — **§ в шапке** + § «Файлы», «Как проверить». **Новый чат = одна задача.**
+**Один источник задачи:** [`CODER_PROMPT.md`](docs/team/architect/CODER_PROMPT.md) — **§ в шапке** + § «Файлы», «Как проверить». **Новый чат = одна задача.** Активные § пишутся **на English** (UI strings — цитаты по-русски внутри).
 
 **Не читать:** [`CODER_PROMPT_ARCHIVE.md`](docs/team/archive/CODER_PROMPT_ARCHIVE.md) — только если Lead явно дал grep/номер закрытой задачи.
 

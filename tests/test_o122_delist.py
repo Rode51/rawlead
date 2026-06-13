@@ -16,6 +16,7 @@ from delist_checker import (
     load_delist_last_stats,
     run_delist_batch,
     save_delist_run,
+    youdo_delist_max_per_cycle,
 )
 from exchange_delist import check_source_page_gone
 from fl_parser import check_project_page_gone
@@ -116,6 +117,21 @@ def test_run_delist_batch_respects_limit() -> None:
     pg.fetch_visible_for_source_recheck.assert_called_once()
     assert pg.fetch_visible_for_source_recheck.call_args.kwargs["limit"] == 15
     assert stats == {"checked": 0, "delisted": 0, "skipped": 0}
+
+
+def test_youdo_delist_cap_per_cycle() -> None:
+    cfg = _Cfg()
+    pg = MagicMock()
+    rows = [(i, "youdo", f"https://youdo.com/t{i}") for i in range(1, 21)]
+    rows += [(100 + i, "fl", f"https://www.fl.ru/projects/{i}/") for i in range(1, 6)]
+    pg.fetch_visible_for_source_recheck.return_value = rows
+    pg.mark_source_checked.return_value = True
+    with patch.dict("os.environ", {"YOUDO_DELIST_MAX_PER_CYCLE": "3"}):
+        assert youdo_delist_max_per_cycle() == 3
+        with patch("delist_checker.check_source_page_gone", return_value=False):
+            stats = run_delist_batch(cfg, pg, limit=80)
+    assert stats["checked"] == 8  # 3 youdo + 5 fl
+    assert pg.mark_source_checked.call_count == 8
 
 
 def test_kwork_redirect_away_is_gone() -> None:

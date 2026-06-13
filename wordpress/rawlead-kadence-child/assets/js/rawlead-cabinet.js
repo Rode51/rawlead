@@ -567,7 +567,15 @@
 
       }
 
-      return JSON.parse(raw);
+      var meta = JSON.parse(raw);
+
+      if (meta && meta.photo_url && !meta.avatar_url) {
+
+        meta.photo_url = "";
+
+      }
+
+      return meta;
 
     } catch (e) {
 
@@ -589,7 +597,7 @@
 
     var firstName = (data.first_name || "").trim();
 
-    var photoUrl = (data.photo_url || "").trim();
+    var avatarUrl = (data.avatar_url || "").trim();
 
     var display = username ? "@" + username : firstName || "Telegram";
 
@@ -600,7 +608,9 @@
         JSON.stringify({
           username: username,
           first_name: firstName,
-          photo_url: photoUrl,
+          photo_url: "",
+          avatar_url: avatarUrl,
+          has_avatar: !!(data.has_avatar || avatarUrl),
           display: display,
         })
       );
@@ -616,6 +626,149 @@
       window.rawleadSyncHeader();
 
     }
+
+  }
+
+  var failedPhotoUrls = Object.create(null);
+
+  function clearAvatarPhoto(el) {
+
+    if (!el) {
+
+      return;
+
+    }
+
+    el.hidden = false;
+
+    el.removeAttribute("src");
+
+  }
+
+  function resolveAvatarUrl(meta) {
+
+    if (!getToken()) {
+
+      return "";
+
+    }
+
+    if (meta && (meta.avatar_url || "").trim()) {
+
+      return meta.avatar_url.trim();
+
+    }
+
+    if (cfg.restAvatar) {
+
+      return cfg.restAvatar;
+
+    }
+
+    return "";
+
+  }
+
+  function setAvatarPhoto(el, url) {
+
+    if (!el) {
+
+      return;
+
+    }
+
+    el.hidden = false;
+
+    var avatarUrl = (url || "").trim();
+
+    if (!avatarUrl) {
+
+      clearAvatarPhoto(el);
+
+      return;
+
+    }
+
+    if (failedPhotoUrls[avatarUrl]) {
+
+      clearAvatarPhoto(el);
+
+      return;
+
+    }
+
+    el.onerror = function () {
+
+      failedPhotoUrls[avatarUrl] = true;
+
+      clearAvatarPhoto(el);
+
+    };
+
+    if (el.getAttribute("src") !== avatarUrl) {
+
+      el.src = avatarUrl;
+
+    }
+
+  }
+
+  function refreshUserProfile() {
+
+    if (!cfg.restMe || !getToken()) {
+
+      return Promise.resolve();
+
+    }
+
+    return fetch(cfg.restMe, {
+
+      credentials: "same-origin",
+
+      headers: authHeaders(),
+
+    })
+
+      .then(function (res) {
+
+        if (!res.ok) {
+
+          throw new Error("HTTP " + res.status);
+
+        }
+
+        return res.json();
+
+      })
+
+      .then(function (data) {
+
+        var meta = readUserMeta() || {};
+
+        saveUserMeta(
+          Object.assign({}, meta, {
+            username: data.username || meta.username || "",
+            first_name: data.first_name || meta.first_name || "",
+            avatar_url: (data.avatar_url || meta.avatar_url || "").trim(),
+            has_avatar: !!(data.has_avatar || data.avatar_url || meta.avatar_url),
+          })
+        );
+
+        if (data.avatar_url && failedPhotoUrls[data.avatar_url]) {
+
+          delete failedPhotoUrls[data.avatar_url];
+
+        }
+
+        renderUserBar();
+
+      })
+
+      .catch(function () {
+
+        /* keep cached meta */
+
+      });
 
   }
 
@@ -861,19 +1014,7 @@
 
     if (userAvatarEl) {
 
-      if (meta.photo_url) {
-
-        userAvatarEl.src = meta.photo_url;
-
-        userAvatarEl.hidden = false;
-
-      } else {
-
-        userAvatarEl.hidden = true;
-
-        userAvatarEl.removeAttribute("src");
-
-      }
+      setAvatarPhoto(userAvatarEl, resolveAvatarUrl(meta));
 
     }
 
@@ -914,14 +1055,15 @@
     return map[status] || status || "";
   }
 
-  function setSubLink(el, href, label) {
+  function setSubButton(el, label, kind) {
     if (!el) {
       return;
     }
-    el.href = href;
     el.textContent = label;
-    el.setAttribute("target", "_blank");
-    el.setAttribute("rel", "noopener");
+    el.dataset.checkoutKind = kind || "subscription";
+    el.removeAttribute("href");
+    el.removeAttribute("target");
+    el.removeAttribute("rel");
     el.removeAttribute("aria-disabled");
     el.classList.remove("is-disabled");
   }
@@ -945,8 +1087,14 @@
         subPriceEl.hidden = true;
       }
       if (subDetailEl) {
-        subDetailEl.textContent =
-          "Не удалось загрузить статус. Обновите страницу или войдите снова.";
+        subDetailEl.innerHTML =
+          'Не удалось загрузить статус. <button type="button" class="rl-btn rl-btn--danger-ghost rl-cabinet-sub__retry">Попробовать снова</button>';
+        var retryBtn = subDetailEl.querySelector(".rl-cabinet-sub__retry");
+        if (retryBtn) {
+          retryBtn.addEventListener("click", function () {
+            loadSubscription();
+          });
+        }
       }
       if (subTrialEl) {
         subTrialEl.hidden = true;
@@ -961,6 +1109,7 @@
     }
     subEl.hidden = false;
     var status = data.status || "free";
+    var isOwner = data.plan === "owner" || status === "beta";
     if (data.is_active && (status === "free" || status === "expired")) {
       status = "active";
     }
@@ -984,7 +1133,9 @@
     }
 
     if (subTitleEl) {
-      if (status === "free") {
+      if (isOwner) {
+        subTitleEl.textContent = "RawLead Premium";
+      } else if (status === "free") {
         subTitleEl.textContent = "RawLead Free";
       } else if (status === "active" || status === "beta" || isTrial) {
         subTitleEl.textContent = "RawLead Premium";
@@ -1002,7 +1153,8 @@
     }
 
     if (subPriceEl) {
-      subPriceEl.hidden = status === "active" || status === "trial" || status === "beta";
+      subPriceEl.hidden =
+        isOwner || status === "active" || status === "trial" || status === "beta";
     }
 
     if (subDetailEl) {
@@ -1016,12 +1168,13 @@
       } else if (status === "free") {
         detail = "Лента без задержки · Premium — черновики отклика и push в Telegram";
       } else if (status === "expired") {
-        detail = "Подписка истекла — продлите через @rawlead_bot /pay";
+        detail = "Подписка истекла — оформите Premium на сайте";
+      }
+      if (data.renew_canceled_at && data.active_until) {
+        detail = "Premium до " + formatSubDate(data.active_until) + ".";
       }
       subDetailEl.textContent = detail;
     }
-
-    var payUrl = cfg.botPayUrl || botDeepLink("pay");
 
     var subActionsEl = subEl.querySelector(".rl-cabinet-sub__actions");
     if (subActionsEl) {
@@ -1059,6 +1212,7 @@
 
     if (subTrialEl) {
       var hideTrial =
+        isOwner ||
         status === "active" ||
         status === "beta" ||
         status === "trial" ||
@@ -1076,48 +1230,52 @@
     }
 
     if (subPayEl) {
-      if (status === "active" || status === "beta") {
+      if (isOwner) {
+        subPayEl.hidden = true;
+        setSubActionClass(subPayEl, "");
+      } else if (isTrial && !!data.effective_access) {
         subPayEl.hidden = false;
-        setSubLink(subPayEl, payUrl, "Продлить");
+        setSubButton(subPayEl, "Подключить Premium →", "subscription");
         setSubActionClass(subPayEl, "primary");
+      } else if (
+        (status === "active" || status === "beta") &&
+        !!data.effective_access
+      ) {
+        subPayEl.hidden = true;
+        setSubActionClass(subPayEl, "");
       } else if (status === "expired") {
         subPayEl.hidden = false;
-        setSubLink(subPayEl, payUrl, "Возобновить");
+        setSubButton(subPayEl, "Возобновить подписку →", "subscription");
         setSubActionClass(subPayEl, "primary");
       } else if (status === "free") {
         subPayEl.hidden = false;
-        setSubLink(
-          subPayEl,
-          payUrl,
-          data.trial_used ? "Подключить Premium →" : "Подключить Premium →"
-        );
+        setSubButton(subPayEl, "Подключить Premium →", "subscription");
         if (subTrialEl && !subTrialEl.hidden) {
           setSubActionClass(subPayEl, "secondary");
         } else {
           setSubActionClass(subPayEl, "primary");
         }
-      } else if (isTrial) {
-        subPayEl.hidden = false;
-        setSubLink(subPayEl, payUrl, "Оплатить 790 ₽ →");
-        setSubActionClass(subPayEl, "primary");
       } else {
         subPayEl.hidden = true;
         setSubActionClass(subPayEl, "");
       }
     }
+
     if (subNoteEl) {
-      subNoteEl.hidden = true;
-      subNoteEl.textContent = "";
+      if (status === "free" && !data.trial_used) {
+        subNoteEl.hidden = false;
+        subNoteEl.textContent =
+          "Оплата картой или СБП через ЮKassa.";
+      } else {
+        subNoteEl.hidden = true;
+        subNoteEl.textContent = "";
+      }
     }
     updateInboxEmptyStates();
     loadNotificationSettings(data);
   }
 
-  function loadSubscription() {
-    if (!cfg.restSubscription || !getToken()) {
-      renderSubscription(null);
-      return Promise.resolve(null);
-    }
+  function fetchSubscriptionPayload() {
     return fetch(cfg.restSubscription, {
       credentials: "same-origin",
       headers: authHeaders(),
@@ -1138,19 +1296,49 @@
       });
   }
 
-  function startTrial() {
-    if (!cfg.restTrialStart || !getToken() || !subTrialEl) {
+  function loadSubscription() {
+    if (!cfg.restSubscription || !getToken()) {
+      renderSubscription(null);
       return Promise.resolve(null);
     }
-    subTrialEl.disabled = true;
-    subTrialEl.classList.add("is-disabled");
+    return fetchSubscriptionPayload();
+  }
+
+  function confirmSubscriptionOnReturn() {
+    if (!cfg.restConfirm || !getToken()) {
+      return loadSubscription();
+    }
     var headers = authHeaders();
     headers["Content-Type"] = "application/json";
-    return fetch(cfg.restTrialStart, {
+    return fetch(cfg.restConfirm, {
       method: "POST",
       credentials: "same-origin",
       headers: headers,
       body: "{}",
+    })
+      .catch(function () {
+        return null;
+      })
+      .then(function () {
+        return fetchSubscriptionPayload();
+      });
+  }
+
+  function startCheckout(kind, triggerEl) {
+    if (!cfg.restCheckout || !getToken()) {
+      return Promise.resolve(null);
+    }
+    if (triggerEl) {
+      triggerEl.disabled = true;
+      triggerEl.classList.add("is-disabled");
+    }
+    var headers = authHeaders();
+    headers["Content-Type"] = "application/json";
+    return fetch(cfg.restCheckout, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: headers,
+      body: JSON.stringify({ kind: kind || "subscription" }),
     })
       .then(function (res) {
         return res.json().then(function (data) {
@@ -1158,25 +1346,27 @@
             var msg =
               (data && data.message) ||
               (data && data.detail) ||
-              "Не удалось активировать trial";
+              "Не удалось открыть оплату";
             throw new Error(msg);
           }
           return data;
         });
       })
       .then(function (data) {
-        renderSubscription(data);
+        if (data && data.confirmation_url) {
+          window.location.href = data.confirmation_url;
+        }
         return data;
       })
       .catch(function (err) {
         if (subNoteEl) {
           subNoteEl.hidden = false;
           subNoteEl.textContent =
-            (err && err.message) || "Trial недоступен. Попробуйте позже.";
+            (err && err.message) || "Оплата недоступна. Попробуйте позже.";
         }
-        if (subTrialEl) {
-          subTrialEl.disabled = false;
-          subTrialEl.classList.remove("is-disabled");
+        if (triggerEl) {
+          triggerEl.disabled = false;
+          triggerEl.classList.remove("is-disabled");
         }
         return null;
       });
@@ -1184,8 +1374,35 @@
 
   if (subTrialEl) {
     subTrialEl.addEventListener("click", function () {
-      startTrial();
+      startCheckout("trial", subTrialEl);
     });
+  }
+
+  if (subPayEl) {
+    subPayEl.addEventListener("click", function () {
+      var kind = subPayEl.dataset.checkoutKind || "subscription";
+      startCheckout(kind, subPayEl);
+    });
+  }
+
+  if (window.location.search.indexOf("pay=return") >= 0) {
+    confirmSubscriptionOnReturn();
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }
+
+  function maybeStartCheckoutFromUrl() {
+    var params = new URLSearchParams(window.location.search || "");
+    var kind = params.get("checkout");
+    if (!kind || (kind !== "trial" && kind !== "subscription") || !getToken()) {
+      return;
+    }
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    var trigger = kind === "trial" ? subTrialEl : subPayEl;
+    startCheckout(kind, trigger);
   }
 
   function hasPushAccess(sub) {
@@ -1385,6 +1602,8 @@
 
   function showLogin() {
 
+    document.documentElement.classList.remove("rl-cabinet-auth-pending");
+
     setGate(false);
 
     if (appEl) {
@@ -1402,6 +1621,8 @@
   }
 
   function showApp() {
+
+    document.documentElement.classList.remove("rl-cabinet-auth-pending");
 
     setGate(true);
 
@@ -1573,6 +1794,7 @@
         return mergeGuestSkillsAfterAuth().then(function () {
           showApp();
           bootCabinet();
+          maybeStartCheckoutFromUrl();
         });
 
       })
@@ -5066,7 +5288,11 @@
 
     showApp();
 
+    refreshUserProfile();
+
     bootCabinet();
+
+    maybeStartCheckoutFromUrl();
 
   }
 
@@ -5074,6 +5300,10 @@
 
   if (getToken()) {
     syncAuthCookie(getToken());
+    if (loginEl) {
+      loginEl.hidden = true;
+    }
+    document.documentElement.classList.add("rl-cabinet-auth-pending");
   }
 
   if (!getToken()) {

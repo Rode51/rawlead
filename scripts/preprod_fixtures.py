@@ -51,7 +51,7 @@ PREPROD_LEAD_FIXTURES: tuple[PreprodLeadFixture, ...] = (
             "Ежедневная выгрузка отчёта из Excel, расчёт KPI, запись в Google Sheets "
             "через Apps Script или Python. Без ручного копирования."
         ),
-        url="https://freelancehunt.com/project/avtomatizaciya-otcheta/123",
+        url="https://www.fl.ru/projects/5507050/",
     ),
     # design
     PreprodLeadFixture(
@@ -119,7 +119,7 @@ PREPROD_LEAD_FIXTURES: tuple[PreprodLeadFixture, ...] = (
             "Технический аудит, Core Web Vitals, семантика 50 запросов, "
             "рекомендации по контенту и перелинковке."
         ),
-        url="https://freelancehunt.com/project/seo-audit-wp/456",
+        url="https://kwork.ru/projects/567890",
     ),
     # text
     PreprodLeadFixture(
@@ -153,7 +153,7 @@ PREPROD_LEAD_FIXTURES: tuple[PreprodLeadFixture, ...] = (
             "Статьи по маркетингу, 3000–5000 знаков каждая. "
             "Орфография, стиль, единообразие заголовков."
         ),
-        url="https://freelancehunt.com/project/redaktura-blog/789",
+        url="https://www.fl.ru/projects/5507450/",
     ),
 )
 

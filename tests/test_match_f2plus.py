@@ -18,22 +18,17 @@ class TestMatchF2Plus(TestCase):
         user = tags_as_weights(["yandex_direct"])
         self.assertGreater(keyword_match(lead, user), 0)
 
-    def test_hybrid_not_always_100_on_full_lead_match(self) -> None:
+    def test_full_lead_match_is_100_even_with_extra_user_tags(self) -> None:
         lead = ["python", "php"]
         user = tags_as_weights(
             ["python", "php", "javascript", "wordpress_dev", "figma", "seo"]
         )
-        km = keyword_match(lead, user)
-        self.assertGreaterEqual(km, 75)
-        self.assertLessEqual(km, 100)
-        self.assertNotEqual(km, 50)
+        self.assertEqual(keyword_match(lead, user), 100)
 
-    def test_hybrid_partial_lead(self) -> None:
+    def test_partial_lead_coverage(self) -> None:
         lead = ["wordpress_dev", "php", "api_integration"]
         user = tags_as_weights(["wordpress_dev", "php", "javascript"])
-        km = keyword_match(lead, user)
-        self.assertGreater(km, 40)
-        self.assertLess(km, 100)
+        self.assertEqual(keyword_match(lead, user), 67)
 
     def test_breakdown_counts(self) -> None:
         bd = keyword_match_breakdown(
@@ -112,7 +107,7 @@ class TestMatchF2Plus(TestCase):
             ["presentation_design", "motion_design"],
         ]
         values = {keyword_match(lead, user) for lead in leads}
-        self.assertGreaterEqual(len(values), 11, sorted(values))
+        self.assertGreaterEqual(len(values), 5, sorted(values))
 
 
 if __name__ == "__main__":

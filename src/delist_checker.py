@@ -24,6 +24,7 @@ DELIST_LAST_STATS_KEY = "delist_last_stats_json"
 _DEFAULT_BATCH_LIMIT = 80
 _DEFAULT_INTERVAL_SEC = 900
 _DEFAULT_GRACE_HOURS = 6
+_DEFAULT_YOUDO_DELIST_MAX = 10
 
 
 def delist_batch_limit() -> int:
@@ -48,6 +49,15 @@ def delist_grace_hours() -> int:
         return max(1, min(72, int(raw)))
     except ValueError:
         return _DEFAULT_GRACE_HOURS
+
+
+def youdo_delist_max_per_cycle() -> int:
+    """O190 t0j: cap YouDo browser subprocess delist checks per radar cycle."""
+    raw = os.environ.get("YOUDO_DELIST_MAX_PER_CYCLE", str(_DEFAULT_YOUDO_DELIST_MAX)).strip()
+    try:
+        return max(0, min(delist_batch_limit(), int(raw)))
+    except ValueError:
+        return _DEFAULT_YOUDO_DELIST_MAX
 
 
 def load_delist_last_stats(storage: ProjectStorage) -> dict[str, Any]:
@@ -116,7 +126,14 @@ def run_delist_batch(
     rows = pg.fetch_visible_for_source_recheck(
         limit=batch_limit, grace_hours=delist_grace_hours(), errors=err
     )
+    youdo_cap = youdo_delist_max_per_cycle()
+    youdo_checked = 0
     for lead_id, source, url in rows:
+        src = (source or "").strip().lower()
+        if src == "youdo" and youdo_cap >= 0:
+            if youdo_checked >= youdo_cap:
+                continue
+            youdo_checked += 1
         stats["checked"] += 1
         gone = check_source_page_gone(source, url, cfg)
         if gone is None:

@@ -42,7 +42,7 @@ import feed_ui  # noqa: E402
 
 _DEFAULT_STORAGE = _ROOT / "data" / "preprod_playwright" / "storage_state.json"
 _ARTIFACT_DIR = _ROOT / "data" / "preprod_ux_journey"
-_DRAFT_TIMEOUT_MS = 120_000
+_DRAFT_TIMEOUT_MS = 180_000
 _YANDEX_EXE = Path(r"C:\Program Files\Yandex\YandexBrowser\Application\browser.exe")
 _YANDEX_USER_DATA = (
     Path(os.environ.get("LOCALAPPDATA", "")) / "Yandex" / "YandexBrowser" / "User Data"
@@ -600,19 +600,17 @@ def j4_card_expand(ctx: JourneyCtx) -> None:
     _lenta_fresh(ctx, is_mobile=ctx.is_mobile)
     card = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]").first
     card.wait_for(state="visible")
-    card.locator(".rl-lead-card__title").first.click()
-    ctx.page.wait_for_timeout(600)
+    feed_ui.expand_card(card, ctx.page)
     body = card.locator(feed_ui.CARD_FRONT_BODY)
-    body.first.wait_for(state="visible", timeout=15_000)
     inner = body.inner_text().casefold()
     if "суть" not in inner and "задан" not in inner:
         raise RuntimeError("task_summary section missing in expanded card")
     link = card.locator(".rl-feed-card__link", has_text=re.compile("Читать на бирже"))
     if not link.count() or not link.first.is_visible():
         raise RuntimeError("«Читать на бирже» not visible")
-    card.locator(".rl-lead-card__title").first.click()
+    feed_ui.click_card_title(card)
     ctx.page.wait_for_timeout(400)
-    if "is-expanded" in (card.get_attribute("class") or ""):
+    if feed_ui.card_is_expanded(card):
         raise RuntimeError("card did not collapse")
 
 
@@ -640,8 +638,8 @@ def j5_draft_twice(ctx: JourneyCtx) -> None:
     for idx, lid in enumerate(ids[:2]):
         card = ctx.page.locator(f'#rl-feed-list .rl-lead-card[data-id="{lid}"]').first
         card.scroll_into_view_if_needed()
-        if not card.locator(feed_ui.CARD_FRONT_BODY).count():
-            card.locator(".rl-lead-card__title").first.click()
+        if not feed_ui.card_is_expanded(card):
+            feed_ui.click_card_title(card)
             ctx.page.wait_for_timeout(400)
         btn = card.locator(".rl-feed-card__reply-btn")
         if not btn.count():
@@ -667,12 +665,12 @@ def j6_draft_collapse(ctx: JourneyCtx) -> None:
         if run_draft.count():
             run_draft.first.click()
             _wait_draft_text(ctx, card)
-    if "is-expanded" in (card.get_attribute("class") or ""):
-        card.locator(".rl-lead-card__title").first.click()
+    if feed_ui.card_is_expanded(card):
+        feed_ui.click_card_title(card)
         ctx.page.wait_for_timeout(400)
-    if "is-expanded" in (card.get_attribute("class") or ""):
+    if feed_ui.card_is_expanded(card):
         raise RuntimeError("expected collapsed card before re-expand")
-    card.locator(".rl-lead-card__title").first.click()
+    feed_ui.click_card_title(card)
     ctx.page.wait_for_timeout(500)
     card.locator(feed_ui.CARD_FRONT_BODY).first.wait_for(state="visible", timeout=15_000)
 

@@ -1,16 +1,19 @@
 {
-  "generated_at": "2026-06-07T13:30:11.646752+00:00",
+  "generated_at": "2026-06-10T09:24:00.815392+00:00",
   "api_url": "https://api.rawlead.ru",
-  "workers": 20,
-  "duration_sec": 180,
-  "requests_total": 3047,
-  "feed_requests": 1020,
-  "errors_count": 0,
-  "error_rate": 0.0,
-  "p50_feed_ms": 1659.5,
-  "p95_feed_ms": 1845.8,
-  "p50_all_ms": 1402.2,
-  "p95_all_ms": 1777.3,
-  "s3_pass": true,
-  "sample_errors": []
+  "workers": 50,
+  "duration_sec": 300,
+  "requests_total": 13883,
+  "feed_requests": 4640,
+  "errors_count": 1,
+  "error_rate": 0.0001,
+  "p50_feed_ms": 1448.1,
+  "p95_feed_ms": 2027.5,
+  "p99_feed_ms": 2602.3,
+  "p50_all_ms": 831.9,
+  "p95_all_ms": 1757.7,
+  "s3_pass": false,
+  "sample_errors": [
+    "/health status=None err=timed out"
+  ]
 }

@@ -394,6 +394,7 @@ body.rawlead-front .content-wrap > .entry-content {
   object-fit: cover;
   flex-shrink: 0;
   border: 2px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 /* Front page — Lenis smooth scroll + progress + reveal */
@@ -1753,6 +1754,27 @@ section.rl-flow.rl-section {
   line-height: 1.45;
 }
 
+.rl-price-card__legal {
+  margin: 0.5rem 0 0;
+  font-size: 11px;
+  color: var(--rl-text-muted);
+  line-height: 1.45;
+}
+
+.rl-price-card__trial-btn {
+  margin-top: 0.5rem;
+}
+
+.rl-price-card__checkout-note {
+  margin: 0.5rem 0 0;
+  font-size: 12px;
+  color: var(--rl-text-muted);
+}
+
+.rl-price-card__checkout-note--err {
+  color: #b91c1c;
+}
+
 .rl-price-card--full .rl-price-card__list-item--desktop {
   display: list-item;
 }
@@ -2307,6 +2329,10 @@ body.page-contact .rl-prose > h2:first-of-type + p strong {
 }
 
 /* Кабинет: до входа — только плашка, без фильтров/ленты (Kadence ломает [hidden]) */
+html.rl-cabinet-auth-pending #rl-cabinet-login {
+  display: none !important;
+}
+
 .rl-app--cabinet.rl-cabinet--gate #rl-cabinet-app,
 .rl-app--cabinet.rl-cabinet--gate .rl-cabinet-app {
   display: none !important;
@@ -3792,6 +3818,12 @@ body.page-lenta #rl-feed-list > .rl-feed-end {
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
+  border: 2px solid var(--rl-border);
+  background: var(--rl-bg-section);
+}
+
+.rl-cabinet-user__avatar:not([src]) {
+  visibility: hidden;
 }
 
 .rl-cabinet-user__info {
@@ -5821,6 +5853,24 @@ body.rl-skill-tree-open {
   flex-wrap: wrap;
 }
 
+.rl-btn--danger {
+  background: transparent;
+  color: #dc2626 !important;
+  border: var(--rl-border-width) solid #dc2626;
+}
+
+.rl-btn--danger:hover {
+  background: #fef2f2;
+  color: #b91c1c !important;
+  border-color: #b91c1c;
+}
+
+.rl-btn--danger[disabled],
+.rl-btn--danger.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .rl-btn--danger-ghost {
   background: none;
   border: none;
@@ -5831,6 +5881,22 @@ body.rl-skill-tree-open {
   text-decoration: underline;
   text-underline-offset: 3px;
   min-height: 44px;
+}
+
+.rl-cabinet-sub__actions .rl-cabinet-sub__cancel {
+  margin-left: auto;
+  width: auto;
+  padding: 10px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.rl-cabinet-sub__retry {
+  display: inline;
+  min-height: auto;
+  padding: 0;
+  margin-left: 0.25rem;
+  vertical-align: baseline;
 }
 
 .rl-cabinet-sub__card {
@@ -6831,6 +6897,7 @@ body.page-contact .rl-contact-form {
   object-fit: cover;
   width: 32px;
   height: 32px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .rl-header__back {

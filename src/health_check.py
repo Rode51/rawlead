@@ -6,7 +6,9 @@ import asyncio
 import logging
 import os
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +26,10 @@ from tg_proxy_pool import get_active_proxy_url, probe_proxy_https, status_summar
 from storage import ProjectStorage
 
 logger = logging.getLogger(__name__)
+
+_HC_THREAD_PREFIX = "rawlead-health-check"
+_HC_EXECUTOR: ThreadPoolExecutor | None = None
+_HC_EXECUTOR_LOCK = threading.Lock()
 
 _DEFAULT_CHECK_MIN = 15
 _DEFAULT_ALERT_COOLDOWN_MIN = 60
@@ -164,6 +170,32 @@ def account_label_from_env() -> str:
     if name.endswith("_telethon"):
         name = name[: -len("_telethon")]
     return name or "мониторинговый аккаунт"
+
+
+def _hc_thread_initializer() -> None:
+    asyncio.set_event_loop(None)
+
+
+def _hc_executor() -> ThreadPoolExecutor:
+    global _HC_EXECUTOR
+    with _HC_EXECUTOR_LOCK:
+        if _HC_EXECUTOR is None:
+            _HC_EXECUTOR = ThreadPoolExecutor(
+                max_workers=1,
+                thread_name_prefix=_HC_THREAD_PREFIX,
+                initializer=_hc_thread_initializer,
+            )
+        return _HC_EXECUTOR
+
+
+def check_telethon_account_sync() -> TelethonHealthResult:
+    """Telethon probe off main radar thread (O190 t0f — no asyncio.run on caller)."""
+
+    def _run() -> TelethonHealthResult:
+        _hc_thread_initializer()
+        return asyncio.run(check_telethon_account())
+
+    return _hc_executor().submit(_run).result()
 
 
 async def check_telethon_account() -> TelethonHealthResult:
@@ -450,7 +482,7 @@ def run_health_check(
         if is_tg_monitor_active():
             result = check_tg_monitor_pulse(storage)
         else:
-            result = asyncio.run(check_telethon_account())
+            result = check_telethon_account_sync()
     except SystemExit:
         result = TelethonHealthResult(
             False,

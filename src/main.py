@@ -155,9 +155,7 @@ class _CycleWatchdog:
     def _run(self) -> None:
         if self._stop.wait(self._wall):
             return
-        from exchange_browser_fetch import close_all_browser_contexts
-
-        close_all_browser_contexts()
+        _safe_close_browser_contexts()
         msg = f"{radar_timestamp()} цикл:watchdog:kill elapsed>{int(self._wall)}s"
         _append_log_line(self._log_path, msg, echo=True)
         self._fired.set()
@@ -314,6 +312,35 @@ def _process_listings(
     return new_ids, notifications
 
 
+def _safe_close_browser_contexts() -> None:
+    """O190 t0j: never abort radar cycle on Playwright teardown."""
+    try:
+        from exchange_browser_fetch import close_all_browser_contexts
+
+        close_all_browser_contexts()
+    except Exception as exc:
+        logger = __import__("logging").getLogger(__name__)
+        logger.warning("close_all_browser_contexts skipped: %s", exc)
+
+
+def _commit_youdo_fetch_gate(
+    cfg: Config,
+    storage: ProjectStorage,
+    stats: SourceCycleStats,
+    *,
+    ts: str,
+) -> None:
+    """O190 t0j: fetch_end + health:youdo before slow post-fetch steps."""
+    if stats.fetch_error or stats.parsed_cards < 50:
+        return
+    _record_source_health(storage, "youdo", stats, ts=ts, cfg=cfg)
+    health = load_health(storage, "youdo")
+    append_health_log(
+        cfg.radar_log_path,
+        format_health_log_line("youdo", health, fetch_ok=True),
+    )
+
+
 def _fetch_source(
     label: str,
     fetch_fn: Callable[..., list[ListingProject]],
@@ -326,9 +353,7 @@ def _fetch_source(
     if storage is not None:
         flag_key = f"restart_source_{label.strip().lower()}"
         if storage.get_setting(flag_key, "0") == "1":
-            from exchange_browser_fetch import close_all_browser_contexts
-
-            close_all_browser_contexts()
+            _safe_close_browser_contexts()
             storage.set_setting(flag_key, "0")
             _append_log_line(
                 cfg.radar_log_path,
@@ -362,9 +387,7 @@ def _fetch_source(
     try:
         return fut.result(timeout=wall)
     except FuturesTimeout:
-        from exchange_browser_fetch import close_all_browser_contexts
-
-        close_all_browser_contexts()
+        _safe_close_browser_contexts()
         msg = f"source wall-clock {int(wall)}s"
         errors.append(f"{label}:fetch:{msg}")
         if stats is not None:
@@ -391,8 +414,20 @@ def _record_source_health(
     ts: str,
     cfg: Config | None = None,
 ) -> None:
+    if source == "youdo":
+        try:
+            from youdo_parser import youdo_consume_cycle_skip
+
+            if youdo_consume_cycle_skip(storage) == "fetch_every_n":
+                return
+        except Exception:
+            pass
+
     ok = not stats.fetch_error
     parsed_cards = stats.parsed_cards if ok and stats.parsed_cards >= 0 else None
+    if source == "youdo" and ok and parsed_cards == 0:
+        ok = False
+        stats.fetch_error = stats.fetch_error or "antibot SPA shell parsed=0"
     health = record_fetch(
         storage,
         source,
@@ -506,13 +541,13 @@ def run_cycle(
             watchdog=watchdog,
         )
     finally:
-        from exchange_browser_fetch import (
-            cleanup_stale_browser_processes,
-            close_all_browser_contexts,
-        )
+        from exchange_browser_fetch import cleanup_stale_browser_processes
 
-        close_all_browser_contexts()
-        cleanup_stale_browser_processes()
+        _safe_close_browser_contexts()
+        try:
+            cleanup_stale_browser_processes()
+        except Exception:
+            pass
         watchdog.stop()
 
 
@@ -644,6 +679,8 @@ def _run_cycle_body(
         )
         if web_projects is not None:
             stats_web.parsed_cards = len(web_projects)
+            if source_label == "youdo":
+                _commit_youdo_fetch_gate(cfg, storage, stats_web, ts=ts)
             if source_label == "pchyol":
                 web_projects = filter_new_pchyol_projects(web_projects, storage)
             stats_web.downloaded = len(web_projects)

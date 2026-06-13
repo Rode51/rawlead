@@ -22,9 +22,11 @@ _TRIAL_MAINT_LAST_RUN_KEY = "trial_maint_last_run_epoch"
 _MSG_TRIAL_STARTED = (
     "Premium на 3 дня активен. Лента без задержки, черновики — в один клик."
 )
-_MSG_TRIAL_24H = "Завтра trial заканчивается. Продлить — 790 ₽ или Stars: /pay"
+_MSG_TRIAL_24H = (
+    "Завтра trial заканчивается. Продлить — 790 ₽/мес на rawlead.ru/cabinet"
+)
 _MSG_TRIAL_ENDED = (
-    "Trial закончился. Лента снова с задержкой 15 мин. Premium — /pay"
+    "Trial закончился. Лента снова с задержкой 15 мин. Premium — rawlead.ru/pricing"
 )
 
 SubscriptionStatus = Literal["free", "active", "paused", "expired", "beta", "trial"]
@@ -328,6 +330,12 @@ def run_trial_maintenance(cfg: Config, storage: Any, errors: list[str] | None = 
     try:
         with psycopg.connect(cfg.database_url) as conn:
             with conn.cursor() as cur:
+                try:
+                    from yookassa_billing import process_auto_renewals
+
+                    stats["renewals"] = process_auto_renewals(cfg, cur)
+                except Exception as renew_exc:
+                    logger.warning("trial:renewals: %s", renew_exc)
                 stats["expired"] = expire_stale_trials(cur)
                 stats["reminders"] = process_trial_reminders(cfg, cur)
                 conn.commit()

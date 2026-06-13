@@ -822,7 +822,9 @@ def _format_tg_accounts_v2(
         account_rows = {}
         accounts = ("acc1",)
 
-    join_pending = _pending_join_by_account(load_tg_join_config().queue_csv)
+    join_cfg = load_tg_join_config()
+    join_pending = _pending_join_by_account(join_cfg.queue_csv)
+    join_state = _load_join_state()
 
     for acc in accounts:
         acfg = account_rows.get(acc)
@@ -843,6 +845,9 @@ def _format_tg_accounts_v2(
             cfg=cfg,
         )
         lines.append(line)
+        join_line = _join_stats_line(acc, join_state)
+        if join_line:
+            lines.append(join_line)
         problems.extend(acc_probs)
 
     return lines
@@ -872,6 +877,40 @@ def _pending_join_by_account(queue_csv: Path) -> dict[str, int]:
             if acc in out:
                 out[acc] += 1
     return out
+
+
+def _load_join_state() -> dict:
+    cfg = load_tg_join_config()
+    if not cfg.state_path.is_file():
+        return {}
+    try:
+        data = json.loads(cfg.state_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _join_stats_line(account: str, join_state: dict) -> str | None:
+    acc = join_state.get(account.strip().lower())
+    if not isinstance(acc, dict):
+        return None
+    hour = int(acc.get("joins_this_hour", 0))
+    day = int(acc.get("joins_today", 0))
+    history = acc.get("history")
+    if not isinstance(history, list):
+        history = []
+    if hour <= 0 and day <= 0 and not history:
+        return None
+    bits: list[str] = []
+    for item in history[-5:]:
+        if not isinstance(item, dict):
+            continue
+        status = str(item.get("status", "?")).strip()
+        link = str(item.get("link", "")).strip()
+        tail = link.rsplit("/", 1)[-1][:24] if link else "?"
+        bits.append(f"{status}:{tail}")
+    hist = " · ".join(bits) if bits else "—"
+    return f"  join {hour}/h {day}/d · {hist}"
 
 
 def _tg_monitor_state(storage: ProjectStorage) -> tuple[bool, str]:

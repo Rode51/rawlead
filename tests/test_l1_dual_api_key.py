@@ -59,6 +59,11 @@ def _cfg(*, b: str = "") -> Config:
         pay_ton_address="",
         pay_crypto_memo_prefix="RL",
         pay_approve_bot="legacy",
+        yookassa_shop_id="",
+        yookassa_secret_key="",
+        yookassa_return_url="https://rawlead.ru/cabinet/",
+        yookassa_webhook_secret="",
+        yookassa_save_payment_method=False,
     )
 
 

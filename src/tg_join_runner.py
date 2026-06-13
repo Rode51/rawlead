@@ -9,13 +9,17 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from config import (
+    _PROJECT_ROOT,
     append_telethon_chat_id,
     is_join_night_window,
+    load_radar_env,
     load_tg_join_config,
+    load_tg_monitor_config,
     radar_timestamp,
     telethon_chat_ids_path_for_account,
     telethon_monitor_accounts,
 )
+from radar_cycle_log import log_pipeline_line
 from tg_client import connect_client
 from tg_join_lib import (
     join_one,
@@ -33,12 +37,28 @@ class JoinTickResult:
     new_listen_chat_ids: list[int] = field(default_factory=list)
 
 
+def _radar_site_log_path():
+    load_radar_env()
+    path = load_tg_monitor_config().radar_log_path
+    return path if path.is_absolute() else _PROJECT_ROOT / path
+
+
 def log_join(cfg, message: str) -> None:
     line = f"{radar_timestamp()} {message}"
     print(line)
     cfg.log_path.parent.mkdir(parents=True, exist_ok=True)
     with cfg.log_path.open("a", encoding="utf-8") as fh:
         fh.write(line + "\n")
+
+
+def log_join_radar(account: str, kind: str, **fields: object) -> None:
+    """Mirror join events to radar_site.log (O188 t3)."""
+    parts = [f"тг:join:{account}: {kind}"]
+    for key, value in fields.items():
+        if value is None or value == "":
+            continue
+        parts.append(f"{key}={value}")
+    log_pipeline_line(_radar_site_log_path(), " ".join(parts))
 
 
 def _load_state(path) -> dict:
@@ -108,10 +128,12 @@ async def run_join_tick(
 
     if remaining_hour <= 0:
         log_join(cfg, f"join:skip:лимит account={account} reason=hour")
+        log_join_radar(account, "skip:лимит", reason="hour")
         _save_state(cfg.state_path, state)
         return result
     if remaining_day <= 0:
         log_join(cfg, f"join:skip:лимит account={account} reason=day")
+        log_join_radar(account, "skip:лимит", reason="day")
         _save_state(cfg.state_path, state)
         return result
 
@@ -179,6 +201,13 @@ async def run_join_tick(
                     cfg,
                     f"join:ok account={account} link={link} chat_id={cid}{already}",
                 )
+                log_join_radar(
+                    account,
+                    "ok",
+                    name=name,
+                    chat_id=cid,
+                    already=1 if join_result.already else None,
+                )
                 if storage is not None:
                     from radar_status import record_tg_phase
 
@@ -240,6 +269,13 @@ async def run_join_tick(
                 log_join(
                     cfg,
                     f"join:fail account={account} link={link} error={join_result.error}",
+                )
+                log_join_radar(
+                    account,
+                    "fail",
+                    name=name,
+                    link=link,
+                    error=join_result.error,
                 )
     finally:
         if own_client:

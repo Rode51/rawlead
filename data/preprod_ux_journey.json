@@ -1,49 +1,381 @@
 {
-  "generated_at": "2026-05-30T05:36:46.466972+00:00",
+  "generated_at": "2026-06-08T15:16:45.292250+00:00",
   "base_url": "https://rawlead.ru",
-  "browser": "cdp",
+  "browser": "chromium+token",
   "viewport": "desktop",
-  "storage_state": "C:\\Users\\hramo\\uisness\\data\\preprod_playwright\\storage_state.json",
+  "storage_state": null,
   "has_auth": true,
-  "journeys_total": 1,
-  "journeys_pass": 1,
+  "journeys_total": 10,
+  "journeys_pass": 10,
   "critical_count": 0,
   "j5_draft_ok": true,
   "pass": true,
   "results": [
     {
+      "id": "J1",
+      "title": "Главная",
+      "pass": true,
+      "ms": 2803,
+      "error": null,
+      "screenshots": {
+        "before": "data\\preprod_ux_journey\\J1_before.png",
+        "after": "data\\preprod_ux_journey\\J1_after.png"
+      },
+      "console_errors": [],
+      "network_failures": [
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/site-stats",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    {
+      "id": "J2",
+      "title": "Лента load",
+      "pass": true,
+      "ms": 5211,
+      "error": null,
+      "screenshots": {
+        "before": "data\\preprod_ux_journey\\J2_before.png",
+        "after": "data\\preprod_ux_journey\\J2_after.png"
+      },
+      "console_errors": [],
+      "network_failures": [
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/support/unread",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/me/feed-prefs",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    {
+      "id": "J3",
+      "title": "Фильтры",
+      "pass": true,
+      "ms": 9197,
+      "error": null,
+      "screenshots": {
+        "before": "data\\preprod_ux_journey\\J3_before.png",
+        "after": "data\\preprod_ux_journey\\J3_after.png"
+      },
+      "console_errors": [],
+      "network_failures": [
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/feed?limit=20&offset=0&min_score=0&sort=time&min_match=0",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    {
+      "id": "J4",
+      "title": "Карточка expand",
+      "pass": true,
+      "ms": 13320,
+      "error": null,
+      "screenshots": {
+        "before": "data\\preprod_ux_journey\\J4_before.png",
+        "after": "data\\preprod_ux_journey\\J4_after.png"
+      },
+      "console_errors": [
+        "[error] Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "network_failures": [
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/feed?limit=20&offset=0&min_score=0&sort=match&min_match=80&category=design",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 404,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/me/leads/19643/draft/warm",
+          "method": "POST"
+        }
+      ]
+    },
+    {
       "id": "J5",
       "title": "Draft ×2",
       "pass": true,
-      "ms": 50938,
+      "ms": 53867,
       "error": null,
       "screenshots": {
         "before": "data\\preprod_ux_journey\\J5_before.png",
         "after": "data\\preprod_ux_journey\\J5_after.png"
       },
       "console_errors": [
-        "[warning] MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 close listeners added. Use emitter.setMaxListeners() to increase limit",
-        "[warning] MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 end listeners added. Use emitter.setMaxListeners() to increase limit",
-        "[warning] ObjectMultiplex - orphaned data for stream \"app-init-liveness\"",
-        "[warning] ObjectMultiplex - orphaned data for stream \"app-init-liveness\"",
-        "[warning] ObjectMultiplex - orphaned data for stream \"background-liveness\"",
-        "[warning] ObjectMultiplex - orphaned data for stream \"background-liveness\"",
-        "[warning] ObjectMultiplex - malformed chunk without name \"[object Object]\"",
-        "[warning] ObjectMultiplex - malformed chunk without name \"[object Object]\""
+        "[error] Failed to load resource: the server responded with a status of 404 ()",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[error] Failed to load resource: the server responded with a status of 404 ()",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
       ],
+      "network_failures": [
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 404,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/me/leads/19644/draft/warm",
+          "method": "POST"
+        },
+        {
+          "status": 404,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/me/leads/19643/draft/warm",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "id": "J6",
+      "title": "Draft collapse",
+      "pass": true,
+      "ms": 13332,
+      "error": null,
+      "screenshots": {
+        "before": "data\\preprod_ux_journey\\J6_before.png",
+        "after": "data\\preprod_ux_journey\\J6_after.png"
+      },
+      "console_errors": [
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_C-bk.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+        "[warning] The resource https://fonts.gstatic.com/s/manrope/v20/xn7_YHE41ni1AdIRqAuZuw1Bx9mbZk79FN_G-bnBeA.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+      ],
+      "network_failures": [
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    {
+      "id": "J7",
+      "title": "ЛК anon",
+      "pass": true,
+      "ms": 327,
+      "error": null,
+      "screenshots": {
+        "before": "data\\preprod_ux_journey\\J7_before.png",
+        "after": "data\\preprod_ux_journey\\J7_after.png"
+      },
+      "console_errors": [],
       "network_failures": []
+    },
+    {
+      "id": "J8",
+      "title": "ЛК logged",
+      "pass": true,
+      "ms": 14486,
+      "error": null,
+      "screenshots": {
+        "before": "data\\preprod_ux_journey\\J8_before.png",
+        "after": "data\\preprod_ux_journey\\J8_after.png"
+      },
+      "console_errors": [],
+      "network_failures": [
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/me/tags",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/skills/catalog?mode=full&limit=200",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/support/unread",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/me/subscription",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/me/subscription",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    {
+      "id": "J9",
+      "title": "Marketing",
+      "pass": true,
+      "ms": 1812,
+      "error": null,
+      "screenshots": {
+        "before": "data\\preprod_ux_journey\\J9_before.png",
+        "after": "data\\preprod_ux_journey\\J9_after.png"
+      },
+      "console_errors": [],
+      "network_failures": [
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/support/unread",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/support/unread",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/support/unread",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/support/unread",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    {
+      "id": "J11",
+      "title": "FAB support",
+      "pass": true,
+      "ms": 5099,
+      "error": null,
+      "screenshots": {
+        "before": "data\\preprod_ux_journey\\J11_before.png",
+        "after": "data\\preprod_ux_journey\\J11_after.png"
+      },
+      "console_errors": [],
+      "network_failures": [
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/support/unread",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/site-stats",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/feed?limit=3&sort=time&min_score=0",
+          "method": "GET",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "status": 0,
+          "url": "https://rawlead.ru/wp-json/rawlead/v1/admin/pageview",
+          "method": "POST",
+          "error": "net::ERR_ABORTED"
+        }
+      ]
     }
   ],
   "findings": [
     {
       "severity": "info",
       "journey": "J5",
-      "message": "draft 1/2 OK (lead 7546)"
+      "message": "draft 1/2 OK (lead 19644)"
     },
     {
       "severity": "info",
       "journey": "J5",
-      "message": "draft 2/2 OK (lead 7544)"
+      "message": "draft 2/2 OK (lead 19643)"
     }
   ],
   "artifacts_dir": "data\\preprod_ux_journey"

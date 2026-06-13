@@ -625,16 +625,18 @@ def _send_pay_flow(
     *,
     method: str = "menu",
 ) -> None:
-    """O105: меню или конкретный способ (deep link с сайта)."""
-    if pay_available(cfg) or method == "stars" or cfg.stars_enabled:
-        send_pay_method(cfg, int(chat_id), int(user_id), method, errors)
-        return
+    """O174b: оплата только на сайте (ЮKassa)."""
+    del method, user_id
     try:
         _send_to_chat(
             cfg,
             chat_id,
-            "Оплата Premium временно недоступна. Напишите в поддержку.",
-            remove_keyboard=True,
+            "Оплата Premium — на сайте:\nhttps://rawlead.ru/pricing\n\n"
+            "Trial 1 ₽ / 3 дня · далее 790 ₽/мес.",
+            reply_markup=_inline_url_markup(
+                "https://rawlead.ru/pricing",
+                "Открыть тарифы →",
+            ),
         )
     except TelegramControlError:
         pass

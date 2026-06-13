@@ -1634,8 +1634,8 @@
       escapeHtml(pricing) +
       '" onclick="event.stopPropagation()">Подключить Premium 790 ₽</a> ' +
       "или <a href=\"" +
-      escapeHtml(cabinet) +
-      '" onclick="event.stopPropagation()">Попробовать 3 дня</a>' +
+      escapeHtml(pricing) +
+      '" onclick="event.stopPropagation()">Попробовать за 1 ₽</a>' +
       "</div>"
     );
   }
@@ -2192,6 +2192,7 @@
     }
     syncMobileFilterChrome();
     renderSheetSortPanel();
+    readFilters();
   }
 
   function readCategoriesFrom(root) {
@@ -2224,7 +2225,6 @@
     var dirty =
       hasSourceFilter() ||
       state.appliedCategories.length > 0 ||
-      state.appliedTags.length > 0 ||
       state.sort !== "time" ||
       state.min_match !== 80 ||
       !categoriesEqual(state.draftCategories, state.appliedCategories);
@@ -4006,12 +4006,22 @@
           inp.checked = inp.value === "";
         });
         state.sort = "time";
+        state.min_match = 80;
         state.draftCategories = [];
         state.appliedCategories = [];
-        state.draftTags = [];
+        var sheetRoot = populatedSheetBody();
+        if (sheetRoot) {
+          syncCategoryInputs(sidebar, sheetRoot);
+        }
         syncChips();
+        renderSortPanel();
+        renderSheetSortPanel();
         loadCatalog();
-        persistTags([], { reload: true });
+        readFilters();
+        updateFilterBarUi();
+        persistFeedPrefs().finally(function () {
+          resetAndLoad();
+        });
       });
     }
   }

@@ -51,6 +51,20 @@ _CYCLE_SEC = re.compile(r'"cycle_sec"\s*:\s*([\d.]+)')
 _EXCHANGE_ROW = re.compile(
     r"exchange_health:(?P<source>[a-z_]+)\s+(?P<payload>\{.*\})"
 )
+_CYCLE_HEADER = re.compile(r"── Цикл (\d{4}-\d{2}-\d{2} \d{2}:\d{2})")
+_TIER_ENV_KEYS = {
+    "free": "RAWLEAD_PREPROD_FREE_TOKEN",
+    "trial": "RAWLEAD_PREPROD_TRIAL_TOKEN",
+    "premium": "RAWLEAD_PREPROD_ACCESS_TOKEN",
+}
+_L2_SEND_MIN = 0.70
+_L2_AUTO_MIN = 0.95
+_INGEST_GAP_MAX_MIN = 15
+_DEFAULT_VERIFY_MD = _ROOT / "data" / "preprod_stress_v2_verify.md"
+_L2_AUDIT_CANDIDATES = (
+    _ROOT / "data" / "preprod_ai_prod_audit.json",
+    _ROOT / "data" / "preprod_ai_prod_audit_o162_post.json",
+)
 
 
 def percentile(values: list[float], pct: float) -> float | None:
@@ -113,6 +127,68 @@ def parse_radar_snapshot(log_text: str) -> dict[str, Any]:
         "pass": s4_pre_pass,
         "note": "См. PREPROD_STRESS_RUN § Parser — downloaded>0 ≠ сломан",
     }
+
+
+def parse_radar_ingest_gaps(
+    log_text: str,
+    *,
+    max_gap_min: int = _INGEST_GAP_MAX_MIN,
+) -> dict[str, Any]:
+    """O168 g4: max gap between radar cycle headers in log tail (24h proxy)."""
+    stamps: list[datetime] = []
+    for line in log_text.splitlines():
+        m = _CYCLE_HEADER.search(line)
+        if not m:
+            continue
+        try:
+            stamps.append(
+                datetime.strptime(m.group(1), "%Y-%m-%d %H:%M").replace(
+                    tzinfo=timezone.utc
+                )
+            )
+        except ValueError:
+            continue
+    if len(stamps) < 2:
+        return {
+            "cycle_count": len(stamps),
+            "max_gap_min": None,
+            "pass": True,
+            "note": "fewer than 2 cycle markers in log tail",
+        }
+    max_gap = max(
+        (stamps[i] - stamps[i - 1]).total_seconds() / 60.0
+        for i in range(1, len(stamps))
+    )
+    return {
+        "cycle_count": len(stamps),
+        "max_gap_min": round(max_gap, 1),
+        "pass": max_gap <= max_gap_min,
+    }
+
+
+def _store_tier_token(name: str, token: str) -> None:
+    env_key = _TIER_ENV_KEYS.get(name)
+    if env_key and token:
+        os.environ[env_key] = token
+
+
+def _write_env_site_token(env_key: str, token: str) -> None:
+    path = _ROOT / ".env.site"
+    if not path.is_file():
+        return
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    prefix = f"{env_key}="
+    out: list[str] = []
+    replaced = False
+    for line in lines:
+        if line.strip().startswith(prefix):
+            out.append(f"{prefix}{token}")
+            replaced = True
+        else:
+            out.append(line)
+    if not replaced:
+        out.append(f"{prefix}{token}")
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
 def fetch_radar_log(*, vps: bool, local_path: Path | None) -> tuple[str, str]:
@@ -387,6 +463,10 @@ def ensure_tier_plans(api_url: str, tiers: dict[str, Any], *, mint: bool) -> dic
                     meta["token"] = token
                     meta["source"] = src
                     meta["ok"] = True
+                    _store_tier_token(name, token)
+                    env_key = _TIER_ENV_KEYS.get(name)
+                    if env_key:
+                        _write_env_site_token(env_key, token)
             if not meta.get("token"):
                 meta["ok"] = False
                 issues.append(
@@ -403,6 +483,7 @@ def ensure_tier_plans(api_url: str, tiers: dict[str, Any], *, mint: bool) -> dic
         actual = _subscription_plan(api_url, token)
         if actual == expected:
             meta.pop("plan_mismatch", None)
+            meta["ok"] = True
             continue
 
         if mint:
@@ -416,6 +497,10 @@ def ensure_tier_plans(api_url: str, tiers: dict[str, Any], *, mint: bool) -> dic
                 meta["token"] = token
                 meta["source"] = src
                 meta["ok"] = True
+                _store_tier_token(name, token)
+                env_key = _TIER_ENV_KEYS.get(name)
+                if env_key:
+                    _write_env_site_token(env_key, token)
                 actual = _subscription_plan(api_url, token)
 
         if actual != expected:
@@ -642,6 +727,175 @@ def run_skills_mismatch(*, profile: str = "site") -> dict[str, Any]:
     return step
 
 
+def _fetch_l2_audit_sample(
+    conn: Any,
+    *,
+    limit: int,
+    since_days: int = 7,
+) -> list[dict[str, Any]]:
+    from preprod_ai_prod_audit import _SELECT_COLS, _row_to_lead
+    from public_feed import public_feed_source_sql
+
+    src_sql, src_params = public_feed_source_sql()
+    sql = f"""
+        SELECT {_SELECT_COLS}
+        FROM leads
+        WHERE is_visible = TRUE
+          {src_sql}
+          AND created_at >= NOW() - make_interval(days => %s)
+          AND COALESCE(NULLIF(TRIM(reply_draft), ''), '') <> ''
+          AND LOWER(TRIM(COALESCE(ai_verdict, ''))) IN (
+              'брать', 'брат', 'сомнительно', 'take', 'ok', 'maybe'
+          )
+        ORDER BY id DESC
+        LIMIT %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, [*src_params, since_days, limit])
+        rows = cur.fetchall()
+    return [_row_to_lead(r) for r in rows]
+
+
+def load_cached_l2_send(*, max_age_hours: int = 48) -> dict[str, Any] | None:
+    """Recent judge_l2_summary from prod audit artifacts (O168 offline gate)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    for path in _L2_AUDIT_CANDIDATES:
+        if not path.is_file():
+            continue
+        try:
+            body = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        js = body.get("judge_l2_summary")
+        if not isinstance(js, dict) or not js.get("scored"):
+            continue
+        gen = body.get("generated_at")
+        if gen:
+            try:
+                ts = datetime.fromisoformat(str(gen).replace("Z", "+00:00"))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if ts < cutoff:
+                    continue
+            except ValueError:
+                pass
+        send_pct = float(js.get("send_as_is_pct") or 0) / 100.0
+        return {
+            "source": str(path.relative_to(_ROOT)),
+            "send_as_is_pct": js.get("send_as_is_pct"),
+            "accept_l2": bool(js.get("accept_l2")),
+            "pass": send_pct >= _L2_SEND_MIN,
+            "scored": js.get("scored"),
+            "avg_combined_3": js.get("avg_combined_3"),
+        }
+    return None
+
+
+def _audit_lead_stress(lead: dict[str, Any]) -> dict[str, Any]:
+    """O168: TZ-aware auto-audit (validate_stored_l2_draft), not bare audit_lead."""
+    from ai_analyze import validate_stored_l2_draft
+
+    fails = validate_stored_l2_draft(
+        verdict=lead.get("ai_verdict") or "",
+        reply_draft=lead.get("reply_draft") or "",
+        tools_required=lead.get("tools_required") or [],
+        title=lead.get("title") or "",
+        description=lead.get("body") or "",
+    )
+    draft_fails = [f for f in fails if f.startswith(("L1:", "L2:"))]
+    tools_fails = [f for f in fails if f.startswith("tools:")]
+    return {
+        **lead,
+        "fails": fails,
+        "draft_fails": draft_fails,
+        "tools_fails": tools_fails,
+        "draft_only_pass": not draft_fails,
+        "tools_pass": not tools_fails,
+        "auto_pass": not fails,
+    }
+
+
+def check_l2_quality(
+    db_url: str,
+    *,
+    run_judge: bool,
+    judge_limit: int,
+    sample_limit: int,
+) -> dict[str, Any]:
+    """O168 g1: forbidden/tools auto-audit on Neon sample + optional L2 send judge."""
+    from preprod_ai_prod_audit import _judge_l2_summary, _run_judge_l2
+    from config import load_config
+
+    try:
+        import psycopg
+
+        with psycopg.connect(db_url) as conn:
+            leads = _fetch_l2_audit_sample(conn, limit=sample_limit)
+    except Exception as exc:
+        return {"pass": False, "error": f"db: {exc}"}
+
+    if not leads:
+        return {"pass": False, "error": "no L2 sample leads", "sample_size": 0}
+
+    audited = [_audit_lead_stress(lead) for lead in leads]
+    draft_ok = sum(1 for r in audited if r.get("draft_only_pass"))
+    tools_ok = sum(1 for r in audited if r.get("tools_pass"))
+    auto_ok = sum(1 for r in audited if r.get("auto_pass"))
+    n = len(audited)
+    draft_rate = draft_ok / n
+    tools_rate = tools_ok / n
+    auto_rate = auto_ok / n
+    auto_pass = draft_rate >= _L2_AUTO_MIN and tools_rate >= _L2_AUTO_MIN
+
+    result: dict[str, Any] = {
+        "sample_size": n,
+        "draft_only_pass_pct": round(draft_rate * 100, 1),
+        "tools_pass_pct": round(tools_rate * 100, 1),
+        "auto_pass_pct": round(auto_rate * 100, 1),
+        "auto_pass": auto_pass,
+        "top_fails": [
+            {
+                "lead_id": r["lead_id"],
+                "fails": r.get("fails") or [],
+            }
+            for r in audited
+            if not r.get("auto_pass")
+        ][:8],
+    }
+
+    send_section: dict[str, Any] = {"pass": False, "mode": "none"}
+    if run_judge:
+        cfg = load_config()
+        judged = _run_judge_l2(cfg, audited, limit=judge_limit)
+        js = _judge_l2_summary(judged)
+        send_pct = float(js.get("send_as_is_pct") or 0) / 100.0
+        send_section = {
+            "mode": "judge",
+            "pass": send_pct >= _L2_SEND_MIN,
+            "send_as_is_pct": js.get("send_as_is_pct"),
+            "accept_l2": js.get("accept_l2"),
+            "scored": js.get("scored"),
+            "avg_combined_3": js.get("avg_combined_3"),
+        }
+    else:
+        cached = load_cached_l2_send()
+        if cached:
+            send_section = {**cached, "mode": "cached_audit"}
+        else:
+            send_section = {
+                "mode": "skipped",
+                "pass": True,
+                "note": "run --l2-judge or preprod_ai_prod_audit --judge",
+            }
+
+    result["send_gate"] = send_section
+    send_ok = (
+        send_section.get("pass") is True or send_section.get("mode") == "skipped"
+    )
+    result["pass"] = auto_pass and send_ok
+    return result
+
+
 def _gate_result(section: dict[str, Any], *, pass_key: str = "pass") -> bool | str:
     if section.get("skipped"):
         return "skipped"
@@ -658,14 +912,24 @@ def build_pass_summary(report: dict[str, Any]) -> dict[str, Any]:
     parsers = report.get("parser_snapshot") or {}
     skills = report.get("skills_mismatch") or {}
     tier_matrix = report.get("tier_matrix") or {}
+    l2 = report.get("l2_quality") or {}
+    ingest = report.get("ingest_24h") or {}
 
     gates = {
         "tier_matrix": _gate_result(tier_matrix),
         "load_p95_feed": _gate_result(load, pass_key="s3_pass"),
+        "l2_auto": _gate_result(l2, pass_key="auto_pass"),
+        "l2_send": (
+            "skipped"
+            if l2.get("skipped")
+            or (l2.get("send_gate") or {}).get("mode") in ("skipped", "missing")
+            else _gate_result(l2.get("send_gate") or {}, pass_key="pass")
+        ),
         "draft_burst": _gate_result(draft),
         "tz_leads": _gate_result(tz),
         "ux_journey": _gate_result(journey),
         "parsers": _gate_result(parsers),
+        "ingest_24h": _gate_result(ingest),
         "skills_mismatch": _gate_result(skills),
     }
     actionable = [v for v in gates.values() if v != "skipped"]
@@ -764,11 +1028,86 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"- cascade hits: **{parsers.get('cascade_exhausted_hits', 0)}** · "
         f"runaway cycles: **{parsers.get('runaway_cycle_count', 0)}**"
     )
+    if parsers.get("ingest_max_gap_min") is not None:
+        lines.append(
+            f"- ingest max gap: **{parsers.get('ingest_max_gap_min')} min** "
+            f"(cycles **{parsers.get('ingest_cycle_count', 0)}**)"
+        )
+
+    l2 = report.get("l2_quality") or {}
+    if not l2.get("skipped"):
+        sg = l2.get("send_gate") or {}
+        lines.extend(
+            [
+                "",
+                "## L2 quality (O168)",
+                "",
+                f"- auto pass: **{l2.get('auto_pass_pct', '—')}%** "
+                f"(draft **{l2.get('draft_only_pass_pct', '—')}%** · "
+                f"tools **{l2.get('tools_pass_pct', '—')}%** · n={l2.get('sample_size', 0)})",
+                f"- send gate ({sg.get('mode', '—')}): "
+                f"**{sg.get('send_as_is_pct', '—')}%** "
+                f"({'PASS' if sg.get('pass') else 'FAIL' if sg.get('mode') not in ('skipped',) else 'skipped'})",
+            ]
+        )
+
+    ingest = report.get("ingest_24h") or {}
+    if not ingest.get("skipped"):
+        lines.extend(
+            [
+                "",
+                "## Ingest 24h",
+                "",
+                f"- max cycle gap: **{ingest.get('max_gap_min', '—')} min** "
+                f"(limit **{ingest.get('max_allowed_min', _INGEST_GAP_MAX_MIN)}**)",
+            ]
+        )
 
     skills = report.get("skills_mismatch") or {}
     if not skills.get("skipped"):
         lines.extend(["", "## S1-b skills_mismatch", "", f"- PASS: **{skills.get('pass')}**"])
 
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_verify_brief(report: dict[str, Any], path: Path) -> None:
+    """O168: short verify brief for owner / Lead."""
+    ps = report.get("pass_summary") or {}
+    gates = ps.get("gates") or {}
+    load = report.get("load") or {}
+    l2 = report.get("l2_quality") or {}
+    sg = l2.get("send_gate") or {}
+    ingest = report.get("ingest_24h") or {}
+    lines = [
+        "# PRE-PROD Stress V2 verify (O168)",
+        "",
+        f"**Generated:** {report.get('generated_at', '')}",
+        f"**Overall:** {'PASS' if ps.get('pass') else 'FAIL'}",
+        "",
+        "## Gates",
+        "",
+    ]
+    for key, ok in gates.items():
+        mark = "⏭" if ok == "skipped" else ("✅" if ok else "❌")
+        lines.append(f"- **{key}**: {mark}")
+    lines.extend(
+        [
+            "",
+            "## Metrics",
+            "",
+            f"- feed p95 @50 VU: **{load.get('p95_feed_ms', '—')} ms** (target <2000)",
+            f"- L2 auto: **{l2.get('auto_pass_pct', '—')}%** · send: "
+            f"**{sg.get('send_as_is_pct', '—')}%** ({sg.get('mode', '—')})",
+            f"- ingest max gap: **{ingest.get('max_gap_min', '—')} min**",
+            "",
+            "## Next",
+            "",
+            "- tier_matrix: `DATABASE_URL` + mint acc2 free / acc3 trial if env tokens stale",
+            "- p95: Neon pooler on VPS API (`DATABASE_URL` :6543) — см. O131",
+            "- L2 send: `preprod_stress_v2.py --l2-judge` or `preprod_ai_prod_audit.py --judge`",
+        ]
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -784,6 +1123,9 @@ def run_stress_v2(
     skip_tz: bool,
     skip_skills: bool,
     skip_parsers: bool,
+    skip_l2: bool,
+    l2_judge: bool,
+    l2_judge_limit: int,
     mint_tokens: bool,
     vps_log: bool,
     radar_log: Path | None,
@@ -854,11 +1196,33 @@ def run_stress_v2(
 
     if skip_parsers:
         report["parser_snapshot"] = {"skipped": True, "pass": True}
+        report["ingest_24h"] = {"skipped": True, "pass": True}
     else:
         log_text, log_source = fetch_radar_log(vps=vps_log, local_path=radar_log)
         snap = parse_radar_snapshot(log_text)
         snap["log_source"] = log_source
         report["parser_snapshot"] = snap
+        report["ingest_24h"] = {
+            "max_gap_min": snap.get("ingest_max_gap_min"),
+            "cycle_count": snap.get("ingest_cycle_count", 0),
+            "max_allowed_min": _INGEST_GAP_MAX_MIN,
+            "pass": snap.get("ingest_max_gap_min") is None
+            or float(snap.get("ingest_max_gap_min") or 0) <= _INGEST_GAP_MAX_MIN,
+        }
+
+    if skip_l2 or not db_url:
+        report["l2_quality"] = {
+            "skipped": True,
+            "pass": True,
+            **({"reason": "no DATABASE_URL"} if not db_url else {}),
+        }
+    else:
+        report["l2_quality"] = check_l2_quality(
+            db_url,
+            run_judge=l2_judge,
+            judge_limit=l2_judge_limit,
+            sample_limit=15 if quick else 30,
+        )
 
     report["pass_summary"] = build_pass_summary(report)
     return report
@@ -878,8 +1242,16 @@ def main() -> int:
     parser.add_argument("--skip-tz", action="store_true")
     parser.add_argument("--skip-skills", action="store_true")
     parser.add_argument("--skip-parsers", action="store_true")
+    parser.add_argument("--skip-l2", action="store_true")
+    parser.add_argument(
+        "--l2-judge",
+        action="store_true",
+        help="Run OpenRouter L2 judge on sample (expensive)",
+    )
+    parser.add_argument("--l2-judge-limit", type=int, default=10)
     parser.add_argument("--output-json", type=Path, default=_DEFAULT_JSON)
     parser.add_argument("--output-md", type=Path, default=_DEFAULT_MD)
+    parser.add_argument("--output-verify-md", type=Path, default=_DEFAULT_VERIFY_MD)
     args = parser.parse_args()
 
     report = run_stress_v2(
@@ -892,6 +1264,9 @@ def main() -> int:
         skip_tz=args.skip_tz,
         skip_skills=args.skip_skills,
         skip_parsers=args.skip_parsers,
+        skip_l2=args.skip_l2,
+        l2_judge=args.l2_judge,
+        l2_judge_limit=args.l2_judge_limit,
         mint_tokens=not args.no_mint,
         vps_log=args.vps_log,
         radar_log=args.radar_log,
@@ -900,9 +1275,11 @@ def main() -> int:
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     write_markdown(report, args.output_md)
+    write_verify_brief(report, args.output_verify_md)
     print(json.dumps(report.get("pass_summary"), ensure_ascii=False, indent=2))
     print(f"→ {args.output_json}")
     print(f"→ {args.output_md}")
+    print(f"→ {args.output_verify_md}")
     return 0 if (report.get("pass_summary") or {}).get("pass") else 1
 
 

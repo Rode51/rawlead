@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.18.56');
+define('RAWLEAD_CHILD_VERSION', '1.18.75');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -234,9 +234,24 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restSubscription' => esc_url_raw(rest_url('rawlead/v1/me/subscription')),
             'pricingUrl'       => esc_url_raw(rawlead_page_url('pricing')),
             'cabinetUrl'       => esc_url_raw(rawlead_page_url('cabinet')),
-            'botPayUrl'        => esc_url_raw('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay'),
             'nonce'            => wp_create_nonce('wp_rest'),
             'apiBase'          => rawlead_api_base_url(),
+        ]);
+    }
+
+    if (is_page('pricing')) {
+        wp_enqueue_script(
+            'rawlead-pricing',
+            RAWLEAD_CHILD_URI . '/assets/js/rawlead-pricing.js',
+            [],
+            RAWLEAD_CHILD_VERSION,
+            true
+        );
+        wp_localize_script('rawlead-pricing', 'rawleadPricing', [
+            'restCheckout'     => esc_url_raw(rest_url('rawlead/v1/me/subscription/checkout')),
+            'restSubscription' => esc_url_raw(rest_url('rawlead/v1/me/subscription')),
+            'cabinetUrl'       => esc_url_raw(rawlead_page_url('cabinet')),
+            'nonce'            => wp_create_nonce('wp_rest'),
         ]);
     }
 
@@ -250,6 +265,8 @@ add_action('wp_enqueue_scripts', static function (): void {
         );
         wp_localize_script('rawlead-cabinet', 'rawleadCabinet', [
             'restReplies'          => esc_url_raw(rest_url('rawlead/v1/me/replies')),
+            'restMe'               => esc_url_raw(rest_url('rawlead/v1/me')),
+            'restAvatar'           => esc_url_raw(rest_url('rawlead/v1/me/avatar')),
             'restTags'             => esc_url_raw(rest_url('rawlead/v1/me/tags')),
             'restSkills'           => esc_url_raw(rest_url('rawlead/v1/skills/catalog')),
             'restAuth'             => esc_url_raw(rest_url('rawlead/v1/auth/telegram')),
@@ -258,11 +275,11 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restQrImage'          => esc_url_raw(rest_url('rawlead/v1/auth/qr-image')),
             'botLoginUrl'          => esc_url_raw('https://t.me/' . rawlead_tg_login_bot_username() . '?start=login'),
             'restSubscription'          => esc_url_raw(rest_url('rawlead/v1/me/subscription')),
-            'restTrialStart'            => esc_url_raw(rest_url('rawlead/v1/me/subscription/trial-start')),
+            'restCheckout'              => esc_url_raw(rest_url('rawlead/v1/me/subscription/checkout')),
+            'restConfirm'               => esc_url_raw(rest_url('rawlead/v1/me/subscription/confirm')),
             'restNotificationSettings'  => esc_url_raw(rest_url('rawlead/v1/me/notification-settings')),
             'lentaUrl'                  => esc_url_raw(rawlead_page_url('lenta')),
             'pricingUrl'           => esc_url_raw(rawlead_page_url('pricing')),
-            'botPayUrl'            => esc_url_raw('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay'),
             'tgBotUsername'        => rawlead_tg_login_bot_username(),
             'tgBotId'              => rawlead_tg_login_bot_id(),
             'tgLoginFallbackUrl'   => rawlead_tg_login_fallback_url(),

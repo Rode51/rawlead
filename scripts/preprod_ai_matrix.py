@@ -52,6 +52,8 @@ _SKILLS_MISMATCH_FIXTURE = PreprodLeadFixture(
     url="https://www.fl.ru/projects/skills-mismatch-node/",
 )
 _PREPROD_TEST_USER_ID = "895912a1-ffb6-46fb-be7e-4e051f2ff8c1"
+# O168 g3: ondemand L2 = up to 2×90s OR attempts + outer retry (match_push._analyze_shared_ondemand)
+_SKILLS_MISMATCH_MAX_MS = 300_000
 
 
 def _analysis_to_dict(obj: AiLiteAnalysis | AiAnalysis | None) -> dict | None:
@@ -239,9 +241,9 @@ def _run_skills_mismatch(cfg) -> dict:
                 """
                 INSERT INTO leads (
                     source, external_id, title, body, url, budget_text,
-                    lead_tags, is_visible, category, task_summary, reply_draft
+                    lead_tags, tools_required, is_visible, category, task_summary, reply_draft
                 )
-                VALUES ('fl', %s, %s, %s, %s, %s, %s::jsonb, TRUE, 'dev', %s, '')
+                VALUES ('fl', %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, TRUE, 'dev', %s, '')
                 RETURNING id
                 """,
                 (
@@ -251,6 +253,7 @@ def _run_skills_mismatch(cfg) -> dict:
                     fx.url,
                     fx.budget_text,
                     '["nodejs","nestjs","react"]',
+                    '["nodejs","nestjs","postgresql","redis"]',
                     "Node.js backend NestJS и React frontend для маркетплейса.",
                 ),
             )
@@ -289,7 +292,13 @@ def _run_skills_mismatch(cfg) -> dict:
     bad_stack = any(x in lower for x in ("yii2", "yii 2", "fontlab"))
     smell = reply_ai_smell_reason(draft) if draft else "empty"
     node_in_tz = "node" in lower or "nestjs" in lower
-    ok = bool(draft) and not bad_stack and smell is None and node_in_tz and total_ms < 90_000
+    ok = (
+        bool(draft)
+        and not bad_stack
+        and smell is None
+        and node_in_tz
+        and total_ms < _SKILLS_MISMATCH_MAX_MS
+    )
 
     return {
         "scenario": "skills_mismatch",
@@ -304,7 +313,7 @@ def _run_skills_mismatch(cfg) -> dict:
             "no_yii2_fontlab": not bad_stack,
             "no_smell": smell is None,
             "node_from_tz": node_in_tz,
-            "under_90s": total_ms < 90_000,
+            "under_budget": total_ms < _SKILLS_MISMATCH_MAX_MS,
         },
         "smell": smell,
         "errors": errors,

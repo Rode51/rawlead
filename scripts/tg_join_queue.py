@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
+os.environ.setdefault("RADAR_PROFILE", "site")
 
 from config import (  # noqa: E402
     load_tg_join_config,

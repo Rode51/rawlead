@@ -6,6 +6,40 @@
 
 ---
 
+# Перенесено из hot **2026-06-13** (O194 YouDo ingest after listing)
+
+## § O194-YOUDO-INGEST-AFTER-LISTING ✅ Lead 2026-06-13
+
+**Symptom:** listing `parsed=50` but ingest 0 — owner: new tasks on YouDo today.
+
+**Root cause:** listing subprocess (O190) OK · `_process_listings` → in-process `fetch_project_detail` → `Sync API inside asyncio`.
+
+**Fix (approach A):** `fetch_youdo_detail_snapshot` → camoufox **`youdo_fetch_worker.py --stage detail`** (same as listing subprocess).
+
+**DoD (Lead verify VPS):** deploy `deploy-o194-youdo-detail-subprocess-vps.py` · post-deploy **00:07** `fetch_end parsed=50` → **`pipeline:L1 youdo:id=` ×29+** (7× `visible=1`) · **0** asyncio on 2026-06-13 · `health:youdo ok parsed=50`
+
+**Files:** `src/exchange_browser_fetch.py` · `scripts/youdo_fetch_worker.py` · `scripts/deploy-o194-youdo-detail-subprocess-vps.py`
+
+---
+
+# Перенесено из hot **2026-06-12** (O193 FL subprocess)
+
+## § O193-FL-SUBPROCESS-WORKER ✅ Lead 2026-06-12
+
+**DoD:** `fl_fetch_worker.py` · `fetch_listing_html_browser` → subprocess when `FL_LISTING_SUBPROCESS=1` (default) · deploy `deploy-o193-fl-subprocess-vps.py` · radar `listing:fl parsed=30` · rollback env `FL_LISTING_SUBPROCESS=0`
+
+---
+
+# Перенесено из hot **2026-06-12** (O191 YouDo proxy mix)
+
+## § O191-YOUDO-PROXY-MIX ✅ Lead 2026-06-12
+
+**DoD:** prepend 1 DC slot (185.147) + 25 RU → **26** `YOUDO_PROXY_URLS` · active_slot reset 0 · radar `slot=1/26` · `fetch_end parsed=50` · smoke failover CLI · rollback `patch-vps-youdo-proxy-env.py`
+
+**Files:** `scripts/deploy-o191-youdo-proxy-vps.py` · `scripts/patch-vps-youdo-proxy-env.py` comment
+
+---
+
 # Перенесено из hot **2026-06-12** (O190 YouDo ingest DoD — full chronicle)
 
 ## § O190-YOUDO-CAMOUFOX ✅ Lead 2026-06-12

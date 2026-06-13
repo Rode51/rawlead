@@ -219,6 +219,28 @@ alwaysApply: false
 
 В `CODER_PROMPT.md`: ссылка на [`CODE_STRUCTURE.md`](docs/team/architect/CODE_STRUCTURE.md) · § «Файлы» · сверка с `PROJECT_MAP` § «Зоны».
 
+### Язык промптов (2026-06-09, решение владельца)
+
+**Промпты для агентов — English.** Сводки владельцу и git — **русский**.
+
+| Артефакт | Язык | Зачем |
+|----------|------|--------|
+| `CODER_PROMPT.md` — активные § (DoD, steps, constraints) | **EN** | лучше adherence у Coder/Composer; пути и идентификаторы уже EN |
+| `DESIGNER_PROMPT.md` · `docs/problems/*.md` (Mechanic) | **EN** | то же для исполнителей |
+| Шапка hot-файла (`→ Now:` / ticket id) | EN или RU | id тикета (`O167-SORT-SOURCE`) — как есть |
+| `STATUS.md` · `TASKS.md` · `OWNER_INTENT.md` | **RU** | читает владелец |
+| Сводка в чат владельцу (§ Handoff) | **RU** | простым языком |
+| `git commit -m` | **RU** | § Git выше |
+| UI copy / regex / few-shot в промпте | **цитата RU** | в EN-промпте: `Button label: «Применить →»`, `Reject: «книга под ключ»` |
+
+**Правила EN-промпта:**
+- Imperative steps (`t1`, `t2`…), explicit **DoD**, **Files**, **Do not break**
+- Ticket id в заголовке § сохранять (`O167-SORT-SOURCE`)
+- Не переводить имена файлов, env, SQL, API paths
+- Старые § на русском — **не переписывать массово**; при следующем открытии § → EN
+
+**Не делать:** весь `docs/` на EN · product copy · `FOR_YOU.md` · ответы владельцу.
+
 ---
 
 ## Handoff владельцу → `@coder` (обязательный порядок)

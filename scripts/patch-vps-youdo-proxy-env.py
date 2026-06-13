@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Записать YOUDO_PROXY_URLS в /opt/rawlead/.env.site на VPS (секреты не в git).
 
+O191 order (DC→RU): use scripts/deploy-o191-youdo-proxy-vps.py — prepends FL/EXCHANGE DC slot(s),
+keeps RU residential tail, resets youdo active_slot=0. Rollback here with RU-only YOUDO_PROXY_URLS.
+
 Локально в .env:
   YOUDO_PROXY_URLS=http://user:pass@host:10000,http://user:pass@host:10001
   .venv\\Scripts\\python.exe scripts\\patch-vps-youdo-proxy-env.py

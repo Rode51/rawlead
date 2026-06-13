@@ -3,7 +3,7 @@
 Desktop skills: #rl-feed-skills-modal (not legacy .rl-feed-skills-dd).
 Sort: input[name=rl-feed-sort] / input[name=rl-sheet-sort].
 Count: #rl-feed-toolbar .rl-feed-toolbar__meta (not hidden #rl-feed-count).
-Cards: scope .rl-feed-card__face--front to avoid duplicate body-inner.
+Cards: O149 inline expand — `.rl-feed-card__body-inner` (no flip faces).
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ FEED_APP = '[data-rl-app="feed"]'
 FEED_READY = "#rl-feed-list .rl-lead-card, #rl-feed-list .rl-feed-empty"
 FEED_META = "#rl-feed-toolbar .rl-feed-toolbar__meta"
 FEED_CARD = "#rl-feed-list .rl-lead-card[data-id]"
-CARD_FRONT_BODY = ".rl-feed-card__face--front .rl-feed-card__body-inner"
-CARD_FRONT_SECTION = ".rl-feed-card__face--front .rl-feed-card__section"
+CARD_FRONT_BODY = ".rl-feed-card__body-inner"
+CARD_FRONT_SECTION = ".rl-feed-card__section"
 SKILLS_TRIGGER = "#rl-feed-skills-trigger"
 SKILLS_MODAL = "#rl-feed-skills-modal"
 SKILLS_TREE = "#rl-feed-skill-tree-roots"
@@ -127,7 +127,8 @@ def reset_feed_filters(page: Any, *, is_mobile: bool = False) -> None:
                         page.locator("#rl-feed-sort-apply").click()
                         page.wait_for_timeout(800)
                     _close_skills_modal_if_open(page)
-    page.wait_for_selector(FEED_CARD, timeout=45_000)
+                    _close_skills_modal_if_open(page)
+    wait_feed_loading_done(page)
     page.wait_for_timeout(400)
     err = feed_error_visible(page)
     if err:
@@ -309,10 +310,43 @@ def apply_sort_match(page: Any, *, is_mobile: bool = False) -> None:
         page.wait_for_timeout(400)
 
 
-def expand_card(card: Any, page: Any) -> None:
+def wait_feed_loading_done(page: Any, *, timeout_ms: int = 30_000) -> None:
+    page.wait_for_selector(FEED_APP, state="visible")
+    page.wait_for_selector(FEED_READY, timeout=timeout_ms)
+    page.wait_for_function(
+        "() => { const el = document.getElementById('rl-feed-loading'); return !el || el.hidden; }",
+        timeout=timeout_ms,
+    )
+
+
+def click_card_title(card: Any) -> None:
+    """Toggle expand/collapse — click title span (h3 center misses handler in Playwright)."""
+    card.scroll_into_view_if_needed()
+    span = card.locator(".rl-lead-card__title span").first
+    if span.count():
+        span.click()
+        return
     card.locator(".rl-lead-card__title").first.click()
-    page.wait_for_timeout(500)
-    card.locator(CARD_FRONT_BODY).first.wait_for(state="visible", timeout=15_000)
+
+
+def card_is_expanded(card: Any) -> bool:
+    return "is-expanded" in (card.get_attribute("class") or "")
+
+
+def expand_card(card: Any, page: Any) -> None:
+    card.scroll_into_view_if_needed()
+    last_err: Exception | None = None
+    for _ in range(2):
+        if not card_is_expanded(card):
+            click_card_title(card)
+        page.wait_for_timeout(500)
+        try:
+            card.locator(CARD_FRONT_BODY).first.wait_for(state="visible", timeout=8000)
+            return
+        except Exception as exc:
+            last_err = exc
+    if last_err:
+        raise last_err
 
 
 def collapse_card_tap_outside(card: Any, page: Any) -> None:

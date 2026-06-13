@@ -26,6 +26,7 @@ from youdo_parser import (  # noqa: E402
     YOUDO_FAIL_STREAK_KEY,
     YOUDO_TRAFFIC_GUARD_UNTIL_KEY,
     YOUDO_COOLDOWN_KEY,
+    YoudoListingError,
     fetch_listing_projects,
 )
 
@@ -148,19 +149,44 @@ class TestYoudoTraffic(unittest.TestCase):
         }.get(key, default)
         cfg = MagicMock()
         cfg.radar_log_path = Path("/tmp/radar.log")
-        out = fetch_listing_projects(cfg, storage=storage)
-        self.assertEqual(out, [])
+        with self.assertRaises(YoudoListingError) as ctx:
+            fetch_listing_projects(cfg, storage=storage)
+        self.assertIn("traffic_guard", str(ctx.exception).casefold())
         mock_fetch.assert_not_called()
 
-    def test_retry_goto_uses_commit(self) -> None:
+    def test_retry_goto_uses_domcontentloaded_slot1_networkidle(self) -> None:
         from exchange_browser_fetch import (
-            _youdo_goto_wait_until,
             _youdo_goto_wait_until_for_attempt,
+            _youdo_headless,
+            _youdo_post_goto_jitter_ms,
         )
 
         os.environ.pop("YOUDO_RETRY_GOTO_WAIT_UNTIL", None)
-        self.assertEqual(_youdo_goto_wait_until_for_attempt(2), "commit")
-        self.assertEqual(_youdo_goto_wait_until_for_attempt(1), _youdo_goto_wait_until())
+        os.environ.pop("YOUDO_GOTO_WAIT_UNTIL", None)
+        os.environ.pop("YOUDO_POST_GOTO_JITTER_MS", None)
+        os.environ.pop("YOUDO_HEADLESS", None)
+        self.assertEqual(_youdo_goto_wait_until_for_attempt(2), "domcontentloaded")
+        self.assertEqual(_youdo_goto_wait_until_for_attempt(1), "load")
+        self.assertEqual(_youdo_post_goto_jitter_ms(), (1500, 3500))
+        self.assertTrue(_youdo_headless())
+        os.environ["YOUDO_HEADLESS"] = "0"
+        self.assertFalse(_youdo_headless())
+
+    def test_validate_rejects_spa_shell_626(self) -> None:
+        from exchange_browser_fetch import _validate_youdo_html
+        from html_fetch import HtmlFetchError
+
+        shell = "<html><head></head><body><div id='__next'></div></body></html>"
+        self.assertLessEqual(len(shell), 1500)
+        with self.assertRaises(HtmlFetchError) as ctx:
+            _validate_youdo_html(shell, "http://1.2.3.4:8000")
+        self.assertIn("antibot", str(ctx.exception).casefold())
+
+    def test_lean_route_off_on_slot_one(self) -> None:
+        from exchange_browser_fetch import _youdo_lean_route_on_attempt
+
+        self.assertFalse(_youdo_lean_route_on_attempt(1))
+        self.assertFalse(_youdo_lean_route_on_attempt(2))
 
     @patch("exchange_browser_fetch._warm_youdo_home")
     @patch("exchange_browser_fetch._youdo_warm_recent", return_value=True)

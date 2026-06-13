@@ -172,9 +172,9 @@ function rawlead_faq_groups_html(string $lenta, string $cabinet): string {
         '<button type="button" class="rl-faq-group__header">' . esc_html__('Premium', 'rawlead-kadence-child') . '</button>' .
         '<div class="rl-faq-group__body">' .
         '<details class="rl-faq-item"><summary><h2>' . esc_html__('Сервис платный?', 'rawlead-kadence-child') . '</h2></summary>' .
-        '<p>Лента открыта бесплатно — с задержкой 15 мин. Для авторизованных и Premium пользователей (<strong>790 ₽/мес</strong> или 600 ⭐) — без задержки, уникальные черновики, push. <a href="' . $pricing . '">Тарифы →</a></p></details>' .
+        '<p>Лента открыта бесплатно — с задержкой 15 мин. Для авторизованных и Premium (<strong>790 ₽/мес</strong>) — без задержки, уникальные черновики, push. <a href="' . $pricing . '">Тарифы →</a></p></details>' .
         '<details class="rl-faq-item"><summary><h2>' . esc_html__('Есть пробный период?', 'rawlead-kadence-child') . '</h2></summary>' .
-        '<p>Да — 3 дня полного Premium один раз после входа через Telegram. Без карты и скрытых условий. Потом — <strong>790 ₽/мес</strong> или 600 ⭐ в @rawlead_bot /pay. <a href="' . $pricing . '">Тарифы →</a></p></details>' .
+        '<p>Да — <strong>1 ₽ / 3 дня</strong> Premium один раз после входа. Оплата картой или СБП через ЮKassa. Далее — <strong>790 ₽/мес</strong>. <a href="' . $pricing . '">Тарифы →</a></p></details>' .
         '<details class="rl-faq-item"><summary><h2>' . esc_html__('Зачем Premium, если лента и так без задержки после входа?', 'rawlead-kadence-child') . '</h2></summary>' .
         '<p>После входа через Telegram — лента сразу. Это бесплатно. Premium даёт: уникальный черновик отклика под твой профиль · push в Telegram при матче · inbox с черновиками · умный лимит <strong>10 откликов в час</strong>.</p></details>' .
         '<details class="rl-faq-item"><summary><h2>' . esc_html__('Почему лимит 10 черновиков на один заказ?', 'rawlead-kadence-child') . '</h2></summary>' .
@@ -189,11 +189,10 @@ function rawlead_faq_groups_html(string $lenta, string $cabinet): string {
 function rawlead_inner_page_html(string $slug): ?string {
     $lenta = esc_url(rawlead_page_url('lenta'));
     $cabinet = esc_url(rawlead_page_url('cabinet'));
-    $bot_pay = esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay');
-
     return match ($slug) {
         'pricing' => '<h2>ИИ-агент</h2>
-<p><strong>600 ⭐ Stars в месяц</strong> — оплата в Telegram.</p>
+<p><strong>790 ₽ / мес</strong> — оплата картой или СБП через ЮKassa.</p>
+<p>Попробовать — <strong>1 ₽ / 3 дня</strong> (один раз). Далее — <strong>790 ₽/мес</strong>.</p>
 <p>Для любой ниши — дизайн, тексты, код, маркетинг. ИИ знает твои теги.</p>
 <ul>
 <li>Лента только с заказами под твой стек</li>
@@ -201,9 +200,9 @@ function rawlead_inner_page_html(string $slug): ?string {
 <li>Пуш в Telegram — только при хорошем совпадении</li>
 </ul>
 <h2>Оплата</h2>
-<p>Оплата через Telegram Stars — @rawlead_bot /pay или кнопка «Оплатить Stars» в кабинете.</p>
+<p>Оформление в <a href="' . $cabinet . '">кабинете</a> — trial или полная подписка.</p>
 <p><a href="' . $cabinet . '">Вход в кабинет →</a> · <a href="' . $lenta . '">Продолжить с ограничениями (Free) →</a></p>
-<p><a class="rl-btn rl-btn--primary" href="' . $bot_pay . '">Подключить — 600 ⭐ в Telegram →</a></p>',
+<p><a class="rl-btn rl-btn--primary" href="' . $cabinet . '">Оформить Premium →</a></p>',
         'how'     => '<h2>1. Указываешь навыки</h2>
 <p>Выбери нишу и добавь теги — дизайн, разработка, маркетинг, тексты. Чем точнее профиль, тем лучше совместимость.</p>
 <h2>2. Настраиваешь профиль</h2>
@@ -216,7 +215,7 @@ function rawlead_inner_page_html(string $slug): ?string {
 <p>Черновик уже готов — для тебя написан отдельно, не скопирован с чужого отклика. Поправь детали и отправь. Мы не пишем заказчикам за тебя.</p>
 <h2>Защита от спама</h2>
 <p>Система жёстко контролирует нагрузку: умный лимит — <strong>10 откликов в час</strong>. Мы защищаем твой аккаунт от спам-фильтров бирж и гарантируем заказчикам качество.</p>
-<p><strong>Один поток вместо десятка вкладок.</strong> Premium с лентой без задержки и push — от <strong>790 ₽/мес</strong> или 600 ⭐.</p>
+<p><strong>Один поток вместо десятка вкладок.</strong> Premium с лентой без задержки и push — от <strong>790 ₽/мес</strong> (ЮKassa).</p>
 <p><a class="rl-btn rl-btn--primary" href="' . $cabinet . '">Войти в кабинет →</a></p>',
         'faq'     => rawlead_faq_groups_html($lenta, $cabinet),
         default   => null,

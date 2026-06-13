@@ -74,6 +74,16 @@ from src.rank import (
 )
 from src.ai_analyze import draft_stats_24h, ai_last_error, draft_fail_per_hour
 from src.stars_billing import stars_available
+from src.yookassa_billing import (
+    CheckoutError,
+    ConfirmError,
+    cancel_subscription,
+    confirm_pending_payment,
+    create_checkout,
+    fetch_subscription_billing_fields,
+    handle_webhook_notification,
+    yookassa_available,
+)
 from src.draft_async import draft_response_body, poll_draft, submit_draft, submit_warm
 from src.draft_limits import draft_rate_limit_detail
 from src.bot_auth import (
@@ -1023,7 +1033,9 @@ def _upsert_telegram_user(
         cur.execute(
             """
             UPDATE users
-            SET tg_username = %s, tg_first_name = %s, tg_photo_url = %s
+            SET tg_username = %s,
+                tg_first_name = %s,
+                tg_photo_url = COALESCE(%s, tg_photo_url)
             WHERE id = %s::uuid
             """,
             (username, first_name, photo_url, user_id),
@@ -1249,6 +1261,7 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
     username = (payload.username or "").strip() or None
     first_name = (payload.first_name or "").strip() or None
     photo_url = (payload.photo_url or "").strip() or None
+    avatar_url: str | None = None
 
     try:
         with psycopg.connect(_db_url()) as conn:
@@ -1262,6 +1275,14 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
                 )
                 _grant_owner_beta_if_match(cur, user_id, int(payload.id))
                 merge_chat_id_on_login(cur, tg_user_id=int(payload.id))
+                from user_avatar import sync_avatar_on_login
+
+                avatar_url = sync_avatar_on_login(
+                    cur,
+                    user_id,
+                    photo_url,
+                    int(payload.id),
+                )
             conn.commit()
     except Exception as exc:
         logger.error("auth_telegram: %s", exc)
@@ -1275,7 +1296,9 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
         "tg_user_id": int(payload.id),
         "username": username,
         "first_name": first_name,
-        "photo_url": photo_url,
+        "photo_url": None,
+        "avatar_url": avatar_url,
+        "has_avatar": bool(avatar_url),
     }
 
 
@@ -1306,6 +1329,7 @@ def _complete_bot_auth(auth_token: str) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="auth_token required")
     token_hash = _hash_bot_auth_token(token)
     now = datetime.now(timezone.utc)
+    avatar_url: str | None = None
     try:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
@@ -1350,6 +1374,14 @@ def _complete_bot_auth(auth_token: str) -> dict[str, Any]:
                 )
                 _grant_owner_beta_if_match(cur, user_id, int(tg_user_id))
                 merge_chat_id_on_login(cur, tg_user_id=int(tg_user_id))
+                from user_avatar import sync_avatar_on_login
+
+                avatar_url = sync_avatar_on_login(
+                    cur,
+                    user_id,
+                    (tg_photo_url or "").strip() or None,
+                    int(tg_user_id),
+                )
                 cur.execute(
                     """
                     UPDATE auth_bot_sessions
@@ -1376,7 +1408,9 @@ def _complete_bot_auth(auth_token: str) -> dict[str, Any]:
         "tg_user_id": int(tg_user_id),
         "username": username,
         "first_name": first_name,
-        "photo_url": photo_url,
+        "photo_url": None,
+        "avatar_url": avatar_url,
+        "has_avatar": bool(avatar_url),
     }
 
 
@@ -1696,6 +1730,70 @@ def get_lead(
 
 
 # 3e — me (cabinet) ───────────────────────────────────────────────────────────
+
+
+@app.get("/v1/me")
+def me_profile(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
+    """Profile + cached avatar URL (file on disk, not Neon blob)."""
+    from user_avatar import avatar_public_url, ensure_avatar_cached
+
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT tg_user_id, tg_username, tg_first_name
+                    FROM users WHERE id = %s::uuid
+                    """,
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="user not found")
+                ensure_avatar_cached(cur, user_id)
+            conn.commit()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("me_profile: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+    tg_user_id, tg_username, tg_first_name = row
+    username = (tg_username or "").strip() or None
+    first_name = (tg_first_name or "").strip() or None
+    avatar_url = avatar_public_url(user_id)
+    return {
+        "user_id": user_id,
+        "tg_user_id": int(tg_user_id) if tg_user_id is not None else None,
+        "username": username,
+        "first_name": first_name,
+        "photo_url": None,
+        "avatar_url": avatar_url,
+        "has_avatar": bool(avatar_url),
+    }
+
+
+@app.get("/v1/me/avatar")
+def me_avatar(user_id: str = Depends(_resolve_user_id)) -> Response:
+    """Serve cached avatar bytes (fallback if static uploads URL unavailable)."""
+    from user_avatar import ensure_avatar_cached, read_avatar_bytes
+
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                ensure_avatar_cached(cur, user_id)
+            conn.commit()
+    except Exception as exc:
+        logger.error("me_avatar ensure: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+    payload = read_avatar_bytes(user_id)
+    if not payload:
+        raise HTTPException(status_code=404, detail="avatar not cached")
+    content, media_type = payload
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 class TagsPayload(BaseModel):
@@ -2197,6 +2295,10 @@ def _subscription_payload(
     active_until: datetime | None,
     paused_until: datetime | None,
     trial_used_at: datetime | None = None,
+    *,
+    auto_renew: bool | None = None,
+    has_payment_method: bool | None = None,
+    renew_canceled_at: datetime | None = None,
 ) -> dict[str, Any]:
     now = _utc_now()
     pu = _as_utc(paused_until)
@@ -2230,7 +2332,8 @@ def _subscription_payload(
         "status": status,
         "effective_access": effective_access,
         "can_pause": is_active and not paused and status == "active",
-        "stars_available": stars_available(load_config()),
+        "stars_available": False,
+        "yookassa_available": yookassa_available(load_config()),
     }
     payload.update(
         subscription_extra_fields(
@@ -2241,7 +2344,48 @@ def _subscription_payload(
             now=now,
         )
     )
+    if auto_renew is not None:
+        payload["auto_renew"] = auto_renew
+    if has_payment_method is not None:
+        payload["has_payment_method"] = has_payment_method
+    if renew_canceled_at is not None:
+        rc = _as_utc(renew_canceled_at)
+        payload["renew_canceled_at"] = rc.isoformat() if rc else None
+    elif auto_renew is not None:
+        payload["renew_canceled_at"] = None
     return payload
+
+
+def _me_subscription_payload(cur: Any, user_id: str) -> dict[str, Any]:
+    expire_stale_trials(cur)
+    plan, is_active, active_until, paused_until, trial_used_at = _ensure_subscription(
+        cur, user_id
+    )
+    if paused_until is not None and paused_until <= _utc_now():
+        cur.execute(
+            """
+            UPDATE subscriptions
+            SET paused_until = NULL
+            WHERE user_id = %s::uuid AND paused_until IS NOT NULL
+              AND paused_until <= NOW()
+            """,
+            (user_id,),
+        )
+        paused_until = None
+    plan, is_active, active_until, paused_until, trial_used_at = fetch_subscription_row(
+        cur, user_id
+    )
+    billing = fetch_subscription_billing_fields(cur, user_id)
+    return _subscription_payload(
+        plan,
+        is_active,
+        active_until,
+        paused_until,
+        trial_used_at,
+        auto_renew=billing["auto_renew"],
+        has_payment_method=billing["has_payment_method"],
+        renew_canceled_at=billing["renew_canceled_at"],
+    )
 
 
 @app.get("/v1/me/subscription")
@@ -2249,28 +2393,9 @@ def me_subscription(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     try:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
-                expire_stale_trials(cur)
-                plan, is_active, active_until, paused_until, trial_used_at = (
-                    _ensure_subscription(cur, user_id)
-                )
-                if paused_until is not None and paused_until <= _utc_now():
-                    cur.execute(
-                        """
-                        UPDATE subscriptions
-                        SET paused_until = NULL
-                        WHERE user_id = %s::uuid AND paused_until IS NOT NULL
-                          AND paused_until <= NOW()
-                        """,
-                        (user_id,),
-                    )
-                    paused_until = None
+                payload = _me_subscription_payload(cur, user_id)
                 conn.commit()
-                plan, is_active, active_until, paused_until, trial_used_at = (
-                    fetch_subscription_row(cur, user_id)
-                )
-                return _subscription_payload(
-                    plan, is_active, active_until, paused_until, trial_used_at
-                )
+                return payload
     except HTTPException:
         raise
     except Exception as exc:
@@ -2282,27 +2407,109 @@ def me_subscription(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
 def me_subscription_trial_start(
     user_id: str = Depends(_resolve_user_id),
 ) -> dict[str, Any]:
+    """Legacy alias — trial is now 1 ₽ via YooKassa checkout."""
+    return me_subscription_checkout(
+        SubscriptionCheckoutPayload(kind="trial"),
+        user_id=user_id,
+    )
+
+
+class SubscriptionCheckoutPayload(BaseModel):
+    kind: Literal["trial", "subscription"] = "subscription"
+
+
+@app.post("/v1/me/subscription/checkout")
+def me_subscription_checkout(
+    payload: SubscriptionCheckoutPayload,
+    user_id: str = Depends(_resolve_user_id),
+) -> dict[str, Any]:
+    cfg = load_config()
+    if not yookassa_available(cfg):
+        raise HTTPException(status_code=503, detail="Оплата временно недоступна")
     try:
-        cfg = load_config()
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
                 expire_stale_trials(cur)
-                try:
-                    start_trial(cur, user_id)
-                except TrialStartError as exc:
-                    raise HTTPException(status_code=409, detail=exc.detail) from exc
-                notify_trial_started(cfg, cur, user_id)
+                result = create_checkout(cfg, cur, user_id, payload.kind)
                 conn.commit()
-                plan, is_active, active_until, paused_until, trial_used_at = (
-                    fetch_subscription_row(cur, user_id)
-                )
-                return _subscription_payload(
-                    plan, is_active, active_until, paused_until, trial_used_at
-                )
+                return result
+    except CheckoutError as exc:
+        code = 409 if exc.code in ("trial_already_used", "already_premium") else 400
+        raise HTTPException(status_code=code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("me_subscription_trial_start: %s", exc)
+        logger.error("me_subscription_checkout: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+@app.post("/v1/webhooks/yookassa")
+async def yookassa_webhook(request: Request) -> dict[str, str]:
+    """YooKassa POST webhook — configure in LK: https://api.rawlead.ru/v1/webhooks/yookassa · event payment.succeeded."""
+    cfg = load_config()
+    if not yookassa_available(cfg):
+        raise HTTPException(status_code=503, detail="not configured")
+    secret = cfg.yookassa_webhook_secret.strip()
+    if secret:
+        got = (request.headers.get("X-Yookassa-Webhook-Secret") or "").strip()
+        if got != secret:
+            raise HTTPException(status_code=403, detail="forbidden")
+    try:
+        body = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="invalid json") from exc
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="invalid body")
+    ok = handle_webhook_notification(cfg, body)
+    return {"status": "ok" if ok else "ignored"}
+
+
+class SubscriptionConfirmPayload(BaseModel):
+    payment_id: str | None = None
+
+
+@app.post("/v1/me/subscription/confirm")
+def me_subscription_confirm(
+    payload: SubscriptionConfirmPayload = SubscriptionConfirmPayload(),
+    user_id: str = Depends(_resolve_user_id),
+) -> dict[str, Any]:
+    cfg = load_config()
+    if not yookassa_available(cfg):
+        raise HTTPException(status_code=503, detail="Оплата временно недоступна")
+    payment_id = (payload.payment_id or "").strip() or None
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                result = confirm_pending_payment(
+                    cfg, cur, user_id, payment_id=payment_id
+                )
+                subscription = _me_subscription_payload(cur, user_id)
+                conn.commit()
+                return {**result, "subscription": subscription}
+    except ConfirmError as exc:
+        raise HTTPException(status_code=502, detail=exc.detail) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("me_subscription_confirm: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+@app.post("/v1/me/subscription/cancel")
+def me_subscription_cancel(
+    user_id: str = Depends(_resolve_user_id),
+) -> dict[str, Any]:
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                canceled = cancel_subscription(cur, user_id)
+                subscription = _me_subscription_payload(cur, user_id)
+                conn.commit()
+                return {"canceled": canceled, "subscription": subscription}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("me_subscription_cancel: %s", exc)
         raise HTTPException(status_code=500, detail="db error") from exc
 
 

@@ -98,10 +98,9 @@ class TestTrialHelpers(unittest.TestCase):
 
 
 class TestTrialApi(unittest.TestCase):
-    def test_trial_start_endpoint(self) -> None:
+    def test_trial_start_returns_checkout(self) -> None:
         user_id = "00000000-0000-0000-0000-000000000088"
         token = issue_access_token(user_id, tg_user_id=88001)
-        until = datetime(2026, 6, 8, tzinfo=timezone.utc)
 
         with patch.object(api_server, "psycopg") as mock_pg:
             conn = MagicMock()
@@ -109,23 +108,24 @@ class TestTrialApi(unittest.TestCase):
             mock_pg.connect.return_value.__enter__.return_value = conn
             conn.cursor.return_value.__enter__.return_value = cur
             with patch.object(api_server, "expire_stale_trials"):
-                with patch.object(api_server, "start_trial", return_value=until):
-                    with patch.object(api_server, "notify_trial_started"):
-                        with patch.object(
-                            api_server,
-                            "fetch_subscription_row",
-                            return_value=("trial", True, until, None, until),
-                        ):
-                            client = TestClient(app)
-                            resp = client.post(
-                                "/v1/me/subscription/trial-start",
-                                headers={"Authorization": f"Bearer {token}"},
-                            )
+                with patch.object(
+                    api_server,
+                    "create_checkout",
+                    return_value={
+                        "payment_id": "pay-test",
+                        "confirmation_url": "https://yookassa.ru/checkout",
+                    },
+                ):
+                    with patch.object(api_server, "yookassa_available", return_value=True):
+                        client = TestClient(app)
+                        resp = client.post(
+                            "/v1/me/subscription/trial-start",
+                            headers={"Authorization": f"Bearer {token}"},
+                        )
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
-        self.assertEqual(body["status"], "trial")
-        self.assertTrue(body["effective_access"])
-        self.assertTrue(body["is_trial"])
+        self.assertEqual(body["payment_id"], "pay-test")
+        self.assertIn("yookassa.ru", body["confirmation_url"])
 
 
 if __name__ == "__main__":

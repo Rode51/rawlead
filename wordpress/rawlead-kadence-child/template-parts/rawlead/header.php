@@ -86,7 +86,7 @@ $nav = [
 			<?php else : ?>
 				<a href="<?php echo esc_url($cabinet); ?>" class="rl-header__login js-header-login"><?php esc_html_e('Войти →', 'rawlead-kadence-child'); ?></a>
 				<a href="<?php echo esc_url($cabinet); ?>" class="rl-header__user js-header-user" hidden>
-					<img class="rl-header__avatar js-header-avatar" src="" alt="" width="32" height="32">
+					<img class="rl-header__avatar js-header-avatar" alt="" width="32" height="32">
 					<span class="rl-header__username js-header-username"></span>
 				</a>
 			<?php endif; ?>
@@ -123,6 +123,11 @@ $nav = [
 (function () {
 	var TOKEN_KEY = "rawlead_access_token";
 	var META_KEY = "rawlead_user_meta";
+	var REST_ME = <?php echo wp_json_encode(esc_url_raw(rest_url('rawlead/v1/me'))); ?>;
+	var REST_AVATAR = <?php echo wp_json_encode(esc_url_raw(rest_url('rawlead/v1/me/avatar'))); ?>;
+	var REST_NONCE = <?php echo wp_json_encode(wp_create_nonce('wp_rest')); ?>;
+	var failedPhotoUrls = Object.create(null);
+	var profileFetchPromise = null;
 
 	function readMeta() {
 		try {
@@ -130,27 +135,79 @@ $nav = [
 			if (!raw) {
 				return null;
 			}
-			return JSON.parse(raw);
+			var meta = JSON.parse(raw);
+			if (meta && meta.photo_url && !meta.avatar_url) {
+				meta.photo_url = "";
+			}
+			return meta;
 		} catch (e) {
 			return null;
 		}
 	}
 
-	window.rawleadSyncHeader = function () {
+	function saveMeta(meta) {
+		if (!meta) {
+			return;
+		}
+		var username = (meta.username || "").trim();
+		var firstName = (meta.first_name || "").trim();
+		meta.display = username ? "@" + username : firstName || meta.display || "Telegram";
+		try {
+			localStorage.setItem(META_KEY, JSON.stringify(meta));
+		} catch (e) {
+			/* private mode */
+		}
+	}
+
+	function getToken() {
+		try {
+			return localStorage.getItem(TOKEN_KEY) || "";
+		} catch (e) {
+			return "";
+		}
+	}
+
+	function resolveAvatarUrl(meta) {
+		if (!getToken()) {
+			return "";
+		}
+		if (meta && (meta.avatar_url || "").trim()) {
+			return meta.avatar_url.trim();
+		}
+		if (REST_AVATAR) {
+			return REST_AVATAR;
+		}
+		return "";
+	}
+
+	function setHeaderAvatar(avatarEl, meta) {
+		if (!avatarEl) {
+			return;
+		}
+		var url = resolveAvatarUrl(meta);
+		if (!url || failedPhotoUrls[url]) {
+			avatarEl.removeAttribute("src");
+			return;
+		}
+		avatarEl.onerror = function () {
+			failedPhotoUrls[url] = true;
+			avatarEl.removeAttribute("src");
+		};
+		if (avatarEl.getAttribute("src") !== url) {
+			avatarEl.src = url;
+		}
+	}
+
+	function applyHeaderMeta() {
 		var loginEl = document.querySelector(".js-header-login");
 		var userEl = document.querySelector(".js-header-user");
 		var drawerLoginEl = document.querySelector(".js-nav-drawer-login");
+		var avatarEl = document.querySelector(".js-header-avatar");
+		var nameEl = document.querySelector(".js-header-username");
 		if (!loginEl || !userEl) {
 			return;
 		}
-		var avatarEl = document.querySelector(".js-header-avatar");
-		var nameEl = document.querySelector(".js-header-username");
-		var token = "";
-		try {
-			token = localStorage.getItem(TOKEN_KEY) || "";
-		} catch (e) {
-			token = "";
-		}
+		var token = getToken();
 		if (!token) {
 			loginEl.hidden = false;
 			userEl.hidden = true;
@@ -168,15 +225,60 @@ $nav = [
 			drawerLoginEl.hidden = true;
 		}
 		var meta = readMeta();
-		if (meta && meta.photo_url && avatarEl) {
-			avatarEl.src = meta.photo_url;
-		} else if (avatarEl) {
-			avatarEl.removeAttribute("src");
-		}
+		setHeaderAvatar(avatarEl, meta);
 		if (nameEl && meta) {
 			var username = (meta.username || "").trim();
 			nameEl.textContent = username ? "@" + username : meta.display || "Telegram";
 		}
+	}
+
+	function ensureProfileFromServer() {
+		var token = getToken();
+		if (!token || !REST_ME) {
+			return Promise.resolve();
+		}
+		if (profileFetchPromise) {
+			return profileFetchPromise;
+		}
+		profileFetchPromise = fetch(REST_ME, {
+			credentials: "same-origin",
+			headers: {
+				Authorization: "Bearer " + token,
+				"X-WP-Nonce": REST_NONCE,
+			},
+		})
+			.then(function (res) {
+				if (!res.ok) {
+					throw new Error("HTTP " + res.status);
+				}
+				return res.json();
+			})
+			.then(function (data) {
+				var meta = readMeta() || {};
+				meta.username = data.username || meta.username || "";
+				meta.first_name = data.first_name || meta.first_name || "";
+				meta.avatar_url = (data.avatar_url || meta.avatar_url || "").trim();
+				meta.has_avatar = !!(data.has_avatar || data.avatar_url || meta.avatar_url);
+				meta.photo_url = "";
+				saveMeta(meta);
+				if (data.avatar_url && failedPhotoUrls[data.avatar_url]) {
+					delete failedPhotoUrls[data.avatar_url];
+				}
+			})
+			.catch(function () {
+				/* keep cached meta */
+			})
+			.finally(function () {
+				profileFetchPromise = null;
+			});
+		return profileFetchPromise;
+	}
+
+	window.rawleadSyncHeader = function () {
+		applyHeaderMeta();
+		ensureProfileFromServer().then(function () {
+			applyHeaderMeta();
+		});
 	};
 
 	window.rawleadSyncHeader();

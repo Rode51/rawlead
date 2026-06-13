@@ -8,20 +8,17 @@
 
 ---
 
-## Сейчас prod (2026-06-12)
+## Сейчас prod (2026-06-13)
 
 | Слой | Факт |
 |------|------|
-| **WP theme** | **1.18.75** O185 t5b-reset-btn |
-| **VPS** | **4 GB / 2 vCPU** · swap 0 · radar **active** · `L1_MAX_WORKERS=2` |
-| **Pay** | **✅ smoke 2026-06-12** trial 1 ₽ · ЮKassa · **790** restored · O174d ⏸ |
-| **ИИ gate** | L2 send **71.8%** · L1 **83.1%** · L3 **92%** |
-| **Feed env** | fl,kwork + **4× secondary** + **28× tg** (+ test_bots) |
-| **YouDo ingest** | **✅ O190** subprocess · `fetch_end parsed=50` · `health:youdo ok` |
-| **TG join** | O188 wave **28/127** · mechanism ✅ · ~10/h/account |
-| **ads** | **⏸** owner — после stability + O186 |
-
-**Judge freeze:** [`preprod_ai_prod_audit_judge_o72e_a_freeze.md`](../../data/preprod_ai_prod_audit_judge_o72e_a_freeze.md)
+| **WP theme** | **1.18.75** |
+| **VPS** | **4 GB / 2 vCPU** · radar **active** · `L1_MAX_WORKERS=2` |
+| **Pay** | **✅** trial 1 ₽ · **790** restored |
+| **YouDo** | **✅ O190+O191+O194** · listing `parsed=50` · ingest+L1 restored · detail subprocess |
+| **FL listing** | **✅ O193** subprocess · `parsed=30` · `health:fl ok` |
+| **TG join** | O188 **28/127** |
+| **ads** | **⏸** |
 
 ---
 
@@ -29,22 +26,22 @@
 
 | Зона | Статус |
 |------|--------|
-| **O191 YouDo proxy** | **→ @coder** · DC primary + RU residential fallback |
-| **O193 FL subprocess** | owner **B** · после O191 · § O193-w |
-| **O188 TG wave** | join ⏳ · 5 fail usernames · Neon 24h smoke |
-| **O186 security** | pentest backlog · после O185 |
-| **O171 /ops/** | rebuild ⏸ после O168 |
-| **O133 TZ** | downloader ✅ deploy · smoke Kwork PDF owner |
-| **HC fail URL** | `HEALTHCHECKS_SITE_FAIL_URL` — проверить на VPS |
+| **O195 TINDER-ONBOARD** | /quiz/ + scoring → @coder w1 |
+| **O196 ASYNC-DRAFT** | instant отклик → @coder |
+| **O188 TG wave** | join ⏳ radar auto · 5 fail usernames |
+| **O186 security** | backlog |
+| **O171 /ops/** | ⏸ |
 
 ---
 
-## ✅ Недавно закрыто (индекс)
+## ✅ Недавно закрыто
 
-O190-t0j · O185 w1–w3/t5b/t6 · O174a/b/c · O182b · O182/O181/O180 delist · O178 feed sort · O176 trace · O175 inbox · O168 stress · O133 TZ batch · O160 ingest locks
-
-Хронология O175–O190 → [`STATUS_ARCHIVE.md`](../archive/STATUS_ARCHIVE.md) § **2026-06-12**
+O194-youdo-ingest · O193-fl-subprocess · O191-youdo-proxy · O190-t0j · O185 · O174 · O182* · O178 · O176 · O175
 
 ---
 
-_O190 **2026-06-12**: subprocess `youdo_fetch_worker` · t0j cycle gate · Lead verify · ingest DoD ✅ → **O191**_
+_O194 **Lead verify 2026-06-13 ~00:15 MSK**: approach **A** detail subprocess · `00:07` fetch → **29+** `pipeline:L1 youdo` · **0** asyncio · цикл YouDo-fetch **~6–10 мин** (50× detail+L1) — норма_
+
+_O193 **Lead deploy+verify 2026-06-12 ~23:42**: `deploy-o193-fl-subprocess-vps.py` · `listing:fl parsed=30` · cycle **32–47s** на FL-only_
+
+_O191 **2026-06-12**: DC+RU 26 slots · `slot=1/26`_

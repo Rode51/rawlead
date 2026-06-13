@@ -80,6 +80,16 @@ def log_youdo_trace_path(log_path: os.PathLike[str] | str | None, stage: str, **
     log_pipeline_line(log_path, line)
 
 
+def _mark_youdo_cycle_skip(storage, reason: str) -> None:
+    storage.set_setting(YOUDO_CYCLE_SKIP_KEY, reason)
+
+
+def youdo_consume_cycle_skip(storage) -> str:
+    reason = storage.get_setting(YOUDO_CYCLE_SKIP_KEY, "").strip()
+    storage.set_setting(YOUDO_CYCLE_SKIP_KEY, "")
+    return reason
+
+
 def youdo_fail_kind(error_msg: str) -> str:
     """Map failure text to exchange_health reason tag."""
     from exchange_health import classify_error
@@ -108,6 +118,7 @@ YOUDO_COOLDOWN_KEY = "youdo_cooldown_until"
 YOUDO_FETCH_CYCLE_KEY = "youdo_fetch_cycle_n"
 YOUDO_FAIL_STREAK_KEY = "youdo_fail_streak"
 YOUDO_TRAFFIC_GUARD_UNTIL_KEY = "youdo_traffic_guard_until"
+YOUDO_CYCLE_SKIP_KEY = "youdo_last_cycle_skip"
 
 _DEFAULT_LISTING_URL = "https://youdo.com/tasks-all-opened-all"
 _TASK_ID_RE = re.compile(r"/t(\d+)")
@@ -214,11 +225,15 @@ def _log_youdo_traffic_guard_skip(cfg: Config, streak: int, until_hhmm: str) -> 
 
 
 def _youdo_goto_timeout_sec() -> float:
-    raw = os.getenv("YOUDO_GOTO_TIMEOUT_SEC", "90").strip()
-    try:
-        return max(float(raw), 15.0)
-    except ValueError:
-        return 90.0
+    raw = os.getenv("YOUDO_GOTO_TIMEOUT_SEC", "").strip()
+    if raw:
+        try:
+            return max(float(raw), 15.0)
+        except ValueError:
+            pass
+    from exchange_browser_fetch import _youdo_goto_wait_until
+
+    return 150.0 if _youdo_goto_wait_until() in ("load", "networkidle") else 90.0
 
 
 def _youdo_cooldown_min() -> int:
@@ -698,16 +713,19 @@ def fetch_listing_projects(
             mins = _youdo_cooldown_min()
         _log_youdo_cooldown_skip(cfg, mins, cooldown_until=cooldown_until)
         st.set_setting("status_youdo_cooldown_msg", msg)
-        return []
+        raise YoudoListingError(f"antibot cooldown {msg}")
     st.set_setting("status_youdo_cooldown_msg", "")
     if not _should_fetch_youdo_listing(st):
         _log_youdo_fetch_every_n_skip(cfg)
+        _mark_youdo_cycle_skip(st, "fetch_every_n")
         return []
 
     guard_blocks, fail_streak, guard_until = youdo_traffic_guard_blocks_fetch(st)
     if guard_blocks:
         _log_youdo_traffic_guard_skip(cfg, fail_streak, guard_until)
-        return []
+        raise YoudoListingError(
+            f"traffic_guard antibot streak={fail_streak} until={guard_until}"
+        )
     url = _listing_url()
     hint = proxy_log_hint("youdo")
     slot = ""

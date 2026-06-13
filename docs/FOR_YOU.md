@@ -73,14 +73,16 @@
 
 ---
 
-## Сейчас — stability ingest (2026-06-12)
+## Сейчас — stability ingest (2026-06-13)
 
 | Шаг | Что |
 |-----|-----|
-| **YouDo ✅** | **O190** ingest на VPS · subprocess worker · `health:youdo ok` · **O191** — DC+RU прокси (Coder) |
-| **Pay ✅** | Trial 1 ₽ smoke · prod **790 ₽** |
-| **TG ⏳** | O188 wave4 join **~28/127** · acc1/2/3 только на VPS |
-| **Дальше** | O191 → O193 FL subprocess · O186 security · **реклама ⏸** |
+| **YouDo ✅** | O190+O191+**O194** · listing `parsed=50` · ingest+L1 в Neon · detail через subprocess |
+| **FL ✅** | **O193** subprocess · `parsed=30` · без asyncio-crash |
+| **TG ⏳** | O188 **~28/127** |
+| **Дальше** | O186 security · **реклама ⏸** |
+
+**Нюанс:** цикл с полным YouDo-fetch (50 карточек + detail + L1) занимает **~6–10 мин** — это нормально, не «завис».
 
 Детали: [`STATUS.md`](team/common/STATUS.md) · [`PRODUCT_CANON.md`](team/product/PRODUCT_CANON.md)
 

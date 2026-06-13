@@ -15,6 +15,13 @@ $rawlead_cabinet_is_local = rawlead_is_local_dev();
 $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 ?>
 <main id="primary" class="rl-app rl-app--cabinet rl-cabinet--gate site-main" data-rl-app="cabinet">
+	<script>
+		try {
+			if (localStorage.getItem("rawlead_access_token")) {
+				document.documentElement.classList.add("rl-cabinet-auth-pending");
+			}
+		} catch (e) {}
+	</script>
 	<section class="rl-cabinet-login" id="rl-cabinet-login">
 		<div class="rl-cabinet-login__card">
 			<h1 class="rl-cabinet-login__title"><?php esc_html_e('Кабинет', 'rawlead-kadence-child'); ?></h1>
@@ -36,11 +43,6 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 				<button type="button" class="rl-btn rl-btn--ghost rl-cabinet-login__qr-cancel" id="rl-cabinet-login-qr-cancel"><?php esc_html_e('Отмена', 'rawlead-kadence-child'); ?></button>
 			</div>
 			<p class="rl-cabinet-login__state" id="rl-cabinet-login-state" aria-live="polite" hidden></p>
-			<p class="rl-cabinet-login__alt">
-				<a class="rl-link-arrow" href="<?php echo esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=login'); ?>" target="_blank" rel="noopener">
-					<?php esc_html_e('Или войти через @rawlead_bot →', 'rawlead-kadence-child'); ?>
-				</a>
-			</p>
 			<?php if ($rawlead_cabinet_is_local) : ?>
 			<p class="rl-cabinet-login__dev">
 				<a class="rl-link-arrow" href="<?php echo esc_url($rawlead_cabinet_login_url); ?>">
@@ -52,7 +54,7 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 	</section>
 	<div class="rl-container rl-app__layout rl-cabinet-app" id="rl-cabinet-app" hidden>
 		<div class="rl-cabinet-user" id="rl-cabinet-user" hidden>
-			<img class="rl-cabinet-user__avatar" id="rl-cabinet-user-avatar" alt="" width="40" height="40" hidden>
+			<img class="rl-cabinet-user__avatar" id="rl-cabinet-user-avatar" alt="" width="40" height="40">
 			<div class="rl-cabinet-user__info">
 				<p class="rl-cabinet-user__label">
 					<?php esc_html_e('В системе:', 'rawlead-kadence-child'); ?>
@@ -70,15 +72,15 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 				<h2 class="rl-cabinet-sub__title" id="rl-cabinet-sub-title"><?php esc_html_e('RawLead Premium', 'rawlead-kadence-child'); ?></h2>
 				<span class="rl-cabinet-sub__badge" id="rl-cabinet-sub-badge" aria-live="polite"></span>
 			</div>
-			<p class="rl-cabinet-sub__price" id="rl-cabinet-sub-price"><?php esc_html_e('790 ₽/мес · или 600 ⭐ Stars', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-cabinet-sub__price" id="rl-cabinet-sub-price"><?php esc_html_e('790 ₽/мес · trial 1 ₽ / 3 дня', 'rawlead-kadence-child'); ?></p>
 			<p class="rl-cabinet-sub__detail" id="rl-cabinet-sub-detail"></p>
 			<div class="rl-cabinet-sub__actions">
 				<button type="button" class="rl-btn rl-btn--primary rl-cabinet-sub__trial" id="rl-cabinet-sub-trial" hidden>
-					<?php esc_html_e('Попробовать 3 дня бесплатно', 'rawlead-kadence-child'); ?>
+					<?php esc_html_e('Попробовать за 1 ₽ →', 'rawlead-kadence-child'); ?>
 				</button>
-				<a class="rl-btn rl-btn--primary rl-cabinet-sub__pay" id="rl-cabinet-sub-pay" href="<?php echo esc_url('https://t.me/' . rawlead_tg_login_bot_username() . '?start=pay'); ?>" target="_blank" rel="noopener">
+				<button type="button" class="rl-btn rl-btn--primary rl-cabinet-sub__pay" id="rl-cabinet-sub-pay" hidden>
 					<?php esc_html_e('Подключить Premium →', 'rawlead-kadence-child'); ?>
-				</a>
+				</button>
 			</div>
 			<p class="rl-cabinet-sub__note" id="rl-cabinet-sub-note" hidden></p>
 		</section>
@@ -95,7 +97,6 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 			<div class="rl-cabinet-notif__row rl-cabinet-notif__row--toggle">
 				<div class="rl-cabinet-notif__toggle-wrap">
 					<span class="rl-cabinet-notif__label" id="rl-cabinet-notif-enabled-label"><?php esc_html_e('Push в Telegram', 'rawlead-kadence-child'); ?></span>
-					<p class="rl-cabinet-notif__toggle-hint"><?php esc_html_e('Premium в @rawlead_bot — /pay или кнопка в кабинете. Нажми /start в боте.', 'rawlead-kadence-child'); ?></p>
 				</div>
 				<button type="button" class="rl-toggle" id="rl-cabinet-notif-enabled" role="switch" aria-checked="true" aria-labelledby="rl-cabinet-notif-enabled-label">
 					<span class="rl-toggle__knob"></span>
@@ -104,7 +105,7 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 			<p class="rl-cabinet-notif__status" id="rl-cabinet-notif-status" aria-live="polite"></p>
 		</section>
 		<p class="rl-cabinet-notif__hint" id="rl-cabinet-notif-hint" hidden>
-			<?php esc_html_e('Push: активируй Premium (@rawlead_bot /pay) и /start — иначе уведомления не дойдут.', 'rawlead-kadence-child'); ?>
+			<?php esc_html_e('Push: напиши /start в @rawlead_bot — иначе уведомления не дойдут.', 'rawlead-kadence-child'); ?>
 		</p>
 		<div class="rl-feed-main rl-cabinet-inbox">
 			<header class="rl-cabinet-head">

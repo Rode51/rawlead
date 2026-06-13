@@ -15,25 +15,25 @@ from skills_catalog import _USER_MAX_TAGS, normalize_user_tags  # noqa: E402
 
 class TestKeywordMatchF2(TestCase):
     def test_example_67_percent(self) -> None:
-        lead = ["wordpress", "php", "woocommerce"]
-        user = tags_as_weights(["wordpress", "php", "javascript"])
+        lead = ["wordpress_dev", "php", "api_integration"]
+        user = tags_as_weights(["wordpress_dev", "php", "javascript"])
         self.assertEqual(keyword_match(lead, user), 67)
 
     def test_all_lead_tags_matched_100(self) -> None:
         lead = ["wordpress", "php", "woocommerce"]
         user = tags_as_weights(["wordpress", "php", "woocommerce", "javascript", "python"])
-        self.assertGreaterEqual(keyword_match(lead, user), 80)
+        self.assertEqual(keyword_match(lead, user), 100)
 
     def test_extra_user_tags_do_not_penalize(self) -> None:
         lead = ["python", "php"]
         user = tags_as_weights(
             ["python", "php", "javascript", "wordpress_dev", "figma", "seo", "smm", "copywriting"]
         )
-        self.assertGreaterEqual(keyword_match(lead, user), 75)
+        self.assertEqual(keyword_match(lead, user), 100)
 
     def test_single_lead_tag_full_match(self) -> None:
         km = keyword_match(["python"], tags_as_weights(["python", "php"]))
-        self.assertGreaterEqual(km, 70)
+        self.assertEqual(km, 100)
 
     def test_no_overlap(self) -> None:
         self.assertEqual(keyword_match(["python"], tags_as_weights(["figma"])), 0)

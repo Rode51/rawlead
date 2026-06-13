@@ -90,6 +90,11 @@ class Config:
     pay_ton_address: str
     pay_crypto_memo_prefix: str
     pay_approve_bot: str
+    yookassa_shop_id: str
+    yookassa_secret_key: str
+    yookassa_return_url: str
+    yookassa_webhook_secret: str
+    yookassa_save_payment_method: bool
 
     @property
     def ai_active(self) -> bool:
@@ -988,6 +993,15 @@ def load_config() -> Config:
     pay_ton_address = str(os.environ.get("PAY_TON_ADDRESS") or "").strip()
     pay_crypto_memo_prefix = str(os.environ.get("PAY_CRYPTO_MEMO_PREFIX") or "RL").strip()
     pay_approve_bot = str(os.environ.get("PAY_APPROVE_BOT") or "legacy").strip()
+    yookassa_shop_id = str(os.environ.get("YOOKASSA_SHOP_ID") or "").strip()
+    yookassa_secret_key = str(os.environ.get("YOOKASSA_SECRET_KEY") or "").strip()
+    yookassa_return_url = str(
+        os.environ.get("YOOKASSA_RETURN_URL") or "https://rawlead.ru/cabinet/"
+    ).strip()
+    yookassa_webhook_secret = str(os.environ.get("YOOKASSA_WEBHOOK_SECRET") or "").strip()
+    yookassa_save_payment_method = str(
+        os.environ.get("YOOKASSA_SAVE_PAYMENT_METHOD") or "0"
+    ).strip().lower() in ("1", "true", "yes", "on")
 
     return Config(
         fl_projects_url=fl_url,
@@ -1037,6 +1051,11 @@ def load_config() -> Config:
         pay_ton_address=pay_ton_address,
         pay_crypto_memo_prefix=pay_crypto_memo_prefix,
         pay_approve_bot=pay_approve_bot,
+        yookassa_shop_id=yookassa_shop_id,
+        yookassa_secret_key=yookassa_secret_key,
+        yookassa_return_url=yookassa_return_url,
+        yookassa_webhook_secret=yookassa_webhook_secret,
+        yookassa_save_payment_method=yookassa_save_payment_method,
     )
 
 
