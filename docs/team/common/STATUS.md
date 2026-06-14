@@ -169,7 +169,8 @@ pytest tests/test_o214_ops_truth.py -q
 | Волна | What | Who |
 |-------|------|-----|
 | **1** | ~~**O214** ops truth~~ · owner accept | ✅ 2026-06-14 |
-| **2** | **Perf** lenta/home/quiz load | @lead-designer scope → @coder · **→ сейчас** |
+| **2** | **O215** WP design polish (BrowserSync local) | @designer · owner session · **→ сейчас** |
+| **2b** | **Perf** lenta/home/quiz load | after O215 owner OK · @lead-designer → @coder |
 | **3** | «Платформа для учебного центра» в ленте | monitor / owner spot-check |
 | **4–6** | L2 70% · stress · ads | ROADMAP |
 
