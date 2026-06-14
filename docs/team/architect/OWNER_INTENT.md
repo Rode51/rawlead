@@ -1584,7 +1584,7 @@ Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unse
 | 2026-06-13 | **TG t3c ✅** — test group мгновенно; owner принял | § **O206 t3c** |
 | 2026-06-13 | **Биржи «как TG»** — push нет у FL/Kwork; цель: ужать lag цикла + health в ops (не магия instant) | backlog **ingest SLA** |
 | 2026-06-14 | **FL proxy restore** — 194.226 были **неоплачены**, не мёртвы; owner оплатил · pool **4/4** восстановлен · удаление 2 слотов **откат** | problems/2026-06-14 |
-| 2026-06-14 | **O216** — universal quiz cards · retake in LK · anon locked match bar · trial=premium feed · quiz no-resume / completed modal + «ещё раз» · **10 ₽ smoke** | CODER_PROMPT § O216 |
+| 2026-06-14 | **O216 r1 уточнение:** квиз-карточки = **курация Neon** (универсальные лиды по 4 нишам), не только «убрать диджитал» — убрать и **чужие сферы** (медицина, юриспруденция, …) | CODER_PROMPT § O216 |
 | 2026-06-14 | **O215 design polish** — Perf **отложен**; owner довёл вид через **BrowserSync** с @designer | DESIGNER_PROMPT § O215 |
 | 2026-06-13 | **O208-B monetization** — **5 откликов/час всем** (вкл. premium) · L3 judge → K · убрать просмотры+слоты с карточки · PM воронка (trial 3д → без match-фильтра) | § **O208-B** · PM § O208-MONETIZATION |
 | 2026-06-13 | **TG filter по данным** — доказать воронку · sample audit · filter lab | § **O207** |

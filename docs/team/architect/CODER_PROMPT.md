@@ -17,7 +17,7 @@
 
 | # | Requirement |
 |---|-------------|
-| r1 | **Quiz cards:** more **universal** tasks — understandable outside digital; reduce dev jargon in card titles/tasks shown in quiz (curate pool / filter / replace worst offenders). |
+| r1 | **Quiz cards:** curated **universal** pool from **Neon `leads`** — plain-language titles/tasks any freelancer understands; **exclude** niche jargon from *other* fields (medicine, law, obscure tech) **and** confusing dev-only terms. **Not** a denylist-only hack — **audit DB → pick best exemplars per niche** (dev/design/marketing/text), ship as allowlist / `quiz_pool` table. |
 | r2 | **Cabinet:** all logged-in users can **retake quiz** (entry in LK). |
 | r3 | **Feed match bar:** **anon** sees **locked** compat bar (like current `rl-match--free-locked`); **trial** gets **real % bar** like premium — **remove** lock from trial. |
 | r4 | **Trial feed:** same experience as **premium** — personal sort + **keyword_match %** on cards (API + JS). |
@@ -64,9 +64,12 @@ tests/test_o195_quiz.py tests/test_o197_quiz_adaptive.py  ← extend
 **t4 — Cabinet retake**
 - Button/link «Пройти тест заново» / «Настроить ленту» → opens quiz overlay (`rawleadQuizApp.open`) with retake flow (r8).
 
-**t5 — Universal cards**
-- Audit quiz lead titles for digital-only terms (API, React, парсинг, …); prefer plain client tasks in `fetch_quiz_card` ordering or small denylist + fallback queries.
-- Do **not** change 4 niche category labels in result bars without Design OK — only **card content** universal.
+**t5 — Universal quiz pool (Neon audit → curated set)**
+- **Step A (data):** SQL/script over `leads` (`is_visible=true`, `ai_score>=60`, has `task_summary` or readable `title`): score **universality** — short title, everyday wording, category in QUIZ_NICHES, no cross-domain jargon (owner examples: medical/legal terms, hyper-specific stack when task is generic).
+- **Step B:** Pick **N cards per niche** (e.g. 8–12 each) + backup alternates; store IDs in repo `data/quiz_pool_allowlist.json` (or SQL seed) — **single source** for `fetch_quiz_card` / `_query_card`.
+- **Step C:** Adaptive logic unchanged (phase1/2) but **only** pulls from allowlisted ids (+ fallback query only if pool exhausted — log warning).
+- Owner can spot-check list before deploy; optional export CSV for review.
+- Do **not** change 4 result category labels without Design OK.
 
 **t6 — Price 10 ₽ smoke**
 - VPS: `PAY_PREMIUM_RUB=10` in `.env.site` · restart `rawlead-api`.
