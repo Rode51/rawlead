@@ -1014,6 +1014,26 @@ section.rl-flow.rl-section {
   background: #525252;
 }
 
+.rl-match--neutral .rl-match__fill {
+  background: #a3a3a3;
+}
+
+.rl-match--neutral .rl-match__label span {
+  color: #737373;
+}
+
+.rl-match--amber .rl-match__fill {
+  background: #d97706;
+}
+
+.rl-match--amber .rl-match__label span {
+  color: #b45309;
+}
+
+.rl-match--good .rl-match__fill {
+  background: var(--rl-match-fill);
+}
+
 .rl-match--no-skills .rl-match-row {
   display: none;
 }
@@ -3139,6 +3159,7 @@ button#rl-feed-skills-trigger.rl-feed-skills-dd__trigger::after {
 }
 
 .rl-feed-list .rl-lead-card:not(.is-expanded) .rl-row--auth-only,
+.rl-feed-list .rl-lead-card:not(.is-expanded) .rl-row--match-tier,
 .rl-feed-list .rl-lead-card:not(.is-expanded) .rl-slot-row {
   flex-shrink: 0;
   min-height: 16px;
@@ -5775,9 +5796,13 @@ body.rl-skill-tree-open {
 }
 
 .rl-difficulty-row {
-  margin: 4px 0 0;
+  margin: 4px 0 12px;
   font: 600 11px/1.35 var(--font-main);
   color: #525252;
+}
+
+.rl-feed-card__body-inner > .rl-difficulty-row + .rl-feed-card__section {
+  margin-top: 4px;
 }
 
 .rl-difficulty-badge {
@@ -8341,6 +8366,12 @@ body.page-contact .rl-contact-form {
     overflow: hidden;
     white-space: normal;
   }
+
+  .rl-feed-list .rl-lead-card.is-expanded .rl-lead-card__title span {
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+  }
 }
 
 /* O209 quiz match-first + O196 async toast */
@@ -9224,6 +9255,20 @@ body.page-contact .rl-contact-form {
   font-weight: 700;
   padding: 4px 10px;
   margin-bottom: 12px;
+}
+
+.rl-trial-badge[hidden],
+.rl-trial-badge:empty {
+  display: none !important;
+}
+
+.rl-cabinet-skills--hidden {
+  display: none !important;
+}
+
+.rl-cabinet-quiz-retake {
+  margin-top: 8px;
+  margin-bottom: 4px;
 }
 
 .rl-tier-table {

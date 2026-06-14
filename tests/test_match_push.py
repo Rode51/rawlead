@@ -23,6 +23,7 @@ from src import api_server  # noqa: E402
 from src.api_server import app  # noqa: E402
 from src.jwt_auth import issue_access_token  # noqa: E402
 from match_push import (  # noqa: E402
+    _lite_from_lead_row,
     _normalize_order_url,
     _user_already_pushed_for_order,
 )
@@ -86,6 +87,41 @@ class TestPushOrderDedup(unittest.TestCase):
         )
 
 
+class TestO200LiteFromLeadRow(unittest.TestCase):
+    """O200-L2-CAT-80 t3: match_push primary_category from leads.category (row[11])."""
+
+    def _sample_row(self, category: str | None) -> tuple:
+        return (
+            19954,
+            "fl",
+            "Title",
+            "Body",
+            "https://example.com/1",
+            "10000",
+            80,
+            "Брать",
+            '["python"]',
+            "[]",
+            None,
+            category,
+            "Summary",
+            '["python"]',
+            "",
+        )
+
+    def test_primary_category_from_row11(self) -> None:
+        for cat in ("dev", "design", "marketing", "text"):
+            with self.subTest(category=cat):
+                lite = _lite_from_lead_row(self._sample_row(cat))
+                self.assertEqual(lite.primary_category, cat)
+
+    def test_other_or_empty_category_not_passed(self) -> None:
+        for cat in ("other", None, ""):
+            with self.subTest(category=cat):
+                lite = _lite_from_lead_row(self._sample_row(cat))
+                self.assertEqual(lite.primary_category, "")
+
+
 def _sample_lead_row(lead_id: int = 42) -> tuple:
     return (
         lead_id,
@@ -123,7 +159,7 @@ class TestGetLeadKeywordMatch(unittest.TestCase):
         self.assertEqual(data.get("reply_draft"), "")
 
     @patch("src.api_server._attach_personal_replies")
-    @patch("src.api_server.keyword_match", return_value=82)
+    @patch("src.api_server.lead_coverage_match", return_value=82)
     def test_bearer_returns_keyword_match(
         self, _km: MagicMock, _attach: MagicMock
     ) -> None:
@@ -147,3 +183,100 @@ class TestGetLeadKeywordMatch(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json().get("keyword_match"), 82)
         _attach.assert_called_once()
+
+
+class TestKeywordMatchForUser(unittest.TestCase):
+    def test_empty_profile_returns_zero_not_placeholder(self) -> None:
+        from src.api_server import _keyword_match_for_user
+
+        self.assertEqual(
+            _keyword_match_for_user(["python"], {}, has_profile=False),
+            0,
+        )
+
+    def test_profile_uses_real_match(self) -> None:
+        from src.api_server import _keyword_match_for_user
+
+        km = _keyword_match_for_user(
+            ["python", "django"],
+            {"python": 1.0},
+            has_profile=True,
+        )
+        self.assertGreater(km, 0)
+        self.assertLessEqual(km, 100)
+
+
+class TestO220LeadCoverageMatch(unittest.TestCase):
+    def test_empty_lead_tags_returns_none(self) -> None:
+        from rank import keyword_match, lead_coverage_match, tags_as_weights
+
+        user = tags_as_weights(["python"])
+        self.assertIsNone(keyword_match([], user))
+        self.assertIsNone(lead_coverage_match([], user))
+
+    def test_full_lead_coverage_100(self) -> None:
+        from rank import lead_coverage_match
+
+        user = {"python": 8.0, "fastapi": 4.0, "figma": 2.0, "copywriting": 2.0}
+        self.assertEqual(lead_coverage_match(["python", "fastapi"], user), 100)
+
+    def test_partial_missing_lead_tag_67(self) -> None:
+        from rank import lead_coverage_match
+
+        user = {"python": 8.0, "django": 4.0}
+        self.assertEqual(lead_coverage_match(["python", "fastapi"], user), 67)
+
+    def test_half_weight_on_one_tag_50(self) -> None:
+        from rank import lead_coverage_match
+
+        user = {"python": 4.0}
+        self.assertEqual(lead_coverage_match(["python", "fastapi"], user), 50)
+
+    def test_no_overlap_returns_zero(self) -> None:
+        from rank import lead_coverage_match
+
+        user = {"figma": 6.0}
+        self.assertEqual(lead_coverage_match(["python", "fastapi"], user), 0)
+
+    def test_python_synonym_counts_as_coverage(self) -> None:
+        from rank import lead_coverage_match
+
+        user = {"api_integration": 8.0, "django": 1.0}
+        km = lead_coverage_match(["python"], user)
+        self.assertIsNotNone(km)
+        assert km is not None
+        self.assertGreaterEqual(km, 70)
+
+
+class TestO220PriorityMatch(unittest.TestCase):
+    def test_empty_lead_tags_returns_none(self) -> None:
+        from rank import keyword_match, priority_keyword_match, tags_as_weights
+
+        user = tags_as_weights(["python"])
+        self.assertIsNone(keyword_match([], user))
+        self.assertIsNone(priority_keyword_match([], user))
+
+    def test_python_dev_priority_match(self) -> None:
+        from rank import priority_keyword_match
+
+        user = {"python": 8.0, "django": 1.0, "javascript": 1.0}
+        km = priority_keyword_match(["python"], user)
+        self.assertIsNotNone(km)
+        assert km is not None
+        self.assertGreaterEqual(km, 70)
+        self.assertLessEqual(km, 90)
+
+    def test_python_synonym_via_api_integration(self) -> None:
+        from rank import priority_keyword_match
+
+        user = {"api_integration": 8.0, "django": 1.0}
+        km = priority_keyword_match(["python"], user)
+        self.assertIsNotNone(km)
+        assert km is not None
+        self.assertGreaterEqual(km, 70)
+
+    def test_no_overlap_returns_zero(self) -> None:
+        from rank import priority_keyword_match, tags_as_weights
+
+        km = priority_keyword_match(["figma"], tags_as_weights(["python"]))
+        self.assertEqual(km, 0)

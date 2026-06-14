@@ -1,147 +1,269 @@
 # Coder — hot queue (active)
 
-**→ Now:** § **O216b-QUIZ-POOL-AUDIT** (Neon allowlist) · deploy O216 code · **O216** partial ✅ Lead verify 2026-06-14
+**→ Now:** § **O220-QUIZ-DEDUP** + § **O220-QUIZ-BAR-ALIGN**  
+**Next:** § **O220-L1-PROMPT-R2** · O218 Playwright · mass retag **нет**
 
 ---
 
-## § O216-QUIZ-TIER-UX — PARTIAL ✅ code · deploy + pool + price pending (Lead verify 2026-06-14)
+## ✅ O220-MATCH-CODE — CLOSED (Lead verify + deploy 2026-06-14)
 
-**Lead verify:**
+Theme **1.19.02** prod · API `lead_coverage_match` · bar only · feed ≡ cabinet · pytest **21/21** · archive [`CODER_PROMPT_ARCHIVE`](../archive/CODER_PROMPT_ARCHIVE.md) § O220-MATCH-CODE
 
-| Area | Result |
+---
+
+## ✅ O220-JS-SYNTAX-HOTFIX — CLOSED (Lead verify 2026-06-14)
+
+Theme **1.19.01** prod · `node --check` ✅ · ticket [`2026-06-14-feed-cabinet-js-syntax.md`](../../problems/2026-06-14-feed-cabinet-js-syntax.md) · UI stray `"` → § O220-MATCH-CODE u1
+
+---
+
+## § O220-QUIZ-DEDUP — same card 4× on retake (P1)
+
+**Ticket:** [`docs/problems/2026-06-14-quiz-duplicate-card-o217.md`](../../problems/2026-06-14-quiz-duplicate-card-o217.md)
+
+**Root:** `quiz_next_response` drops string JSON `card_id` when building `shown_ids` (`int()` fail) → dedup broken.
+
+### DoD
+
+| Step | Action |
 |------|--------|
-| Quiz lifecycle (COMPLETED_KEY, retake, clear-on-exit) | ✅ local `rawlead-quiz.js` |
-| Feed locked bar anon/expired/free | ✅ `renderMatchBlock` |
-| Cabinet «Пройти тест заново» | ✅ `rawlead-cabinet.js` |
-| Allowlist loader in `quiz_adaptive.py` | ✅ mechanism |
-| **`data/quiz_pool_allowlist.json`** | ❌ **file missing** — Neon audit **not done** |
-| **Deploy prod** | ❌ prod `rawlead-quiz.js` **no** COMPLETED_KEY/retake (still **1.18.95** pre-O216) |
-| **PAY_PREMIUM_RUB=10** VPS + UI | ❌ not verified · pricing PHP still **790** hardcoded |
-| pytest test_o197 + test_o195 | ✅ **24/24** local |
-
-**Owner was right:** Coder shipped **hook** for allowlist, not the **curated pool**.
-
-**Next (order):**
-1. § **O216b** — Neon audit → `data/quiz_pool_allowlist.json`
-2. Deploy theme **1.18.96+** + API (`quiz_adaptive.py`) to VPS
-3. Owner: VPS `PAY_PREMIUM_RUB=10` → smoke checkout → revert 790
-4. Owner DoD D1–D7 on prod
+| 1 | `quiz_adaptive.py`: shown set from history **as strings** for O217 JSON |
+| 2 | Test: 2× `/v1/quiz/next` with same synthetic id in history → next card **≠** first |
+| 3 | Deploy API · owner retake smoke (no 4× amoCRM) |
 
 ---
 
-## § O216b-QUIZ-POOL-AUDIT — Neon curated quiz cards (P0 · blocks r1)
+## § O220-QUIZ-BAR-ALIGN — result bars same left edge (P2 UI)
 
-**Blocked:** O216 r1/t5 · owner: «понятные всем, без чужих сфер».
+**Symptom:** «Разработка» / «Маркетинг» — жёлтые полоски начинаются с разного X (label width auto).
 
-### Deliverables
+**Fix:** `rawlead.css` `.rl-quiz__category-bar` — fixed label column (e.g. `grid-template-columns: 7.5rem 1fr` or `minmax(7.5rem,7.5rem) 1fr`); verify overlay result modal (owner screenshot).
 
-| # | Task |
-|---|------|
-| b1 | Script `scripts/quiz_pool_audit.py` (or one-off SQL export): query `leads` WHERE `is_visible` AND `ai_score>=60` AND `category IN (dev,design,marketing,text)`; output CSV/JSON with `id, category, title, task_summary, lead_tags` |
-| b2 | **Manual or semi-auto filter:** drop cross-domain jargon (medical, legal, …) + hyper-niche stack; prefer short everyday titles |
-| b3 | Pick **8–12 ids per niche** (+ 4 alternates) → commit **`data/quiz_pool_allowlist.json`** (flat list of int ids) |
-| b4 | Spot-check: run quiz 20 cards incognito — no «WTF» titles; log if fallback to non-allowlist |
-| b5 | pytest: allowlist file present in repo + `_load_allowlist()` non-empty in CI |
-
-**Do not:** change adaptive phase logic · only data + optional export script.
-
-**DoD:** file in repo · owner OK on sample export · quiz uses allowlist on prod after API deploy.
-
-**Deploy:** API only (allowlist file on VPS with code) · no theme required for b1–b3.
+Bump theme if CSS-only · deploy with dedup or separate patch OK.
 
 ---
 
-**Context:** Owner tier smoke stopped at **T1 (Trial)**. Batch of UX fixes from BrowserSync session + product rules below.
+## § O220-L1-PROMPT-R2 — L1 few-shot after pilot judge (P1 · optional re-pilot 6 ids)
 
-**Lead verify (read-only, root cause anon quiz):**
-- Quiz progress is **`localStorage` key `rawlead_quiz_session`** — **per browser**, **not IP**, **not server-side shared state**.
-- `beginQuizPlay()` calls `readSession()` → **resumes partial `history`** → can finish with 1 niche bar only (confidence filter in `renderCategoryBars` shows max 3 niches with `pct>0`).
-- **Not** «one quiz for all users» — but **same browser** shares session (acceptable); must **not resume incomplete** on re-entry (see t2).
+**Canon:** `data/preprod_ai_prod_audit_judge.md` § L1 Top prompt-fix · pilot `data/o220_l1_retag_pilot.json`  
+**Pilot result:** l1_usable **80%** ✅ · tags avg **1.7–2.1** (target 2.5) · **6** leads still `<2` tags (3 empty)
 
-### Owner requirements
+**Goal:** Surgical `_LITE_SYSTEM` / `_LITE_FEWSHOT_BLOCK` in `src/ai_analyze.py` — **no model change**, no Neon schema.
 
-| # | Requirement |
-|---|-------------|
-| r1 | **Quiz cards:** curated **universal** pool from **Neon `leads`** — plain-language titles/tasks any freelancer understands; **exclude** niche jargon from *other* fields (medicine, law, obscure tech) **and** confusing dev-only terms. **Not** a denylist-only hack — **audit DB → pick best exemplars per niche** (dev/design/marketing/text), ship as allowlist / `quiz_pool` table. |
-| r2 | **Cabinet:** all logged-in users can **retake quiz** (entry in LK). |
-| r3 | **Feed match bar:** **anon** sees **locked** compat bar (like current `rl-match--free-locked`); **trial** gets **real % bar** like premium — **remove** lock from trial. |
-| r4 | **Trial feed:** same experience as **premium** — personal sort + **keyword_match %** on cards (API + JS). |
-| r5 | **Quiz exit:** if user **leaves before finish** → next open **starts from intro** (clear in-progress session). **No** resume mid-quiz. |
-| r6 | **Quiz complete (anon):** persist **completed profile** locally; on TG login → import to Neon (existing `importQuizTags`). |
-| r7 | **Quiz re-open after complete:** show **result modal** (screenshot: «Готово. Вот что мы узнали») — **not** restart cards silently. Add link/button **«Пройти ещё раз»** → starts fresh run. |
-| r8 | **Retake rules:** if retake **finished** → **replace** profile (Neon tags + local completed snapshot). If retake **abandoned** → keep **first completed** profile. |
-| r9 | **Smoke price:** temporarily **`PAY_PREMIUM_RUB=10`** on VPS + checkout amount; UI price display should match API (use existing pattern / script `scripts/_tmp_o185_t1b_smoke_price.py` if still valid). **Revert to 790** after owner payment smoke — document in STATUS. |
+### Requirements (from judge worst L1)
 
-### Files (expected)
+| id | Fix |
+|----|-----|
+| **r2-1** | **dev vs marketing:** cold TG outreach / «рассылка в тг» / lead gen scripts → `primary_category=marketing`, not dev (ref #24202) |
+| **r2-2** | **infographic / slides / visual for cards** → `design`, not marketing (#24638, #24580) |
+| **r2-3** | **Tags match subject:** marketplace product card / furniture → product/visual tags, not `landing_page_design`/`ui_ux` when subject is physical goods (#24776) |
+| **r2-4** | **Min tags enforce:** if `feed_visible=true` and L1 returns `<2` lead_tags after sanitize → **retry 1×** with user hint «need ≥2 canonical_tag» (extend existing retry path ~L1843) |
+| **r2-5** | **Optional:** Xmind / diagram / scheme software → document in few-shot (judge: dev vs text #23959 — pick **one** line, align with `lead_category` canon) |
+
+### Files
 
 ```
-wordpress/rawlead-kadence-child/assets/js/rawlead-quiz.js
-wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js
-wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js
-wordpress/rawlead-kadence-child/template-parts/rawlead/quiz.php
-wordpress/rawlead-kadence-child/assets/css/rawlead.css
-src/quiz_adaptive.py                    ← card pool / jargon filter if needed
-src/api_server.py                       ← trial feed parity (delay/sort/match) if gap
-src/config.py                           ← pay_premium_rub already env-driven
-wordpress/.../pricing-card.php        ← price from API/config, not hardcoded 790 during smoke
-scripts/_tmp_o185_t1b_smoke_price.py    ← reuse for VPS 10 ₽ if applicable
-tests/test_o195_quiz.py tests/test_o197_quiz_adaptive.py  ← extend
+src/ai_analyze.py          — _LITE_SYSTEM / few-shot only
+tests/test_ai_analyze.py   — or extend existing L1 smoke if present
 ```
-
-### Implementation notes
-
-**t1 — localStorage model (quiz.js)**
-- Split keys e.g. `rawlead_quiz_session` (in-progress, cleared on exit/close overlay without done) vs `rawlead_quiz_completed_v1` (canonical completed profile + category bars snapshot + `completed_at`).
-- On overlay/page **close** without `done` → `clearSession()` only (drop in-progress).
-- On `showResult` / API `done` → write **completed** snapshot; clear in-progress.
-- On quiz open: if **completed** exists → show **result screen** immediately (+ «Пройти ещё раз»).
-- Retake: set flag `retake_pending`; on new **done** → overwrite completed + `importQuizTags` if logged in; on abandon retake → restore completed from backup taken at retake start.
-
-**t2 — Feed match bar (rawlead-feed.js `renderMatchBlock`)**
-- **anon:** render `renderFreeLockedMatchBar()` (currently anon returns `""` — **change**).
-- **trial** (`subscriptionState.is_trial` or `status==='trial'` with `effective_access`): treat as **premium** for match bar — `renderCompatMatchBar`, no lock.
-- **free logged-in** (no trial access): keep lock OR clarify with owner — default: lock only **anon + expired_trial**; trial ≠ lock.
-
-**t3 — Trial feed parity**
-- Verify `/v1/feed` for trial JWT: `apply_delay=false`, match sort available, `keyword_match` populated when user has quiz tags.
-- If trial lacks tags until import — use quiz completed local tags for anon→login path; logged-in trial must show % after profile import.
-
-**t4 — Cabinet retake**
-- Button/link «Пройти тест заново» / «Настроить ленту» → opens quiz overlay (`rawleadQuizApp.open`) with retake flow (r8).
-
-**t5 — Universal quiz pool (Neon audit → curated set)**
-- **Step A (data):** SQL/script over `leads` (`is_visible=true`, `ai_score>=60`, has `task_summary` or readable `title`): score **universality** — short title, everyday wording, category in QUIZ_NICHES, no cross-domain jargon (owner examples: medical/legal terms, hyper-specific stack when task is generic).
-- **Step B:** Pick **N cards per niche** (e.g. 8–12 each) + backup alternates; store IDs in repo `data/quiz_pool_allowlist.json` (or SQL seed) — **single source** for `fetch_quiz_card` / `_query_card`.
-- **Step C:** Adaptive logic unchanged (phase1/2) but **only** pulls from allowlisted ids (+ fallback query only if pool exhausted — log warning).
-- Owner can spot-check list before deploy; optional export CSV for review.
-- Do **not** change 4 result category labels without Design OK.
-
-**t6 — Price 10 ₽ smoke**
-- VPS: `PAY_PREMIUM_RUB=10` in `.env.site` · restart `rawlead-api`.
-- WP checkout uses API amount · bump `RAWLEAD_CHILD_VERSION` if pricing UI touched.
-- Owner note in STATUS: «revert 790 after smoke».
 
 ### Do not break
 
-- O215 visual polish (NEO tokens) · quiz overlay on `/lenta/` · TG auth import · expired-trial mandatory banner · Monica/trial auto-start on first login.
-- Do **not** remove completed profile on anon exit after **successful** finish.
-- Do **not** store quiz state server-side keyed by IP.
+- L1 model · judge infra · `sanitize_l1_*` guards · ingest pipeline
 
 ### DoD
 
 | # | Check |
 |---|--------|
-| D1 | Incognito anon: exit quiz mid-way → reopen → **intro**, empty history |
-| D2 | Anon complete quiz → result modal → login → tags in Neon |
-| D3 | Anon complete → open quiz again → **result modal** + «Пройти ещё раз» |
-| D4 | Retake complete → profile updates; retake abandon → first profile kept |
-| D5 | Anon `/lenta/` cards show **locked** compat bar; trial shows **real %** |
-| D6 | Trial feed: no 30m delay · match sort · % visible (T1 smoke) |
-| D7 | Cabinet: retake entry for logged-in user |
-| D8 | YooKassa checkout **10 ₽** on prod (owner test) · revert documented |
-| D9 | pytest quiz + feed tier tests green |
+| R1 | 3–5 new few-shot lines (RU examples) in prompt |
+| R2 | Retry when feed_visible + `<2` tags after sanitize |
+| R3 | pytest green |
+| R4 | **No VPS deploy required for verify** — owner may re-run 6 thin ids via `o220_l1_retag_pilot.py --lead-ids …` if script extended, or manual replay 6 ids |
 
-**Deploy:** theme `deploy-wp-theme-vps.py` · API if backend touched · price env on VPS.
+**Deploy:** `ai_analyze.py` → VPS `/opt/rawlead/src/` + restart **`rawlead-radar`** (L1 on ingest) · API optional same file
+
+**Not in scope:** mass retag 2264 · L2 prompt (separate track if owner wants design send 65%)
+
+---
+
+## Closed index
+
+| § | Status |
+|---|--------|
+| **O220-MATCH-CODE** | ✅ deploy **1.19.02** · `lead_coverage_match` · bar only 2026-06-14 |
+| **O220-FEED** | ✅ deploy 1.19.00+ |
+| **O219** | ✅ deploy 1.18.97 · archive `CODER_PROMPT_ARCHIVE` |
+| **O220-L1-RETAG** | ✅ code · owner apply+judge ⏳ |
+
+---
+
+**Owner batch (one deploy):** cabinet UX · anon locked match bar · auto trial on first TG login · hide synthetic badge · canonical quiz on `/lenta/#quiz`.
+
+### Requirements
+
+| id | Fix | Detail |
+|----|-----|--------|
+| **r1** | **Yellow square in LK** | Stray `#rl-cabinet-trial-badge` or skeleton chip under header — hide when empty; do not render yellow block without trial text |
+| **r2** | **Hide user skills in LK** | Quiz-first (O208): hide `#rl-cabinet-tags`, label «Твои навыки», «+ Добавить», skills modal entry from head · keep tags in Neon/API |
+| **r3** | **Retake button** | «Пройти ещё раз» / «Пройти тест заново» — **not** black `rl-cabinet-tag` chip · use `rl-btn rl-btn--ghost` · place **directly under** `.rl-cabinet-head__lead` (after «Отклики с ленты…»), not in tags row · opens `/lenta/#quiz` retake (`rawleadQuizApp.retake`) |
+| **r4** | **Anon match bar** | Locked compat bar on every feed card for **anon** · root cause: CSS hides `.rl-row--auth-only` for `[data-tier="anon"]` (`rawlead.css` ~8144) while `renderMatchBlock` wraps bar in that class — fix class/CSS so anon sees lock bar |
+| **r5** | **Tier match bars** | **Trial + active Premium:** real `%` bar, no lock · **Anon + expired trial + expired premium (no access):** locked bar · `free` logged-in without access: locked (upsell) |
+| **r6** | **Auto trial first TG login** | **O208-B4 / O107 amended:** on `auth_telegram` + `_complete_bot_auth`, if `trial_used_at IS NULL` and no active premium → `start_trial()` + `notify_trial_started()` · skip owner/beta · Monica test after full wipe |
+| **r7** | **Hide synthetic badge** | `rawlead-quiz.js`: `source=synthetic` → no visible pill (API field stays for O218 j7) |
+| **r8** | **Canonical quiz URL** | Single entry: **`/lenta/#quiz`** overlay · `/quiz/` → **301** (or `template_redirect`) to `/lenta/#quiz` · update `quizUrl` in `functions.php` + PHP/JS links (`rawlead_page_url('quiz')` → lenta hash or helper `rawlead_quiz_url()`) · do **not** delete WP page without redirect |
+
+### Files
+
+```
+wordpress/rawlead-kadence-child/page-cabinet.php
+wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js
+wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js
+wordpress/rawlead-kadence-child/assets/js/rawlead-quiz.js
+wordpress/rawlead-kadence-child/assets/css/rawlead.css
+wordpress/rawlead-kadence-child/functions.php
+wordpress/rawlead-kadence-child/page-quiz.php          ← redirect stub OK
+wordpress/rawlead-kadence-child/template-parts/rawlead/hero.php
+wordpress/rawlead-kadence-child/template-parts/rawlead/feed-strip.php
+src/api_server.py                                      ← r6 auto trial
+src/trial_subscription.py                              ← reuse start_trial
+tests/test_trial_subscription.py                       ← extend auto-start on auth
+tests/test_o197_quiz_adaptive.py                       ← if quiz URL touched
+```
+
+### Steps
+
+**t1 — Cabinet head (`page-cabinet.php` + `rawlead-cabinet.js` + CSS)**
+- Hide skills block (r2); move retake button under lead (r3); fix trial badge empty state (r1).
+
+**t2 — Feed match bar (`rawlead-feed.js` + CSS)**
+- `renderMatchBlock`: lock only `anon | expired_trial | free-without-access`; trial/premium → `renderCompatMatchBar`.
+- Remove/adjust `.rl-lead-card[data-tier="anon"] .rl-row--auth-only { display:none }` or use `.rl-row--match-tier` for match row (r4,r5).
+
+**t3 — Auto trial (`api_server.py`)**
+- After `_upsert_telegram_user` in both auth paths: try `start_trial`; on success commit + notify; swallow `TrialStartError` for already_used/premium.
+
+**t4 — Quiz URL (`functions.php` + links)**
+- `rawlead_quiz_url()` → `/lenta/#quiz`; redirect `/quiz/`; retake/cabinet links use hash overlay.
+
+**t5 — Synthetic badge (`rawlead-quiz.js`)** — r7.
+
+### Do not break
+
+- O216 quiz lifecycle · retake rules · `importQuizTags` · expired-trial banner · O217 synthetic API · Monica wipe is **ops** (owner), not code.
+
+### DoD
+
+| # | Check |
+|---|--------|
+| D1 | LK logged-in: **no** skill chips row · retake = normal ghost button under lead text |
+| D2 | LK: **no** yellow stray square under header |
+| D3 | Anon `/lenta/`: **locked** compat bar on cards (visible, with lock icon) |
+| D4 | Trial Monica after wipe + TG login: `plan=trial` · real match % · no lock |
+| D5 | Expired trial/premium: locked bar returns |
+| D6 | `/quiz/` → redirects to `/lenta/#quiz` · overlay works · no duplicate standalone quiz UX |
+| D7 | Quiz card: no «synthetic» pill · pytest green · bump `RAWLEAD_CHILD_VERSION` |
+
+**Deploy:** theme rsync + restart API if t3 · owner re-tests Monica first-login.
+
+---
+
+**Next:** owner tier smoke · **O218 Playwright** after O219 deploy
+
+## § O218-PLAYWRIGHT-QUIZ-E2E — human-like UI/quiz journeys (P1 · pre-ads gate · after O219)
+
+**Owner 2026-06-14:** Playwright · multi-user · quiz scenarios · **mobile 390 + desktop** · no state bleed.
+
+**Spec:** [`OWNER_INTENT.md`](OWNER_INTENT.md) § **O218-w** · accounts [`PREPROD_ACCOUNTS.md`](../../ops/PREPROD_ACCOUNTS.md)
+
+### Scenarios (min)
+
+| id | Flow | assert |
+|----|------|--------|
+| j1 | anon abandon mid-quiz → reopen intro | empty history · no resume |
+| j2 | anon complete → result + retake button | `COMPLETED_KEY` set |
+| j3 | anon complete → TG login | Neon `user_tags` import |
+| j4 | retake done vs retake abandon | profile replace vs keep first |
+| j5 | anon locked match bar · trial real % | tier-specific DOM |
+| j6 | cabinet retake link | overlay opens retake |
+| j7 | synthetic card title on prod | `source=synthetic` in **API/Network** only · **no visible badge**
+
+### Implementation
+
+| # | Task |
+|---|------|
+| t1 | `tests/e2e/` or extend preprod script — **separate browser context per persona** |
+| t2 | Viewports: **1280 desktop** + **390 mobile** (duplicate critical paths j1,j2,j5,j7) |
+| t3 | Use Monica + dedicated anon JWT users · reset subscription SQL hook or fixture between runs |
+| t4 | Output `data/preprod_quiz_e2e.json` · fail screenshots |
+| t5 | CI/local: `pytest` marker or standalone playwright cmd documented in TASKS |
+
+**Do not break:** O37c unrelated flows · production data (use test tg ids only).
+
+**DoD:** all j1–j7 green desktop + j1,j2,j5,j7 green mobile · Lead verify before ads gate.
+
+---
+
+## § O217-DEPLOY — VPS API + quiz_cards_v1.json (P0 · code ✅)
+
+**Lead verify 2026-06-14:** local code ✅ · prod quiz **still Neon** (`source=kwork`, card_id=23958) until this deploy.
+
+| Step | Task |
+|------|------|
+| d1 | `python scripts/deploy-o217-quiz-vps.py` |
+| d2 | Prod: `/wp-json/rawlead/v1/quiz/start` → `card.source=synthetic` · title from PM pack |
+| d3 | Owner: incognito quiz — PM titles, not Kwork junk |
+
+**DoD:** script prints `DEPLOY OK` · `quiz_cards_v1=56` · `quiz_source=synthetic`
+
+---
+
+## § O217-QUIZ-SYNTHETIC-CODE — summary ✅ code (Lead verify 2026-06-14)
+
+| Area | Result |
+|------|--------|
+| `data/quiz_cards_v1.json` | ✅ **56** (14/niche: 8+2+4) · pilot 20 ids present |
+| Tag lint | ✅ all `skills_on_like` ∈ CANONICAL_TAGS |
+| `quiz_adaptive.py` | ✅ JSON-first · Neon fallback if file missing |
+| pytest | ✅ **59/59** (o217 + o197 + o195) |
+| `.gitignore` | ✅ `!data/quiz_cards_v1.json` |
+| **Deploy prod** | ❌ API still allowlist/Neon on prod |
+
+---
+
+## § O216-DEPLOY — VPS + gitignore (P0 · after code ✅)
+
+**Lead verify 2026-06-14:** O216 + O216b **code accepted** · prod still **1.18.95** · allowlist **not in git** (`.gitignore data/*`).
+
+| Step | Task |
+|------|------|
+| d0 | `.gitignore`: add `!data/quiz_pool_allowlist.json` (whitelist curated pool for repo + CI) |
+| d1 | `python scripts/deploy-o216-quiz-vps.py` — theme **1.18.96** + API + allowlist |
+| d2 | Prod curl: `rawlead-quiz.js` has `COMPLETED_KEY` · `/lenta/` `ver=1.18.96` |
+| d3 | Owner: `PAY_PREMIUM_RUB=10` in `.env.site` → restart API → checkout smoke → revert **790** |
+
+**DoD:** deploy script prints `DEPLOY OK` · owner D1–D9 from STATUS · pytest **26/26** unchanged.
+
+**Do not break:** O215 CSS/UX · locked bar only anon/expired/free · trial = premium match bar.
+
+---
+
+## § O216 + O216b — summary ✅ code (Lead verify 2026-06-14)
+
+| Area | Result |
+|------|--------|
+| Quiz lifecycle · retake · clear-on-exit | ✅ `rawlead-quiz.js` + `quiz.php` |
+| Feed locked bar anon/expired/free; trial → premium tier | ✅ `renderMatchBlock` |
+| Cabinet «Пройти тест заново» | ✅ `rawlead-cabinet.js` |
+| Allowlist loader + SQL filter | ✅ `quiz_adaptive.py` |
+| **`data/quiz_pool_allowlist.json`** | ✅ **64 ids** local · ⚠️ **gitignored** — d0 |
+| `scripts/quiz_pool_audit.py` | ✅ export script |
+| pytest test_o197 + test_o195 | ✅ **26/26** |
+| **Deploy prod** | ❌ still **1.18.95**, no `COMPLETED_KEY` on prod |
+| **PAY_PREMIUM_RUB=10** | ❌ not set · pricing PHP **790** (OK until smoke) |
+
+---
+
+**O216 code ✅ deploy 1.18.96** — details → [`CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) · follow-up UX → **§ O219** above.
 
 ---
 

@@ -797,6 +797,150 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 **→ Lead Architect:** после PM — § в `CODER_PROMPT` (data/API), не раньше.
 
+**Superseded (owner 2026-06-14):** Neon allowlist (O216b) — **временный мост** до § **O217-w** (синтетический пак PM).
+
+### § O217-w — Quiz synthetic card pack (**P0 product · owner 2026-06-14**)
+
+**Решение owner (принято Lead):**
+
+| # | Решение |
+|---|---------|
+| 1 | Квиз-карточки — **авторские**, не вакансии Neon · **гибрид с leads ❌** |
+| 2 | PM пишет текст + **ground truth** теги из каталога · Design — длина/UX карточки |
+| 3 | Три типа: **якорные** · **граничные** (2 ниши) · **ловушки** (обманчивые) |
+| 4 | Сложность **1–3** на карточку (для cx_pref / soft rank O198) |
+| 5 | Match % после квиза — **без отдельного disclaimer**; профиль → match по навыкам как есть |
+| 6 | Каталог навыков — **расширить сейчас**, если для пака не хватает id (lint «карточка ↔ catalog» позже в коде) |
+| 7 | Адаптив O197 **не ломать** — меняется только **источник карточек** |
+
+**Зачем:** вакансии с бирж = шум; квиз = **измеритель профиля**. Тонкая настройка match.
+
+**PM deliverables → `LEAD_PRODUCT_PROMPT` § O217-QUIZ-SYNTHETIC-PACK` (hot ≤80 строк):**
+
+| # | Артефакт |
+|---|----------|
+| p0 | **Аудит каталога:** `SKILLS_TOOLS_CATALOG.md` v0.5 vs 12 quiz-signals (ниже) · список **новых tag_id** или Tier A/B · что взять из `pending_tags`/накопленного |
+| p1 | **JSON schema** `quiz_cards_v1` (поля ниже) · версия пака |
+| p2 | **Матрица пула v1:** 4 niche × 3 signal × **8–12** карточек + **4–6 ловушек/niche** · cx 1–3 внутри |
+| p3 | **Pilot 20 карточек** (5/niche) — owner spot-check «нет WTF» |
+| p4 | **Правила весов:** `skills_on_like[]` / `skills_on_dislike[]` · связь с import в `user_tags` |
+| p5 | **Stop/adaptive** — без изменений O197 unless gap found |
+
+**Quiz signals (канон API, не менять без PM+Architect):**
+
+| niche | signals |
+|-------|---------|
+| dev | python · wordpress_dev · api_integration |
+| design | ui_ux · video_editing · brand_identity |
+| marketing | smm · yandex_direct · seo |
+| text | copywriting · article_writing · editing_proofreading |
+
+**Schema карточки (draft для PM):**
+
+```json
+{
+  "id": "qc_dev_python_01",
+  "pack_version": "v1",
+  "card_type": "anchor|boundary|trap",
+  "niche": "dev",
+  "signal": "python",
+  "complexity": 2,
+  "title": "…",
+  "task_summary": "…",
+  "skills_on_like": ["python", "django"],
+  "skills_on_dislike": [],
+  "boundary_with": null,
+  "notes_pm": "optional reviewer hint"
+}
+```
+
+**Файл (Coder позже):** `data/quiz_cards_v1.json` · CI lint: все tag_id ∈ `CANONICAL_TAGS`.
+
+**Порядок:** O216 deploy + tier smoke **можно параллельно PM pilot** · **Coder O217-code** только после PM pilot ✅ + Lead § `CODER_PROMPT`.
+
+**→ @lead-product:** § **O217-QUIZ-SYNTHETIC-PACK** в `LEAD_PRODUCT_PROMPT.md` · p0 audit каталога **первым**.
+
+**→ Lead Architect:** после PM pilot — API swap off `leads` · deprecate `quiz_pool_allowlist.json`.
+
+### § O218-w — Playwright UX/quiz E2E перед рекламой (**owner 2026-06-14**)
+
+**Запрос owner:** перед ads — автоматические **Playwright**-прогоны с **имитацией человека**: UI/UX + **квиз** (разные сценарии, **разные пользователи**, без путаницы state) · **mobile + desktop**.
+
+**Зачем:** ручной tier smoke не ловит регресс «Monica увидела trial, anon — locked bar», смешение `localStorage`, retake vs first profile, импорт tags в Neon.
+
+**Scope (→ @coder § O218-PLAYWRIGHT-QUIZ-E2E):**
+
+| # | Сценарий | Viewport | Изоляция |
+|---|----------|----------|----------|
+| j1 | Anon: exit mid-quiz → reopen intro | desktop + **390** | fresh context |
+| j2 | Anon: complete → result modal → «ещё раз» | desktop + 390 | fresh context |
+| j3 | Anon complete → TG login → tags in Neon | desktop | **отдельный** test user (не Monica одновременно с j4) |
+| j4 | Retake finish → profile update; retake abandon → first kept | desktop | fresh localStorage |
+| j5 | **Trial** Monica: real match % bar · **anon**: locked bar | desktop + 390 | `PREPROD_ACCOUNTS` · reset sub между прогонами |
+| j6 | Cabinet «Пройти тест заново» | desktop | logged-in context |
+| j7 | Synthetic cards visible (`source=synthetic`, PM title substring) | desktop + 390 | — |
+
+### § O220-w — Feed smoke batch (**owner 2026-06-14 · после O219**)
+
+| # | Симптом | Куда |
+|---|---------|------|
+| 0 | **Owner:** вошёл в ЛК/ленту **до квиза** → на совместимости **замок**, не 50% · после квиза → реальный % | **Coder O220 r0** (решение owner, PM не блокирует) |
+| 1 | **Match ~50% везде** (до r0) → после reload 8% | **→ @lead-product** опционально — post-quiz low % |
+| 2 | В развёрнутой карточке «Сложность» вплотную к «СУТЬ ЗАДАНИЯ» | Coder O220 r4 |
+| 3 | Можно нажать **>5 откликов разом** — нужен concurrent cap | Coder O220 r2 |
+| 4 | Ушёл со страницы во время генерации — вернулся, **анимация пропала** | Coder O220 r3 (`PENDING_DRAFTS` не restore) |
+| 5 | **Mobile expanded:** заголовок обрезан (свёрнутый — OK) | Coder O220 r5 |
+| 6 | **Лимит 5/ч не работает** → owner: **поднять до 10/ч** + UI везде | **amend O208-B1** · Coder O220 r1 |
+| 7 | **Страница оплаты** не грузится (`yoomoney.ru` timeout) | Coder r7 probe · `@mechanic` если URL OK |
+
+**Lead verify:** `DRAFT_HOURLY_LIMIT` default **0** на prod · 50% = `EMPTY_PROFILE_KEYWORD_MATCH` без tags в Neon.
+
+**→ @lead-product:** § **O220-MATCH-PM** — **✅ owner OK 2026-06-14**  
+**→ @coder:** § **O220-MATCH-CODE** (reopened) · § **O220-FEED** r0–r7 ✅
+
+### § O220-match-ui — карточки лента ≡ ЛК (**owner 2026-06-14**)
+
+| # | Запрос |
+|---|--------|
+| 1 | **Лента и ЛК — один вид карточки**; в ЛК **только** плашка «ОТКЛИК ✓» |
+| 2 | **Без текстовых подписей match** — убрать «Не ваша ниша», «Частичное совпадение · N%», «Хорошее…», «–», «?» · **только полоска** (owner **отменяет** PM § A band copy) |
+| 3 | Убрать мусор `"` под bar (следствие `renderMatchBreakdown`) |
+| 4 | PM § **O220-MATCH-PM** ✅ по **формуле** — **`lead_coverage_match`** · UI bar only ✅ 2026-06-14 |
+
+**Lead verify:** `renderMatchBreakdown` строка заканчивается `"></div>"'` · cabinet без `rl-match-bar` / `rl-row--match-tier` · ticket [`2026-06-14-match-ui-stray-quote.md`](../../problems/2026-06-14-match-ui-stray-quote.md)
+
+**→ @coder:** `CODER_PROMPT` § **O220-MATCH-CODE** · `TASKS` **69**, **77**
+
+### § O219-w — LK UX + match bars + auto-trial + quiz URL (**owner 2026-06-14**)
+
+**Запрос owner (batch, до @coder):**
+
+| # | Что |
+|---|-----|
+| 1 | ЛК: убрать жёлтый квадратик под шапкой |
+| 2 | ЛК: **скрыть** ручные навыки (chips Figma/SMM…) — quiz-first |
+| 3 | «Пройти ещё раз» — нормальная кнопка **под** «Отклики с ленты…», не чёрный chip |
+| 4 | Лента anon: **полоска совместимости с замком** на карточках |
+| 5 | Trial + Premium: реальный % · expired/anon: замок |
+| 6 | Monica: **полный wipe** из Neon → проверить auto-trial при первом TG-login |
+| 7 | `/quiz/` → канон **`/lenta/#quiz`** (редirect, не две точки входа) |
+| 8 | Спрятать badge «synthetic» на карточках квиза |
+
+**Lead verify:** anon bar не виден из-за CSS `display:none` на `.rl-row--auth-only` · auto-trial **не реализован** в `auth_telegram`/`bot-complete` · retake = `rl-cabinet-tag` (чёрный).
+
+**→ @coder:** § **O219-CABINET-QUIZ-UX-BATCH** · `TASKS` **66**
+
+**Техника:**
+- **Отдельный browser context на persona** (anon A / anon B / Monica / owner JWT) — **не** один storage
+- Mobile: viewport **390×844**, touch-friendly taps
+- Assert: DOM + API (`/wp-json/rawlead/v1/quiz/*`) + optional Neon read tag count per user
+- Артефакт: `data/preprod_quiz_e2e.json` + скрины при fail
+- Не дублировать O37c pixel-audit — фокус **quiz lifecycle + tier bars**
+
+**Порядок:** после owner tier smoke (FOR_YOU) · **до** stress/GTM · параллельно Perf ok.
+
+**→ @coder:** `CODER_PROMPT` § **O218-PLAYWRIGHT-QUIZ-E2E** (после tier smoke).
+
 ### § O168-w2 — L2: ложное «ТЗ обрывается» (**P0**, owner **2026-06-10**)
 
 **Кейс:** [FL #5508904](https://www.fl.ru/projects/5508904/vyikachat-bazu-retseptov-iz-igryi.html) — в ТЗ: «Рецепты хранятся **на сервере игры**». Черновик: «фраза «Рецепты хранятся на…» **обрывается**» — **ложь**, снижает send_as_is.
@@ -1586,6 +1730,9 @@ Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unse
 | 2026-06-14 | **FL proxy restore** — 194.226 были **неоплачены**, не мёртвы; owner оплатил · pool **4/4** восстановлен · удаление 2 слотов **откат** | problems/2026-06-14 |
 | 2026-06-14 | **O216 r1 уточнение:** квиз-карточки = **курация Neon** (универсальные лиды по 4 нишам), не только «убрать диджитал» — убрать и **чужие сферы** (медицина, юриспруденция, …) | CODER_PROMPT § O216 |
 | 2026-06-14 | **O215 design polish** — Perf **отложен**; owner довёл вид через **BrowserSync** с @designer | DESIGNER_PROMPT § O215 |
+| 2026-06-14 | **O220 ✅ code** match A–F + feed r0–r7 · pytest 48/48 | deploy ⏳ theme **1.19.00** |
+| 2026-06-14 | **O208-B1 amend** — hourly cap **10/ч** (was 5, env never set) | § O208-B · owner |
+| 2026-06-14 | **O218 Playwright** — quiz E2E multi-user · mobile+desktop · gate до ads | § **O218-w** · `TASKS` **65** |
 | 2026-06-13 | **O208-B monetization** — **5 откликов/час всем** (вкл. premium) · L3 judge → K · убрать просмотры+слоты с карточки · PM воронка (trial 3д → без match-фильтра) | § **O208-B** · PM § O208-MONETIZATION |
 | 2026-06-13 | **TG filter по данным** — доказать воронку · sample audit · filter lab | § **O207** |
 | 2026-06-13 | **acc1 handler deaf** — test group msg=70 only acc2 `не_слушаем`; acc1 ready but 0 handler events | § **O206 t3b** → **t3c** |

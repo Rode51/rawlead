@@ -16,13 +16,14 @@
 | Волна | § | Кто |
 |-------|---|-----|
 | 1 TG | t2b · O207 · join | @coder |
-| 2 Концепция | **O208** quiz-first UI/copy/воронка | @lead-product → @lead-designer → @coder |
+| 2 Концепция | **O208** + **O217** synthetic quiz pack | @lead-product |
 | 3 Perf | lenta/home/quiz load | Design scope → @coder |
 | 4 L2 | O200 regen **≥70%×4** | @coder |
-| 5 Pre-ads | stress @50 · security | owner |
-| 6 GTM | ads | ⏸ |
+| 5 SEO + analytics | **O113-seo** · Яндекс.Метрика (счётчик + цели) | @coder · owner ID |
+| 6 Pre-ads QA | **O218** Playwright quiz/UX E2E · mobile+desktop · stress @50 · security | @coder |
+| 7 GTM | ads | ⏸ |
 
-**Гейт ads:** O207 ok · L2 **70%**×4 · stress green.
+**Гейт ads:** tier smoke ✅ · **O218 Playwright green** · L2 **70%**×4 · stress green · **SEO** · **Метрика на prod**.
 
 ---
 
@@ -53,13 +54,28 @@
 | **58i** | **O214** ops truth: cycle_age fallback + residential badge | @coder | ✅ Lead verify VPS 2026-06-14 |
 | **59** | **O215** WP design polish (BrowserSync local) | @designer + owner | ✅ deploy **1.18.95** 2026-06-14 |
 | **59b** | **Tier smoke** — все уровни доступа (FOR_YOU чеклист) | owner | T1 blocked → **O216** |
-| **59c** | **O216** quiz lifecycle · match bars · cabinet retake | @coder | **partial ✅** code · deploy ❌ |
-| **59d** | **O216b** Neon quiz pool audit → `quiz_pool_allowlist.json` | @coder | **→ сейчас** |
-| **59e** | Deploy O216 + owner DoD D1–D7 + 10 ₽ smoke | owner + @coder | после 59d |
+| **59c** | **O216** quiz lifecycle · match bars · cabinet retake | @coder | ✅ code Lead verify |
+| **59d** | **O216b** Neon quiz pool audit → `quiz_pool_allowlist.json` | @coder | ✅ **64 ids** · ⚠️ gitignore |
+| **59e** | Deploy O216 + owner DoD D1–D9 + 10 ₽ smoke | owner + @coder | ✅ theme **1.18.96** · owner smoke **→ сейчас** |
 | **60** | **Perf** lenta/home/quiz | @lead-designer → @coder | после tier smoke |
 | **61** | **Stress** финал @50 VU | owner | **перед ads** |
-
----
+| **62** | **O113-seo** — title/meta, sitemap, OG ключевых страниц | @coder | после Perf · **до ads** |
+| **63** | **Яндекс.Метрика** — счётчик в теме + цели quiz/trial/pay | @coder · owner | после 62 · **до ads** |
+| **64** | **O217** synthetic quiz — PM spec + pilot 20 | @lead-product | ✅ owner pilot OK |
+| **64b** | **O217** code 56 cards + API JSON source + deploy | @coder | ✅ Lead deploy 2026-06-14 |
+| **65** | **O218** Playwright UX/quiz E2E — multi-user · mobile 390 + desktop | @coder | после O219 · **до ads** |
+| **66** | **O219** LK UX · anon match bar · auto-trial · `/quiz/` redirect | Lead | ✅ deploy 2026-06-14 |
+| **67** | **O220-MATCH-PM** — A–F rank UX | @lead-product | ✅ owner OK 2026-06-14 |
+| **68** | **O220-FEED** r0+r1 quiz lock · 10/ч | @coder | ✅ code · deploy ⏳ |
+| **69** | **O220-MATCH-CODE** A–F (D + bar-only UI) | @coder | ✅ deploy **1.19.02** 2026-06-14 |
+| **70** | **O220-FEED** r2–r7 UX · checkout | @coder | ✅ deploy |
+| **71** | **O220 deploy** API + theme **1.19.00** | Lead | ✅ 2026-06-14 |
+| **72** | **O220-L1-RETAG-PILOT** | @coder + owner | ✅ apply+judge 2026-06-14 |
+| **73** | **O220-L1-PROMPT-R2** — few-shot + min 2 tags retry | @coder | ⏸ после **69** |
+| **74** | **O220-JS-SYNTAX-HOTFIX** — feed/cabinet `node --check` | @coder | ✅ **1.19.01** prod |
+| **75** | **O220-QUIZ-DEDUP** — string card_id shown set (API) | @coder | **→ now** |
+| **76** | **O220-QUIZ-BAR-ALIGN** — category bar grid CSS | @coder | with **75** |
+| **77** | **O220-MATCH-UI** — stray `"` · feed≡cabinet bar | @coder | ✅ in **69** |
 
 ## План O208 (owner 2026-06-13)
 

@@ -6,6 +6,354 @@
 
 ---
 
+# Перенесено из hot **2026-06-14** — O220-MATCH-CODE (reopened)
+
+## § O220-MATCH-CODE ✅ Lead verify + deploy 2026-06-14
+
+**Owner:** bar only (no PM § A band copy) · feed ≡ cabinet · `lead_coverage_match` (PM § D) · B+F · E/C deferred
+
+| id | Done |
+|----|------|
+| u1–u3 | No `renderMatchBreakdown` on card · no `.rl-match__label` on logged-in bar · aria-label only |
+| u2 | Cabinet `rl-match rl-match-bar` + `rl-row--match-tier` · «ОТКЛИК ✓» kept |
+| B | `keyword_match` → `None` if no lead tags |
+| D | `lead_coverage_match` + `LEAD_COVERAGE_REF_W=4` · API switched |
+| F | `TAG_SYNONYMS` + row match in coverage |
+
+**pytest:** 21/21 `test_match_push` · **theme:** **1.19.02** · **Deploy:** Lead rsync API+theme · restart `rawlead-api`
+
+---
+
+# Перенесено из hot **2026-06-14** — O211-DEPLOY ops footer
+
+## § O211-DEPLOY ✅ Lead verify + deploy 2026-06-14
+
+**Goal:** prod `/ops/` footer `сегодня N · за 24ч M` (MSK), parsed in tooltip, YouDo 🟡 when visible_24h>0.
+
+**Deploy:** `deploy-o211-ops-footer-vps.py` → `ops_funnel.py` · `ops-pult.js` · `owner_admin.py` · restart **`rawlead-api`**
+
+**Verify VPS:** api **active** · `ops-pult.js` has `metaLine` + `за 24ч` · `ops_root=200` · prod JS ✅
+
+**pytest:** 15/15 (`test_o171_ops_funnel.py`)
+
+---
+
+# Перенесено из hot **2026-06-14** — O207b TG filter tune
+
+## § O207b ✅ Lead verify 2026-06-14
+
+**Problem:** 8 owner-labeled `vacancy` rows blocked by FILTER_WIDE skill stops (figma, монтаж, логотип, …).
+
+**Fix:**
+- `TG_WIDE_SOFT_STOPS` + `tg_filter_soft_bypass()` in `src/filters.py` — only when `source=tg:*` + `is_tg_order_post` + not team-hiring «в команду»
+- `accepts_listing` wires soft bypass for live TG path
+- `scripts/tg_filter_replay.py` mirrors same logic
+- `is_tg_order_post`: `задача:`, `откликнуться`, flexible `ищем … дизайнера`
+
+**Replay (labeled 120):** pass **99** · filter **14** · spam **7** · `vacancy_blocked` **0** (was 8) · noise pass **69** unchanged
+
+**pytest:** 49/49 (`test_o207b` + `test_o207` + `test_tg_spam_filter`)
+
+**Deploy:** ✅ `deploy-o207b-radar-vps.py` 2026-06-14 · VPS replay **99/14/7** · radar **active**
+
+---
+
+# Перенесено из hot **2026-06-14** — O207 TG funnel proof
+
+## § O207 ✅ Lead verify + deploy scripts 2026-06-14
+
+**Goal:** prove TG funnel drop (filter vs L1 МИМО) without changing filter rules — log audit + Telethon history sample + offline replay.
+
+**Delivered:**
+- `scripts/tg_funnel_audit.py` — `days_7` / `days_30`, per-account, mimo_samples, `human_summary` → MD
+- `scripts/tg_history_sample.py` — read-only Telethon, reuses `tg_monitor._listing_from_message`
+- `scripts/tg_filter_replay.py` — spam + word_filter replay, `owner_label` field
+- `scripts/deploy-o207-tg-funnel-vps.py` — upload 3 scripts + t1 on VPS log
+- `tests/test_o207_tg_funnel_audit.py` + `test_o207_tg_filter_replay.py` — **7/7**
+- `docs/problems/2026-06-13-tg-feed-volume.md` § Owner labeling
+
+**VPS t1:** audit JSON + human MD written · 30d recommendation `word_filter_heavy` (filter > ai skips).
+
+**Not in scope (O207b):** filter rule edits · L1 tune · owner must label sample first.
+
+---
+
+# Перенесено из hot **2026-06-14** — O206 t2b sync chat_ids
+
+## § O206 t2b ✅ Lead verify + deploy 2026-06-14
+
+**Problem:** acc1 listen file **32** vs queue **72 done** — half of joined chats not listened.
+
+**Fix:**
+- `config._seed_chat_ids_from_queue_paths` — merge **all** `TG_JOIN_QUEUE.csv` + v2 + v3 (dedupe)
+- `tg_sync_chat_ids.py` — rebuild `telethon_chat_ids_accN.txt` per account
+- `tg_join_listen_audit.py` — report `ok: true/false` (queue vs file vs startup peers)
+
+**VPS:** acc1 file **72** · radar startup **70 peers** (2 chats: session can't resolve entity — acceptable) · **`ok: true`**
+**pytest:** 4/4 · `deploy-o206-t2b-sync-vps.py` ✅
+
+---
+
+# Перенесено из hot **2026-06-14** — O211 ops truth metrics
+
+## § O211-OPS-TRUTH-METRICS ✅ Lead verify 2026-06-14
+
+**Delivered:**
+- Footer: `сегодня N · за 24ч M` (MSK calendar day in Neon SQL)
+- `parsed` moved to tooltip · step tooltips clarified (разбор = HTML→cards per cycle)
+- YouDo: 🟡 not 🔴 when `visible_24h>0` and process/fetch ok
+- pytest `test_o171_ops_funnel.py` **15/15**
+- Files: `ops_funnel.py` · `static/ops-pult.js` · `owner_admin.py` (SSR meta tail — old format until JS hydrate)
+
+**Deploy:** `ops_funnel.py` + `static/ops-pult.js` + `owner_admin.py` → restart `rawlead-api`
+
+---
+
+# Перенесено из hot **2026-06-14** — FL-PROXY-STABILITY
+
+## § FL-PROXY-STABILITY ✅ Lead verify + deploy 2026-06-14
+
+**Ticket:** [`2026-06-14-fl-proxy-pool-exhausted.md`](../../problems/2026-06-14-fl-proxy-pool-exhausted.md) · canon `OWNER_INTENT` § O210-FL-PROXY-TIER
+
+**Delivered:**
+- `FL_PROXY_URLS` DC tier · fallback `FL_PROXY_URLS_RESIDENTIAL` when DC `alive==0`
+- FL `browser_slots` multi-slot retry · httpx `max_bans=1` / off when subprocess
+- YouDo O191 DC→RU ordering in `exchange_proxy`
+- Ops 🟡 (not 🔴) when `parsed>=25` + DC exhausted but ingest ok
+- pytest `test_exchange_proxy_cascade` + `test_o171_ops_funnel` **25/25**
+- VPS deploy: `exchange_proxy.py` · `exchange_browser_fetch.py` · `fl_parser.py` · `radar_status.py` · `ops_funnel.py` · `owner_admin.py` · restart api+radar
+- Smoke: `fetch:fl … alive=4/4` in `radar_site.log`
+
+**Owner tail:** add `FL_PROXY_URLS_RESIDENTIAL` (RU node-proxy) to `/opt/rawlead/.env.site` — key **missing** on VPS 2026-06-14; DC-only works until all DC banned.
+
+---
+
+# Перенесено из hot **2026-06-14** — O209 match-first WP
+
+## § O209-MATCH-EXPERIENCE ✅ Lead verify + deploy 2026-06-14
+
+**Spec:** [`wave-o209-match-brief.md`](../../design/wp/wave-o209-match-brief.md) · tier `OWNER_INTENT` § O208-B
+
+**Delivered:**
+- P0 `/quiz/` — intro, cards (exit anim, early-cta ≥5), finale (category bars, TG, trial chip)
+- P1 lenta — anon strip 30 мин, quiz banner-card, expired banner, filter bar hidden anon/expired, match label «Совпадение»
+- P1 cabinet — copy, trial badge, expired banner, skills modal hidden (CSS)
+- P1 marketing — hero/pricing/FAQ/how, `.rl-tier-table`
+- Theme **1.18.84** · `deploy-wp-theme-vps.py` ✅ · pytest O175/O195/O197 **37/37**
+- Do not break: O203 glow `@keyframes rl-draft-glow` preserved
+
+**Tail:** duplicate FAQ «% совпадения» in `marketing.php` L171–174 (cosmetic) · `viewsHeadHtml` only in `refreshCardSocialMeta`, not initial `renderCard`
+
+**Files:** `page-quiz.php` · `quiz.php` · `rawlead-quiz.js` · `rawlead-feed.js` · `page-cabinet.php` · `marketing.php` · hero/audience/live-preview/pricing-card · `rawlead.css`
+
+---
+
+---
+
+---
+
+# Перенесено из hot **2026-06-13** (O206 t3c watchdog zombie)
+
+## § O206 t3c ✅ Lead verify + deploy 2026-06-13
+
+**Fix:** sync `_client_connected` · `_reconnect_session` per-acc · removed `_force_reconnect_all`.
+
+**pytest:** 14/14 · `deploy-o206-t3c-watchdog-vps.py` ✅
+
+**VPS:** pulse `connected=1` all acc · no reconnect loop · acc3 handlers 23:27+.
+
+**Open:** owner test group smoke · t2b · O207
+
+---
+
+# Перенесено из hot **2026-06-13** (O206 t3b acc1 deaf)
+
+## § O206 t3b ✅ Lead verify + deploy 2026-06-13
+
+**Fix:** `tg_monitor.py` — per-acc `тг:пульс:{acc}` · deaf reconnect 10m · `handler_ok` · `catch_up` sync · test group auto re-join · `нет_chat_id` skip log.
+
+**pytest:** 11/11 · `deploy-o206-t3b-acc1-deaf-vps.py` ✅
+
+**VPS verify:** acc1 `membership_ok=True` · `handler_ok test_group_peer=1` · `sync ok` · re-join fired.
+
+**Open:** owner smoke (new post after 23:06) · t2b sync
+
+---
+
+# Перенесено из hot **2026-06-13** (O206 TG feed volume)
+
+## § O206 t1–t4 ✅ Lead verify + deploy 2026-06-13
+
+**t1:** `chat_in_tg_interest_set` · conditional `не_слушаем`  
+**t2:** `tg_join_listen_audit.py` — VPS acc1 72 done / 32 file  
+**t3:** `_resolve_message_chat_id` · probe `str(path)`  
+**t4:** `tg_funnel_audit.py` — 7d 282→54 visible  
+**pytest:** 16/16 · `deploy-o206-tg-funnel-vps.py` ✅  
+**Open:** t2b sync · t4b filter · t5 counters
+
+---
+
+# Перенесено из hot **2026-06-13** (O205 t10+t11+t13)
+
+## § O205 t10+t11+t13 ✅ Lead verify + deploy 2026-06-13
+
+**t10:** delist `threading.Thread` · ответ «Проверка ссылок запущена в фоне»  
+**t11:** `ops-pult.js` `span.style.display=block`  
+**t13:** `тг:пропуск reason=не_слушаем|исходящее|нет_текста|бот` · `probe_tg_test_group_membership.py` (Path bug on VPS)  
+**pytest:** 8/8 skip+delist+chat_id · bundle 24/24 with O161
+
+---
+
+# Перенесено из hot **2026-06-13** (O205 t2+t5)
+
+## § O205-SPAM-OPS-CSP ✅ Lead verify + deploy 2026-06-13
+
+**t2:** `rawlead_api_post` — `$body === [] ? '{}'`  
+**t5:** `ops-pult.js` + `/ops/static/`  
+**t1+t6+t7 (2026-06-13):** fast ops shell (TTFB 0.02s) · TG `_message_chat_listened` · banner `radar/restart` · pytest 30/30  
+**Open:** t3 `smoke_feed_local.py`
+
+---
+
+
+## § O190-AUTO-ALLOWLIST-LISTEN ✅ Lead verify 2026-06-13
+
+`append_link_to_allowlist` · `filter_listen_chat_ids` trust file · pytest 6/6 · deploy ⏳
+
+## § O203-OPS-TG-RU ✅
+
+RU headers/tooltips · `tg_listen_line_ru` · `tg_queue_hint_ru` · SSR+AJAX
+
+## § O202-SPAM-WP-PROXY ✅
+
+`rawlead-api.php` `/leads/{id}/tg-spam` · `restLeadAdmin` in feed.js
+
+## § O203-FEED-DRAFT-GLOW ✅
+
+`runDraftFetchForCard` → `draftInflight` + `syncDraftGeneratingUi` · theme **1.18.80**
+
+## § TG-ACC3-SESSION ✅ Coder VPS diag
+
+acc3 ready · session `239823951` · owner smoke post-deploy
+
+---
+
+# Перенесено из hot **2026-06-13** (O202 TG spam corpus)
+
+## § O202-TG-SPAM-CORPUS ✅ Lead verify 2026-06-13 · deploy ⏳
+
+**Corpus:** `tg_spam_corpus` · `POST /v1/admin/leads/{id}/tg-spam` · `GET /v1/admin/tg-spam-corpus` · owner only · TG-only · `delist_reason=owner_tg_spam` · feed ghost «Спам» · `tg_spam_corpus_export.py` · theme **1.18.79** · pytest 11/11
+
+---
+
+# Перенесено из hot **2026-06-13** (O190 TG join→listen)
+
+## § O190-TG-JOIN-LISTEN-CHAIN ✅ Lead verify 2026-06-13 · deploy ⏳
+
+**Option A:** expand `TG_PUBLIC_FEED_ALLOWLIST.txt` (~100 URLs) · chain `тг:цепочка` · hourly `тг:сводка` · ops peers/file/filter · `record_tg_listen_stats` live · `expand_allowlist_from_done_queues` · pytest 5/5 · `deploy-o190-tg-join-listen-vps.py`
+
+---
+
+# Перенесено из hot **2026-06-13** (O201 ops 500)
+
+## § O201-OPS-500-FIX ✅ Lead verify 2026-06-13 · deploy ⏳
+
+**Fix:** `Config()`→`load_config()` · `_safe_ops_funnel`/`_safe_ops_tg` degraded · dashboard isolated · SSR `database_url` · pytest 19/19 · `deploy-o201-ops500-vps.py`
+
+---
+
+# Перенесено из hot **2026-06-13** (O201 tail ops fix)
+
+## § O201-TAIL-OPS-FIX ✅ Lead verify code 2026-06-13 · deploy ⏳
+
+**DoD:** failed login clears `rl_ops_key` · `can_ops_admin` on `/v1/me` · «Админка» hidden + owner-only on marketing · not on app pages · `hydrateDashboardFallback` + proxy render in SSR · theme **1.18.78** · `deploy-o201-tail-ops-vps.py` · pytest **12/12** · prod deploy pending
+
+---
+
+# Перенесено из hot **2026-06-13** (O171 ops admin rebuild)
+
+## § O171-OPS-ADMIN-REBUILD ✅ Lead verify 2026-06-13
+
+**DoD:** `ops_funnel.py` · `/ops/funnel` · `/ops/tg` · `#ops-summary` + `#ops-tg` · pytest **19/19** · deploy ⏳ · tail `/status` w2 backlog
+
+---
+
+# Перенесено из hot **2026-06-13** (O201 ops password gate)
+
+## § O201-OPS-SIMPLE-GATE ✅ Lead 2026-06-13
+
+**DoD:** password-only `/ops/` (no cabinet block) · `ops_setup_html` if unconfigured · «Админка» header · theme **1.18.77** · `deploy-o201-ops-gate-vps.py` · pytest **9/9** · optional `OPS_PASSWORD_HASH` bcrypt
+
+---
+
+# Перенесено из hot **2026-06-13** (O198-DEPLOY + O171 ops w1)
+
+## § O198-DEPLOY ✅ Lead 2026-06-13
+
+**DoD:** `deploy-o198-vps.py` · API quiz_adaptive+rank+api_server · theme **1.18.76** · weight_delta proxy · api+radar active · prod quiz cx=2
+
+## § O171-OPS-ADMIN-REBUILD ✅ Lead 2026-06-13
+
+**DoD:** `ops_funnel.py` · `#ops-summary` truth ladder · `#ops-tg` · `/ops/funnel` · `/ops/tg` · pytest **19/19** · **Tail:** `/status` FLPARSING w2
+
+---
+
+# Перенесено из hot **2026-06-13** (O118 local quiz page)
+
+## § O118-LOCAL-QUIZ-PAGE ✅ Lead 2026-06-13
+
+**DoD:** `wp_link_theme_local.py --ensure-pages` · page `quiz` id=59 · template `page-quiz.php` · `/quiz/` HTTP **200** · idempotent · `WP_CURSOR_CONNECT.md` · **Tail:** `--ensure-pages` без `--force` может exit 1 если junction уже есть, но страница OK
+
+---
+
+# Перенесено из hot **2026-06-13** (O198 complexity + O195-w2-tail)
+
+## § O198-COMPLEXITY-RANK ✅ Lead 2026-06-13
+
+**DoD:** quiz pool cx IN (1,2) + exclude IDs · `cx_pref` · `__cx_pref` · `complexity_multiplier` · pytest O198 **6/6**
+
+## § O195-w2-tail-WP-WEIGHT-DELTA ✅ Lead 2026-06-13
+
+**DoD:** WP REST proxy `/me/tags/weight_delta` · deploy ⏳
+
+---
+
+# Перенесено из hot **2026-06-13** (O188 TG join wave4)
+
+## § O188-TG-JOIN-WAVE4 ✅ Lead 2026-06-13
+
+**DoD:** `deploy-o188-vps.py` · v3 on VPS · merge **115** done from v2 · `MAX_PER_HOUR=10` · acc1/2/3 ready · join ticks `тг:join:` in radar log · repo CSV synced **115/8/4** · no AuthKeyDuplicated · **Tail:** InviteRequestSentError → `fail` (should stay pending); dead usernames in queue → `fail`
+
+---
+
+# Перенесено из hot **2026-06-13** (O195-w2 weighted rank + filter lock)
+
+## § O195-TINDER-ONBOARD-w2 ✅ Lead 2026-06-13
+
+**DoD:** `rank.py` weighted km + decay · `POST /v1/me/tags/weight_delta` · empty profile km=50 · anon filter lock + quiz promo · pytest **30/30** · deploy ✅ · **Tail:** WP REST proxy weight_delta missing
+
+---
+
+# Перенесено из hot **2026-06-13** (O197 adaptive quiz)
+
+## § O197-QUIZ-ADAPTIVE ✅ Lead 2026-06-13
+
+**DoD:** `GET /v1/quiz/start` · `POST /v1/quiz/next {history}` · stateless confidence · Phase1/2/3 · stop rules · `src/quiz_adaptive.py` · WP `rawlead-quiz.js` · `pytest test_o197_quiz_adaptive.py` **12/12** · **Tail:** deploy ⏳ · refresh mid-quiz → `/start` ignores localStorage history
+
+---
+
+# Перенесено из hot **2026-06-13** (O196 async draft + O195-w1 quiz)
+
+## § O196-ASYNC-DRAFT ✅ Lead 2026-06-13
+
+**DoD:** feed «Написать отклик» → instant «✅ Добавлено в кабинет» · cabinet `pending/failed/done` poll · pytest N/A · **Files:** `rawlead-feed.js` · `rawlead-cabinet.js`
+
+## § O195-TINDER-ONBOARD-w1 ✅ Lead 2026-06-13
+
+**DoD:** `GET /v1/quiz/cards` · `POST /v1/me/tags/import` · `sql/023_user_tags_active.sql` · `/quiz/` WP · `pytest test_o195_quiz.py` **4/4** · **Tail:** card selection weak → **O195-w1b** curated 12 IDs
+
+---
+
 # Перенесено из hot **2026-06-13** (O194 YouDo ingest after listing)
 
 ## § O194-YOUDO-INGEST-AFTER-LISTING ✅ Lead 2026-06-13

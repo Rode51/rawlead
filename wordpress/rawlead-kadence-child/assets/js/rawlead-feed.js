@@ -40,7 +40,7 @@
   var AUTH_COOKIE_MAX_AGE = 7 * 24 * 3600;
   var MAX_USER_TAGS = 12;
   var cabinetLoginUrl = (cfg.cabinetUrl || "/cabinet/").replace(/\/?$/, "/");
-  var quizUrl = cfg.quizUrl || "/quiz/";
+  var quizUrl = cfg.quizUrl || (cfg.lentaUrl || "/lenta/") + "#quiz";
   var quizOverlay = !!cfg.quizOverlay;
   var TIER_A_BY_NICHE = {
     dev: [
@@ -469,6 +469,91 @@
       added: Date.now(),
     };
     writePendingDraftsMap(map);
+  }
+
+  function removePendingDraft(leadId) {
+    if (!leadId) {
+      return;
+    }
+    var key = String(leadId);
+    var map = readPendingDraftsMap();
+    if (!map[key]) {
+      return;
+    }
+    delete map[key];
+    writePendingDraftsMap(map);
+  }
+
+  function countDraftInflight() {
+    return Object.keys(state.draftInflight).length;
+  }
+
+  function itemHasReplyDraft(item) {
+    return !!(item && prepForDisplay(item.reply_draft || "", false).trim());
+  }
+
+  function resumePendingDraft(card, leadId) {
+    var pending = readPendingDraftsMap()[String(leadId)];
+    if (!pending || !card) {
+      return;
+    }
+    var item = state.itemsById[leadId];
+    if (itemHasReplyDraft(item)) {
+      removePendingDraft(leadId);
+      return;
+    }
+    if (state.draftInflight[leadId]) {
+      return;
+    }
+    var startedMs = pending.added || Date.now();
+    state.draftInflight[leadId] = { startedMs: startedMs, queued: false };
+    syncDraftGeneratingUi(card);
+    if (item) {
+      setDraftPendingBody(card, item);
+    }
+    pollDraftStatus(leadId, startedMs)
+      .then(function (data) {
+        delete state.draftInflight[leadId];
+        var baseItem = item || state.itemsById[leadId] || { id: leadId };
+        if (data) {
+          if (data.reply_draft) {
+            baseItem.reply_draft = data.reply_draft;
+          }
+          if (data.reply_slots_remaining != null) {
+            baseItem.reply_slots_remaining = data.reply_slots_remaining;
+          }
+          state.itemsById[leadId] = baseItem;
+        }
+        removePendingDraft(leadId);
+        onDraftReady(card, baseItem);
+      })
+      .catch(function (err) {
+        delete state.draftInflight[leadId];
+        resetCardDraftUi(card);
+        var btn = card.querySelector(".rl-feed-card__reply-btn");
+        if (btn) {
+          setReplyBtnGenerating(btn, false, "Написать отклик →");
+        }
+        removePendingDraft(leadId);
+        showDraftToast(draftErrorUserMessage(err));
+      });
+  }
+
+  function restorePendingDrafts() {
+    if (!hasPaidAccess() || !listEl) {
+      return;
+    }
+    var map = readPendingDraftsMap();
+    Object.keys(map).forEach(function (key) {
+      var leadId = parseInt(key, 10);
+      if (!leadId) {
+        return;
+      }
+      var card = listEl.querySelector('.rl-lead-card[data-id="' + leadId + '"]');
+      if (card) {
+        resumePendingDraft(card, leadId);
+      }
+    });
   }
 
   function showDraftToast(msg) {
@@ -1096,9 +1181,12 @@
     return draftUrl(leadId) + "/warm";
   }
 
+  var DRAFT_MAX_CONCURRENT = 5;
   var DRAFT_POLL_MS = 2000;
   var DRAFT_POLL_MAX_MS = 180000;
   var DRAFT_BTN_SLOW_MS = 20000;
+  var DRAFT_CONCURRENT_CAP_RU =
+    "Максимум 5 откликов одновременно — дождитесь завершения";
   var DRAFT_BTN_QUEUE_RU = "В очереди…";
   var DRAFT_BTN_SLOW_RU = "Сложный бриф, ИИ полирует отклик...";
   var DRAFT_FAIL_RU = "ИИ временно недоступен — повторите";
@@ -1501,15 +1589,7 @@
   }
 
   function renderExpandedMeta(item) {
-    var html = "";
-    if (isLoggedIn() && !hasUserSkills()) {
-      html += renderMatchBreakdown(item);
-    }
-    var diff = renderDifficultyRow(item);
-    if (diff) {
-      html += diff;
-    }
-    return html;
+    return renderDifficultyRow(item);
   }
 
   function renderTzAttachmentWarn(item) {
@@ -1664,41 +1744,8 @@
   }
 
   function renderSlotLine(item) {
-    if (getFeedTier() !== "premium") {
-      return "";
-    }
-    var n = replySlotsRemaining(item);
-    if (n <= 0) {
-      return (
-        '<div class="rl-row rl-row--paid-only rl-slot-row rl-slot-row--full" title="' +
-        escapeHtml(SLOT_TOOLTIP) +
-        '">' +
-        escapeHtml("Все места заняты") +
-        ' <span class="rl-feed-card__slot-info" title="' +
-        escapeHtml(SLOT_TOOLTIP) +
-        '">' +
-        INFO_ICON_SVG +
-        "</span></div>"
-      );
-    }
-    var lastClass = n === 1 ? " rl-slot-row--last" : "";
-    var text =
-      n === 1
-        ? "Последний черновик на этот заказ"
-        : "Осталось " + n + " из " + SLOT_MAX;
-    return (
-      '<div class="rl-row rl-row--paid-only rl-slot-row' +
-      lastClass +
-      '" title="' +
-      escapeHtml(SLOT_TOOLTIP) +
-      '">' +
-      escapeHtml(text) +
-      ' <span class="rl-feed-card__slot-info" title="' +
-      escapeHtml(SLOT_TOOLTIP) +
-      '">' +
-      INFO_ICON_SVG +
-      "</span></div>"
-    );
+    /* O220 r6: slot counter removed from feed UI (O209-B3) */
+    return "";
   }
 
   function renderTagChips(item, maxVisible) {
@@ -1898,41 +1945,52 @@
     );
   }
 
-  function renderMatchBreakdown(item) {
-    if (!isLoggedIn() || hasUserSkills()) {
-      return "";
+  function matchBarMeta(item) {
+    var km = item.keyword_match;
+    var hasLeadTags = leadTagKeys(item).length > 0;
+    if (km == null || !hasLeadTags) {
+      return {
+        neutral: true,
+        pct: 0,
+        modifier: "rl-match--neutral",
+        ariaLabel: "Совместимость — нет данных",
+      };
     }
-    return (
-      '<div class="rl-match-breakdown">' +
-      '<a class="rl-match-breakdown__cta rl-quiz-trigger" href="#quiz" data-quiz-open="1">' +
-      escapeHtml("Пройди квиз — увидишь совместимость →") +
-      "</a></div>"
-    );
+    var modifier = "";
+    if (km >= 60) {
+      modifier = "rl-match--good";
+    } else if (km < 25) {
+      modifier = "rl-match--amber";
+    }
+    return {
+      neutral: false,
+      pct: km,
+      modifier: modifier,
+      ariaLabel: "Совместимость " + km + "%",
+    };
   }
 
   function renderCompatMatchBar(item) {
-    var km = item.keyword_match != null ? item.keyword_match : 0;
-    var compatTitle =
-      ' title="Насколько заказ подходит под твой профиль из квиза"';
+    var meta = matchBarMeta(item);
+    var barPct = meta.neutral ? 0 : meta.pct;
+    var fillStyle = meta.neutral ? "0%" : meta.pct + "%";
+    var ariaNow = meta.neutral ? 0 : meta.pct;
+    var modClass = meta.modifier ? " " + meta.modifier : "";
     return (
-      '<div class="rl-match rl-match-bar">' +
-      '<div class="rl-match__label"><span' +
-      compatTitle +
-      ">" +
-      "Совпадение " +
-      km +
-      "%</span></div>" +
+      '<div class="rl-match rl-match-bar' +
+      modClass +
+      '">' +
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
-      km +
-      '" aria-valuemin="0" aria-valuemax="100">' +
+      ariaNow +
+      '" aria-valuemin="0" aria-valuemax="100" aria-label="' +
+      escapeHtml(meta.ariaLabel) +
+      '">' +
       '<span class="rl-match__fill" data-match-pct="' +
-      km +
+      barPct +
       '" style="--match-value:' +
-      km +
-      '%"></span>' +
-      "</div>" +
-      renderMatchBreakdown(item) +
-      "</div>"
+      fillStyle +
+      '"></span>' +
+      "</div></div>"
     );
   }
 
@@ -1948,22 +2006,31 @@
     );
   }
 
+  function renderQuizLockedMatchBar() {
+    return (
+      '<div class="rl-match rl-match--free-locked rl-match--quiz-locked">' +
+      '<div class="rl-match__label"><span title="Пройди квиз — увидишь % совместимости">Совместимость</span></div>' +
+      '<div class="rl-match__bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Совместимость — пройди квиз">' +
+      '<span class="rl-match__fill"></span>' +
+      MATCH_LOCK_HTML +
+      "</div>" +
+      '<div class="rl-match-breakdown">' +
+      '<a class="rl-match-breakdown__cta rl-quiz-trigger" href="#quiz" data-quiz-open="1">' +
+      escapeHtml("Пройти квиз →") +
+      "</a></div>" +
+      "</div>"
+    );
+  }
+
   function renderMatchBlock(item) {
     var tier = getFeedTier();
-    if (tier === "anon" || tier === "expired_trial") {
-      return "";
+    if (tier === "anon" || tier === "expired_trial" || tier === "free") {
+      return '<div class="rl-row rl-row--match-tier">' + renderFreeLockedMatchBar() + "</div>";
     }
-    if (getFeedTier() === "free") {
-      return '<div class="rl-row rl-row--auth-only">' + renderFreeLockedMatchBar() + "</div>";
+    if (!hasUserSkills()) {
+      return '<div class="rl-row rl-row--match-tier">' + renderQuizLockedMatchBar() + "</div>";
     }
-    if (!hasUserSkills() && !cardHasSkillMatch(item)) {
-      return "";
-    }
-    if (!showSkillMatchUi(item)) {
-      return "";
-    }
-    var inner = renderCompatMatchBar(item);
-    return '<div class="rl-row rl-row--auth-only">' + inner + "</div>";
+    return '<div class="rl-row rl-row--match-tier">' + renderCompatMatchBar(item) + "</div>";
   }
 
   function syncExpandedL1FromDraft() {
@@ -2257,6 +2324,16 @@
         retryFn();
       });
     }
+  }
+
+  function draftErrorUserMessage(err) {
+    if (!err) {
+      return "Ошибка, попробуй снова";
+    }
+    if (err.status === 429) {
+      return err.detail || "Лимит черновиков в час. Попробуй позже.";
+    }
+    return err.detail || err.message || "Ошибка, попробуй снова";
   }
 
   function parseDraftApiError(res, data) {
@@ -3574,6 +3651,7 @@
         updateCount();
         updateFilterBarUi();
         bindCards();
+        restorePendingDrafts();
         ensureAnonQuizPromo();
         observeLeadCards(listEl);
         updatePagination();
@@ -3791,6 +3869,9 @@
   }
 
   function onDraftReady(card, item) {
+    if (item && item.id) {
+      removePendingDraft(item.id);
+    }
     expandCard(card);
     var bodyHtml = renderExpandedBody(item);
     setCardBodyHtml(card, bodyHtml);
@@ -3942,6 +4023,10 @@
       expandCard(card);
       return;
     }
+    if (countDraftInflight() >= DRAFT_MAX_CONCURRENT) {
+      showDraftToast(DRAFT_CONCURRENT_CAP_RU);
+      return;
+    }
     if (replyBtn.disabled && replyBtn.textContent.indexOf("Добавлено") >= 0) {
       return;
     }
@@ -3972,11 +4057,10 @@
       })
       .catch(function (err) {
         delete state.draftInflight[id];
+        removePendingDraft(id);
         resetCardDraftUi(card);
         setReplyBtnGenerating(replyBtn, false, prevLabel);
-        showDraftToast(
-          (err && err.detail) || (err && err.message) || "Ошибка, попробуй снова"
-        );
+        showDraftToast(draftErrorUserMessage(err));
       });
   }
 

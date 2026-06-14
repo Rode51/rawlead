@@ -20,6 +20,7 @@ import secrets
 import threading
 import time
 from contextlib import contextmanager
+from pathlib import Path
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
@@ -34,6 +35,7 @@ except ImportError:
     ConnectionPool = None  # type: ignore[misc, assignment]
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 from src.config import load_config, load_radar_env
 
@@ -51,9 +53,11 @@ from src.skills_catalog import (
     build_dynamic_catalog_groups,
     lead_tags_for_feed,
     normalize_user_tags,
+    resolve_canonical_tag,
     user_tags_input_count,
 )
 from src.public_feed import (
+    FEED_ANON_DELAY_MINUTES,
     feed_source_filter_sql,
     feed_visibility_where_sql,
     inbox_replies_where_sql,
@@ -65,8 +69,12 @@ from src.jwt_auth import decode_access_token, issue_access_token
 from src.telegram_login import login_bot_token, verify_telegram_login
 from src.feed_social import display_replies, display_views
 from src.rank import (
+    CX_PREF_TAG,
+    cx_pref_from_user_tags,
+    effective_user_tag_weights,
     final_rank,
     keyword_match,
+    lead_coverage_match,
     normalize_tags,
     open_rank,
     parse_lead_tags,
@@ -105,10 +113,13 @@ from src.reply_draft_strip import strip_reply_draft_price_deadline
 from src.tools_catalog import normalize_tools_required, vendor_lock_tools
 from src.owner_admin import (
     fetch_dashboard,
+    fetch_ops_funnel,
+    fetch_ops_tg,
     hide_lead,
     is_owner_db_user,
     ops_html,
     ops_login_html,
+    ops_setup_html,
     record_pageview,
     run_ops_control,
 )
@@ -125,11 +136,13 @@ from src.trial_subscription import (
     TrialStartError,
     expire_stale_trials,
     fetch_subscription_row,
+    has_active_premium,
     notify_trial_started,
     resolve_subscription_status,
     start_trial,
     subscription_extra_fields,
 )
+from src.tg_spam_corpus import fetch_corpus_summary, mark_tg_lead_spam
 
 # /cabinet/ login and /v1/me/* are site-product endpoints.
 # Force site profile to avoid accidental legacy token verification
@@ -144,7 +157,7 @@ _OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
 _ME_FEED_SCAN_LIMIT = 500
 _SKILLS_CATALOG_LIMIT = 50
 _SKILLS_CATALOG_DAYS = 30
-_FEED_DELAY_MINUTES = 15
+_FEED_DELAY_MINUTES = FEED_ANON_DELAY_MINUTES
 _HOT_MAX_AGE_SEC = 300
 _DRAFT_RETRY_AFTER_SEC = 5
 _FEED_PREFS_SORT = frozenset({"time", "match"})
@@ -233,6 +246,27 @@ def _bot_login_username() -> str:
 
 def _api_key() -> str:
     return os.getenv("RAWLEAD_API_KEY", "").strip()
+
+
+def _lead_complexity_from_row(row: tuple[Any, ...]) -> int | None:
+    from ai_reasons import difficulty_from_ai_reasons
+
+    if len(row) <= 9:
+        return None
+    return difficulty_from_ai_reasons(row[9])
+
+
+def _final_rank_for_row(
+    row: tuple[Any, ...],
+    km: int | None,
+    tag_weights: dict[str, float] | None,
+) -> int:
+    return final_rank(
+        row[6],
+        km if km is not None else 0,
+        lead_complexity=_lead_complexity_from_row(row),
+        user_cx_pref=cx_pref_from_user_tags(tag_weights) if tag_weights else None,
+    )
 
 
 def _row_to_item(
@@ -385,12 +419,30 @@ def _passes_category_filter(row: tuple[Any, ...], categories: list[str]) -> bool
 
 
 def _load_user_tags(cur: Any, user_id: str) -> dict[str, float]:
+    from pg_storage import _ensure_user_tags_columns
+
+    _ensure_user_tags_columns(_db_url())
     cur.execute(
-        "SELECT tag FROM user_tags WHERE user_id = %s::uuid ORDER BY tag",
+        """
+        SELECT tag, COALESCE(weight, 1.0), last_active_at
+        FROM user_tags
+        WHERE user_id = %s::uuid
+        ORDER BY tag
+        """,
         (user_id,),
     )
-    tags = normalize_user_tags([row[0] for row in cur.fetchall()])
-    return {tag: 1.0 for tag in tags}
+    return effective_user_tag_weights(cur.fetchall())
+
+
+def _keyword_match_for_user(
+    lead_tags: list[str],
+    user_tags: dict[str, float],
+    *,
+    has_profile: bool,
+) -> int | None:
+    if not has_profile:
+        return 0
+    return lead_coverage_match(lead_tags, user_tags)
 
 
 def _rewrite_user_tags(cur: Any, user_id: str, tags: list[str]) -> None:
@@ -482,9 +534,9 @@ def _canonical_lead_tags(raw: Any) -> list[str]:
     return slugs
 
 
-def _passes_min_match(km: int, min_match: int) -> bool:
+def _passes_min_match(km: int | None, min_match: int) -> bool:
     """Personal feed: hide keyword_match=0; min_match=0 → any overlap > 0."""
-    if km <= 0:
+    if km is None or km <= 0:
         return False
     if min_match > 0:
         return km >= min_match
@@ -508,8 +560,8 @@ def _rank_feed_rows(
             continue
         tags = _canonical_lead_tags(row[8])
         category = resolve_lead_category(row[11], row[2] or "", row[3] or "", tags)
-        km = keyword_match(tags, tag_weights) if tag_weights else 0
-        fr = final_rank(row[6], km)
+        km = lead_coverage_match(tags, tag_weights) if tag_weights else 0
+        fr = _final_rank_for_row(row, km, tag_weights)
         if min_match is not None:
             if not _passes_min_match(km, min_match):
                 continue
@@ -778,8 +830,8 @@ def _feed_page_time(
             continue
         tags = _canonical_lead_tags(r[8])
         category = resolve_lead_category(r[11], r[2] or "", r[3] or "", tags)
-        km = keyword_match(tags, tag_weights) if tag_weights else 0
-        fr = final_rank(r[6], km)
+        km = lead_coverage_match(tags, tag_weights) if tag_weights else 0
+        fr = _final_rank_for_row(r, km, tag_weights)
         score_for_filter = r[6] or 0
         if not passes_score_filter(int(score_for_filter), min_score, category):
             continue
@@ -953,8 +1005,8 @@ def _personal_feed_page(
             if categories and not _passes_category_filter(row, categories):
                 continue
             tags = _canonical_lead_tags(row[8])
-            km = keyword_match(tags, user_tags) if has_profile else 0
-            fr = final_rank(row[6], km)
+            km = _keyword_match_for_user(tags, user_tags, has_profile=has_profile)
+            fr = _final_rank_for_row(row, km, user_tags if has_profile else None)
             ranked.append(
                 _row_to_item(row, keyword_match_val=km, final_rank_val=fr, feed_delayed=False)
             )
@@ -1085,6 +1137,29 @@ def _grant_owner_beta_if_match(cur: Any, user_id: str, tg_user_id: int) -> None:
     )
 
 
+def _try_auto_start_trial_on_login(
+    cur: Any, user_id: str, tg_user_id: int
+) -> None:
+    """O219 r6: first TG login → auto trial if unused and no active premium."""
+    owner_id = _owner_telegram_id()
+    if owner_id is not None and tg_user_id == owner_id:
+        return
+    plan, is_active, active_until, paused_until, trial_used_at = fetch_subscription_row(
+        cur, user_id
+    )
+    if plan in ("owner", "beta"):
+        return
+    if trial_used_at is not None:
+        return
+    if has_active_premium(plan, is_active, active_until, paused_until):
+        return
+    try:
+        start_trial(cur, user_id)
+        notify_trial_started(load_config(), cur, user_id)
+    except TrialStartError:
+        pass
+
+
 def _resolve_bearer_user_id(
     authorization: str = Header(default="", alias="Authorization"),
 ) -> str:
@@ -1167,6 +1242,10 @@ class TelegramAuthPayload(BaseModel):
 # ─── app ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="RawLead API", version=_VERSION, docs_url="/docs")
+
+_OPS_STATIC_DIR = Path(__file__).resolve().parent / "static"
+if _OPS_STATIC_DIR.is_dir():
+    app.mount("/ops/static", StaticFiles(directory=_OPS_STATIC_DIR), name="ops_static")
 
 
 def _cors_origins() -> list[str]:
@@ -1274,6 +1353,7 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
                     photo_url=photo_url,
                 )
                 _grant_owner_beta_if_match(cur, user_id, int(payload.id))
+                _try_auto_start_trial_on_login(cur, user_id, int(payload.id))
                 merge_chat_id_on_login(cur, tg_user_id=int(payload.id))
                 from user_avatar import sync_avatar_on_login
 
@@ -1373,6 +1453,7 @@ def _complete_bot_auth(auth_token: str) -> dict[str, Any]:
                     photo_url=(tg_photo_url or "").strip() or None,
                 )
                 _grant_owner_beta_if_match(cur, user_id, int(tg_user_id))
+                _try_auto_start_trial_on_login(cur, user_id, int(tg_user_id))
                 merge_chat_id_on_login(cur, tg_user_id=int(tg_user_id))
                 from user_avatar import sync_avatar_on_login
 
@@ -1606,7 +1687,7 @@ def feed(
     source: str = Query(default=""),
     authorization: str = Header(default="", alias="Authorization"),
 ) -> dict[str, Any]:
-    """Лента: is_visible=true; anon → delay 15m; any valid JWT → instant."""
+    """Лента: is_visible=true; anon → delay 30m; any valid JWT → instant."""
     if sort not in ("time", "match"):
         raise HTTPException(status_code=400, detail="sort must be time or match")
     if min_match not in _FEED_PREFS_MIN_MATCH:
@@ -1715,7 +1796,11 @@ def get_lead(
                 if user_id:
                     user_tags = _load_user_tags(cur, user_id)
                     tags, _ = lead_tags_for_feed(row[8])
-                    km = keyword_match(tags, user_tags) if user_tags else 0
+                    km = _keyword_match_for_user(
+                        tags,
+                        user_tags,
+                        has_profile=bool(user_tags),
+                    )
                 item = _row_to_item(row, keyword_match_val=km)
                 if user_id:
                     _attach_personal_replies(cur, user_id, [item])
@@ -1761,6 +1846,14 @@ def me_profile(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     username = (tg_username or "").strip() or None
     first_name = (tg_first_name or "").strip() or None
     avatar_url = avatar_public_url(user_id)
+    can_ops_admin = False
+    try:
+        with psycopg.connect(_db_url()) as conn:
+            with conn.cursor() as cur:
+                can_ops_admin = is_owner_db_user(cur, user_id)
+    except Exception as exc:
+        logger.warning("me_profile can_ops_admin: %s", exc)
+
     return {
         "user_id": user_id,
         "tg_user_id": int(tg_user_id) if tg_user_id is not None else None,
@@ -1769,6 +1862,7 @@ def me_profile(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
         "photo_url": None,
         "avatar_url": avatar_url,
         "has_avatar": bool(avatar_url),
+        "can_ops_admin": can_ops_admin,
     }
 
 
@@ -1818,6 +1912,253 @@ def me_tags(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
         logger.error("me_tags: %s", exc)
         raise HTTPException(status_code=500, detail="db error")
     return {"tags": tags}
+
+
+_TAG_WEIGHT_MIN = -5.0
+_TAG_WEIGHT_MAX = 10.0
+
+_WEIGHT_EVENT_SPECS: dict[str, tuple[float, int, bool]] = {
+    "expand": (0.1, 0, True),
+    "draft": (3.0, 2, True),
+    "inbox_delete": (-0.5, 0, False),
+}
+
+
+def _clamp_tag_weight(weight: float) -> float:
+    return max(_TAG_WEIGHT_MIN, min(_TAG_WEIGHT_MAX, weight))
+
+
+def _canonical_weight_tags(raw_tags: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in normalize_tags(raw_tags):
+        canonical = resolve_canonical_tag(raw)
+        if not canonical:
+            t = str(raw).strip().lower().lstrip("#")
+            canonical = t or None
+        if not canonical or canonical in seen:
+            continue
+        seen.add(canonical)
+        out.append(canonical)
+    return out
+
+
+def _apply_tag_weight_event(
+    cur: Any,
+    user_id: str,
+    event: str,
+    raw_tags: list[str],
+) -> int:
+    spec = _WEIGHT_EVENT_SPECS.get(event)
+    if spec is None:
+        return 0
+    delta, interaction_delta, touch_active = spec
+    tags = _canonical_weight_tags(raw_tags)
+    if not tags:
+        return 0
+    updated = 0
+    for tag in tags:
+        start_weight = _clamp_tag_weight(delta) if delta > 0 else 0.0
+        cur.execute(
+            """
+            INSERT INTO user_tags (user_id, tag, weight, last_active_at, interaction_count)
+            VALUES (%s::uuid, %s, %s, NOW(), GREATEST(0, %s))
+            ON CONFLICT (user_id, tag) DO UPDATE SET
+                weight = GREATEST(
+                    %s,
+                    LEAST(%s, user_tags.weight + %s)
+                ),
+                interaction_count = user_tags.interaction_count + %s,
+                last_active_at = CASE
+                    WHEN %s THEN NOW()
+                    ELSE user_tags.last_active_at
+                END
+            """,
+            (
+                user_id,
+                tag,
+                start_weight,
+                interaction_delta,
+                _TAG_WEIGHT_MIN,
+                _TAG_WEIGHT_MAX,
+                delta,
+                interaction_delta,
+                touch_active,
+            ),
+        )
+        updated += 1
+    return updated
+
+
+def _apply_tag_weight_event_for_lead(
+    user_id: str,
+    lead_id: int,
+    event: str,
+) -> None:
+    from pg_storage import _ensure_user_tags_columns
+
+    try:
+        db_url = _db_url()
+        _ensure_user_tags_columns(db_url)
+        with psycopg.connect(db_url) as conn:
+            with conn.cursor() as cur:
+                row = _fetch_visible_lead(cur, lead_id)
+                if row is None:
+                    return
+                tags = _canonical_lead_tags(row[8])
+                if not tags:
+                    return
+                _apply_tag_weight_event(cur, user_id, event, tags)
+            conn.commit()
+    except Exception as exc:
+        logger.warning("tag_weight_event %s lead=%d: %s", event, lead_id, exc)
+
+
+class QuizHistoryItem(BaseModel):
+    card_id: str
+    liked: bool
+    tags: list[str] = []
+    complexity: int | None = None
+
+
+class QuizNextPayload(BaseModel):
+    history: list[QuizHistoryItem] = []
+
+
+def _quiz_adaptive_next(history: list[dict[str, Any]]) -> dict[str, Any]:
+    from pg_storage import _ensure_user_tags_columns
+    from src.quiz_adaptive import quiz_next_response
+
+    try:
+        db_url = _db_url()
+        _ensure_user_tags_columns(db_url)
+        with psycopg.connect(db_url) as conn:
+            with conn.cursor() as cur:
+                return quiz_next_response(history, cur)
+    except Exception as exc:
+        logger.error("quiz_adaptive: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+@app.get("/v1/quiz/start")
+def quiz_start() -> dict[str, Any]:
+    """O197: first adaptive quiz card (Phase 1, empty history)."""
+    return _quiz_adaptive_next([])
+
+
+@app.post("/v1/quiz/next")
+def quiz_next(payload: QuizNextPayload) -> dict[str, Any]:
+    """O197: next card or done profile from client history."""
+    history = [item.model_dump() for item in payload.history]
+    return _quiz_adaptive_next(history)
+
+
+class TagsImportPayload(BaseModel):
+    tags: dict[str, float] = {}
+    cx_pref: float | None = None
+
+
+def _upsert_imported_user_tags(cur: Any, user_id: str, tags_map: dict[str, float]) -> int:
+    written = 0
+    for raw_tag, weight in tags_map.items():
+        tag_str = str(raw_tag).strip()
+        if tag_str == CX_PREF_TAG:
+            canonical = CX_PREF_TAG
+            try:
+                w = float(weight)
+            except (TypeError, ValueError):
+                continue
+            w = max(1.0, min(2.0, w))
+        else:
+            canonical = resolve_canonical_tag(tag_str)
+            if not canonical:
+                continue
+            try:
+                w = float(weight)
+            except (TypeError, ValueError):
+                continue
+            w = max(_TAG_WEIGHT_MIN, min(_TAG_WEIGHT_MAX, w))
+        cur.execute(
+            """
+            INSERT INTO user_tags (user_id, tag, weight, last_active_at, interaction_count)
+            VALUES (%s::uuid, %s, %s, NOW(), 1)
+            ON CONFLICT (user_id, tag) DO UPDATE SET
+                weight = EXCLUDED.weight,
+                last_active_at = NOW(),
+                interaction_count = 1
+            """,
+            (user_id, canonical, w),
+        )
+        written += 1
+    return written
+
+
+@app.post("/v1/me/tags/import")
+def me_tags_import(
+    payload: TagsImportPayload,
+    user_id: str = Depends(_resolve_user_id),
+) -> dict[str, Any]:
+    """O195: import quiz localStorage weights into user_tags."""
+    from pg_storage import _ensure_user_tags_columns
+
+    if not payload.tags and payload.cx_pref is None:
+        return {"ok": True, "imported": 0}
+    skill_keys = [k for k in payload.tags.keys() if not str(k).startswith("__")]
+    if user_tags_input_count(skill_keys) > _USER_MAX_TAGS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"max {_USER_MAX_TAGS} skills allowed",
+        )
+    tags_map = dict(payload.tags)
+    if payload.cx_pref is not None:
+        try:
+            tags_map[CX_PREF_TAG] = max(1.0, min(2.0, float(payload.cx_pref)))
+        except (TypeError, ValueError):
+            pass
+    if not tags_map:
+        return {"ok": True, "imported": 0}
+    try:
+        db_url = _db_url()
+        _ensure_user_tags_columns(db_url)
+        with psycopg.connect(db_url) as conn:
+            with conn.cursor() as cur:
+                imported = _upsert_imported_user_tags(cur, user_id, tags_map)
+            conn.commit()
+    except Exception as exc:
+        logger.error("me_tags_import: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+    return {"ok": True, "imported": imported}
+
+
+class WeightDeltaPayload(BaseModel):
+    event: str
+    tags: list[str] = []
+
+
+@app.post("/v1/me/tags/weight_delta")
+def me_tags_weight_delta(
+    payload: WeightDeltaPayload,
+    user_id: str = Depends(_resolve_user_id),
+) -> dict[str, Any]:
+    """O195: adjust user_tags weights from feed/cabinet interactions."""
+    from pg_storage import _ensure_user_tags_columns
+
+    event = str(payload.event or "").strip()
+    if event not in _WEIGHT_EVENT_SPECS:
+        raise HTTPException(status_code=400, detail="event must be expand, draft, or inbox_delete")
+    if not payload.tags:
+        return {"ok": True, "updated": 0}
+    try:
+        db_url = _db_url()
+        _ensure_user_tags_columns(db_url)
+        with psycopg.connect(db_url) as conn:
+            with conn.cursor() as cur:
+                updated = _apply_tag_weight_event(cur, user_id, event, payload.tags)
+            conn.commit()
+    except Exception as exc:
+        logger.error("me_tags_weight_delta: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+    return {"ok": True, "updated": updated}
 
 
 @app.put("/v1/me/tags")
@@ -1957,12 +2298,14 @@ def me_feed(
     skills: str = Query(default=""),
     category: str = Query(default=""),
     sort: str = Query(default="time"),
+    source: str = Query(default=""),
 ) -> dict[str, Any]:
     """Персональная лента: user_tags, is_visible=true; sort=time|match; min_match on keyword_match."""
     if sort not in ("time", "match"):
         raise HTTPException(status_code=400, detail="sort must be time or match")
     skill_list = _parse_skills_param(skills)
     category_list = parse_category_param(category)
+    source_keys = parse_feed_source_param(source)
     try:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
@@ -1976,6 +2319,7 @@ def me_feed(
                     skills=skill_list,
                     categories=category_list,
                     sort=sort,
+                    source_keys=source_keys,
                 )
     except Exception as exc:
         logger.error("me_feed: %s", exc)
@@ -1989,6 +2333,7 @@ def me_feed(
         "min_match": min_match,
         "skills": skill_list,
         "category": category_list,
+        "source": source_keys,
         "feed_delayed": False,
     }
 
@@ -2131,6 +2476,7 @@ def me_lead_draft(
         logger.error("me_lead_draft %d: %s", lead_id, exc)
         raise HTTPException(status_code=500, detail="db error") from exc
 
+    _apply_tag_weight_event_for_lead(user_id, lead_id, "draft")
     return _me_lead_draft_response(resp, lead_id=lead_id)
 
 
@@ -2162,6 +2508,7 @@ def me_lead_draft_warm(
         logger.error("me_lead_draft_warm %d: %s", lead_id, exc)
         raise HTTPException(status_code=500, detail="db error") from exc
 
+    _apply_tag_weight_event_for_lead(user_id, lead_id, "expand")
     body = draft_response_body(resp)
     if resp.status == "ready":
         return JSONResponse(status_code=200, content=body)
@@ -2213,7 +2560,7 @@ def me_replies(
         lead_row = row[:15]
         replied_at = row[15]
         tags = _canonical_lead_tags(lead_row[8])
-        km = keyword_match(tags, user_tags) if user_tags else None
+        km = lead_coverage_match(tags, user_tags) if user_tags else None
         item = _row_to_item(lead_row, keyword_match_val=km, feed_delayed=False)
         item["replied_at"] = replied_at.isoformat() if replied_at else None
         items.append(item)
@@ -2248,6 +2595,11 @@ def me_reply_delete(
                     (user_id, lead_id),
                 )
                 deleted = cur.fetchone()
+                if deleted:
+                    row = _fetch_visible_lead(cur, lead_id)
+                    if row:
+                        tags = _canonical_lead_tags(row[8])
+                        _apply_tag_weight_event(cur, user_id, "inbox_delete", tags)
                 conn.commit()
     except Exception as exc:
         logger.error("me_reply_delete %d: %s", lead_id, exc)
@@ -2734,24 +3086,66 @@ def _require_owner_user(
     return user_id
 
 
-def _ops_gate_key() -> str:
+def _ops_gate_plaintext() -> str:
     return (os.getenv("RAWLEAD_OPS_KEY") or os.getenv("OPS_PASSWORD") or "").strip()
 
 
-def _ops_password_match(supplied: str, gate: str) -> bool:
-    if not supplied or not gate:
+def _ops_gate_hash() -> str:
+    return (os.getenv("OPS_PASSWORD_HASH") or "").strip()
+
+
+def _ops_gate_configured() -> bool:
+    return bool(_ops_gate_plaintext() or _ops_gate_hash())
+
+
+def _ops_session_token() -> str:
+    plain = _ops_gate_plaintext()
+    if plain:
+        return plain
+    import hashlib
+    import hmac
+
+    digest = hmac.new(
+        _ops_gate_hash().encode("utf-8"),
+        b"rl_ops_session",
+        hashlib.sha256,
+    ).hexdigest()
+    return digest
+
+
+def _ops_password_match_login(supplied: str) -> bool:
+    if not supplied:
         return False
-    if len(supplied) != len(gate):
+    plain = _ops_gate_plaintext()
+    if plain:
+        if len(supplied) != len(plain):
+            return False
+        return secrets.compare_digest(supplied, plain)
+    hash_val = _ops_gate_hash()
+    if not hash_val:
         return False
-    return secrets.compare_digest(supplied, gate)
+    try:
+        import bcrypt
+
+        return bcrypt.checkpw(supplied.encode("utf-8"), hash_val.encode("utf-8"))
+    except Exception:
+        return False
 
 
 def _ops_access_granted(request: Request, key: str = "") -> bool:
-    gate = _ops_gate_key()
-    if not gate:
-        return True
+    if not _ops_gate_configured():
+        return False
     supplied = (key or request.cookies.get("rl_ops_key", "")).strip()
-    return _ops_password_match(supplied, gate)
+    if not supplied:
+        return False
+    token = _ops_session_token()
+    if len(supplied) == len(token) and secrets.compare_digest(supplied, token):
+        return True
+    if key and _ops_gate_plaintext():
+        plain = _ops_gate_plaintext()
+        if len(key) == len(plain) and secrets.compare_digest(key, plain):
+            return True
+    return False
 
 
 def _ops_cookie_kwargs() -> dict[str, Any]:
@@ -2764,6 +3158,8 @@ def _ops_cookie_kwargs() -> dict[str, Any]:
 
 
 def _require_ops_access(request: Request) -> None:
+    if not _ops_gate_configured():
+        raise HTTPException(status_code=503, detail="ops gate not configured")
     if not _ops_access_granted(request):
         raise HTTPException(status_code=401, detail="ops auth required")
 
@@ -2810,34 +3206,30 @@ def ops_dashboard_page(
     request: Request,
     key: str = Query(default=""),
 ) -> HTMLResponse:
-    """O45/O78/O161: password cookie → SSR; иначе форма входа."""
-    gate = _ops_gate_key()
-    if gate and not _ops_access_granted(request, key):
+    """O45/O78/O161/O201: password cookie → SSR; иначе форма входа."""
+    if not _ops_gate_configured():
+        return HTMLResponse(ops_setup_html())
+    if not _ops_access_granted(request, key):
         show_err = request.query_params.get("err") == "1"
         return HTMLResponse(ops_login_html(show_error=show_err))
-    data: dict[str, Any] | None = None
-    if _ops_access_granted(request, key):
-        try:
-            data = fetch_dashboard(_db_url())
-        except Exception as exc:
-            logger.warning("ops SSR dashboard: %s", exc)
-    elif not gate:
-        jwt = _ops_jwt_from_request(request)
-        data = _owner_dashboard_data(jwt)
-    api_base = "/ops" if gate else os.getenv("RAWLEAD_OPS_API_BASE", "/wp-json/rawlead/v1").strip()
+    # O205-t7: shell only — client hydrates via ops-pult.js (no blocking fetch_dashboard SSR)
     resp = HTMLResponse(
-        ops_html(api_base=api_base, data=data, ops_authenticated=_ops_access_granted(request, key))
+        ops_html(
+            api_base="/ops",
+            data=None,
+            ops_authenticated=True,
+            database_url=_db_url(),
+        )
     )
-    if gate and key == gate:
-        resp.set_cookie("rl_ops_key", gate, **_ops_cookie_kwargs())
+    if key and _ops_access_granted(request, key):
+        resp.set_cookie("rl_ops_key", _ops_session_token(), **_ops_cookie_kwargs())
     return resp
 
 
 @app.post("/ops/login")
 async def ops_login(request: Request) -> RedirectResponse:
-    gate = _ops_gate_key()
-    if not gate:
-        raise HTTPException(status_code=404, detail="Not found")
+    if not _ops_gate_configured():
+        raise HTTPException(status_code=503, detail="ops gate not configured")
     password = ""
     ct = (request.headers.get("content-type") or "").lower()
     if "application/json" in ct:
@@ -2851,10 +3243,14 @@ async def ops_login(request: Request) -> RedirectResponse:
         raw = (await request.body()).decode("utf-8", errors="replace")
         password = parse_qs(raw).get("password", [""])[0]
     supplied = (password or "").strip()
-    if not _ops_password_match(supplied, gate):
-        return RedirectResponse(url="/ops/?err=1", status_code=303)
+    if not _ops_password_match_login(supplied):
+        resp = RedirectResponse(url="/ops/?err=1", status_code=303)
+        clear_kwargs = {**_ops_cookie_kwargs(), "max_age": 0}
+        resp.set_cookie("rl_ops_key", "", **clear_kwargs)
+        resp.delete_cookie("rl_ops_key", path="/")
+        return resp
     resp = RedirectResponse(url="/ops/", status_code=303)
-    resp.set_cookie("rl_ops_key", gate, **_ops_cookie_kwargs())
+    resp.set_cookie("rl_ops_key", _ops_session_token(), **_ops_cookie_kwargs())
     return resp
 
 
@@ -2868,8 +3264,9 @@ def ops_logout() -> RedirectResponse:
 @app.get("/ops/log/stream")
 def ops_log_stream(request: Request) -> StreamingResponse:
     """O161: SSE tail radar_site.log — same-origin or rl_ops_key cookie."""
-    gate = _ops_gate_key()
-    if gate and not _ops_access_granted(request):
+    if not _ops_gate_configured():
+        raise HTTPException(status_code=503, detail="ops gate not configured")
+    if not _ops_access_granted(request):
         raise HTTPException(status_code=401, detail="ops auth required")
     return StreamingResponse(
         iter_radar_log_sse(),
@@ -2885,7 +3282,23 @@ def ops_log_stream(request: Request) -> StreamingResponse:
 @app.get("/ops/dashboard")
 def ops_dashboard_json(request: Request) -> dict[str, Any]:
     _require_ops_access(request)
-    return fetch_dashboard(_db_url())
+    try:
+        return fetch_dashboard(_db_url())
+    except Exception as exc:
+        logger.exception("ops_dashboard_json: %s", exc)
+        raise HTTPException(status_code=500, detail="dashboard error") from exc
+
+
+@app.get("/ops/funnel")
+def ops_funnel_json(request: Request) -> dict[str, Any]:
+    _require_ops_access(request)
+    return fetch_ops_funnel(_db_url())
+
+
+@app.get("/ops/tg")
+def ops_tg_json(request: Request) -> dict[str, Any]:
+    _require_ops_access(request)
+    return fetch_ops_tg()
 
 
 @app.post("/ops/control")
@@ -2958,6 +3371,48 @@ def admin_hide_lead(
     if not hide_lead(_db_url(), lead_id):
         raise HTTPException(status_code=404, detail="lead not found or already hidden")
     return {"ok": True, "lead_id": lead_id}
+
+
+class TgSpamPayload(BaseModel):
+    category: str | None = None
+
+
+@app.post("/v1/admin/leads/{lead_id}/tg-spam")
+def admin_mark_tg_spam(
+    lead_id: int,
+    payload: TgSpamPayload | None = None,
+    owner: str = Depends(_require_owner_user),
+) -> dict[str, Any]:
+    if lead_id <= 0:
+        raise HTTPException(status_code=400, detail="invalid lead id")
+    category = payload.category if payload else None
+    try:
+        return mark_tg_lead_spam(
+            _db_url(),
+            lead_id,
+            owner,
+            category=category,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("admin_mark_tg_spam: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+
+@app.get("/v1/admin/tg-spam-corpus")
+def admin_tg_spam_corpus_summary(
+    limit: int = 20,
+    _owner: str = Depends(_require_owner_user),
+) -> dict[str, Any]:
+    del _owner
+    try:
+        return fetch_corpus_summary(_db_url(), limit=limit)
+    except Exception as exc:
+        logger.error("admin_tg_spam_corpus_summary: %s", exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
 
 
 class PageviewPayload(BaseModel):

@@ -1021,6 +1021,8 @@
   var subTrialEl = document.getElementById("rl-cabinet-sub-trial");
   var subNoteEl = document.getElementById("rl-cabinet-sub-note");
   var trialBadgeEl = document.getElementById("rl-cabinet-trial-badge");
+  var quizRetakeEl = document.getElementById("rl-cabinet-quiz-retake");
+  var quizRetakeReady = false;
   var expiredBannerEl = document.getElementById("rl-cabinet-expired-banner");
   var subscriptionState = null;
 
@@ -1029,6 +1031,37 @@
   var notifEnabledEl = document.getElementById("rl-cabinet-notif-enabled");
   var notifStatusEl = document.getElementById("rl-cabinet-notif-status");
   var notifHintEl = document.getElementById("rl-cabinet-notif-hint");
+
+  function goQuizRetake(event) {
+    if (event) {
+      event.preventDefault();
+    }
+    try {
+      sessionStorage.setItem("rawlead_quiz_retake", "1");
+    } catch (err) {
+      /* ignore */
+    }
+    if (window.rawleadQuizApp && typeof window.rawleadQuizApp.retake === "function") {
+      window.rawleadQuizApp.retake();
+      return;
+    }
+    window.location.href = (cfg.lentaUrl || "/lenta/") + "#quiz";
+  }
+
+  function wireQuizRetake() {
+    if (!quizRetakeEl || quizRetakeReady) {
+      return;
+    }
+    quizRetakeReady = true;
+    quizRetakeEl.addEventListener("click", goQuizRetake);
+  }
+
+  function syncQuizRetakeVisibility() {
+    if (!quizRetakeEl) {
+      return;
+    }
+    quizRetakeEl.hidden = !getToken();
+  }
 
   function renderUserBar() {
 
@@ -1320,6 +1353,7 @@
       var showTrialBadge =
         isTrial && !!data.effective_access && data.trial_days_left != null;
       trialBadgeEl.hidden = !showTrialBadge;
+      trialBadgeEl.setAttribute("aria-hidden", showTrialBadge ? "false" : "true");
       trialBadgeEl.textContent = showTrialBadge
         ? "✓ Trial Premium · " + data.trial_days_left + " дн."
         : "";
@@ -1692,6 +1726,8 @@
 
     }
 
+    syncQuizRetakeVisibility();
+
   }
 
   function showApp() {
@@ -1713,6 +1749,10 @@
     }
 
     renderUserBar();
+
+    wireQuizRetake();
+
+    syncQuizRetakeVisibility();
 
     loadSubscription();
 
@@ -2358,7 +2398,7 @@
 
     var task = taskBodyText(item);
 
-    var html = "";
+    var html = renderDifficultyRow(item);
 
     if (task) {
 
@@ -2765,176 +2805,33 @@
 
   function renderTags() {
 
-    if (!tagsEl) {
+    // O219: quiz-first — skills UI hidden; tags stay in state/API for match.
 
-      return;
+    if (tagsEl) {
 
-    }
+      tagsEl.innerHTML = "";
 
-    if (state.tagsStripSkeleton) {
+      tagsEl.classList.remove("is-skeleton", "is-loading", "is-saved-flash");
 
-      tagsEl.classList.add("is-skeleton");
-
-      tagsEl.innerHTML = tagsStripSkeletonHtml();
-
-      if (tagsHint) {
-
-        tagsHint.hidden = true;
-
-      }
-
-      if (noTagsEl) {
-
-        noTagsEl.hidden = true;
-
-      }
-
-      if (tagsClearBtn) {
-
-        tagsClearBtn.hidden = true;
-
-      }
-
-      return;
+      tagsEl.hidden = true;
 
     }
 
-    tagsEl.classList.remove("is-skeleton");
+    if (tagsHint) {
 
-    var html = "";
-
-    var ordered = orderedTagsForStrip(state.tags);
-
-    var mobile = !isWideScreen();
-
-    if (!ordered.length) {
-
-      html +=
-        '<a class="rl-cabinet-tag--empty-link" href="' +
-        escapeHtml(cfg.quizUrl || "/quiz/") +
-        '">Пройди квиз — увидишь совместимость →</a>';
-
-      if (tagsHint) {
-
-        tagsHint.hidden = false;
-
-        tagsHint.textContent = "Лента подбирает совместимость из квиза";
-
-        tagsHint.classList.add("rl-cabinet-head__hint--compat");
-
-      }
-
-    } else {
-
-      html = ordered
-
-        .map(function (tag) {
-
-          var label = titleForTag(tag);
-
-          return (
-
-            '<span class="rl-cabinet-tag' +
-
-            (mobile ? " rl-cabinet-tag--open-sheet" : "") +
-
-            '" role="listitem" data-tag="' +
-
-            escapeHtml(tag) +
-
-            '">' +
-
-            escapeHtml(label) +
-
-            '<button type="button" class="rl-cabinet-tag__remove" aria-label="Убрать навык">×</button></span>'
-
-          );
-
-        })
-
-        .join("");
-
-      html +=
-
-        '<button type="button" class="rl-cabinet-tag rl-cabinet-tag--add" id="rl-cabinet-tag-add">+ Добавить</button>';
-
-      if (tagsHint) {
-
-        tagsHint.hidden = true;
-
-        tagsHint.classList.remove("rl-cabinet-head__hint--compat");
-
-      }
-
-    }
-
-    tagsEl.innerHTML = html;
-
-    if (noTagsEl) {
-
-      noTagsEl.hidden = state.tags.length > 0;
+      tagsHint.hidden = true;
 
     }
 
     if (tagsClearBtn) {
 
-      tagsClearBtn.hidden = state.tags.length === 0;
-
-      tagsClearBtn.disabled = state.tagsLoading;
+      tagsClearBtn.hidden = true;
 
     }
 
-    tagsEl.querySelectorAll(".rl-cabinet-tag__remove").forEach(function (btn) {
+    if (noTagsEl) {
 
-      btn.addEventListener("click", function (e) {
-
-        e.stopPropagation();
-
-        var chip = btn.closest(".rl-cabinet-tag");
-
-        var tag = chip && chip.getAttribute("data-tag");
-
-        if (!tag) {
-
-          return;
-
-        }
-
-        saveTags(
-
-          state.tags.filter(function (t) {
-
-            return t !== tag;
-
-          })
-
-        );
-
-      });
-
-    });
-
-    tagsEl.querySelectorAll(".rl-cabinet-tag--open-sheet").forEach(function (chip) {
-
-      chip.addEventListener("click", function (e) {
-
-        if (e.target.closest(".rl-cabinet-tag__remove")) {
-
-          return;
-
-        }
-
-        openSkillsPicker();
-
-      });
-
-    });
-
-    var addBtn = document.getElementById("rl-cabinet-tag-add");
-
-    if (addBtn) {
-
-      addBtn.addEventListener("click", openSkillsPicker);
+      noTagsEl.hidden = true;
 
     }
 
@@ -4042,7 +3939,7 @@
 
         : item && item.lead_tags) || [];
 
-    var max = 4;
+    var max = 2;
 
     var html = [];
 
@@ -4197,50 +4094,88 @@
     );
   }
 
-  function renderMatchBreakdown(item) {
-    if (!hasUserSkills()) {
-      return (
-        '<div class="rl-match-breakdown">' +
-        '<a class="rl-match-breakdown__cta" href="' +
-        escapeHtml(cfg.quizUrl || "/quiz/") +
-        '">' +
-        escapeHtml("Пройди квиз — увидишь совместимость →") +
-        "</a></div>"
-      );
+  var MATCH_LOCK_HTML =
+    '<span class="rl-match__lock" aria-hidden="true">' +
+    '<svg class="rl-match__lock-icon" width="10" height="10" viewBox="0 0 24 24" focusable="false">' +
+    '<path fill="currentColor" d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-7 8a2 2 0 112 0 2 2 0 01-2 0zm3.1-8H9.9V6a3.1 3.1 0 016.2 0v2z"/>' +
+    "</svg></span>";
+
+  function quizUrlForCabinet() {
+    return cfg.quizUrl || (cfg.lentaUrl || "/lenta/") + "#quiz";
+  }
+
+  function renderQuizLockedMatchBar() {
+    return (
+      '<div class="rl-match rl-match--free-locked rl-match--quiz-locked">' +
+      '<div class="rl-match__label"><span title="Пройди квиз — увидишь % совместимости">Совместимость</span></div>' +
+      '<div class="rl-match__bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Совместимость — пройди квиз">' +
+      '<span class="rl-match__fill"></span>' +
+      MATCH_LOCK_HTML +
+      "</div>" +
+      '<div class="rl-match-breakdown">' +
+      '<a class="rl-match-breakdown__cta" href="' +
+      escapeHtml(quizUrlForCabinet()) +
+      '">' +
+      escapeHtml("Пройти квиз →") +
+      "</a></div>" +
+      "</div>"
+    );
+  }
+
+  function matchBarMeta(item) {
+    var km = item.keyword_match;
+    var hasLeadTags = leadTagKeys(item).length > 0;
+    if (km == null || !hasLeadTags) {
+      return {
+        neutral: true,
+        pct: 0,
+        modifier: "rl-match--neutral",
+        ariaLabel: "Совместимость — нет данных",
+      };
     }
-    return "";
+    var modifier = "";
+    if (km >= 60) {
+      modifier = "rl-match--good";
+    } else if (km < 25) {
+      modifier = "rl-match--amber";
+    }
+    return {
+      neutral: false,
+      pct: km,
+      modifier: modifier,
+      ariaLabel: "Совместимость " + km + "%",
+    };
   }
 
   function renderCompatMatchBar(item) {
-    var km = item.keyword_match != null ? item.keyword_match : 0;
-    var compatTitle =
-      ' title="Насколько ваш стек совпадает с заказом — не оценка качества заказа"';
+    var meta = matchBarMeta(item);
+    var barPct = meta.neutral ? 0 : meta.pct;
+    var fillStyle = meta.neutral ? "0%" : meta.pct + "%";
+    var ariaNow = meta.neutral ? 0 : meta.pct;
+    var modClass = meta.modifier ? " " + meta.modifier : "";
     return (
-      '<div class="rl-match">' +
-      '<div class="rl-match__label"><span' +
-      compatTitle +
-      ">" +
-      km +
-      "% Совместимость</span></div>" +
+      '<div class="rl-match rl-match-bar' +
+      modClass +
+      '">' +
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
-      km +
-      '" aria-valuemin="0" aria-valuemax="100">' +
+      ariaNow +
+      '" aria-valuemin="0" aria-valuemax="100" aria-label="' +
+      escapeHtml(meta.ariaLabel) +
+      '">' +
       '<span class="rl-match__fill" data-match-pct="' +
-      km +
+      barPct +
       '" style="--match-value:' +
-      km +
-      '%"></span>' +
-      "</div>" +
-      renderMatchBreakdown(item) +
-      "</div>"
+      fillStyle +
+      '"></span>' +
+      "</div></div>"
     );
   }
 
   function renderMatchBlock(item) {
     if (!hasUserSkills()) {
-      return '<div class="rl-match rl-match--no-skills">' + renderMatchBreakdown(item) + "</div>";
+      return '<div class="rl-row rl-row--match-tier">' + renderQuizLockedMatchBar() + "</div>";
     }
-    return renderCompatMatchBar(item);
+    return '<div class="rl-row rl-row--match-tier">' + renderCompatMatchBar(item) + "</div>";
   }
 
   var VIEWS_EYE_SVG =
@@ -4338,7 +4273,6 @@
       escapeHtml(budget) +
       "</p>" +
       renderMatchBlock(item) +
-      renderDifficultyRow(item) +
       '<div class="rl-chips">' +
       renderTagChips(item) +
       "</div>" +
@@ -4425,62 +4359,44 @@
 
 
 
-  function parseDraftApiError(res, data) {
-
-    var err = new Error("HTTP " + res.status);
-
-    err.status = res.status;
-
-    var detail = "";
-
-    var retryAfter = null;
-
-    if (data && typeof data === "object") {
-
-      if (typeof data.detail === "string") {
-
-        detail = data.detail;
-
-      } else if (data.detail && typeof data.detail === "object") {
-
-        detail = String(data.detail.error || data.detail.detail || "");
-
-        retryAfter = data.detail.retry_after_sec;
-
-      }
-
-      if (!detail && data.error) {
-
-        detail = String(data.error);
-
-      }
-
-      if (!detail && data.message) {
-
-        detail = String(data.message);
-
-      }
-
-      if (data.data && data.data.retry_after_sec != null) {
-
-        retryAfter = data.data.retry_after_sec;
-
-      }
-
-      if (data.retry_after_sec != null) {
-
-        retryAfter = data.retry_after_sec;
-
-      }
-
+  function draftErrorUserMessage(err) {
+    if (!err) {
+      return "Ошибка, попробуй снова";
     }
+    if (err.status === 429) {
+      return err.detail || "Лимит черновиков в час. Попробуй позже.";
+    }
+    return err.detail || err.message || "Ошибка, попробуй снова";
+  }
 
+  function parseDraftApiError(res, data) {
+    var err = new Error("HTTP " + res.status);
+    err.status = res.status;
+    var detail = "";
+    var retryAfter = null;
+    if (data && typeof data === "object") {
+      if (typeof data.detail === "string") {
+        detail = data.detail;
+      } else if (data.detail && typeof data.detail === "object") {
+        detail = String(data.detail.error || data.detail.detail || "");
+        retryAfter = data.detail.retry_after_sec;
+      }
+      if (!detail && data.error) {
+        detail = String(data.error);
+      }
+      if (!detail && data.message) {
+        detail = String(data.message);
+      }
+      if (data.data && data.data.retry_after_sec != null) {
+        retryAfter = data.data.retry_after_sec;
+      }
+      if (data.retry_after_sec != null) {
+        retryAfter = data.retry_after_sec;
+      }
+    }
     err.detail = detail;
-
     err.retryAfterSec = retryAfter;
-
     return err;
-
   }
 
 

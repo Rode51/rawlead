@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.18.95');
+define('RAWLEAD_CHILD_VERSION', '1.19.02');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -28,6 +28,13 @@ function rawlead_page_url(string $slug): string {
         return (string) get_permalink($page);
     }
     return home_url('/' . $slug . '/');
+}
+
+/**
+ * Canonical quiz entry — overlay on /lenta/.
+ */
+function rawlead_quiz_url(): string {
+    return rawlead_page_url('lenta') . '#quiz';
 }
 
 /**
@@ -256,7 +263,7 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restMe'           => esc_url_raw(rest_url('rawlead/v1/me')),
             'pricingUrl'       => esc_url_raw(rawlead_page_url('pricing')),
             'cabinetUrl'       => esc_url_raw(rawlead_page_url('cabinet')),
-            'quizUrl'          => esc_url_raw(rawlead_page_url('quiz')),
+            'quizUrl'          => esc_url_raw(rawlead_quiz_url()),
             'quizOverlay'      => true,
             'nonce'            => wp_create_nonce('wp_rest'),
             'apiBase'          => rawlead_api_base_url(),
@@ -326,6 +333,7 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restNotificationSettings'  => esc_url_raw(rest_url('rawlead/v1/me/notification-settings')),
             'restDraft'                 => esc_url_raw(rest_url('rawlead/v1/me/leads')),
             'lentaUrl'                  => esc_url_raw(rawlead_page_url('lenta')),
+            'quizUrl'                   => esc_url_raw(rawlead_quiz_url()),
             'pricingUrl'           => esc_url_raw(rawlead_page_url('pricing')),
             'tgBotUsername'        => rawlead_tg_login_bot_username(),
             'tgBotId'              => rawlead_tg_login_bot_id(),
@@ -481,6 +489,13 @@ add_filter('redirect_canonical', static function ($redirect_url, $requested_url)
     }
     return $redirect_url;
 }, 10, 2);
+
+add_action('template_redirect', static function (): void {
+    if (is_page('quiz')) {
+        wp_safe_redirect(rawlead_quiz_url(), 301);
+        exit;
+    }
+}, 0);
 
 add_action('template_redirect', static function (): void {
     if (!is_page('cabinet')) {

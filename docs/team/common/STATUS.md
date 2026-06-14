@@ -6,6 +6,96 @@
 
 > Hot ≤80 строк · детали → [`archive/STATUS_ARCHIVE.md`](../archive/STATUS_ARCHIVE.md)
 
+**Next:** @coder **O220-QUIZ-DEDUP** + **BAR-ALIGN**
+
+---
+
+## ✅ O220-MATCH-CODE — deploy (2026-06-14)
+
+**Theme prod:** **1.19.02** · **API:** `lead_coverage_match` · `rawlead-api` **active**
+
+| DoD | Result |
+|-----|--------|
+| pytest `test_match_push` | ✅ **21/21** (100/67/50/0% + synonym) |
+| `node --check` | ✅ feed + cabinet |
+| UI | bar only · no band copy · feed ≡ cabinet · «ОТКЛИК ✓» in LK |
+| VPS verify | ✅ `1.19.02` · 0× «Не ваша ниша» in prod JS · feed **200** |
+
+**Deploy:** Lead 2026-06-14 — `rank.py` + `api_server.py` rsync · theme rsync · restart API
+
+**Ticket:** [`2026-06-14-match-ui-stray-quote.md`](../../problems/2026-06-14-match-ui-stray-quote.md) ✅
+
+---
+
+## ✅ O220-JS-SYNTAX-HOTFIX — feed + cabinet (2026-06-14)
+
+**Fix:** trailing `'` в `renderMatchBreakdown` · feed **2011** · cabinet **4175**  
+**Theme prod:** **1.19.01** · `node --check` ✅ · smoke `/lenta/` `ver=1.19.01` · JS line OK  
+**Ticket:** [`2026-06-14-feed-cabinet-js-syntax.md`](../../problems/2026-06-14-feed-cabinet-js-syntax.md)
+
+---
+
+## ✅ O220 — deploy 2026-06-14 (partial match)
+
+**Theme prod:** **1.19.01** · **API:** `priority_keyword_match` (**не** PM `lead_coverage_match`) · `rawlead-api` **active**
+
+| Блок | На prod |
+|------|---------|
+| **Match** | bands A-min · syn F · B null lead · **D wrong formula** · UI `"` bug |
+| **Feed UX** | quiz lock · 10/ч · max 5 draft · restore · layout ✅ |
+
+**Lead deploy 2026-06-14:** theme rsync ✅ · API 7 files + restart ✅
+
+**Next:** § **O220-L1-PROMPT-R2** ✅ code → Lead deploy `ai_analyze.py` → **O218** Playwright
+
+---
+
+## ✅ O220-L1-PROMPT-R2 — few-shot + thin-tag retry (2026-06-14)
+
+**Файлы:** `src/ai_analyze.py` · `tests/test_ai_analyze.py` (NEW)
+
+| DoD | Result |
+|-----|--------|
+| R1 | +4 few-shot (TG leadgen→marketing, MP cards→design, furniture tags, XMind→text) + anti-errors 5–7 |
+| R2 | retry 1× when `feed_visible` + `<2` tags after sanitize (hint `need ≥2 canonical_tag`) |
+| R3 | pytest **11/11** (`test_ai_analyze` + `test_l1_complexity_canon`) |
+
+**Deploy:** `ai_analyze.py` → VPS ✅ 2026-06-14 (`rawlead-radar` + API restart) · owner optional re-pilot 6 thin ids
+
+**Как проверить:**
+```bash
+pytest tests/test_ai_analyze.py tests/test_l1_complexity_canon.py -q
+# optional: scripts/o220_l1_retag_pilot.py --lead-ids … (6 thin ids from pilot JSON)
+```
+
+---
+
+## ✅ O220-L1-RETAG-PILOT — apply + judge (2026-06-14)
+
+**Apply:** 14:32 UTC · **40 лидов** · `data/o220_l1_retag_pilot.json`  
+**Judge:** 14:40 UTC · **`preprod_ai_prod_audit_judge.md`** — те же 40 id (`--lead-ids`)
+
+| Метрика | Результат |
+|---------|-----------|
+| Теги avg | dev 1.2→**1.7** · design 1.4→**1.8** · mkt 1.5→**2.1** · text 1.1→**1.9** |
+| ≥2 тега | **85%** (34/40) · gate avg **FAIL** (dev <2.5) |
+| **L1 judge** | **l1_usable 80%** ✅ · category_ok **85%** · complexity **100%** ✅ |
+| **L2 judge** (bonus) | send **75%** ✅ · balanced cats **FAIL** (design 65%) |
+
+**Вывод:** промпт **жить можно** · точность L1 ок · **кол-во тегов** — подкрутить (dev + 6 thin) · категории/infographic — few-shot из judge § L1 fix
+
+**Next:** @coder **O220-L1-PROMPT-R2** (few-shot) **или** сразу **O218** — на выбор владельца
+
+---
+
+## ✅ O219 — cabinet/quiz UX batch (deploy 2026-06-14)
+
+**Theme:** **1.18.97** · API auto-trial on TG login · Lead deploy
+
+**Lead verify 2026-06-14:** code ✅ · deploy ✅ · prod `ver=1.18.97` · API `active` · auto-trial fn on VPS
+
+**Owner smoke:** Monica wipe → tier checklist `FOR_YOU.md` · **O220** feed bugs → `TASKS` **67–68**
+
 ---
 
 ## Сейчас prod (2026-06-14 · triage)
@@ -13,7 +103,7 @@
 | Слой | Факт |
 |------|------|
 | **Сервисы** | `rawlead-api` · `rawlead-bot-poll` · `rawlead-radar` — **active** |
-| **Сайт** | `/lenta/` 200 · theme **1.18.95** (O215 deploy 2026-06-14) |
+| **Сайт** | `/lenta/` 200 · theme **1.19.00** · O220 deploy ✅ |
 | **FL** | last Neon insert **00:30 MSK Jun 14** (~13h) · `parsed=30 fresh=0` = возможно мало заказов в вс |
 | **Kwork** | O213 ✅ prod — `parsed=36 pages=3` (2026-06-14 14:12 MSK) |
 | **TG** | monitor слушает · O212 ✅ prod — `skip_entity=N`, старт без `ids=[…]` |
@@ -21,26 +111,54 @@
 
 ---
 
-## 🚧 O216 — PARTIAL ✅ code · Lead verify (pool ❌ deploy ❌)
+## 🚧 O217 — quiz JSON pack **✅ deploy 2026-06-14** (`deploy-o217-quiz-vps.py`)
 
-**Lead verify 2026-06-14:** код локально OK · `quiz_pool_allowlist.json` **нет** · prod **не задеплоен** (quiz.js без retake) · pytest **24/24** · → **O216b** pool audit
+**Deploy ✅ Lead 2026-06-14:** VPS `quiz_source=synthetic` · `quiz_cards_v1=56` · API active
 
 **Files changed:**
-- `wordpress/rawlead-kadence-child/assets/js/rawlead-quiz.js` — localStorage split (SESSION_KEY / COMPLETED_KEY), retake flow, clear-on-exit, completed-on-reopen
-- `wordpress/rawlead-kadence-child/template-parts/rawlead/quiz.php` — кнопка «Пройти ещё раз» (id `rl-quiz-retake-completed`)
-- `wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js` — `renderMatchBlock`: anon/expired_trial/free → locked bar (ранее anon возвращал `""`)
-- `wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js` — «Пройти тест заново» в блоке навыков
-- `src/quiz_adaptive.py` — `quiz_pool_allowlist.json` support (allowlist filter в `_query_card`)
-- `tests/test_o197_quiz_adaptive.py` — +4 теста allowlist
+- `data/quiz_cards_v1.json` — **NEW** 56 карточек (4 ниши × 14: 8 anchor + 2 boundary + 4 trap)
+- `src/quiz_adaptive.py` — O217: `_load_json_cards()`, `_query_card_json()`, `_card_payload_json()`; `fetch_card_categories` ищет в JSON map сначала; `fetch_quiz_card` → JSON-first, Neon-fallback only if JSON missing
+- `tests/test_o217_quiz_cards.py` — **NEW** 25 тестов: lint 56 карточек + JSON source integration
+- `.gitignore` — `!data/quiz_cards_v1.json`
+- `scripts/deploy-o217-quiz-vps.py` — **NEW** deploy script
 
-**pytest:** 16/16 (test_o197) · 8/8 (test_o195) ✅
+**pytest:** 59/59 (test_o217 + test_o197 + test_o195) ✅
+
+**DoD:**
+```
+quiz_source=synthetic  — /v1/quiz/start возвращает source=synthetic
+56 cards             — quiz_cards_v1.json на VPS
+owner smoke          — /lenta/ incognito: PM titles (не FL-мусор)
+pytest green         — 59/59 quiz
+```
+
+**Deploy:** `python scripts/deploy-o217-quiz-vps.py`
+
+---
+
+## 🚧 O216 — code ✅ · O216b pool ✅ · **deploy ✅ 1.18.96** (2026-06-14)
+
+**O216b ✅ Lead verify 2026-06-14:** `data/quiz_pool_allowlist.json` — **64 ids**; `scripts/quiz_pool_audit.py`; pytest **26/26**.
+
+**Deploy ✅ 2026-06-14:** theme 1.18.96 live · allowlist 64 ids on VPS · quiz /start 200
+
+**O217 deploy next:** `python scripts/deploy-o217-quiz-vps.py` (swap to JSON pack)
+
+**Files changed (O216 + O216b):**
+- `wordpress/rawlead-kadence-child/assets/js/rawlead-quiz.js` — localStorage split (SESSION_KEY / COMPLETED_KEY), retake flow, clear-on-exit, completed-on-reopen
+- `wordpress/rawlead-kadence-child/template-parts/rawlead/quiz.php` — кнопка «Пройти ещё раз»
+- `wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js` — anon/expired_trial/free → locked bar
+- `wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js` — «Пройти тест заново»
+- `wordpress/rawlead-kadence-child/functions.php` — `RAWLEAD_CHILD_VERSION` **1.18.96**
+- `src/quiz_adaptive.py` — allowlist filter в `_query_card`
+- `data/quiz_pool_allowlist.json` — **NEW** 64 curated ids (dev/design/marketing/text, 12+4 each)
+- `scripts/quiz_pool_audit.py` — **NEW** one-off export script
+- `tests/test_o197_quiz_adaptive.py` — +6 тестов allowlist (26/26 ✅)
+
+**pytest:** 18/18 (test_o197) · 8/8 (test_o195) ✅
 
 **t6 — price smoke (VPS, ждём owner):**
 > VPS: `PAY_PREMIUM_RUB=10` в `.env.site` → restart `rawlead-api` → YooKassa checkout 10 ₽ → owner test → **revert 790**
-> `config.py` уже env-driven — менять нечего. bump `RAWLEAD_CHILD_VERSION` если UI pricing touched.
-
-**t5 — quiz pool (data, ждём owner):**
-> Нужно заполнить `data/quiz_pool_allowlist.json` — SQL audit по `leads` (is_visible=true, ai_score≥60) per niche. Механизм загрузки в `quiz_adaptive.py` ✅; без файла — поведение прежнее.
 
 **Как проверить (DoD):**
 ```
@@ -52,10 +170,10 @@ D5  anon /lenta/: locked compat bar visible; trial: real % bar
 D6  trial feed: no delay · match sort · % visible
 D7  cabinet: «Пройти тест заново» link visible
 D8  YooKassa 10₽ checkout (owner, after VPS env change)
-D9  pytest 16/16 quiz ✅
+D9  pytest 26/26 quiz ✅
 ```
 
-**Deploy:** `deploy-wp-theme-vps.py` · API if needed (quiz_adaptive change) · price env VPS (owner)
+**Deploy:** `python scripts/deploy-o216-quiz-vps.py` (theme 1.18.96 + API + allowlist file)
 
 **Корень Kwork/FL:** Kwork → **O213** pagination + filter (src ✅) · FL: воскресенье, мало постинга — мб норма.  
 [`2026-06-14-kwork-fl-zero-new.md`](../../problems/2026-06-14-kwork-fl-zero-new.md)
