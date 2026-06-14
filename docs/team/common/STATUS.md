@@ -17,7 +17,7 @@
 | **FL** | last Neon insert **00:30 MSK Jun 14** (~13h) · `parsed=30 fresh=0` = возможно мало заказов в вс |
 | **Kwork** | O213 ✅ prod — `parsed=36 pages=3` (2026-06-14 14:12 MSK) |
 | **TG** | monitor слушает · O212 ✅ prod — `skip_entity=N`, старт без `ids=[…]` |
-| **Ops** | O212 ✅ API — `today_new` Neon + `за цикл: parsed/fresh` |
+| **Ops** | **O214 ✅** — cycle_age из лога (не 154м) · residential badge when FL on fallback |
 
 **Корень Kwork/FL:** Kwork → **O213** pagination + filter (src ✅) · FL: воскресенье, мало постинга — мб норма.  
 [`2026-06-14-kwork-fl-zero-new.md`](../../problems/2026-06-14-kwork-fl-zero-new.md)
@@ -168,9 +168,9 @@ pytest tests/test_o214_ops_truth.py -q
 
 | Волна | What | Who |
 |-------|------|-----|
-| **1** | ~~**O214** ops truth~~ | ✅ Lead verify VPS 2026-06-14 |
-| **2** | Owner smoke `/ops/` — cycle_age ≤15м, не 154м | owner · **→ сейчас** |
-| **3** | Perf lenta/home/quiz | Design → @coder |
+| **1** | ~~**O214** ops truth~~ · owner accept | ✅ 2026-06-14 |
+| **2** | **Perf** lenta/home/quiz load | @lead-designer scope → @coder · **→ сейчас** |
+| **3** | «Платформа для учебного центра» в ленте | monitor / owner spot-check |
 | **4–6** | L2 70% · stress · ads | ROADMAP |
 
 ---

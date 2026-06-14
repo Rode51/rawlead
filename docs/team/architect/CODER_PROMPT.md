@@ -1,6 +1,6 @@
 # Coder — hot queue (active)
 
-**→ Now:** *(empty — wave 1 closed)* · owner smoke `/ops/` · next **Perf**
+**→ Now:** *(empty — wave 1 ingest/ops closed)* · **next: волна 3 Perf** — ждём scope от `@lead-designer`
 
 ---
 
