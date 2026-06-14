@@ -21,7 +21,9 @@
 
 ---
 
-## 🚧 O216-QUIZ-TIER-UX (src + WP · 2026-06-14 · code done, deploy pending)
+## 🚧 O216 — PARTIAL ✅ code · Lead verify (pool ❌ deploy ❌)
+
+**Lead verify 2026-06-14:** код локально OK · `quiz_pool_allowlist.json` **нет** · prod **не задеплоен** (quiz.js без retake) · pytest **24/24** · → **O216b** pool audit
 
 **Files changed:**
 - `wordpress/rawlead-kadence-child/assets/js/rawlead-quiz.js` — localStorage split (SESSION_KEY / COMPLETED_KEY), retake flow, clear-on-exit, completed-on-reopen
