@@ -1,68 +1,22 @@
 # Coder — hot queue (active)
 
-**→ Now:** § **O214-OPS-TRUTH** — ops panel accuracy: cycle age, residential badge, DC bans UX
+**→ Now:** *(empty — wave 1 closed)* · owner smoke `/ops/` · next **Perf**
 
 ---
 
-## § O214-OPS-TRUTH — ops panel: stale cycle_age + residential tier display
+## § O214-OPS-TRUTH — CLOSED ✅ (Lead verify VPS 2026-06-14)
 
-**Ticket:** [`2026-06-14-ops-cycle-age-stale.md`](../../problems/2026-06-14-ops-cycle-age-stale.md)
+**Deploy:** `deploy-o214-ops-truth-vps.py` · API restarted
 
-**Owner:** «всё красное, если показано что не работает — думаю что не работает». Ops должен **отражать реальность**, а не вводить в заблуждение.
+| Check | Result |
+|-------|--------|
+| `_cycle_ts_from_log` on VPS | ✅ |
+| `cycle_age_min` live | ✅ **3м** (was 154м) · `radar_lamp=ok` |
+| `residential_active` in proxy groups | ✅ |
+| clear-bans tooltip | ✅ |
+| pytest 19/19 (O214 + O171) | ✅ |
 
-**Facts (Lead verify 2026-06-14):**
-- Radar alive: cycles every ~11 min in log (`── Цикл 14:06 / 14:11 / 14:23`)
-- Ops shows `cycle_age=154м` 🔴 = **SQLite summary stale** after deploy restart
-- FL: `fetch:fl proxy=gate.node-proxy.com res slot=20/25 alive=23/25` = residential active, **not shown in ops**
-- DC 4 slots red «Временно отключён (бан)» = correct but **no context** that FL works via residential
-
-### t1 — Fix cycle_age fallback: read last `── Цикл` from log
-
-**File:** `src/ops_funnel.py`
-
-Function `_cycle_age_min(summary)` returns `None` or stale value when SQLite `status_cycle_summary` not updated.
-
-Add fallback: if SQLite age > 30 min **or** `summary is None`:
-- scan tail of `data/radar_site.log` (last 500 lines)
-- find last `── Цикл YYYY-MM-DD HH:MM:SS ──` line
-- parse its timestamp, use as cycle_age
-
-This way ops shows real cycle age even if SQLite record lagged.
-
-Log format: `── Цикл 2026-06-14 14:23:21 ──` — regex `── Цикл (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})`.
-
-### t2 — Residential badge on FL exchange card
-
-**File:** `src/ops_funnel.py` · `src/owner_admin.py`
-
-When `fl_on_residential_tier()` is True:
-- Add `"fl_tier": "residential"` to source meta in `build_funnel_payload`
-- In exchange card render (`owner_admin.py`), if `fl_tier == "residential"`: show sub-line `«резидентский fallback: N/25 alive»` in place of or alongside normal proxy status
-- Card lamp: when on residential AND `parsed >= FL_DC_PARSED_INGEST_OK` → force **warn** (yellow), not red
-
-### t3 — DC bans UX: show residential context
-
-**File:** `src/owner_admin.py` (proxy group render) or `src/exchange_proxy.py` (list_ui_groups)
-
-In `list_ui_groups()` for `exchange-fl`:
-- If `fl_on_residential_tier()` is True, add `"residential_active": True, "res_alive": N` to group dict
-- In proxy group HTML: when `residential_active`, show info line «FL сейчас работает через residential (N/25 слотов)» above DC slots
-
-### t4 — Tests
-
-- `test_ops_funnel.py`: `_cycle_age_min` returns log-based age when SQLite summary is None or >30m stale
-- `test_ops_funnel.py`: `build_funnel_payload` sets `fl_tier=residential` when `fl_on_residential_tier` mocked True + lamp is warn not bad
-- Existing tests green
-
-### DoD
-
-- Reload `/ops/` after radar running → shows correct cycle age (≤ last cycle + 2 min buffer), not 154м
-- FL card: when residential active — shows yellow (warn) not red + tier badge visible
-- DC proxy group: info note «residential active» when FL on fallback
-- `clear_bans` button description: add tooltip «DC ban снят → при следующем цикле вернётся DC (авто, без рестарта)»
-- pytest green
-
-**Deploy:** `ops_funnel.py` + `owner_admin.py` → restart `rawlead-api`
+**Note:** `fl_tier=residential` badge shows **only when DC exhausted** and FL on fallback. If DC alive again → badge hidden, FL 🟢 — correct.
 
 ---
 
@@ -208,6 +162,7 @@ Log on allow: `pipeline:filter:exchange_safe kwork:id=… stop=…` (one line, n
 
 | § | DoD | deploy |
 |---|-----|--------|
+| **O214-DEPLOY** | cycle_age 3м not 154м · residential badge · pytest 19/19 | ✅ 2026-06-14 |
 | **O213-DEPLOY** | parsed=36 pages=3 on VPS | ✅ 2026-06-14 |
 | **O212-DEPLOY** | skip_entity · no ids dump · ops 200 | ✅ 2026-06-14 |
 | **O213** | pages 1–3 + EXCHANGE_SAFE_STOPS · pytest 42/42 | ✅ |

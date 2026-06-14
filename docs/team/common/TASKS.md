@@ -51,7 +51,7 @@
 | **58f** | **O212** ops log spam + TG 🔴 false + «0 новых» UX | @coder | ✅ Lead verify 2026-06-14 |
 | **58g** | **O213** Kwork pagination (page2-3) + filter scope | @coder | ✅ Lead verify 2026-06-14 |
 | **58h** | **O213+O212 deploy** radar + API | @coder | ✅ Lead verify VPS 2026-06-14 |
-| **58i** | **O214** ops truth: cycle_age fallback + residential badge | @coder | **→ сейчас** |
+| **58i** | **O214** ops truth: cycle_age fallback + residential badge | @coder | ✅ Lead verify VPS 2026-06-14 |
 | **59** | **Perf** lenta/home/quiz | Design → @coder | волна 3 |
 | **60** | **O200** L2 regen ≥**70%**×4 | @coder | волна 4 |
 | **61** | **Stress** финал @50 VU | owner | **перед ads** |

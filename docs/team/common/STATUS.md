@@ -148,12 +148,28 @@ pytest tests/test_o212_ops_log_truth.py tests/test_o171_ops_funnel.py -q
 
 ---
 
+## ✅ O214 ops truth (src · 2026-06-14)
+
+**Fix:** `ops_funnel.py` — cycle_age fallback из `── Цикл` в логе если SQLite >30м · FL `fl_tier=residential` + 🟡 при parsed≥25 · `exchange_proxy.py` — residential badge в proxy group · `owner_admin` + `ops-pult.js` — tier hint + clear-bans tooltip  
+**pytest:** 4/4 (`test_o214`) + 20/20 regression  
+**Deploy:** ✅ `deploy-o214-ops-truth-vps.py` 2026-06-14 · Lead verify VPS: `cycle_age_min=3` · `radar_lamp=ok` (was 154м)
+
+**Как проверить (VPS):**
+```bash
+curl -s -b cookie.txt /ops/dashboard | jq '{cycle_age: .funnel.cycle_age_min, fl: .funnel.sources[]|select(.source_id=="fl")|{lamp,meta}}'
+grep '── Цикл' data/radar_site.log | tail -1
+# /ops/ FL card: «резидентский fallback: N/25 alive» · proxy group: residential note
+pytest tests/test_o214_ops_truth.py -q
+```
+
+---
+
 ## 🔴 Next
 
 | Волна | What | Who |
 |-------|------|-----|
-| **1** | Owner smoke: `/lenta/?source=kwork` + `/ops/` | owner · **→ сейчас** |
-| **2** | «Платформа для учебного центра» в ленте / filter log | owner/Lead |
+| **1** | ~~**O214** ops truth~~ | ✅ Lead verify VPS 2026-06-14 |
+| **2** | Owner smoke `/ops/` — cycle_age ≤15м, не 154м | owner · **→ сейчас** |
 | **3** | Perf lenta/home/quiz | Design → @coder |
 | **4–6** | L2 70% · stress · ads | ROADMAP |
 
