@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.18.75');
+define('RAWLEAD_CHILD_VERSION', '1.18.95');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
@@ -218,9 +218,29 @@ add_action('wp_enqueue_scripts', static function (): void {
 
     if (is_page('lenta')) {
         wp_enqueue_script(
+            'rawlead-quiz',
+            RAWLEAD_CHILD_URI . '/assets/js/rawlead-quiz.js',
+            [],
+            RAWLEAD_CHILD_VERSION,
+            true
+        );
+        wp_localize_script('rawlead-quiz', 'rawleadQuiz', [
+            'restQuizStart'    => esc_url_raw(rest_url('rawlead/v1/quiz/start')),
+            'restQuizNext'     => esc_url_raw(rest_url('rawlead/v1/quiz/next')),
+            'restTagsImport'   => esc_url_raw(rest_url('rawlead/v1/me/tags/import')),
+            'restAuth'         => esc_url_raw(rest_url('rawlead/v1/auth/telegram')),
+            'lentaUrl'         => esc_url_raw(rawlead_page_url('lenta')),
+            'cabinetUrl'       => esc_url_raw(rawlead_page_url('cabinet')),
+            'loginUrl'         => esc_url_raw(rawlead_cabinet_login_url()),
+            'tgBotUsername'    => rawlead_tg_login_bot_username(),
+            'nonce'            => wp_create_nonce('wp_rest'),
+            'overlayMode'      => true,
+            'overlayAutoStart' => false,
+        ]);
+        wp_enqueue_script(
             'rawlead-feed',
             RAWLEAD_CHILD_URI . '/assets/js/rawlead-feed.js',
-            [],
+            ['rawlead-quiz'],
             RAWLEAD_CHILD_VERSION,
             true
         );
@@ -231,11 +251,37 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restTags'         => esc_url_raw(rest_url('rawlead/v1/me/tags')),
             'restSkills'       => esc_url_raw(rest_url('rawlead/v1/skills/catalog')),
             'restDraft'        => esc_url_raw(rest_url('rawlead/v1/me/leads')),
+            'restLeadAdmin'    => esc_url_raw(rest_url('rawlead/v1/leads')),
             'restSubscription' => esc_url_raw(rest_url('rawlead/v1/me/subscription')),
+            'restMe'           => esc_url_raw(rest_url('rawlead/v1/me')),
             'pricingUrl'       => esc_url_raw(rawlead_page_url('pricing')),
             'cabinetUrl'       => esc_url_raw(rawlead_page_url('cabinet')),
+            'quizUrl'          => esc_url_raw(rawlead_page_url('quiz')),
+            'quizOverlay'      => true,
             'nonce'            => wp_create_nonce('wp_rest'),
             'apiBase'          => rawlead_api_base_url(),
+            'feedDelayMinutes' => 30,
+        ]);
+    }
+
+    if (is_page('quiz')) {
+        wp_enqueue_script(
+            'rawlead-quiz',
+            RAWLEAD_CHILD_URI . '/assets/js/rawlead-quiz.js',
+            [],
+            RAWLEAD_CHILD_VERSION,
+            true
+        );
+        wp_localize_script('rawlead-quiz', 'rawleadQuiz', [
+            'restQuizStart'   => esc_url_raw(rest_url('rawlead/v1/quiz/start')),
+            'restQuizNext'    => esc_url_raw(rest_url('rawlead/v1/quiz/next')),
+            'restTagsImport'  => esc_url_raw(rest_url('rawlead/v1/me/tags/import')),
+            'restAuth'        => esc_url_raw(rest_url('rawlead/v1/auth/telegram')),
+            'lentaUrl'        => esc_url_raw(rawlead_page_url('lenta')),
+            'cabinetUrl'      => esc_url_raw(rawlead_page_url('cabinet')),
+            'loginUrl'        => esc_url_raw(rawlead_cabinet_login_url()),
+            'tgBotUsername'   => rawlead_tg_login_bot_username(),
+            'nonce'           => wp_create_nonce('wp_rest'),
         ]);
     }
 
@@ -278,6 +324,7 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restCheckout'              => esc_url_raw(rest_url('rawlead/v1/me/subscription/checkout')),
             'restConfirm'               => esc_url_raw(rest_url('rawlead/v1/me/subscription/confirm')),
             'restNotificationSettings'  => esc_url_raw(rest_url('rawlead/v1/me/notification-settings')),
+            'restDraft'                 => esc_url_raw(rest_url('rawlead/v1/me/leads')),
             'lentaUrl'                  => esc_url_raw(rawlead_page_url('lenta')),
             'pricingUrl'           => esc_url_raw(rawlead_page_url('pricing')),
             'tgBotUsername'        => rawlead_tg_login_bot_username(),
@@ -307,7 +354,7 @@ add_action('wp_enqueue_scripts', static function (): void {
         ]);
     }
 
-    if (is_page(['lenta', 'cabinet']) || is_front_page()) {
+    if (is_page(['lenta', 'cabinet', 'quiz']) || is_front_page()) {
         $pv_slug = is_front_page() ? '' : (string) get_post_field('post_name', get_queried_object_id());
         $pv_path = $pv_slug === '' ? '/' : '/' . $pv_slug;
         wp_register_script('rawlead-pageview', false, [], RAWLEAD_CHILD_VERSION, true);
@@ -418,11 +465,7 @@ add_filter('the_content', static function (string $content): string {
             '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="%s">Контакты</a></p>',
             esc_url($contact)
         ),
-        'contact' => sprintf(
-            '<p class="rl-page-cta"><a class="rl-btn rl-btn--primary" href="https://t.me/rcnn43" target="_blank" rel="noopener">Telegram @rcnn43</a> '
-            . '<a class="rl-link-arrow" href="%s">Как это работает →</a></p>',
-            esc_url($how)
-        ),
+        'contact' => '',
         default => '',
     };
 

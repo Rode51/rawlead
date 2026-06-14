@@ -16,9 +16,17 @@
   root.classList.add("rl-feed-shell--pending");
 
   var cfg = window.rawleadFeed;
+  var FEED_DELAY_MINUTES =
+    typeof cfg.feedDelayMinutes === "number" && cfg.feedDelayMinutes > 0
+      ? cfg.feedDelayMinutes
+      : 30;
+  var FEED_DELAY_MS = FEED_DELAY_MINUTES * 60 * 1000;
+  var FEED_DELAY_MINUTES = parseInt(cfg.feedDelayMinutes, 10) || 30;
+  var FEED_DELAY_MS = FEED_DELAY_MINUTES * 60 * 1000;
   var TOKEN_KEY = "rawlead_access_token";
   var PREFS_KEY = "rawlead_feed_prefs";
   var INBOX_SYNC_KEY = "rawlead_inbox_rev";
+  var PENDING_DRAFTS_KEY = "rawlead_pending_drafts";
   var TAGS_SYNC_KEY = "rawlead_user_tags_rev";
   var MIN_MATCH_OPTIONS = [50, 60, 70, 80, 90];
   var SLOT_TOOLTIP =
@@ -32,6 +40,8 @@
   var AUTH_COOKIE_MAX_AGE = 7 * 24 * 3600;
   var MAX_USER_TAGS = 12;
   var cabinetLoginUrl = (cfg.cabinetUrl || "/cabinet/").replace(/\/?$/, "/");
+  var quizUrl = cfg.quizUrl || "/quiz/";
+  var quizOverlay = !!cfg.quizOverlay;
   var TIER_A_BY_NICHE = {
     dev: [
       "telegram_bot_dev",
@@ -156,6 +166,7 @@
   };
 
   var subscriptionState = null;
+  var meState = null;
 
   var prefersReduced =
     window.matchMedia &&
@@ -167,8 +178,7 @@
       function (entries) {
         entries.forEach(function (entry) {
           if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            syncMatchFill(entry.target);
+            revealCardAnimated(entry.target);
             rlCardIo.unobserve(entry.target);
           }
         });
@@ -205,18 +215,41 @@
     });
   }
 
+  function revealCardAnimated(card, syncMatch) {
+    if (!card || card.classList.contains("is-visible")) {
+      return;
+    }
+    if (prefersReduced) {
+      card.classList.add("is-visible");
+      if (syncMatch !== false && card.classList.contains("rl-lead-card") && !card.classList.contains("rl-feed-quiz-promo")) {
+        syncMatchFill(card);
+      }
+      return;
+    }
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (!card.isConnected || card.classList.contains("is-visible")) {
+          return;
+        }
+        card.classList.add("is-visible");
+        if (syncMatch !== false && card.classList.contains("rl-lead-card") && !card.classList.contains("rl-feed-quiz-promo")) {
+          syncMatchFill(card);
+        }
+      });
+    });
+  }
+
   function syncMatchFillsInViewport(root) {
     if (!root) {
       return;
     }
     var vh = window.innerHeight || document.documentElement.clientHeight || 0;
-    root.querySelectorAll(".rl-lead-card").forEach(function (card) {
+    root.querySelectorAll(".rl-lead-card:not(.rl-feed-quiz-promo)").forEach(function (card) {
       var rect = card.getBoundingClientRect();
       if (rect.bottom <= 0 || rect.top >= vh) {
         return;
       }
-      card.classList.add("is-visible");
-      syncMatchFill(card);
+      revealCardAnimated(card);
     });
   }
 
@@ -224,13 +257,16 @@
     if (!root) {
       return;
     }
-    var cards = root.querySelectorAll(".rl-lead-card:not(.is-visible)");
+    var cards = root.querySelectorAll(
+      ".rl-lead-card:not(.is-visible), .rl-feed-quiz-promo:not(.is-visible)"
+    );
     if (prefersReduced || !rlCardIo) {
       cards.forEach(function (el) {
         el.classList.add("is-visible");
-        syncMatchFill(el);
+        if (el.classList.contains("rl-lead-card") && !el.classList.contains("rl-feed-quiz-promo")) {
+          syncMatchFill(el);
+        }
       });
-      syncMatchFillsInViewport(root);
       return;
     }
     cards.forEach(function (el) {
@@ -269,6 +305,9 @@
   }
 
   function feedApiBase() {
+    if (isLoggedIn() && cfg.restMeFeed) {
+      return cfg.restMeFeed;
+    }
     return cfg.restFeed;
   }
 
@@ -395,6 +434,60 @@
     } catch (err) {
       // ignore
     }
+  }
+
+  function readPendingDraftsMap() {
+    try {
+      var raw = localStorage.getItem(PENDING_DRAFTS_KEY);
+      if (!raw) {
+        return {};
+      }
+      var data = JSON.parse(raw);
+      return data && typeof data === "object" ? data : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function writePendingDraftsMap(map) {
+    try {
+      localStorage.setItem(PENDING_DRAFTS_KEY, JSON.stringify(map || {}));
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  function addPendingDraft(leadId, item) {
+    if (!leadId) {
+      return;
+    }
+    var map = readPendingDraftsMap();
+    map[String(leadId)] = {
+      id: leadId,
+      title: item && item.title ? item.title : "",
+      category: item && item.category ? item.category : "",
+      added: Date.now(),
+    };
+    writePendingDraftsMap(map);
+  }
+
+  function showDraftToast(msg) {
+    var toast = document.createElement("div");
+    toast.className = "rl-feed-toast";
+    toast.setAttribute("role", "status");
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    window.setTimeout(function () {
+      toast.classList.add("is-visible");
+    }, 10);
+    window.setTimeout(function () {
+      toast.classList.remove("is-visible");
+      window.setTimeout(function () {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 300);
+    }, 3200);
   }
 
   function applyFeedPrefsToState(prefs) {
@@ -544,6 +637,20 @@
     return h;
   }
 
+  function isExpiredTrial() {
+    if (!isLoggedIn() || !subscriptionState) {
+      return false;
+    }
+    if (subscriptionState.effective_access) {
+      return false;
+    }
+    var st = subscriptionState.status || "";
+    if (st === "expired" || st === "paused") {
+      return true;
+    }
+    return !!subscriptionState.trial_used;
+  }
+
   function hasPaidAccess() {
     return !!(subscriptionState && subscriptionState.effective_access);
   }
@@ -555,7 +662,35 @@
     if (hasPaidAccess()) {
       return "premium";
     }
+    if (isExpiredTrial()) {
+      return "expired_trial";
+    }
     return "free";
+  }
+
+  function openQuizOverlay(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    if (quizOverlay && window.rawleadQuizApp && typeof window.rawleadQuizApp.open === "function") {
+      window.rawleadQuizApp.open({ autoStart: false });
+      return;
+    }
+    window.location.href = quizUrl;
+  }
+
+  function bindQuizTriggers(container) {
+    if (!container || !quizOverlay) {
+      return;
+    }
+    container.querySelectorAll("[data-quiz-open], .rl-quiz-trigger").forEach(function (el) {
+      if (el.dataset.quizBound === "1") {
+        return;
+      }
+      el.dataset.quizBound = "1";
+      el.addEventListener("click", openQuizOverlay);
+    });
   }
 
   function hideFilterHint() {
@@ -572,11 +707,143 @@
     if (!filterHintEl || getFeedTier() !== "anon") {
       return;
     }
+    filterHintEl.innerHTML =
+      "⚙ Фильтры — после настройки профиля · " +
+      '<a href="#quiz" class="rl-quiz-trigger" data-quiz-open="1">Настроить ленту →</a>';
     filterHintEl.hidden = false;
+    bindQuizTriggers(filterHintEl);
     if (filterHintTimer) {
       clearTimeout(filterHintTimer);
     }
     filterHintTimer = window.setTimeout(hideFilterHint, 4000);
+  }
+
+  function weightDeltaUrl() {
+    var rest = (cfg.restTags || "").replace(/\/tags\/?$/, "/tags/weight_delta");
+    if (rest.indexOf("weight_delta") >= 0) {
+      return rest;
+    }
+    var base = (cfg.apiBase || "").replace(/\/$/, "");
+    return base ? base + "/v1/me/tags/weight_delta" : "";
+  }
+
+  function leadTagsForWeight(item) {
+    if (!item) {
+      return [];
+    }
+    return (item.lead_tags || item.tags || []).slice();
+  }
+
+  function postTagWeightDelta(event, tags) {
+    if (!isLoggedIn() || !tags || !tags.length) {
+      return;
+    }
+    var url = weightDeltaUrl();
+    if (!url) {
+      return;
+    }
+    fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+      body: JSON.stringify({ event: event, tags: tags }),
+    }).catch(function () {
+      /* fire-and-forget */
+    });
+  }
+
+  function quizPromoHtml() {
+    return (
+      '<article class="rl-feed-quiz-promo rl-lead-card" id="rl-feed-quiz-promo">' +
+      '<div class="rl-feed-card__head">' +
+      '<div class="rl-feed-card__head-start">' +
+      '<div class="rl-feed-card__badge-stack">' +
+      '<span class="rl-feed-card__source rl-feed-card__source--rawlead">RawLead</span>' +
+      "</div>" +
+      "</div>" +
+      "</div>" +
+      '<h3 class="rl-lead-card__title"><span>Персональная лента за 2 мин</span></h3>' +
+      '<p class="rl-feed-quiz-promo__desc">Ответь на карточки — ИИ подберёт заказы под твой стек</p>' +
+      '<div class="rl-chips rl-chips--promo-spacer" aria-hidden="true"></div>' +
+      '<a class="rl-btn rl-btn--primary rl-feed-quiz-promo__cta rl-quiz-trigger" href="#quiz" data-quiz-open="1">Настроить ленту →</a>' +
+      "</article>"
+    );
+  }
+
+  function expiredBannerHtml() {
+    var pricingUrl = (cfg.pricingUrl || "/pricing/").replace(/\/?$/, "/");
+    return (
+      '<div class="rl-feed-expired-banner" id="rl-feed-expired-banner">' +
+      '<p class="rl-feed-expired-banner__title">⚠ Пробный период закончился</p>' +
+      '<p class="rl-feed-expired-banner__text">Лента без фильтров и с задержкой 30 мин.</p>' +
+      '<a class="rl-btn rl-btn--primary" href="' +
+      escapeHtml(pricingUrl) +
+      '">Вернуть персонализацию →</a>' +
+      '<p class="rl-feed-expired-banner__price">Premium · 790 ₽/мес</p>' +
+      "</div>"
+    );
+  }
+
+  function ensureExpiredBanner() {
+    var tier = getFeedTier();
+    var banner = document.getElementById("rl-feed-expired-banner");
+    if (tier !== "expired_trial") {
+      if (banner) {
+        banner.remove();
+      }
+      return;
+    }
+    if (!banner && listEl && listEl.parentElement) {
+      listEl.parentElement.insertAdjacentHTML("afterbegin", expiredBannerHtml());
+    }
+  }
+
+  function positionQuizPromoInFeed() {
+    var promo = document.getElementById("rl-feed-quiz-promo");
+    if (getFeedTier() !== "anon") {
+      if (promo) {
+        promo.remove();
+      }
+      return;
+    }
+    if (!listEl) {
+      return;
+    }
+    if (!promo) {
+      listEl.insertAdjacentHTML("afterbegin", quizPromoHtml());
+      promo = document.getElementById("rl-feed-quiz-promo");
+      if (promo) {
+        revealCardAnimated(promo, false);
+      }
+      return;
+    }
+    if (listEl.firstElementChild !== promo) {
+      listEl.insertBefore(promo, listEl.firstChild);
+    }
+  }
+
+  function ensureAnonQuizPromo() {
+    ensureExpiredBanner();
+    positionQuizPromoInFeed();
+  }
+
+  function setCategoryFiltersLocked(locked) {
+    if (!sidebar) {
+      return;
+    }
+    sidebar.querySelectorAll(".rl-cat-chip").forEach(function (label) {
+      var input = label.querySelector('input[name="category"]');
+      if (!input || !input.value) {
+        return;
+      }
+      input.disabled = locked;
+      label.classList.toggle("rl-cat-chip--locked", locked);
+      if (locked) {
+        label.setAttribute("data-filter-locked", "category");
+      } else {
+        label.removeAttribute("data-filter-locked");
+      }
+    });
   }
 
   function updateSortTriggerLabel() {
@@ -634,7 +901,8 @@
       sidebar.setAttribute("data-tier", tier);
     }
     root.setAttribute("data-feed-tier", tier);
-    var locked = tier === "anon";
+    root.classList.toggle("rl-app--feed-expired", tier === "expired_trial");
+    var locked = tier === "anon" || tier === "expired_trial";
     var sortTrigger = document.getElementById("rl-feed-sort-trigger");
     [skillsTriggerBtn, sortTrigger].forEach(function (btn) {
       if (!btn) {
@@ -662,6 +930,8 @@
     enforceFeedSortTier();
     renderSortPanel();
     updateSortTriggerLabel();
+    setCategoryFiltersLocked(locked);
+    ensureAnonQuizPromo();
   }
 
   function loadSubscription() {
@@ -686,6 +956,134 @@
       .catch(function () {
         subscriptionState = null;
         return null;
+      });
+  }
+
+  function loadMe() {
+    if (!cfg.restMe || !getToken()) {
+      meState = null;
+      return Promise.resolve(null);
+    }
+    return fetch(cfg.restMe, {
+      credentials: "same-origin",
+      headers: authHeaders(),
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error("me " + res.status);
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        meState = data || null;
+        return data;
+      })
+      .catch(function () {
+        meState = null;
+        return null;
+      });
+  }
+
+  function canMarkTgSpam() {
+    return !!(meState && meState.can_ops_admin);
+  }
+
+  function isTgSource(source) {
+    var s = (source || "").toLowerCase();
+    return s.indexOf("tg") === 0 || s.indexOf("telegram") === 0;
+  }
+
+  function tgSpamAdminUrl(leadId) {
+    var base = (cfg.restLeadAdmin || "").replace(/\/$/, "");
+    return base + "/" + leadId + "/tg-spam";
+  }
+
+  function tgSpamFooterHtml(item) {
+    if (!canMarkTgSpam() || !isTgSource(item.source)) {
+      return "";
+    }
+    return (
+      '<div class="rl-feed-card__footer">' +
+      '<button type="button" class="rl-btn rl-btn--ghost rl-feed-card__spam-btn" data-lead-id="' +
+      item.id +
+      '">Спам</button>' +
+      "</div>"
+    );
+  }
+
+  function removeFeedCard(card) {
+    if (!card || !card.parentNode) {
+      return;
+    }
+    card.classList.add("rl-lead-card--removing");
+    window.setTimeout(function () {
+      if (card.parentNode) {
+        card.parentNode.removeChild(card);
+      }
+      var id = parseInt(card.getAttribute("data-id"), 10);
+      if (id && state.itemsById[id]) {
+        delete state.itemsById[id];
+      }
+      if (state.totalShown > 0) {
+        state.totalShown -= 1;
+      }
+      updateCount();
+    }, 220);
+  }
+
+  function tgSpamToastForStatus(status) {
+    if (status === 403) {
+      return "Только владелец";
+    }
+    if (status === 404) {
+      return "Уже скрыт";
+    }
+    if (status === 401) {
+      return "Войдите снова";
+    }
+    if (status >= 500) {
+      return "Сервер занят — повторите";
+    }
+    return "Не удалось отметить спам";
+  }
+
+  function markTgSpamCard(card, btn) {
+    var id = parseInt(
+      btn.getAttribute("data-lead-id") || card.getAttribute("data-id"),
+      10
+    );
+    if (!id || btn.disabled) {
+      return;
+    }
+    btn.disabled = true;
+    fetch(tgSpamAdminUrl(id), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+      body: "{}",
+    })
+      .then(function (res) {
+        return res
+          .json()
+          .catch(function () {
+            return {};
+          })
+          .then(function (body) {
+            if (!res.ok) {
+              var err = new Error("HTTP " + res.status);
+              err.status = res.status;
+              throw err;
+            }
+            return body;
+          });
+      })
+      .then(function () {
+        showDraftToast("Учтём в фильтре");
+        removeFeedCard(card);
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        showDraftToast(tgSpamToastForStatus((err && err.status) || 0));
       });
   }
 
@@ -922,6 +1320,9 @@
       return "";
     }
     var diff = Date.now() - d.getTime();
+    if (diff < 0) {
+      diff = 0;
+    }
     var mins = Math.floor(diff / 60000);
     if (mins < 60) {
       return mins <= 1 ? "только что" : mins + " мин назад";
@@ -931,6 +1332,28 @@
       return hrs + " ч назад";
     }
     return d.toLocaleDateString("ru-RU");
+  }
+
+  function itemPassesFeedDelay(item) {
+    if (!item || !item.created_at) {
+      return false;
+    }
+    var d = new Date(item.created_at);
+    if (isNaN(d.getTime())) {
+      return false;
+    }
+    return Date.now() - d.getTime() >= FEED_DELAY_MS;
+  }
+
+  function filterDelayedFeedItems(items, feedDelayed) {
+    if (!feedDelayed) {
+      return items;
+    }
+    return items.filter(itemPassesFeedDelay);
+  }
+
+  function cardTimeHtml(iso) {
+    return '<span class="rl-feed-card__time">' + escapeHtml(formatTime(iso)) + "</span>";
   }
 
   var HOT_MAX_AGE_MS = 300000;
@@ -1476,31 +1899,29 @@
   }
 
   function renderMatchBreakdown(item) {
-    if (!isLoggedIn()) {
+    if (!isLoggedIn() || hasUserSkills()) {
       return "";
     }
-    if (!hasUserSkills()) {
-      return (
-        '<div class="rl-match-breakdown">' +
-        '<button type="button" class="rl-match-breakdown__cta" data-open-skills>' +
-        escapeHtml("Добавь навыки — увидишь совместимость →") +
-        "</button></div>"
-      );
-    }
-    return "";
+    return (
+      '<div class="rl-match-breakdown">' +
+      '<a class="rl-match-breakdown__cta rl-quiz-trigger" href="#quiz" data-quiz-open="1">' +
+      escapeHtml("Пройди квиз — увидишь совместимость →") +
+      "</a></div>"
+    );
   }
 
   function renderCompatMatchBar(item) {
     var km = item.keyword_match != null ? item.keyword_match : 0;
     var compatTitle =
-      ' title="Насколько ваш стек совпадает с заказом — не оценка качества заказа"';
+      ' title="Насколько заказ подходит под твой профиль из квиза"';
     return (
-      '<div class="rl-match">' +
+      '<div class="rl-match rl-match-bar">' +
       '<div class="rl-match__label"><span' +
       compatTitle +
       ">" +
+      "Совпадение " +
       km +
-      "% Совместимость</span></div>" +
+      "%</span></div>" +
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
       km +
       '" aria-valuemin="0" aria-valuemax="100">' +
@@ -1528,7 +1949,8 @@
   }
 
   function renderMatchBlock(item) {
-    if (getFeedTier() === "anon") {
+    var tier = getFeedTier();
+    if (tier === "anon" || tier === "expired_trial") {
       return "";
     }
     if (getFeedTier() === "free") {
@@ -1602,6 +2024,9 @@
   }
 
   function openSkillsUi() {
+    if (isLoggedIn()) {
+      return;
+    }
     if (usesSkillTree() && skillsModalEl) {
       openFeedSkillsModal();
       return;
@@ -1635,7 +2060,7 @@
       '" onclick="event.stopPropagation()">Подключить Premium 790 ₽</a> ' +
       "или <a href=\"" +
       escapeHtml(pricing) +
-      '" onclick="event.stopPropagation()">Попробовать за 1 ₽</a>' +
+      '" onclick="event.stopPropagation()">Trial бесплатно 3 дня</a>' +
       "</div>"
     );
   }
@@ -1655,9 +2080,15 @@
     }
     if (tier === "anon") {
       return (
+        '<a href="#quiz" class="rl-card-cta rl-card-cta--anon rl-quiz-trigger" data-quiz-open="1">Настроить ленту →</a>'
+      );
+    }
+    if (tier === "expired_trial") {
+      var pricingUrl = (cfg.pricingUrl || "/pricing/").replace(/\/?$/, "/");
+      return (
         '<a href="' +
-        escapeHtml(cabinetLoginUrl) +
-        '" class="rl-card-cta rl-card-cta--anon" onclick="event.stopPropagation()">Войди и проверь совместимость →</a>'
+        escapeHtml(pricingUrl) +
+        '" class="rl-card-cta rl-card-cta--anon" onclick="event.stopPropagation()">Premium — черновики и персонализация →</a>'
       );
     }
     if (tier === "free") {
@@ -1682,23 +2113,7 @@
   }
 
   function viewsHeadHtml(item) {
-    var v = effectiveDisplayViews(item);
-    if (v == null || v <= 0) {
-      return "";
-    }
-    var html = "";
-    if (v != null && v > 0) {
-      var n = escapeHtml(String(v));
-      html +=
-        '<span class="rl-feed-card__views" aria-label="' +
-        n +
-        ' просмотров">' +
-        VIEWS_EYE_SVG +
-        '<span class="rl-feed-card__views-count">' +
-        n +
-        "</span></span>";
-    }
-    return html;
+    return "";
   }
 
   function repliedBadgeHtml() {
@@ -1713,7 +2128,6 @@
     var src = sourceLabel(item.source);
     return (
       '<div class="rl-feed-card__badge-stack">' +
-      nicheIconHtmlForItem(item) +
       '<span class="rl-feed-card__source rl-feed-card__source--' +
       src.cls +
       '">' +
@@ -1746,12 +2160,7 @@
       '<div class="rl-feed-card__head">' +
       '<div class="rl-feed-card__head-start">' +
       headBadgesHtml(item, perfect) +
-      "</div>" +
-      '<div class="rl-feed-card__head-meta">' +
-      viewsHeadHtml(item) +
-      '<span class="rl-feed-card__time">' +
-      formatTime(item.created_at) +
-      "</span>" +
+      cardTimeHtml(item.created_at) +
       "</div>" +
       "</div>" +
       '<h3 class="rl-lead-card__title">' +
@@ -1765,13 +2174,13 @@
       escapeHtml(budget) +
       "</p>" +
       renderMatchBlock(item) +
-      renderSlotLine(item) +
       '<div class="rl-chips' +
       (expanded ? " rl-chips--expanded-visible" : "") +
       '">' +
       renderTagChips(item, expanded ? null : 2) +
       "</div>" +
       replyCtaHtml(item) +
+      tgSpamFooterHtml(item) +
       '<div class="rl-feed-card__body">' +
       '<div class="rl-feed-card__body-inner">' +
       renderExpandedBody(item) +
@@ -3094,6 +3503,10 @@
 
     fetch(url, { credentials: "same-origin", headers: authHeaders() })
       .then(function (res) {
+        if (res.status === 401 && isLoggedIn()) {
+          handleTagsAuthFailure();
+          throw new Error("HTTP 401");
+        }
         if (!res.ok) {
           throw new Error("HTTP " + res.status);
         }
@@ -3105,6 +3518,8 @@
         }
         hideFeedBanner();
         var items = data.items || [];
+        var feedDelayed = data.feed_delayed === true || getFeedTier() === "anon";
+        items = filterDelayedFeedItems(items, feedDelayed);
         if (data.total != null) {
           state.total = parseInt(data.total, 10) || 0;
         }
@@ -3130,14 +3545,17 @@
           ) {
             listEl.innerHTML =
               '<p class="rl-feed-empty">В этой нише пока нет заказов — попробуй «Все»</p>';
+          } else if (getFeedTier() === "anon" || getFeedTier() === "expired_trial") {
+            listEl.innerHTML =
+              '<p class="rl-feed-empty">Лента показывает последние заказы · Персонализация — после входа</p>';
           } else {
             listEl.innerHTML =
-              '<p class="rl-feed-empty">Пока нет заказов. Биржи опрашиваются каждые 15 минут.</p>';
+              '<p class="rl-feed-empty">Пока нет заказов. Биржи опрашиваются регулярно.</p>';
           }
         } else {
           var frag = items
             .map(function (item) {
-              return renderCard(item, !replace);
+              return renderCard(item, false);
             })
             .join("");
           listEl.insertAdjacentHTML("beforeend", frag);
@@ -3156,6 +3574,7 @@
         updateCount();
         updateFilterBarUi();
         bindCards();
+        ensureAnonQuizPromo();
         observeLeadCards(listEl);
         updatePagination();
         if (replace && state.focusLeadId && !state.focusLeadHandled) {
@@ -3249,18 +3668,21 @@
     }
   }
 
+  function resetCardHeadMeta(card, item) {
+    if (!card || !item) {
+      return;
+    }
+    var timeEl = card.querySelector(".rl-feed-card__head-start .rl-feed-card__time");
+    if (timeEl) {
+      timeEl.textContent = formatTime(item.created_at);
+    }
+  }
+
   function refreshCardSocialMeta(card, item) {
     if (!card || !item) {
       return;
     }
-    var meta = card.querySelector(".rl-feed-card__head-meta");
-    if (meta) {
-      var timeEl = meta.querySelector(".rl-feed-card__time");
-      var timeHtml = timeEl
-        ? timeEl.outerHTML
-        : '<span class="rl-feed-card__time">' + formatTime(item.created_at) + "</span>";
-      meta.innerHTML = viewsHeadHtml(item) + timeHtml;
-    }
+    resetCardHeadMeta(card, item);
     var slotRow = card.querySelector(".rl-slot-row");
     var slotHtml = renderSlotLine(item);
     if (slotRow) {
@@ -3325,6 +3747,7 @@
         var otherId = parseInt(c.getAttribute("data-id"), 10);
         if (otherId && state.itemsById[otherId]) {
           syncCardChips(c, state.itemsById[otherId], false);
+          resetCardHeadMeta(c, state.itemsById[otherId]);
         }
       }
     });
@@ -3341,6 +3764,10 @@
     }
     syncDraftGeneratingUi(card);
     maybeWarmDraftOnExpand(card);
+    var item = state.itemsById[id];
+    if (item && (!hasPaidAccess() || getFeedTier() !== "premium")) {
+      postTagWeightDelta("expand", leadTagsForWeight(item));
+    }
   }
 
   function setCardBodyHtml(card, html) {
@@ -3462,6 +3889,7 @@
       card.classList.remove("is-expanded");
       if (state.itemsById[id]) {
         syncCardChips(card, state.itemsById[id], false);
+        resetCardHeadMeta(card, state.itemsById[id]);
         if (
           card.classList.contains("rl-lead-card--draft-done") &&
           prepForDisplay(state.itemsById[id].reply_draft || "", false).trim()
@@ -3503,22 +3931,6 @@
     if (baseItem && replySlotsRemaining(baseItem) <= 0) {
       return;
     }
-    listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
-      if (c === card) {
-        return;
-      }
-      var collapsedId = parseInt(c.getAttribute("data-id"), 10);
-      if (collapsedId && state.draftInflight[collapsedId]) {
-        return;
-      }
-      c.classList.remove("is-expanded");
-      if (collapsedId && state.itemsById[collapsedId]) {
-        syncCardChips(c, state.itemsById[collapsedId], false);
-      }
-    });
-    if (state.expandedId && state.expandedId !== id) {
-      state.expandedId = card.classList.contains("is-expanded") ? id : null;
-    }
     var replyEl = card.querySelector("[data-reply-text]");
     if (replyEl && replyEl.textContent.trim()) {
       expandCard(card);
@@ -3526,89 +3938,44 @@
       return;
     }
     if (state.draftInflight[id]) {
+      syncDraftGeneratingUi(card);
+      expandCard(card);
       return;
     }
-    resetCardDraftUi(card);
+    if (replyBtn.disabled && replyBtn.textContent.indexOf("Добавлено") >= 0) {
+      return;
+    }
+    var prevLabel = replyBtn.textContent;
+    showDraftToast("Черновик появится в личном кабинете после генерации");
+    state.draftInflight[id] = { startedMs: Date.now(), queued: false };
+    syncDraftGeneratingUi(card);
     expandCard(card);
     if (baseItem) {
       setDraftPendingBody(card, baseItem);
     }
-    var prevLabel = replyBtn.textContent;
-    var startedMs = Date.now();
-    var slowTimer = window.setTimeout(function () {
-      if (!state.draftInflight[id]) {
-        return;
-      }
-      var btn = card.querySelector(".rl-feed-card__reply-btn");
-      if (btn && btn.classList.contains("is-generating")) {
-        btn.textContent = DRAFT_BTN_SLOW_RU;
-      }
-    }, DRAFT_BTN_SLOW_MS);
-    state.draftInflight[id] = {
-      startedMs: startedMs,
-      prevLabel: prevLabel,
-      slowTimer: slowTimer,
-    };
-    setReplyBtnGenerating(replyBtn, true);
-    card.classList.add("rl-lead-card--draft-pending");
+    addPendingDraft(id, baseItem);
+    notifyInboxRefresh();
     fetchDraft(id)
       .then(function (data) {
-        var base = state.itemsById[id] || { id: id };
-        var merged = Object.assign({}, base, {
-          reply_draft: data.reply_draft,
-          tools_required: data.tools_required || base.tools_required || [],
-        });
-        state.itemsById[id] = merged;
-        onDraftReady(card, merged);
+        delete state.draftInflight[id];
+        var item = baseItem || state.itemsById[id] || { id: id };
+        if (data) {
+          if (data.reply_draft) {
+            item.reply_draft = data.reply_draft;
+          }
+          if (data.reply_slots_remaining != null) {
+            item.reply_slots_remaining = data.reply_slots_remaining;
+          }
+          state.itemsById[id] = item;
+        }
+        onDraftReady(card, item);
       })
       .catch(function (err) {
-        delete draftLastPollStatus[id];
-        card.classList.remove("rl-lead-card--draft-pending");
-        var itemAfterFail = state.itemsById[id];
-        if (itemAfterFail && card.classList.contains("is-expanded")) {
-          setCardBodyHtml(card, renderExpandedBody(itemAfterFail));
-        }
-        if (err && err.status === 403) {
-          showError(err.detail || "Нет доступа");
-          return;
-        }
-        if (err && err.status === 429) {
-          var limMsg = err.detail || err.error || "";
-          if (limMsg && limMsg.indexOf("rate limit") !== -1) {
-            showError(limMsg);
-          } else if (limMsg) {
-            showError(limMsg);
-          }
-          return;
-        }
-        var msg = (err && err.detail) || DRAFT_FAIL_RU;
-        if (msg === "draft generation failed" || msg === "ai unavailable") {
-          msg = DRAFT_FAIL_RU;
-        }
-        showDraftError(msg, function () {
-          runDraftFetchForCard(card, replyBtn);
-        });
-      })
-      .finally(function () {
-        var inflight = state.draftInflight[id];
         delete state.draftInflight[id];
-        if (inflight && inflight.slowTimer) {
-          window.clearTimeout(inflight.slowTimer);
-        }
-        var item = state.itemsById[id];
-        var hasDraft =
-          item && prepForDisplay(item.reply_draft || "", false).trim();
-        if (hasDraft) {
-          return;
-        }
-        var btn =
-          replyBtn && replyBtn.isConnected
-            ? replyBtn
-            : card.querySelector(".rl-feed-card__reply-btn");
-        setReplyBtnGenerating(
-          btn,
-          false,
-          (inflight && inflight.prevLabel) || prevLabel
+        resetCardDraftUi(card);
+        setReplyBtnGenerating(replyBtn, false, prevLabel);
+        showDraftToast(
+          (err && err.detail) || (err && err.message) || "Ошибка, попробуй снова"
         );
       });
   }
@@ -3630,8 +3997,13 @@
   }
 
   function onFeedListClick(e) {
+    var quizTrigger = e.target.closest("[data-quiz-open], .rl-quiz-trigger");
+    if (quizTrigger && listEl && listEl.contains(quizTrigger)) {
+      openQuizOverlay(e);
+      return;
+    }
     var card = e.target.closest(".rl-lead-card");
-    if (!card || !listEl || !listEl.contains(card)) {
+    if (!card || card.classList.contains("rl-feed-quiz-promo") || !listEl || !listEl.contains(card)) {
       return;
     }
     var replyBtn = e.target.closest(
@@ -3647,6 +4019,12 @@
         return;
       }
       runDraftFetchForCard(card, replyBtn);
+      return;
+    }
+    var spamBtn = e.target.closest(".rl-feed-card__spam-btn");
+    if (spamBtn && card.contains(spamBtn)) {
+      e.stopPropagation();
+      markTgSpamCard(card, spamBtn);
       return;
     }
     var skillsCta = e.target.closest("[data-open-skills]");
@@ -3685,7 +4063,7 @@
 
   function onFeedListKeydown(e) {
     var card = e.target.closest(".rl-lead-card");
-    if (!card || !listEl.contains(card)) {
+    if (!card || card.classList.contains("rl-feed-quiz-promo") || !listEl.contains(card)) {
       return;
     }
     if (e.key === "Enter" || e.key === " ") {
@@ -3714,6 +4092,11 @@
         });
         listEl.querySelectorAll(".rl-lead-card.is-expanded").forEach(function (c) {
           c.classList.remove("is-expanded");
+          var cid = parseInt(c.getAttribute("data-id"), 10);
+          if (cid && state.itemsById[cid]) {
+            syncCardChips(c, state.itemsById[cid], false);
+            resetCardHeadMeta(c, state.itemsById[cid]);
+          }
         });
         state.expandedId = null;
       }
@@ -3957,6 +4340,12 @@
     var allInp = root.querySelector('input[name="category"][value=""]');
     root.querySelectorAll('input[name="category"]').forEach(function (inp) {
       inp.addEventListener("change", function () {
+        if (getFeedTier() === "anon" && inp.value) {
+          inp.checked = false;
+          syncChipActiveStates(root);
+          showFilterHint();
+          return;
+        }
         if (inp.value === "" && inp.checked) {
           root.querySelectorAll('input[name="category"]').forEach(function (other) {
             if (other !== inp && other.value) {
@@ -4259,10 +4648,8 @@
       loginBlock.className = "rl-sheet-block rl-sheet-block--login";
       loginBlock.innerHTML =
         '<p class="rl-sheet-block__label">Навыки и сортировка</p>' +
-        '<p class="rl-sheet-block__hint">Войди через Telegram — настрой подбор по навыкам и сортировку.</p>' +
-        '<a class="rl-btn rl-btn--secondary rl-sheet-login-btn" href="' +
-        escapeHtml(cabinetLoginUrl) +
-        '">Войти в кабинет →</a>';
+        '<p class="rl-sheet-block__hint">Пройди тест — включи фильтры и персональную ленту.</p>' +
+        '<a class="rl-btn rl-btn--secondary rl-sheet-login-btn rl-quiz-trigger" href="#quiz" data-quiz-open="1">Настроить ленту →</a>';
       sheetBody.appendChild(loginBlock);
     }
     sheetBody.querySelectorAll("input").forEach(function (inp) {
@@ -4370,6 +4757,9 @@
   }
 
   ensureCardDelegation();
+  if (!isLoggedIn()) {
+    ensureAnonQuizPromo();
+  }
   syncMobileFilterChrome();
   if (window.matchMedia) {
     window.matchMedia("(max-width: 767px)").addEventListener("change", syncMobileFilterChrome);
@@ -4396,6 +4786,7 @@
 
   Promise.all([
     loadSubscription(),
+    loadMe(),
     isLoggedIn() ? mergeFeedPrefsOnLogin() : Promise.resolve(),
     loadTags().catch(function () {}),
     loadCatalog().catch(function () {}),
@@ -4451,6 +4842,28 @@
 
   syncFeedCabinetLink();
   window.addEventListener("rawlead-auth-changed", syncFeedCabinetLink);
+
+  if (quizOverlay) {
+    root.addEventListener(
+      "click",
+      function (event) {
+        if (event.target.closest("[data-quiz-open], .rl-quiz-trigger")) {
+          openQuizOverlay(event);
+        }
+      },
+      true
+    );
+    window.addEventListener("hashchange", function () {
+      if (location.hash === "#quiz" && window.rawleadQuizApp) {
+        window.rawleadQuizApp.open({ autoStart: false });
+      }
+    });
+    window.addEventListener("rawlead-quiz-complete", function () {
+      applyFeedTierUi();
+      syncFeedCabinetLink();
+      resetAndLoad();
+    });
+  }
 
   if (window.rawleadSyncHeader) {
     window.rawleadSyncHeader();

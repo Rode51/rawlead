@@ -30,6 +30,7 @@
   var TOKEN_KEY = "rawlead_access_token";
   var TAGS_SYNC_KEY = "rawlead_user_tags_rev";
   var INBOX_SYNC_KEY = "rawlead_inbox_rev";
+  var PENDING_DRAFTS_KEY = "rawlead_pending_drafts";
   var AUTH_COOKIE = "rl_access";
   var AUTH_COOKIE_MAX_AGE = 7 * 24 * 3600;
 
@@ -224,6 +225,47 @@
       return path;
     }
     return base + path;
+  }
+
+  function weightDeltaUrl() {
+    var rest = (cfg.restTags || "").replace(/\/tags\/?$/, "/tags/weight_delta");
+    if (rest.indexOf("weight_delta") >= 0) {
+      return rest;
+    }
+    return apiEndpoint("/v1/me/tags/weight_delta");
+  }
+
+  function leadTagsForWeight(item) {
+    if (!item) {
+      return [];
+    }
+    return (item.lead_tags || item.tags || []).slice();
+  }
+
+  function postTagWeightDelta(event, tags) {
+    if (!getToken() || !tags || !tags.length) {
+      return;
+    }
+    var url = weightDeltaUrl();
+    if (!url) {
+      return;
+    }
+    fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+      body: JSON.stringify({ event: event, tags: tags }),
+    }).catch(function () {
+      /* fire-and-forget */
+    });
+  }
+
+  function notifyExpandWeight(card) {
+    var id = parseInt(card.getAttribute("data-id"), 10);
+    if (!id) {
+      return;
+    }
+    postTagWeightDelta("expand", leadTagsForWeight(state.itemsById[id]));
   }
 
   function isWideScreen() {
@@ -978,6 +1020,8 @@
   var subPayEl = document.getElementById("rl-cabinet-sub-pay");
   var subTrialEl = document.getElementById("rl-cabinet-sub-trial");
   var subNoteEl = document.getElementById("rl-cabinet-sub-note");
+  var trialBadgeEl = document.getElementById("rl-cabinet-trial-badge");
+  var expiredBannerEl = document.getElementById("rl-cabinet-expired-banner");
   var subscriptionState = null;
 
   var notifEl = document.getElementById("rl-cabinet-notif");
@@ -1271,6 +1315,36 @@
         subNoteEl.textContent = "";
       }
     }
+
+    if (trialBadgeEl) {
+      var showTrialBadge =
+        isTrial && !!data.effective_access && data.trial_days_left != null;
+      trialBadgeEl.hidden = !showTrialBadge;
+      trialBadgeEl.textContent = showTrialBadge
+        ? "✓ Trial Premium · " + data.trial_days_left + " дн."
+        : "";
+    }
+
+    if (expiredBannerEl) {
+      var showExpired =
+        status === "expired" ||
+        (!!data.trial_used && !data.effective_access && status !== "active" && status !== "beta");
+      if (showExpired) {
+        var pricingUrl = (cfg.pricingUrl || "/pricing/").replace(/\/?$/, "/");
+        expiredBannerEl.hidden = false;
+        expiredBannerEl.innerHTML =
+          '<p class="rl-cabinet-expired-banner__title">⚠ Пробный период закончился</p>' +
+          '<p class="rl-cabinet-expired-banner__text">Лента без фильтров и с задержкой 30 мин.</p>' +
+          '<a class="rl-btn rl-btn--primary" href="' +
+          pricingUrl +
+          '">Вернуть персонализацию →</a>' +
+          '<p class="rl-cabinet-expired-banner__price">Premium · 790 ₽/мес</p>';
+      } else {
+        expiredBannerEl.hidden = true;
+        expiredBannerEl.innerHTML = "";
+      }
+    }
+
     updateInboxEmptyStates();
     loadNotificationSettings(data);
   }
@@ -2309,6 +2383,7 @@
     }
 
     var reply = prepForDisplay(item.reply_draft || "", false).trim();
+    var draftStatus = item.draft_status || (reply ? "done" : "");
 
     var tools = item.tools_required || [];
 
@@ -2348,7 +2423,29 @@
 
     }
 
-    if (reply) {
+    if (draftStatus === "pending") {
+
+      html +=
+
+        '<div class="rl-feed-card__section">' +
+
+        '<p class="rl-feed-card__text rl-feed-card__muted">⏳ Черновик генерируется…</p>' +
+
+        "</div>";
+
+    } else if (draftStatus === "failed") {
+
+      html +=
+
+        '<div class="rl-feed-card__section">' +
+
+        '<p class="rl-feed-card__text">Не удалось сгенерировать · ' +
+
+        '<button type="button" class="rl-btn rl-btn--ghost rl-feed-card__draft-retry" data-draft-retry>Повторить</button>' +
+
+        "</p></div>";
+
+    } else if (reply) {
 
       html +=
 
@@ -2713,14 +2810,15 @@
     if (!ordered.length) {
 
       html +=
-
-        '<button type="button" class="rl-cabinet-tag--empty-link" id="rl-cabinet-tag-add">Добавь навыки для совместимости →</button>';
+        '<a class="rl-cabinet-tag--empty-link" href="' +
+        escapeHtml(cfg.quizUrl || "/quiz/") +
+        '">Пройди квиз — увидишь совместимость →</a>';
 
       if (tagsHint) {
 
         tagsHint.hidden = false;
 
-        tagsHint.textContent = "Лента покажет совместимость";
+        tagsHint.textContent = "Лента подбирает совместимость из квиза";
 
         tagsHint.classList.add("rl-cabinet-head__hint--compat");
 
@@ -4103,9 +4201,11 @@
     if (!hasUserSkills()) {
       return (
         '<div class="rl-match-breakdown">' +
-        '<button type="button" class="rl-match-breakdown__cta" data-open-skills>' +
-        escapeHtml("Добавь навыки — увидишь совместимость →") +
-        "</button></div>"
+        '<a class="rl-match-breakdown__cta" href="' +
+        escapeHtml(cfg.quizUrl || "/quiz/") +
+        '">' +
+        escapeHtml("Пройди квиз — увидишь совместимость →") +
+        "</a></div>"
       );
     }
     return "";
@@ -4149,20 +4249,11 @@
     "</svg>";
 
   function viewsHeadHtml(item) {
-    var v = item.display_views;
-    if (v == null || v <= 0) {
-      return "";
-    }
-    var n = escapeHtml(String(v));
-    return (
-      '<span class="rl-feed-card__views" aria-label="' +
-      n +
-      ' просмотров">' +
-      VIEWS_EYE_SVG +
-      '<span class="rl-feed-card__views-count">' +
-      n +
-      "</span></span>"
-    );
+    return "";
+  }
+
+  function cardTimeHtml(iso) {
+    return '<span class="rl-feed-card__time">' + escapeHtml(formatTime(iso)) + "</span>";
   }
 
   function hasPaidAccess() {
@@ -4202,7 +4293,6 @@
     var reply = prepForDisplay(item.reply_draft || "", false).trim();
     var repliedBadge = reply ? repliedBadgeHtml() : "";
     return (
-      nicheIconHtmlForItem(item) +
       '<span class="rl-feed-card__source rl-feed-card__source--' +
       src.cls +
       '">' +
@@ -4229,11 +4319,9 @@
       '<div class="rl-feed-card__head">' +
       '<div class="rl-feed-card__head-start">' +
       headBadgesHtml(item, perfect) +
+      cardTimeHtml(item.created_at) +
       "</div>" +
       '<div class="rl-feed-card__head-meta">' +
-      '<span class="rl-feed-card__time">' +
-      formatTime(item.created_at) +
-      "</span>" +
       '<button type="button" class="rl-inbox-card__delete" aria-label="Удалить отклик" data-reply-id="' +
       item.id +
       '">✕</button>' +
@@ -4673,6 +4761,9 @@
           state.itemsById[item.id] = item;
         });
 
+        applyInboxDraftStatuses();
+        startInboxDraftPolling();
+
         if (items.length === 0 && state.offset === 0 && inboxItemsFromState().length === 0) {
           if (listEl) {
             listEl.innerHTML = "";
@@ -4749,9 +4840,201 @@
 
 
   var DRAFT_POLL_MS = 2000;
+  var INBOX_DRAFT_POLL_MS = 10000;
   var DRAFT_POLL_MAX_MS = 120000;
   var DRAFT_FAIL_RU = "ИИ временно недоступен — повторите";
   var DRAFT_POLL_TIMEOUT_RU = "ИИ не успел — повторите";
+  var inboxDraftPollTimers = {};
+
+  function readPendingDraftsMap() {
+    try {
+      var raw = localStorage.getItem(PENDING_DRAFTS_KEY);
+      if (!raw) {
+        return {};
+      }
+      var data = JSON.parse(raw);
+      return data && typeof data === "object" ? data : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function writePendingDraftsMap(map) {
+    try {
+      localStorage.setItem(PENDING_DRAFTS_KEY, JSON.stringify(map || {}));
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  function removePendingDraft(leadId) {
+    if (!leadId) {
+      return;
+    }
+    var map = readPendingDraftsMap();
+    delete map[String(leadId)];
+    writePendingDraftsMap(map);
+  }
+
+  function applyInboxDraftStatuses() {
+    var pendingMap = readPendingDraftsMap();
+    for (var key in pendingMap) {
+      var row = pendingMap[key];
+      var id = parseInt(key, 10);
+      if (!id) {
+        continue;
+      }
+      if (!state.itemsById[id]) {
+        state.itemsById[id] = {
+          id: id,
+          title: row.title || "Заказ #" + id,
+          category: row.category || "",
+          reply_draft: "",
+          draft_status: "pending",
+          source: "",
+          created_at: null,
+        };
+      }
+    }
+    for (var lid in state.itemsById) {
+      var item = state.itemsById[lid];
+      var reply = prepForDisplay(item.reply_draft || "", false).trim();
+      if (reply) {
+        item.draft_status = "done";
+        removePendingDraft(item.id);
+      } else if (pendingMap[String(item.id)]) {
+        item.draft_status = item.draft_status === "failed" ? "failed" : "pending";
+      }
+    }
+  }
+
+  function clearInboxDraftPoll(leadId) {
+    if (inboxDraftPollTimers[leadId]) {
+      window.clearTimeout(inboxDraftPollTimers[leadId]);
+      delete inboxDraftPollTimers[leadId];
+    }
+  }
+
+  function refreshInboxCardDraft(leadId) {
+    var item = state.itemsById[leadId];
+    if (!item) {
+      return;
+    }
+    var card = listEl && listEl.querySelector('.rl-lead-card[data-id="' + leadId + '"]');
+    if (card) {
+      updateCardDraft(card, item);
+    } else {
+      rerenderInboxList();
+    }
+  }
+
+  function pollInboxDraftOnce(leadId) {
+    return fetch(draftUrl(leadId), {
+      method: "GET",
+      credentials: "same-origin",
+      headers: authHeaders(),
+    })
+      .then(function (res) {
+        return res.json().catch(function () {
+          return {};
+        }).then(function (data) {
+          return { res: res, data: data };
+        });
+      })
+      .then(function (out) {
+        var res = out.res;
+        var data = out.data || {};
+        var item = state.itemsById[leadId];
+        if (!item) {
+          return "stop";
+        }
+        if (data.status === "failed") {
+          item.draft_status = "failed";
+          refreshInboxCardDraft(leadId);
+          return "stop";
+        }
+        var ready = draftReadyPayload(data);
+        if (ready && ready.reply_draft) {
+          item.reply_draft = ready.reply_draft;
+          item.tools_required = ready.tools_required || item.tools_required || [];
+          item.draft_status = "done";
+          removePendingDraft(leadId);
+          refreshInboxCardDraft(leadId);
+          notifyInboxRefresh();
+          return "stop";
+        }
+        if (res.status === 202 || data.status === "pending") {
+          item.draft_status = "pending";
+          return "pending";
+        }
+        if (!res.ok) {
+          item.draft_status = "failed";
+          refreshInboxCardDraft(leadId);
+          return "stop";
+        }
+        return "pending";
+      })
+      .catch(function () {
+        return "pending";
+      });
+  }
+
+  function scheduleInboxDraftPoll(leadId) {
+    clearInboxDraftPoll(leadId);
+    inboxDraftPollTimers[leadId] = window.setTimeout(function () {
+      pollInboxDraftOnce(leadId).then(function (status) {
+        if (status === "pending") {
+          scheduleInboxDraftPoll(leadId);
+        } else {
+          clearInboxDraftPoll(leadId);
+        }
+      });
+    }, INBOX_DRAFT_POLL_MS);
+    pollInboxDraftOnce(leadId).then(function (status) {
+      if (status === "pending") {
+        return;
+      }
+      clearInboxDraftPoll(leadId);
+    });
+  }
+
+  function startInboxDraftPolling() {
+    for (var id in state.itemsById) {
+      var item = state.itemsById[id];
+      if (item.draft_status === "pending" || item.draft_status === "failed") {
+        scheduleInboxDraftPoll(parseInt(id, 10) || item.id);
+      }
+    }
+  }
+
+  function retryInboxDraft(leadId) {
+    var item = state.itemsById[leadId];
+    if (!item) {
+      return;
+    }
+    item.draft_status = "pending";
+    refreshInboxCardDraft(leadId);
+    fetch(draftUrl(leadId), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: authHeaders(),
+    })
+      .catch(function () {
+        item.draft_status = "failed";
+        refreshInboxCardDraft(leadId);
+      })
+      .finally(function () {
+        scheduleInboxDraftPoll(leadId);
+      });
+  }
+
+  function notifyInboxRefresh() {
+    try {
+      localStorage.setItem(INBOX_SYNC_KEY, String(Date.now()));
+    } catch (err) {
+      // ignore
+    }
+  }
 
   function draftReadyPayload(data) {
     if (!data || data.status === "failed") {
@@ -4931,6 +5214,15 @@
         });
       return;
     }
+    var draftRetry = e.target.closest("[data-draft-retry]");
+    if (draftRetry && card.contains(draftRetry)) {
+      e.stopPropagation();
+      var retryId = parseInt(card.getAttribute("data-id"), 10);
+      if (retryId) {
+        retryInboxDraft(retryId);
+      }
+      return;
+    }
     var skillsLink = e.target.closest("[data-open-skills]");
     if (skillsLink && card.contains(skillsLink)) {
       e.stopPropagation();
@@ -4966,6 +5258,7 @@
     });
     if (!wasExpanded) {
       card.classList.add("is-expanded");
+      notifyExpandWeight(card);
     }
   }
 
@@ -4985,6 +5278,7 @@
       });
       if (!wasExpanded) {
         card.classList.add("is-expanded");
+        notifyExpandWeight(card);
       }
     }
   }

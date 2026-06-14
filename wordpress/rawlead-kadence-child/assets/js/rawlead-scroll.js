@@ -212,7 +212,6 @@
       '">' +
       '<div class="rl-feed-card__head">' +
       '<div class="rl-feed-card__head-start">' +
-      nicheIconHtml(item && item.category) +
       '<span class="rl-feed-card__source rl-feed-card__source--' +
       src.cls +
       '">' +

@@ -25,7 +25,7 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 	<section class="rl-cabinet-login" id="rl-cabinet-login">
 		<div class="rl-cabinet-login__card">
 			<h1 class="rl-cabinet-login__title"><?php esc_html_e('Кабинет', 'rawlead-kadence-child'); ?></h1>
-			<p class="rl-cabinet-login__lead"><?php esc_html_e('Настроишь навыки — лента покажет заказы под твой стек. Черновик отклика — за один клик.', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-cabinet-login__lead"><?php esc_html_e('Лента уже подбирает совпадения. Войди — посмотришь свой профиль и черновики.', 'rawlead-kadence-child'); ?></p>
 			<button type="button" class="rl-btn rl-btn--primary rl-cabinet-login__btn" id="rl-cabinet-login-btn">
 				<svg class="rl-cabinet-login__icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
 					<path fill="currentColor" d="M9.04 15.314l-.376 5.302c.538 0 .77-.231 1.049-.508l2.518-2.418 5.217 3.823c.957.527 1.637.251 1.898-.885l3.438-16.08.001-.001c.305-1.423-.514-1.98-1.447-1.634L1.12 9.775c-1.392.541-1.369 1.317-.236 1.667l4.913 1.533L18.9 5.48c.595-.394 1.136-.176.691.218"/>
@@ -53,6 +53,8 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 		</div>
 	</section>
 	<div class="rl-container rl-app__layout rl-cabinet-app" id="rl-cabinet-app" hidden>
+		<div class="rl-cabinet-expired-banner" id="rl-cabinet-expired-banner" hidden></div>
+		<span class="rl-trial-badge" id="rl-cabinet-trial-badge" hidden></span>
 		<div class="rl-cabinet-user" id="rl-cabinet-user" hidden>
 			<img class="rl-cabinet-user__avatar" id="rl-cabinet-user-avatar" alt="" width="40" height="40">
 			<div class="rl-cabinet-user__info">
@@ -72,11 +74,11 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 				<h2 class="rl-cabinet-sub__title" id="rl-cabinet-sub-title"><?php esc_html_e('RawLead Premium', 'rawlead-kadence-child'); ?></h2>
 				<span class="rl-cabinet-sub__badge" id="rl-cabinet-sub-badge" aria-live="polite"></span>
 			</div>
-			<p class="rl-cabinet-sub__price" id="rl-cabinet-sub-price"><?php esc_html_e('790 ₽/мес · trial 1 ₽ / 3 дня', 'rawlead-kadence-child'); ?></p>
+			<p class="rl-cabinet-sub__price" id="rl-cabinet-sub-price"><?php esc_html_e('790 ₽/мес · первые 3 дня бесплатно', 'rawlead-kadence-child'); ?></p>
 			<p class="rl-cabinet-sub__detail" id="rl-cabinet-sub-detail"></p>
 			<div class="rl-cabinet-sub__actions">
 				<button type="button" class="rl-btn rl-btn--primary rl-cabinet-sub__trial" id="rl-cabinet-sub-trial" hidden>
-					<?php esc_html_e('Попробовать за 1 ₽ →', 'rawlead-kadence-child'); ?>
+					<?php esc_html_e('Активировать Trial бесплатно →', 'rawlead-kadence-child'); ?>
 				</button>
 				<button type="button" class="rl-btn rl-btn--primary rl-cabinet-sub__pay" id="rl-cabinet-sub-pay" hidden>
 					<?php esc_html_e('Подключить Premium →', 'rawlead-kadence-child'); ?>
@@ -111,11 +113,12 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 			<header class="rl-cabinet-head">
 				<h1 class="rl-cabinet-head__title"><?php esc_html_e('Мои отклики', 'rawlead-kadence-child'); ?></h1>
 				<p class="rl-cabinet-head__lead"><?php esc_html_e('Отклики с ленты — здесь. Новые заказы →', 'rawlead-kadence-child'); ?> <a href="<?php echo esc_url(rawlead_page_url('lenta')); ?>"><?php esc_html_e('Лента', 'rawlead-kadence-child'); ?></a></p>
-				<p class="rl-cabinet-head__label"><?php esc_html_e('Твои навыки', 'rawlead-kadence-child'); ?></p>
+				<p class="rl-cabinet-head__label rl-cabinet-head__label--skills"><?php esc_html_e('Твои навыки', 'rawlead-kadence-child'); ?></p>
 				<div class="rl-cabinet-tags" id="rl-cabinet-tags" role="list" aria-live="polite"></div>
 				<button type="button" class="rl-btn rl-btn--ghost rl-cabinet-tags-clear" id="rl-cabinet-tags-clear" hidden><?php esc_html_e('Сбросить', 'rawlead-kadence-child'); ?></button>
-				<p class="rl-cabinet-head__hint rl-cabinet-head__hint--empty" id="rl-cabinet-tags-hint" hidden>
-					<?php esc_html_e('Добавь навыки для совместимости →', 'rawlead-kadence-child'); ?>
+				<p class="rl-cabinet-head__hint rl-cabinet-head__hint--empty rl-cabinet-head__hint--skills" id="rl-cabinet-tags-hint" hidden>
+					<?php esc_html_e('Лента автоматически подбирает заказы под профиль из квиза.', 'rawlead-kadence-child'); ?>
+					<a href="<?php echo esc_url(rawlead_page_url('quiz')); ?>"><?php esc_html_e('Пройти квиз →', 'rawlead-kadence-child'); ?></a>
 				</p>
 			</header>
 			<header class="rl-feed-head rl-cabinet-feed-head">
@@ -125,8 +128,8 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 			</header>
 			<div class="rl-feed-banner" id="rl-cabinet-error" role="alert" hidden></div>
 			<div class="rl-cabinet-empty rl-cabinet-empty--no-tags" id="rl-cabinet-no-tags" hidden>
-				<p><?php esc_html_e('Добавь навыки — покажем заказы под твой стек.', 'rawlead-kadence-child'); ?></p>
-				<button type="button" class="rl-btn rl-btn--primary" id="rl-cabinet-add-first"><?php esc_html_e('Добавить навыки', 'rawlead-kadence-child'); ?></button>
+				<p><?php esc_html_e('Лента автоматически подбирает заказы под профиль из квиза.', 'rawlead-kadence-child'); ?></p>
+				<a class="rl-btn rl-btn--primary" href="<?php echo esc_url(rawlead_page_url('quiz')); ?>"><?php esc_html_e('Пройти квиз →', 'rawlead-kadence-child'); ?></a>
 			</div>
 			<div class="rl-cabinet-empty rl-cabinet-empty--no-match" id="rl-cabinet-no-match" hidden>
 				<p><?php esc_html_e('Откликнулся на ленте — черновик появится здесь.', 'rawlead-kadence-child'); ?></p>

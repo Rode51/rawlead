@@ -1584,7 +1584,8 @@ Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unse
 | 2026-06-13 | **TG t3c ✅** — test group мгновенно; owner принял | § **O206 t3c** |
 | 2026-06-13 | **Биржи «как TG»** — push нет у FL/Kwork; цель: ужать lag цикла + health в ops (не магия instant) | backlog **ingest SLA** |
 | 2026-06-14 | **FL proxy restore** — 194.226 были **неоплачены**, не мёртвы; owner оплатил · pool **4/4** восстановлен · удаление 2 слотов **откат** | problems/2026-06-14 |
-| 2026-06-14 | **O215 design polish** — Perf **отложен**; owner хочет довести вид через **BrowserSync локально** с @designer до deploy | DESIGNER_PROMPT § O215 |
+| 2026-06-14 | **O215 ✅** — owner accept · theme **1.18.95** deploy · **tier smoke** все планы (FOR_YOU чеклист) · Monica сброшена под first-login trial | STATUS · FOR_YOU |
+| 2026-06-14 | **O215 design polish** — Perf **отложен**; owner довёл вид через **BrowserSync** с @designer | DESIGNER_PROMPT § O215 |
 | 2026-06-13 | **O208-B monetization** — **5 откликов/час всем** (вкл. premium) · L3 judge → K · убрать просмотры+слоты с карточки · PM воронка (trial 3д → без match-фильтра) | § **O208-B** · PM § O208-MONETIZATION |
 | 2026-06-13 | **TG filter по данным** — доказать воронку · sample audit · filter lab | § **O207** |
 | 2026-06-13 | **acc1 handler deaf** — test group msg=70 only acc2 `не_слушаем`; acc1 ready but 0 handler events | § **O206 t3b** → **t3c** |

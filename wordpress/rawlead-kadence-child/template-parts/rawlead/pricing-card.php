@@ -18,15 +18,13 @@ $pricing = esc_url(rawlead_page_url('pricing'));
 
 $bullets_preview = [
 	__('Уникальный черновик отклика — ИИ пишет под тебя, ты отправляешь сам', 'rawlead-kadence-child'),
-	__('Лента без задержки и push — заказы появляются сразу при match', 'rawlead-kadence-child'),
-	__('Пуш в Telegram — только при хорошем совпадении', 'rawlead-kadence-child'),
+	__('Персональная лента с % совпадения · push при матче · без задержки', 'rawlead-kadence-child'),
+	__('5 откликов в час — защита от спама', 'rawlead-kadence-child'),
 ];
 
 $bullets_full = array_merge($bullets_preview, [
-	__('Умный лимит (10 откликов в час) — защита от спам-фильтров бирж', 'rawlead-kadence-child'),
+	__('Пуш в Telegram — только при хорошем совпадении', 'rawlead-kadence-child'),
 ]);
-
-$footnote = __('Лимит в час — защита от случайных кликов (anti-тык)', 'rawlead-kadence-child');
 
 ?>
 <article class="rl-price-card rl-price-card--o174<?php echo $is_full ? ' rl-price-card--full' : ' rl-price-card--preview'; ?>">
@@ -35,7 +33,7 @@ $footnote = __('Лимит в час — защита от случайных к
 		<span class="rl-price-card__price-main"><?php esc_html_e('790 ₽ / мес', 'rawlead-kadence-child'); ?></span>
 	</p>
 	<p class="rl-price-card__price-secondary">
-		<?php esc_html_e('Попробовать — 1 ₽ / 3 дня (один раз)', 'rawlead-kadence-child'); ?>
+		<span class="rl-price-card__chip"><?php esc_html_e('первые 3 дня бесплатно', 'rawlead-kadence-child'); ?></span>
 	</p>
 	<ul class="rl-price-card__list">
 		<?php
@@ -44,14 +42,10 @@ $footnote = __('Лимит в час — защита от случайных к
 			?>
 			<li><?php echo esc_html($li); ?></li>
 		<?php endforeach; ?>
-		<?php if ($is_full) : ?>
-			<li class="rl-price-card__list-item--muted rl-price-card__list-item--desktop"><?php echo esc_html($footnote); ?></li>
-		<?php endif; ?>
 	</ul>
 	<?php if ($is_full) : ?>
-		<p class="rl-price-card__footnote"><?php echo esc_html($footnote); ?></p>
 		<p class="rl-price-card__legal">
-			<?php esc_html_e('Оплата картой или СБП через ЮKassa. Trial — 1 ₽ / 3 дня, далее 790 ₽/мес.', 'rawlead-kadence-child'); ?>
+			<?php esc_html_e('3 дня Trial — бесплатно и автоматически при первом входе (1× на аккаунт TG). Далее 790 ₽/мес — без автосписания. Оплата картой или СБП через ЮKassa.', 'rawlead-kadence-child'); ?>
 		</p>
 	<?php endif; ?>
 	<div class="rl-price-card__cta">
@@ -59,12 +53,9 @@ $footnote = __('Лимит в час — защита от случайных к
 			<button type="button" class="rl-btn rl-btn--primary rl-btn--full" id="rl-price-checkout-sub">
 				<?php esc_html_e('Оформить Premium →', 'rawlead-kadence-child'); ?>
 			</button>
-			<button type="button" class="rl-btn rl-btn--ghost rl-btn--full rl-price-card__trial-btn" id="rl-price-checkout-trial">
-				<?php esc_html_e('Попробовать за 1 ₽ →', 'rawlead-kadence-child'); ?>
-			</button>
 			<p class="rl-price-card__checkout-note" id="rl-price-checkout-note" hidden></p>
 			<p class="rl-price-card__cta-secondary">
-				<a class="rl-link-arrow" href="<?php echo $lenta; ?>"><?php esc_html_e('Продолжить с ограничениями (Free) →', 'rawlead-kadence-child'); ?></a>
+				<a class="rl-link-arrow" href="<?php echo $lenta; ?>"><?php esc_html_e('Смотреть ленту →', 'rawlead-kadence-child'); ?></a>
 			</p>
 		<?php else : ?>
 			<a class="rl-btn rl-btn--primary rl-btn--full" href="<?php echo $pricing; ?>">

@@ -16,7 +16,7 @@ rawlead_get_part('header');
 			<div class="rl-container">
 				<p class="rl-inner-hero__eyebrow">RawLead</p>
 				<h1 class="rl-inner-hero__title"><?php esc_html_e('Тарифы', 'rawlead-kadence-child'); ?></h1>
-				<p class="rl-inner-hero__lead"><?php esc_html_e('Один тариф. Всё включено.', 'rawlead-kadence-child'); ?></p>
+				<p class="rl-inner-hero__lead"><?php esc_html_e('Пробуй 3 дня бесплатно — автоматически при первом входе.', 'rawlead-kadence-child'); ?></p>
 			</div>
 		</header>
 		<div class="rl-container rl-inner-body rl-pricing-page">

@@ -62,7 +62,6 @@ $home     = home_url('/');
 				<article class="rl-lead-card rl-flow-anim__card rl-flow-anim__card--perfect" data-match="87">
 					<div class="rl-feed-card__head">
 						<div class="rl-feed-card__head-start">
-							<span class="rl-niche-icon rl-niche-icon--dev" aria-hidden="true">&lt;/&gt;</span>
 							<span class="rl-feed-card__source rl-feed-card__source--fl">FL.ru</span>
 							<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>
 						</div>
@@ -80,7 +79,6 @@ $home     = home_url('/');
 				<article class="rl-lead-card rl-flow-anim__card" data-match="73">
 					<div class="rl-feed-card__head">
 						<div class="rl-feed-card__head-start">
-							<span class="rl-niche-icon rl-niche-icon--dev" aria-hidden="true">&lt;/&gt;</span>
 							<span class="rl-feed-card__source rl-feed-card__source--kwork">Kwork</span>
 						</div>
 					</div>
@@ -97,7 +95,6 @@ $home     = home_url('/');
 				<article class="rl-lead-card rl-flow-anim__card" data-match="61">
 					<div class="rl-feed-card__head">
 						<div class="rl-feed-card__head-start">
-							<span class="rl-niche-icon rl-niche-icon--design" aria-hidden="true">✦</span>
 							<span class="rl-feed-card__source rl-feed-card__source--tg">Telegram</span>
 						</div>
 					</div>

@@ -13,7 +13,7 @@
 | Слой | Факт |
 |------|------|
 | **Сервисы** | `rawlead-api` · `rawlead-bot-poll` · `rawlead-radar` — **active** |
-| **Сайт** | `/lenta/` 200 · feed API 200 |
+| **Сайт** | `/lenta/` 200 · theme **1.18.95** (O215 deploy 2026-06-14) |
 | **FL** | last Neon insert **00:30 MSK Jun 14** (~13h) · `parsed=30 fresh=0` = возможно мало заказов в вс |
 | **Kwork** | O213 ✅ prod — `parsed=36 pages=3` (2026-06-14 14:12 MSK) |
 | **TG** | monitor слушает · O212 ✅ prod — `skip_entity=N`, старт без `ids=[…]` |
@@ -61,6 +61,20 @@ Pilot r5 + batch2: judge **85% / 95%** · cat playbooks deployed.
 | **P1 marketing** | hero/pricing/FAQ/how · tier table |
 
 **Хвосты (косметика):** FAQ дубль «% совпадения» в `marketing.php` · `viewsHeadHtml` в refresh (не в initial render)
+
+---
+
+## ✅ O215 WP polish (theme · 2026-06-14)
+
+**Theme:** **1.18.95** · deploy ✅ · owner accept BrowserSync session
+
+| Check | Result |
+|-------|--------|
+| prod `ver=1.18.95` | ✅ |
+| `/v1/quiz/start` | ✅ 200 |
+| Monica reset (first-login) | ✅ free · 0 tags |
+
+**Next:** tier smoke → Perf
 
 ---
 
@@ -169,11 +183,12 @@ pytest tests/test_o214_ops_truth.py -q
 | Волна | What | Who |
 |-------|------|-----|
 | **1** | ~~**O214** ops truth~~ · owner accept | ✅ 2026-06-14 |
-| **2** | **O215** WP design polish (BrowserSync local) | @designer · owner session · **→ сейчас** |
-| **2b** | **Perf** lenta/home/quiz load | after O215 owner OK · @lead-designer → @coder |
+| **2** | ~~**O215** WP design polish~~ · theme **1.18.95** deploy | ✅ owner accept 2026-06-14 |
+| **2a** | **Tier smoke** all access levels (checklist FOR_YOU) | owner · Monica reset ✅ |
+| **2b** | **Perf** lenta/home/quiz load | after tier smoke · @lead-designer → @coder |
 | **3** | «Платформа для учебного центра» в ленте | monitor / owner spot-check |
 | **4–6** | L2 70% · stress · ads | ROADMAP |
 
 ---
 
-t3c deployed · ops/spam ok · O209+FL deploy 2026-06-14
+t3c deployed · ops/spam ok · O215 theme **1.18.95** deploy 2026-06-14

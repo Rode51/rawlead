@@ -97,7 +97,7 @@
 | 3 | **Ingest 24h smoke** — смотреть, что лента не замирает >15 мин |
 | 4 | **Perf @50** — после smoke |
 
-**Пароль пульта:** `RAWLEAD_OPS_KEY` или `OPS_PASSWORD` в `.env` на VPS (не в git).
+**Пароль пульта:** `RAWLEAD_OPS_KEY` (или `OPS_PASSWORD`) в `/opt/rawlead/.env.site` на VPS · вход на https://rawlead.ru/ops/ · кнопка «Админка» в шапке · опционально `OPS_PASSWORD_HASH` (bcrypt).
 
 **Аккаунты FL/Kwork для ТЗ (O133):** `FL_TZ_EMAIL` / `KWORK_TZ_EMAIL` в локальном `.env` ✅ · на VPS — добавить в `/opt/rawlead/.env` когда Coder подключит downloader.
 
@@ -166,6 +166,115 @@ Deploy: `scripts/deploy-youdo-browser-vps.py` · диагностика: `script
 | **@FLPARSINGBOT** push | `🔴 YouDo · …` — max раз в 30 мин |
 | **`/ops/`** | «Биржи и скорость» · lag минуты |
 | **`radar_site.log`** | `health:youdo status=ok` |
+
+**FL tier-2 (2026-06-14):** в `/opt/rawlead/.env.site` — `FL_PROXY_URLS` (4 DC) + **`FL_PROXY_URLS_RESIDENTIAL`** (25 RU слотов из хвоста YouDo) ✅ Lead 2026-06-14. Патч повторно: `scripts/patch-vps-fl-residential-env.py`.
+
+**Smoke O215 (сайт):** theme **1.18.95** · см. **чеклист tier smoke** ниже.
+
+---
+
+## Tier smoke — полный чеклист (все уровни доступа)
+
+**Зачем:** после O215 убедиться, что UI/copy/гейты работают на **anon · trial · expired · premium · paused · owner**.
+
+**Тестовые аккаунты**
+
+| Роль | Как |
+|------|-----|
+| **Anon** | Incognito · `https://rawlead.ru/lenta/` без входа |
+| **First login / Trial** | **Monica Bates** (TG) — сброшена 2026-06-14: `plan=free`, `trial_used=null`, tags=0 → первый вход должен дать **auto trial 3 дня** |
+| **Expired trial** | После Monica trial: `@lead-architect` или скрипт — `trial_used_at=now()`, `plan=free`, `active_until=null` |
+| **Premium** | Твой owner TG **или** оплата ЮKassa на `/pricing/` |
+| **Paused premium** | ЛК → пауза подписки (14 д) |
+| **Owner/beta** | Owner TG (`TELEGRAM_CHAT_ID`) |
+
+**Перед каждым сценарием:** hard refresh или incognito · смотреть **desktop + mobile 390px**.
+
+### 1. Anon (без JWT)
+
+| # | Страница | Проверить |
+|---|----------|-----------|
+| A1 | `/lenta/` | flat лента · strip «~30 мин» · **нет** match-sort · **нет** черновиков |
+| A2 | `/lenta/` карточка | match % / copy O215 · CTA «квиз / войти» |
+| A3 | `/quiz/` | flow с нуля · кнопки «Да, близко» / «Не моё» |
+| A4 | `/` home | hero · tier preview · pricing teaser |
+| A5 | `/pricing/` | 790 ₽ · trial copy «3 дня бесплатно» |
+| A6 | `/cabinet/` | редирект / gate anon |
+
+### 2. Trial (Monica — первый вход после сброса)
+
+| # | Проверить |
+|---|-----------|
+| T1 | TG-login → `plan=trial` · badge «Trial · N дн.» в ЛК/ленте |
+| T2 | `/lenta/` **без** 30-мин задержки · персональная сортировка / match |
+| T3 | Карточка → **черновик** (лимит **5/ч**) |
+| T4 | `/quiz/` дополняет профиль · влияет на match |
+| T5 | Push TG (если включены) — только paid/trial |
+
+### 3. Expired trial (Monica после использования trial)
+
+| # | Проверить |
+|---|-----------|
+| E1 | **Обязательный баннер** на `/lenta/` + `/cabinet/` (не dismiss) |
+| E2 | Лента снова **flat + 30 мин** delay |
+| E3 | Черновики **заблокированы** · inbox старый сохраняется |
+| E4 | `/pricing/` CTA «Продлить» |
+
+### 4. Premium (agent/pro, active)
+
+| # | Проверить |
+|---|-----------|
+| P1 | Instant лента · match rank · filter bar (если включён) |
+| P2 | Черновики 5/ч · generate OK |
+| P3 | `/cabinet/` inbox · оплата / auto-renew UI |
+| P4 | Pause → см. сценарий 5 |
+
+### 5. Paused premium
+
+| # | Проверить |
+|---|-----------|
+| S1 | `status=paused` · effective_access=false |
+| S2 | Лента как free (delay) · баннер «на паузе» |
+| S3 | Resume → instant снова |
+
+### 6. Owner
+
+| # | Проверить |
+|---|-----------|
+| O1 | Полный доступ без paywall |
+| O2 | `/ops/` только owner |
+
+### 7. Cross-cutting
+
+| # | Проверить |
+|---|-----------|
+| X1 | Лексикон: **совпадение** · нет Tinder/«добавь навыки» |
+| X2 | Theme **1.18.95** в view-source (query `ver=`) |
+| X3 | API `/v1/quiz/start` 200 · `/v1/feed` delay по tier |
+| X4 | TG bot `/status` · `/ops/` cycle_age зелёный |
+
+**Сброс Monica (повтор):** напиши `@lead-architect` — сброс `plan=free`, tags=0, `trial_used=null` (tg **8688264540**).
+
+**Симуляция expired trial (Monica):** после прохода trial — `@lead-architect` выставит `trial_used_at` + `plan=free`.
+
+---
+
+**Удобнее:** Canvas [O207 TG labeling](file:///C:/Users/hramo/.cursor/projects/c-Users-hramo-uisness/canvases/o207-tg-labeling.canvas.tsx) — **выборка уже загружена** (120 постов acc1). Открой canvas → жми Заказ/Шум/Неясно.
+
+**Важно:** команды ниже — только **SSH на VPS**, не вставлять в Canvas и не в PowerShell на ПК одной строкой.
+
+Файл на ПК (если нужен): `data/tg_history_sample.json`
+
+```bash
+cd /opt/rawlead
+.venv/bin/python scripts/tg_history_sample.py --account acc1 --max-chats 15 --per-chat 10
+cp data/tg_history_sample.json data/tg_history_sample_labeled.json
+# в labeled.json у каждой строки в rows[]: "owner_label": "vacancy" | "noise" | "unsure"
+.venv/bin/python scripts/tg_filter_replay.py --in data/tg_history_sample_labeled.json
+```
+
+Baseline из лога (уже есть после deploy): `data/tg_funnel_audit_human.md` на VPS.  
+Детали: [`docs/problems/2026-06-13-tg-feed-volume.md`](problems/2026-06-13-tg-feed-volume.md) § Owner labeling.
 
 **Regen/judge в консоли не ломает:** O104 на VPS (SQLite + log); regen/judge — Neon `reply_draft`, отдельный процесс.
 

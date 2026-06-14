@@ -15,7 +15,7 @@ $cards = [
     ],
     [
         'title' => __('Дизайн & Видео', 'rawlead-kadence-child'),
-        'text'  => __('UI/UX, Reels, монтаж, motion — заказы точно по твоим навыкам, без шума.', 'rawlead-kadence-child'),
+        'text'  => __('UI/UX, Reels, монтаж, motion — % совпадения на каждой карточке, без шума.', 'rawlead-kadence-child'),
         'tags'  => __('Figma · UI · монтаж · анимация', 'rawlead-kadence-child'),
     ],
     [

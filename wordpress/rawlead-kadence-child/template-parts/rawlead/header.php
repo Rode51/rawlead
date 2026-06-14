@@ -27,6 +27,7 @@ $nav = [
     'pricing' => [__('Тарифы', 'rawlead-kadence-child'), rawlead_page_url('pricing')],
     'how'     => [__('Как устроено', 'rawlead-kadence-child'), rawlead_page_url('how')],
 ];
+$ops = home_url('/ops/');
 ?>
 <?php if (is_front_page()) : ?>
 <div class="rl-announcement rl-announcement--ticker" role="region" aria-label="<?php esc_attr_e('Объявление', 'rawlead-kadence-child'); ?>" data-rl-ticker>
@@ -78,6 +79,13 @@ $nav = [
 						</a>
 					</li>
 				<?php endforeach; ?>
+				<?php if (!$is_app) : ?>
+				<li>
+					<a class="rl-header__link rl-header__admin" href="<?php echo esc_url($ops); ?>" hidden>
+						<?php esc_html_e('Админка', 'rawlead-kadence-child'); ?>
+					</a>
+				</li>
+				<?php endif; ?>
 			</ul>
 		</nav>
 		<div class="rl-header__cta">
@@ -115,6 +123,11 @@ $nav = [
 					<?php echo esc_html($item[0]); ?>
 				</a>
 			<?php endforeach; ?>
+			<?php if (!$is_app) : ?>
+			<a class="rl-nav-drawer__link rl-header__admin" href="<?php echo esc_url($ops); ?>" hidden>
+				<?php esc_html_e('Админка', 'rawlead-kadence-child'); ?>
+			</a>
+			<?php endif; ?>
 			<a href="<?php echo esc_url($cabinet); ?>" class="rl-btn rl-nav-drawer__cta js-nav-drawer-login"><?php esc_html_e('Войти →', 'rawlead-kadence-child'); ?></a>
 		</nav>
 	</div>
@@ -198,6 +211,12 @@ $nav = [
 		}
 	}
 
+	function syncAdminLinks(show) {
+		document.querySelectorAll(".rl-header__admin").forEach(function (el) {
+			el.hidden = !show;
+		});
+	}
+
 	function applyHeaderMeta() {
 		var loginEl = document.querySelector(".js-header-login");
 		var userEl = document.querySelector(".js-header-user");
@@ -211,6 +230,7 @@ $nav = [
 		if (!token) {
 			loginEl.hidden = false;
 			userEl.hidden = true;
+			syncAdminLinks(false);
 			if (drawerLoginEl) {
 				drawerLoginEl.hidden = false;
 			}
@@ -225,6 +245,7 @@ $nav = [
 			drawerLoginEl.hidden = true;
 		}
 		var meta = readMeta();
+		syncAdminLinks(!!(meta && meta.can_ops_admin));
 		setHeaderAvatar(avatarEl, meta);
 		if (nameEl && meta) {
 			var username = (meta.username || "").trim();
@@ -260,7 +281,9 @@ $nav = [
 				meta.avatar_url = (data.avatar_url || meta.avatar_url || "").trim();
 				meta.has_avatar = !!(data.has_avatar || data.avatar_url || meta.avatar_url);
 				meta.photo_url = "";
+				meta.can_ops_admin = !!data.can_ops_admin;
 				saveMeta(meta);
+				syncAdminLinks(!!data.can_ops_admin);
 				if (data.avatar_url && failedPhotoUrls[data.avatar_url]) {
 					delete failedPhotoUrls[data.avatar_url];
 				}

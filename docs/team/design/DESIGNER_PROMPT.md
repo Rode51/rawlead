@@ -1,8 +1,61 @@
-# Designer — **→ Now:** § **O215-WP-LIVE-POLISH** — local BrowserSync iteration with owner
+# Designer — **→ Now:** tier smoke support · § **O215** closed ✅ theme **1.18.95**
 
 **O96-D закрыт у Lead Designer** → **`@coder` § O96-code** · см. [`LEAD_DESIGN_PROMPT.md`](LEAD_DESIGN_PROMPT.md) § O96-D.
 
 **Канон WP:** [`REFERENCE.md`](../../design/wp/REFERENCE.md) v5 · [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md)
+
+---
+
+## § O215-WP-LIVE-POLISH — CLOSED ✅ (owner accept · deploy 1.18.95 · 2026-06-14)
+
+**Delivered:** BrowserSync session · theme **1.18.95** on prod · quiz/lenta/home/pricing/cabinet polish.
+
+**Next:** owner tier smoke (FOR_YOU checklist) → Perf wave.
+
+---
+
+## § O215-COPY-UX-ADVISOR — copy coach (archived session · reuse if needed)
+
+**Purpose:** Owner iterates **wording + visual hierarchy** in a **separate chat** from BrowserSync implementer. Advisor suggests **exact RU strings** and **how to present** (typography, placement, component ref); owner relays approved deltas to implementer chat (§ O215-WP-LIVE-POLISH).
+
+**This chat:** advice only · **no** `wordpress/` · **no** CSS · **no** deploy.
+
+### Read (mandatory, first turn)
+
+| # | File | Why |
+|---|------|-----|
+| 1 | [`wave-o209-match-brief.md`](../../design/wp/wave-o209-match-brief.md) § Lexicon + Tier matrix | match-first copy freeze |
+| 2 | [`REFERENCE.md`](../../design/wp/REFERENCE.md) v5 | NEO tokens, page structure |
+| 3 | [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) | lenta/cabinet components (grep section owner names) |
+
+### Response format (every owner message)
+
+Reply in **Russian** (owner-facing). Structure:
+
+1. **Context** — 1 line: which block/page (e.g. lenta card match strip, home hero subhead).
+2. **Copy** — 2–3 variants max; mark **⭐ recommended**; exact final string in quotes.
+3. **Layout** — how to show: element (H1 / subhead / chip / banner / microcopy), Manrope weight/size ref from REFERENCE, color token, spacing note (tight/airy), mobile ≤390px if relevant.
+4. **Guard** — flag if request breaks O209 guard (full redesign, filter bar IA change) → suggest P1 delta instead.
+5. **Handoff block** — copy-paste for implementer:
+
+```text
+@designer § O215-WP-LIVE-POLISH
+Page: …
+Copy: «…» → replace «…»
+CSS/layout: … (class or block name if known)
+```
+
+### Rules
+
+- Lexicon: **совпадение / match / профиль из квиза** — never Tinder/дейтинг, never «добавь навыки» as primary CTA.
+- Tier facts: anon/expired **30 мин** · trial **3 дня бесплатно** · drafts **5/ч** · premium **790 ₽/мес** — do not invent numbers.
+- Prefer **shorter** microcopy on cards; hero/pricing may be denser.
+- If owner sends screenshot or URL path — anchor advice to **visible element**, not abstract rebranding.
+- Do not open BrowserSync or edit repo; if owner asks to apply — «передай implementer-чату ниже».
+
+### DoD (advisor chat)
+
+Owner has approved strings + layout notes for a page block → owner pastes **Handoff block** into BrowserSync implementer chat.
 
 ---
 

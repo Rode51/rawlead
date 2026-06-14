@@ -48,10 +48,7 @@ function rawlead_render_demo_preview_card(array $card, string $lenta_url): void 
 		'marketing' => '◎',
 		'text'      => 'Aa',
 	];
-	$niche_icon = isset($niche_icons[$niche])
-		? '<span class="rl-niche-icon rl-niche-icon--' . esc_attr($niche) . '" aria-hidden="true">'
-			. esc_html($niche_icons[$niche]) . '</span>'
-		: '';
+	$niche_icon = '';
 	?>
 	<article class="<?php echo esc_attr(implode(' ', $classes)); ?>">
 		<div class="rl-feed-card__head">
@@ -118,9 +115,9 @@ $demo_cards = [
 	],
 ];
 ?>
-<section class="rl-live-preview" aria-label="<?php esc_attr_e('Последние заказы из ленты', 'rawlead-kadence-child'); ?>">
+<section class="rl-live-preview" aria-label="<?php esc_attr_e('Последние заказы', 'rawlead-kadence-child'); ?>">
 	<div class="rl-container">
-		<p class="rl-live-preview__label"><?php esc_html_e('Последние заказы из ленты', 'rawlead-kadence-child'); ?></p>
+		<p class="rl-live-preview__label"><?php esc_html_e('Последние заказы', 'rawlead-kadence-child'); ?></p>
 		<div
 			class="rl-live-preview__cards rl-live-preview__cards--demo"
 			id="rl-live-preview-cards"

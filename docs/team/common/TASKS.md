@@ -6,9 +6,8 @@
 
 ## Где мы
 
-**Волна 1:** ingest/ops ✅ · **O215:** design polish (BrowserSync) **→ сейчас**  
-**Волна 2:** **O209** ✅ theme **1.18.84** · deploy 2026-06-14  
-**До ads:** Perf **после O215** · L2 **70%** · stress финал
+**Волна 1:** ingest/ops ✅ · **O215:** design polish ✅ theme **1.18.95** deploy 2026-06-14  
+**Волна 2:** tier smoke (all plans) **→ сейчас** · **Perf** после smoke  
 
 ---
 
@@ -52,8 +51,9 @@
 | **58g** | **O213** Kwork pagination (page2-3) + filter scope | @coder | ✅ Lead verify 2026-06-14 |
 | **58h** | **O213+O212 deploy** radar + API | @coder | ✅ Lead verify VPS 2026-06-14 |
 | **58i** | **O214** ops truth: cycle_age fallback + residential badge | @coder | ✅ Lead verify VPS 2026-06-14 |
-| **59** | **O215** WP design polish (BrowserSync local) | @designer + owner | **→ сейчас** |
-| **60** | **Perf** lenta/home/quiz | @lead-designer → @coder | после O215 OK |
+| **59** | **O215** WP design polish (BrowserSync local) | @designer + owner | ✅ deploy **1.18.95** 2026-06-14 |
+| **59b** | **Tier smoke** — все уровни доступа (FOR_YOU чеклист) | owner | **→ сейчас** |
+| **60** | **Perf** lenta/home/quiz | @lead-designer → @coder | после tier smoke |
 | **61** | **Stress** финал @50 VU | owner | **перед ads** |
 
 ---

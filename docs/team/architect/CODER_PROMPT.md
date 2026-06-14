@@ -1,10 +1,23 @@
 # Coder — hot queue (active)
 
-**→ Now:** *(empty — wave 1 ingest/ops closed)* · **next: волна 3 Perf** — ждём scope от `@lead-designer`
+**→ Now:** *(empty)* · **next:** tier smoke (FOR_YOU) → **Perf** scope от `@lead-designer`
 
 ---
 
-## § O214-OPS-TRUTH — CLOSED ✅ (Lead verify VPS 2026-06-14)
+## § O215-WP-POLISH — CLOSED ✅ (Lead verify+deploy 2026-06-14)
+
+**Theme:** **1.18.95** · `deploy-wp-theme-vps.py` · prod HTML `ver=1.18.95` ✅
+
+| Check | Result |
+|-------|--------|
+| VPS theme version | ✅ 1.18.95 |
+| `/lenta/` HTTP | ✅ 200 |
+| `/v1/quiz/start` | ✅ 200 |
+| Owner accept O215 | ✅ |
+
+**Next:** tier smoke all plans · Monica reset for first-login trial test.
+
+---
 
 **Deploy:** `deploy-o214-ops-truth-vps.py` · API restarted
 

@@ -85,6 +85,28 @@ if ($rl_feed_logged_in) {
 			</div>
 		</div>
 	</div>
+	<div class="rl-feed-quiz-overlay" id="rl-feed-quiz-overlay" hidden aria-hidden="true">
+		<div class="rl-feed-quiz-overlay__backdrop" id="rl-feed-quiz-overlay-backdrop" aria-hidden="true"></div>
+		<div
+			class="rl-feed-quiz-overlay__panel"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="rl-quiz-overlay-title"
+		>
+			<h2 class="rl-feed-quiz-overlay__title" id="rl-quiz-overlay-title">
+				<?php esc_html_e('Настройка ленты', 'rawlead-kadence-child'); ?>
+			</h2>
+			<button
+				type="button"
+				class="rl-feed-quiz-overlay__close"
+				id="rl-feed-quiz-overlay-close"
+				aria-label="<?php esc_attr_e('Закрыть', 'rawlead-kadence-child'); ?>"
+			>✕</button>
+			<div class="rl-feed-quiz-overlay__body">
+				<?php rawlead_get_part('quiz', ['rl_quiz_overlay' => true]); ?>
+			</div>
+		</div>
+	</div>
 </main>
 <?php
 rawlead_get_part('footer');
