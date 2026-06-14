@@ -15,9 +15,9 @@
 | **Сервисы** | `rawlead-api` · `rawlead-bot-poll` · `rawlead-radar` — **active** |
 | **Сайт** | `/lenta/` 200 · feed API 200 |
 | **FL** | last Neon insert **00:30 MSK Jun 14** (~13h) · `parsed=30 fresh=0` = возможно мало заказов в вс |
-| **Kwork** | O213 fix ✅ src · **deploy pending** — pages 1–3 + exchange-safe filter |
-| **TG** | monitor слушает (peers 70/64/40) · O212 fix ✅ deploy pending |
-| **Логи** | O212 fix ✅ (`skip_entity=N` вместо dump ids) · deploy pending |
+| **Kwork** | O213 ✅ prod — `parsed=36 pages=3` (2026-06-14 14:12 MSK) |
+| **TG** | monitor слушает · O212 ✅ prod — `skip_entity=N`, старт без `ids=[…]` |
+| **Ops** | O212 ✅ API — `today_new` Neon + `за цикл: parsed/fresh` |
 
 **Корень Kwork/FL:** Kwork → **O213** pagination + filter (src ✅) · FL: воскресенье, мало постинга — мб норма.  
 [`2026-06-14-kwork-fl-zero-new.md`](../../problems/2026-06-14-kwork-fl-zero-new.md)
@@ -28,13 +28,12 @@
 
 **Fix:** `kwork_parser.py` — pages 1–3 (`KWORK_MAX_PAGES`, default 3), dedup, log `pages=N` · `filters.py` — `EXCHANGE_SAFE_STOPS` bypass for kwork/fl only (TG unchanged)  
 **pytest:** 38/38 (`test_kwork_parser` + `test_filters` + `test_o207b` + `test_o171` + O117 httpx fallback)  
-**Deploy:** `kwork_parser.py` + `filters.py` → restart **`rawlead-radar`**
+**Deploy:** ✅ `deploy-o213-o212-vps.py` 2026-06-14 · VPS `parsed=36 fresh=0 pages=3`
 
 **Как проверить (VPS):**
 ```bash
-grep 'listing:kwork' data/radar_site.log | tail -5   # parsed>12 pages=2-3
-grep 'pipeline:filter:exchange_safe kwork' data/radar_site.log | tail -5
-pytest tests/test_kwork_parser.py tests/test_filters.py tests/test_o207b_tg_filter_tune.py tests/test_o171_ops_funnel.py -q
+grep 'listing:kwork' data/radar_site.log | tail -3   # parsed>12 pages=2-3
+grep skip_entity data/radar_site.log | tail -3         # summary, no ids=[…]
 ```
 
 ---
@@ -136,7 +135,7 @@ pytest tests/test_o207b_tg_filter_tune.py tests/test_o207_tg_filter_replay.py te
 
 **Fix:** TG startup log — `чатов/file/filter` без `ids=[…]` · skip → `skip_entity=N` · ops «сегодня N» из Neon · cycle `parsed/fresh` · TG 🔴 из `tg_pult_lamp_state` · log line prefer `handler_ok`  
 **pytest:** 20/20 (`test_o212` + `test_o171`)  
-**Deploy:** `tg_monitor.py` → restart **`rawlead-radar`** · `owner_admin.py` + `ops-pult.js` → restart **`rawlead-api`**
+**Deploy:** ✅ bundled in `deploy-o213-o212-vps.py` 2026-06-14 · radar+api **active**
 
 **Как проверить (VPS):**
 ```bash
@@ -153,8 +152,8 @@ pytest tests/test_o212_ops_log_truth.py tests/test_o171_ops_funnel.py -q
 
 | Волна | What | Who |
 |-------|------|-----|
-| **1** | **O213+O212 deploy** radar + API | @coder · **→ сейчас** |
-| **2** | Owner smoke: `/lenta/?source=kwork` + `/ops/` | owner |
+| **1** | Owner smoke: `/lenta/?source=kwork` + `/ops/` | owner · **→ сейчас** |
+| **2** | «Платформа для учебного центра» в ленте / filter log | owner/Lead |
 | **3** | Perf lenta/home/quiz | Design → @coder |
 | **4–6** | L2 70% · stress · ads | ROADMAP |
 
