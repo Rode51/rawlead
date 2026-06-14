@@ -246,14 +246,14 @@
 
 ## § O101 — Потолок черновиков на lead (**✅ владелец 2026-06-03**)
 
-**Суть:** на один заказ — **ограниченное число** персональных черновиков (L3). Когда лимит исчерпан — карточка **остаётся в ленте**, кнопка отклика **серая/disabled**. На карточке — строка **«осталось N из 10»** (не «N фрилансеров»). Без аукциона и токенов (≠ O100 ❌).
+**Суть:** на один заказ — **ограниченное число** персональных черновиков (L3). Когда лимит исчерпан — карточка **остаётся в ленте**, кнопка отклика **серая/disabled**. ~~На карточке — строка **«осталось N из 10»**~~ **→ O208-B:** счётчик **не на карточке**; K только в FAQ/pricing. Без аукциона и токенов (≠ O100 ❌).
 
 **Число 10 — старт, не догма:** перед продом прогнать **judge** (синтетика: 1 base → 15–20 L3 с разными `user_id`) → среднее, с какого номера uniqueness/human_tone падают · зафиксировать **K** (может 8, может 12).
 
 | Правило | Простыми словами |
 |---------|------------------|
 | Что считаем | Только **первый удачный** черновик у юзера на этот заказ. Открыл старый — слот не тратится. |
-| Анти-тык | Лимит черновиков **в час на человека** (`DRAFT_HOURLY_LIMIT`). Слот засчитывается, если есть **нормальный мэтч** по навыкам (km ≥ порога — уточнить в ТЗ, ориентир 30%). |
+| Анти-тык | Лимит черновиков **в час на человека** (`DRAFT_HOURLY_LIMIT`) — **owner 2026-06-13: 5/час для всех, вкл. premium** (§ **O208-B**). Слот засчитывается, если есть **нормальный мэтч** по навыкам (km ≥ порога — уточнить в ТЗ, ориентир 30%). |
 | Лента | Слотов **0** → заказа **нет в `/lenta/`** для новых. У кого черновик уже есть — видит в **ЛК/inbox**. |
 | UI | «Осталось 3 из 10 черновиков» · дизайн позже с @lead-design |
 | Ключи OpenRouter | Пачка ключей **не из-за этого**: на заказ макс **1 тяжёлый + K лёгких** L3. Два ключа — для **парсера/L1**, не для кнопки отклика. |
@@ -303,25 +303,97 @@
 
 ---
 
-## § O106 — Карточка ленты: меньше шума (**✅ владелец 2026-06-03**)
+## § O106 — Карточка ленты: меньше шума (**✅ владелец 2026-06-03** · **уточнено O208-B 2026-06-13**)
 
 **Боль:** на карточке **слишком много информации** — перегруз после O94–O97.
 
 **Направление (не код сейчас):** пересборка по эталону `flow.php` + problem-doc O96, но **агрессивнее сжать**:
 
-- **Оставить:** источник · title · бюджет · % совместимости · 1 строка слотов O101 · CTA.
+- **Оставить:** источник · title · бюджет · % совместимости · CTA.
+- **Убрать с preview (owner 2026-06-13):** **просмотры** (O25) · **число откликов/слотов** («осталось N из K») — см. § **O208-B**.
 - **Убрать/спрятать:** breakdown в collapsed · лишние badge · дубли tool/skill · «качество заказа» (уже out).
 - **Раскрытие:** детали (навыки, сложность O97, L3 tray) — **по tap**, не в preview.
 
-**Handoff:** `@lead-designer` wireframe **до** `@coder` · связка с O101 «осталось N слотов».
+**Handoff:** `@lead-designer` wireframe **до** `@coder` · O101 K и hourly — **не на карточке**, только в FAQ/pricing/429 toast.
 
 **Связь:** [`2026-06-02-o96-polish-card-ui.md`](../../problems/2026-06-02-o96-polish-card-ui.md) — baseline, O106 = v2 minimal.
 
 ---
 
-## § O107 — Trial Premium 3 дня (**✅ владелец 2026-06-03**)
+## § O208-B — Лимиты · K · карточка · воронка (**owner 2026-06-13 · до Coder**)
 
-**Суть:** новый пользователь может **один раз** получить **3 календарных дня** полного **Premium** — те же права, что платная подписка (O11 instant · черновики · push · O101 слоты · anti-тыk).
+**Контекст:** волна 2 O208 — quiz-first. Владелец хочет **зафиксировать продуктовые правила** до кода: анти-спам, judge K, чище карточка, нормальная воронка auth.
+
+### B1 — Hourly cap **5** для всех
+
+| Было | Стало (owner) |
+|------|----------------|
+| `DRAFT_HOURLY_LIMIT` default 0 (без лимита) · copy «10/час» (O116) | **`5 черновиков/час на человека` — включая premium и trial** |
+| Только anti-тык для free? | **Даже premium** — «чтобы придурки не тыкали всё подряд» |
+
+**Техника (Coder, после PM copy freeze):** `DRAFT_HOURLY_LIMIT=5` prod · 429 toast · pricing/FAQ/how **«5 в час»** (не 10). **Не** путать с **K на lead** (O101).
+
+**Warm cap:** `DRAFT_WARM_HOURLY_CAP=30` — отдельный фоновый контур; owner не менял · Coder не трогать без слова.
+
+### B2 — L3 judge → число **K** (когда убирать карточку из ленты)
+
+**Цель:** не гадать K=10 — **прогнать L3 judge** на синтетике (1 shared base → 15–20 персональных L3 с разными `user_id`) и зафиксировать, **с какой генерации** падают uniqueness / human_tone / send_as_is.
+
+| Выход judge | Продуктовое правило |
+|-------------|---------------------|
+| K финальное (8–12?) | Макс **K** персональных черновиков на один lead (O101) |
+| Слоты = 0 | Карточка **не показывается в `/lenta/`** новым · у кого черновик есть — **inbox/ЛК** |
+
+**Кто:** @coder — pilot judge (экономно, как O72e) **до или параллельно** волне 4 L2 · артефакт: `data/preprod_o101_l3_k_judge.json` + одна строка K в `OWNER_INTENT` / `CODER_PROMPT`.
+
+**Не на карточке:** K и «осталось N» — **убрать из preview** (B3); объяснение — FAQ/pricing.
+
+### B3 — Убрать с карточки просмотры и счётчик откликов
+
+**Supersedes частично O25** (синтетические просмотры на preview) и старую строку O101 на карточке.
+
+| Убрать с collapsed/preview | Оставить |
+|----------------------------|----------|
+| `display_views` · eye-icon · synthetic «N смотрят» | % совместимости · источник · title · бюджет · время |
+| «осталось N из K» · synthetic reply count | CTA отклика · glow при генерации (O203) |
+
+**Код сейчас:** `rawlead-feed.js` `viewsHeadHtml` · `syntheticDisplayReplies` · `reply_slots_remaining` в meta.
+
+**Design:** § O208-CARD-MINIMAL в `LEAD_DESIGN_PROMPT` · wireframe до Coder.
+
+### B4 — Воронка auth (**✅ owner 2026-06-14**)
+
+**Supersedes частично:** O107 (кнопка trial) · O174 (1₽ trial) · O116-R1 (free TG без задержки) · O11 (15 мин → **30 мин** для anon/expired).
+
+| Tier | Delay | Drafts | Push | Лента | Прочее |
+|------|-------|--------|------|-------|--------|
+| **Anon** | **30 мин** | ❌ | ❌ | **flat** — хронология, все источники, **без km-filter** | browse · promo quiz/TG |
+| **Trial** (первый TG-login) | **instant** | ✅ | ✅ | **персональная** (km-sort, match) | auto **3d бесплатно** · **5/h** · 1× на `user_id` |
+| **Expired-trial / free** | **30 мин** | ❌ | ❌ | **flat** — как anon | inbox сохраняется · quiz учится но **не влияет на rank** |
+| **Premium** | **instant** | ✅ | ✅ | **персональная** | **5/h** · 790₽/мес |
+
+**Правила активации trial:**
+- **Auto** при **первом успешном TG-login** — не на anon · не явная кнопка
+- **Бесплатно** (не 1₽ ЮKassa)
+- После 3d → downgrade в expired/free row выше
+
+**Flat feed (anon + expired):** последние заказы по времени · все источники · **без** персонального ранжирования / min_match / km-sort · filter bar скрыт или disabled (PM+Design).
+
+**UX expired-trial (owner ✅ 2026-06-14):** **обязательный баннер** на `/lenta/` и в ЛК — не тихая деградация:
+- Copy (черновик PM): **«Пробный период закончился · Лента без фильтров и с задержкой 30 мин · Вернуть персонализацию → Premium 790 ₽»**
+- CTA → `/pricing/` или pay flow
+
+**Coder (после PM+Design freeze):** `apply_delay` для anon **и** expired-trial JWT · `plan=trial` auto на first login · flat feed mode flag.
+
+**Handoff:** `@lead-product` copy pack · `@lead-designer` paywall/expired banner wireframe → `@coder`.
+
+---
+
+## § O107 — Trial Premium 3 дня (**✅ владелец 2026-06-03** · **amended O208-B4 2026-06-14**)
+
+**Суть:** новый пользователь получает **3 календарных дня** полного **Premium** — instant · черновики · push · O101 · **5/h**.
+
+**Amended (O208-B4):** активация **auto при первом TG-login** (не кнопка) · **бесплатно** (supersedes O174 1₽) · после trial → **flat feed + 30 мин** (как anon).
 
 **Не путать:** ≠ **3q** «3 матча бесплатно» из vision — **O107 заменяет 3q на запуске** (полный Premium, не лимит матчей).
 
@@ -659,6 +731,72 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 **Правило:** запись в чат → сюда; **код** — когда этап активен в `ROADMAP` / шапка `CODER_PROMPT`. Срочно — только по слову «сейчас».
 
+**Правило:** запись в чат → сюда; **код** — когда этап активен в `ROADMAP` / шапка `CODER_PROMPT`. Срочно — только по слову «сейчас».
+
+### § O198-w — Quiz complexity + curated pool (**P0 product · 2026-06-13**)
+
+**Скелет идеи:**
+
+**1. Complexity-preference в профиле пользователя**
+Пользователь выбирает «предпочтительная сложность» — влияет на `final_rank`. Логика:
+- Пул карточек квиза → только `complexity IN (1,2)` (ясные ТЗ, конкретные задачи)
+- Если пользователь **лайкает cx=1** → в ленте буст заказам с cx=1–2
+- Если лайкает cx=2 (стандарт) → нейтральный вес по сложности
+- cx=3–4 в ленте **не блокировать**, но ранжировать ниже
+
+**2. Ресёрч пула (Lead Neon 2026-06-13)**
+
+Важный вывод: **cx=4 в базе = 0** (`ai_reasons->>'complexity'=4` не встречается). Все лиды cx=1–3 или NULL (NULL = L1 не вернул, default=2). Значит антиспам-фильтрация по complexity работает через cx=3 (несколько систем / монолит — сложные) и нужно выбирать cx=1–2.
+
+| signal | кандидаты cx1-2 (sc≥85) |
+|--------|------------------------|
+| python | 22141, 22049, 22047, 21914, 21696 |
+| wordpress_dev | 22283, 22022, 21813, 21788, 21784 |
+| api_integration | 22305, 22264, 22111, 21744 |
+| ui_ux | 22390, 22336, 22170, 22091 |
+| video_editing | 22338, 22327, 22304, 22268, 22186 |
+| brand_identity | 22341, 22246, 22172, 22101, 21995 |
+| smm | 22356, 22117, 22092 |
+| yandex_direct | 21677, 21571, 21488, 21318 |
+| seo | 22276, 22275, 22233, 21765 |
+| copywriting | 21483 ⚠, 21127, 20846, 20665 |
+| article_writing | 22388, 22011, 21554 |
+| editing_proofreading | 22213, 22209, 21726, 21627 |
+
+⚠ `id=21483` «Написать положительный отзыв» — сомнительный контент, исключить из пула.
+⚠ `id=22251` SMM «Возьму проект» — это объявление исполнителя, не заказ → исключить.
+⚠ `id=21419` «**Ищут редактора»** — asterisk в заголовке, слабый.
+
+**3. Решения owner (2026-06-13)**
+- **cx_pref** — автоматически из лайков квиза (отдельный вопрос не нужен)
+- **Ранк** — мягкий множитель · cx=3 не скрывать
+- **→ @coder:** § **O198-COMPLEXITY-RANK** (`CODER_PROMPT`)
+
+**4. Архитектура (Lead)**
+- Pool: `complexity IN (1,2)` + exclude `{21483, 22251, 21419}`
+- `cx_pref` → тег `__cx_pref` в `user_tags`
+- `final_rank *= max(0.80, 1.0 - abs(lead_cx - cx_pref) * 0.10)`
+
+**→ @lead-product:** закрыто owner 2026-06-13 · **→ CODER_PROMPT § O198 ✅**
+
+### § O197-w — Quiz adaptive: большой пул + ветвление (**P0 product**, owner **2026-06-13**)
+
+**Скелет идеи (не ТЗ):** фиксированные **12 карточек — недостаточно**. Нужна **большая база** реальных лидов из Neon и **адаптивный** квиз: **следующая карточка зависит от предыдущих ответов** («Взял бы» / «Не моё»). Если стек пользователя **неясен** — показываем **больше** карточек; если профиль **сошёлся** — **ранний стоп** (число min/max — решит Product).
+
+| Слой | Что | Кто |
+|------|-----|-----|
+| **1 Product** | Правила ветвления: какие теги/ниши probe дальше · порог «достаточно ясно» · min/max карточек · экран результата · не ломать веса/decay из § TINDER-ONBOARD | **→ @lead-product** **сначала** |
+| **2 Architect** | Модель пула (Neon: curated pack по signal-тегам + fallback) · API `next card` (session state) · что в localStorage до TG login | Lead после PM § |
+| **3 Coder** | Реализация после PM+Architect | **⏸** § O195-w1b **hold** |
+
+**Lead (2026-06-13):** 12 ID из Neon — не финал, а **seed/examples** для пула. `pending_tags` (redis, websocket, nestjs…) — расширение **каталога SKILLS**, не quiz-карточек; в Product § отдельно.
+
+**Supersedes (частично):** `LEAD_PRODUCT_PROMPT` § TINDER-ONBOARD «ровно 12 карточек» · `CODER_PROMPT` § O195-w1b до обновления PM.
+
+**→ @lead-product:** переписать § TINDER-ONBOARD блок `/quiz/` — adaptive tree + pool size + stop rules.
+
+**→ Lead Architect:** после PM — § в `CODER_PROMPT` (data/API), не раньше.
+
 ### § O168-w2 — L2: ложное «ТЗ обрывается» (**P0**, owner **2026-06-10**)
 
 **Кейс:** [FL #5508904](https://www.fl.ru/projects/5508904/vyikachat-bazu-retseptov-iz-igryi.html) — в ТЗ: «Рецепты хранятся **на сервере игры**». Черновик: «фраза «Рецепты хранятся на…» **обрывается**» — **ложь**, снижает send_as_is.
@@ -700,13 +838,43 @@ Picker dev — **два блока**. PM: «B — две группы (по за
 
 **→ Coder:** § O168 **g2b** (feed index / lighter JSON / gzip / VPS CPU) после или параллельно закрытию <2000.
 
-### § O171-w — Админка /ops/ + FLPARSING (**P1**, owner **2026-06-10**)
+### § O171-w — Админка /ops/ + FLPARSING (**P1**, owner **2026-06-10** · research kickoff **2026-06-13**)
 
-**Симптом:** лампы врут — YouDo 🟢 при 0 лидов; FL 🟡 когда биржа жива, просто нет новых заказов.
+**Симптом:** лампы врут — YouDo 🟢 при 0 лидов; FL 🟡 когда биржа жива, просто нет новых заказов; `/status` и push не дают «что делать» не-программисту.
 
-**Решение owner:** полное переосмысление `/ops/` + admin-бота. **После** O168 stress/L2.
+**Решение owner:** полное переосмысление `/ops/` + admin-бота (**Owner Command Center**).
 
-**→ Coder:** § **O171-OPS-ADMIN-REBUILD** (после O168)
+**Scope split (owner 2026-06-13):** параллельный чат «концепция» = **логика карточек + новые публичные страницы** · **админку не трогаем** · O171 отдельная линия.
+
+**Deep research — канон (Lead 2026-06-13):**
+- **Не** новый файл в корне docs без согласия.
+- **→ @lead-product:** § **O171-ADMIN-RESEARCH** в `LEAD_PRODUCT_PROMPT.md` (hot ≤80 строк): JTBD владельца · IA 5–7 блоков · метрики «ступени правды» (process→fetch→parsed→new→L1→visible) · формат `/status` и push · **не** дублировать O121-D wireframes прокси.
+- **→ @lead-designer:** wireframes после PM § (mobile 390 · сводка 30 сек · биржи/TG/прокси).
+- **→ @lead-architect:** нарезка волны Coder после Design · **не** параллельно O198 deploy без решения owner.
+
+**Уже есть:** O121 § · O121-D ✅ (прокси wireframes) · частичный код `/ops/` (`owner_admin.py`).
+
+**→ Coder:** § **O171-OPS-ADMIN-REBUILD** — **после** PM + Design spec (не после O168-only gate)
+
+**→ Coder:** § **O201-OPS-SIMPLE-GATE** — **→ now (owner 2026-06-13)** · O199/O200 **pause**
+
+### § O201-w — Ops вход только пароль + кнопка «Админка» (**P0**, owner **2026-06-13**)
+
+**Боль:** `/ops/` требует Telegram-кабинет в том же браузере · Cursor не работает · `?key=` неудобно.
+
+**Решение owner:** личная **кнопка «Админка»** на сайте → `/ops/` · **только пароль** (hash в `.env`) · cookie 30d · **без** привязки к `/cabinet/`. Заход **откуда угодно** (Chrome на телефоне).
+
+**Не:** bcrypt «для красоты» если compare_digest уже ок — достаточно `RAWLEAD_OPS_KEY` в `.env.site` + форма `/ops/login` (уже есть в API). Убрать блок «войди в кабинет».
+
+**→ @coder:** § **O201-OPS-SIMPLE-GATE** (единственный hot до owner OK)
+
+**Tail owner 2026-06-13:** «Админка» только создатель · убрать из ЛК · `/ops/` не грузится · wrong password пускает → § **O201-TAIL-OPS-FIX**
+
+### § O199-w — Smoke onboarding UX (**P0–P1**, owner **2026-06-13** post-deploy)
+
+**Решения owner:** `/ops/` только Chrome (не Cursor) · **P0** лента logged-in «Не удалось загрузить» · убрать manual skills · quiz UX + promo → Design · copy quiz-first → PM · toast «появится в ЛК» на отклик · audit learning loop.
+
+**→ @coder** § **O199-FEED-ONBOARD-FIX** · **→ @lead-product** § **O199-ONBOARD-COPY** · **→ @lead-designer** § **O199-QUIZ-UX**
 
 ### § O172-w — Green/Red ops-runbook (**P2**, owner **2026-06-10**, согласовано)
 
@@ -727,6 +895,35 @@ Token-stream L2 + второй юзер без общего стрима · O160
 **Порядок:** только **после** O190 ingest DoD (`fetch_end parsed>=50`) · smoke DC slot → env order DC→RU → deploy · rollback RU-only одной строкой.
 
 **→ @coder:** § **O191-YOUDO-PROXY-MIX** (в `CODER_PROMPT` после t0d-ingest ✅)
+
+### § O210-FL-PROXY-TIER — DC + residential fallback (**owner 2026-06-14**)
+
+**Проблема:** FL на DC-прокси · при antibot **часто 0/4 alive** · не «один бан = все», но **httpx fallback за один цикл** может пройти все слоты (2×403 каждый).
+
+**Решение owner:**
+- **Tier-1:** `FL_PROXY_URLS` — обычные DC (как сейчас)
+- **Tier-2:** residential (node-proxy RU) — **только когда tier-1 `alive==0`** · TTL бана DC **1ч** — сами вернутся
+- **Не** держать FL постоянно на residential (трафик/деньги)
+
+**YouDo (тот же принцип):** DC **первый слот** · residential **только slot_retry/ban** — см. **O191-w** · не listing 24/7 на res.
+
+**Coder:** § **FL-PROXY-STABILITY** · `FL_PROXY_URLS_RESIDENTIAL` env · отключить/ограничить httpx multi-ban cascade на FL.
+
+### § O211-w — Ops карточки: «сегодня в ленте» vs misleading 0/0 (**owner 2026-06-14**)
+
+**Симптом:** `/ops/` карточки FL/YouDo показывают `parsed 0 · new 0`, хотя в ленте заказы есть · «Разбор» красный при живом ingest.
+
+**Причина (код):**
+- `parsed` = карточек **в последнем цикле** (не «сегодня»)
+- `new` = вставки в Neon **за 1 час** (не «сегодня» · не «в ленте»)
+- `visible_24h` уже считается в SQL, но **не в строке** под карточкой
+- `lag` = минут с последней **вставки** в БД (336 мин ≈ 5.5 ч без новых FL)
+
+**Решение owner:** в meta строке карточки — **`сегодня N`** (или `за 24ч`) + tooltip что значит каждый шаг лестницы.
+
+**→ @coder:** § **O207** — t1 log baseline → t2 history sample (10/chat) → t3 filter replay · owner labels before rule changes.
+
+---
 
 ### § O193-w — FL listing: subprocess worker (**P1**, owner **2026-06-12**)
 
@@ -1364,6 +1561,11 @@ Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unse
 
 | Дата | Мысль / запрос | Kуда ушло |
 |------|----------------|-----------|
+| 2026-06-13 | **L2 Option B** — подкрутить playbooks до full regen · **все 4 cat send ≥80%** (не 60%) · pilot r1 mkt 60% — не проходит owner bar | **§ O200-L2-CAT-80** · parallel L2 chat |
+| 2026-06-13 | **L2 чат отдельно** | O200 ≠ O201/O199/concept · pilot 40 в L2-чате | § **O200** · `TASKS` две линии |
+| 2026-06-13 | **L2 pilot 40** — 10×4 cat сначала · judge balanced → full regen только после PASS + «да» | **§ O200-L2-CATEGORY-WAVE** · `CODER_PROMPT` |
+| 2026-06-13 | **Complexity в quiz** — cx_pref автоматически · мягкий rank · § O198 → @coder | **§ O198-w** · CODER_PROMPT § O198 |
+| 2026-06-13 | **Quiz adaptive** — большой пул Neon · следующая карточка от ответов · 6–20 карточек · PM spec ✅ → **§ O197** `@coder` | **§ O197-w** · `CODER_PROMPT` § O197-QUIZ-ADAPTIVE |
 | 2026-06-12 | **FL listing — вариант B** · subprocess worker как YouDo · **не** httpx-primary · **`tz_session` не трогать** | **§ O193-w** · Coder после O190 t0j ✅ |
 | 2026-06-12 | **VPS апгрейд** — **4 GB / 2 vCPU** (было 2 GB / 1 vCPU) · camoufox + FL Chromium + L1 ×3 + tg_main влезают без OOM · до рекламы | owner сделал 2026-06-12 19:30 UTC+8 |
 | 2026-06-12 | **Stability first** — заморозить antibot-эксперименты после t0e; ingest SLA 48h; deploy-gate: smoke + grep после каждого деплоя | **§ O192-STABILITY** (Coder) после t0e |
@@ -1372,7 +1574,30 @@ Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unse
 | 2026-06-12 | **YouDo P2 camoufox** — после O189 ❌ · owner: Firefox ok если прикрыть хвосты patchright/t6 | **§ O190** t0b |
 | 2026-06-12 | **Аудит логики** — owner: «может Sonata проверит» / баг в join-очереди | Lead verify O188 → v2/v3 рассинхрон · **Mechanic** TG state или **@coder** O188 fix · не O186 security |
 | 2026-06-12 | **YouDo P1 patchright** — owner «давай пробовать» после Mechanic CDP analysis | **§ O189** ✅ code · ❌ ingest |
-| 2026-06-12 | **TG wave 4:** 127 чатов (@agile_jobs …) · **10 join/час** · split acc1/2/3 · **логи per acc** когда/куда вступил | **§ O188** · `TG_JOIN_QUEUE_v3.csv` · CODER_PROMPT |
+| 2026-06-13 | **O201-w** ops только пароль + кнопка «Админка», без cabinet | § O201-OPS-SIMPLE-GATE |
+| 2026-06-13 | **TG listen gap** — 115 done но ~10 listen · join+listen parallel · log chain · 150+ | § **O190-TG-JOIN-LISTEN-CHAIN** |
+| 2026-06-13 | **TG allowlist ✅ Option A** — расширить файл под всю очередь `done` · **не B** (anon отдельно не режем; spam/L1 = качество) | § **O190** t2 allowlist expand |
+| 2026-06-13 | **План до ads (owner)** — волна 1 TG (t2b+O207) → **2 O208** quiz-first UI/copy/воронка (без ручных навыков) → **3 perf** → **4 L2 70%×4** → **5 stress финал** → ads | `ROADMAP` § волны |
+| 2026-06-13 | **Гейт ads:** L2 **≥70%** по 4 категориям (не 60%) + O207 TG funnel + stress green | `ROADMAP` O72e |
+| 2026-06-13 | **Концепция quiz-first** — подогнать UI/UX/тексты/воронку; старые фильтры навыков в UI убрать | § **O208** · O199 PM+Design |
+| 2026-06-13 | **Perf сайта** — долго грузится; оптимизация после O208 scope | Design § O199 optimization |
+| 2026-06-13 | **TG t3c ✅** — test group мгновенно; owner принял | § **O206 t3c** |
+| 2026-06-13 | **Биржи «как TG»** — push нет у FL/Kwork; цель: ужать lag цикла + health в ops (не магия instant) | backlog **ingest SLA** |
+| 2026-06-14 | **FL proxy restore** — 194.226 были **неоплачены**, не мёртвы; owner оплатил · pool **4/4** восстановлен · удаление 2 слотов **откат** | problems/2026-06-14 |
+| 2026-06-14 | **O215 design polish** — Perf **отложен**; owner хочет довести вид через **BrowserSync локально** с @designer до deploy | DESIGNER_PROMPT § O215 |
+| 2026-06-13 | **O208-B monetization** — **5 откликов/час всем** (вкл. premium) · L3 judge → K · убрать просмотры+слоты с карточки · PM воронка (trial 3д → без match-фильтра) | § **O208-B** · PM § O208-MONETIZATION |
+| 2026-06-13 | **TG filter по данным** — доказать воронку · sample audit · filter lab | § **O207** |
+| 2026-06-13 | **acc1 handler deaf** — test group msg=70 only acc2 `не_слушаем`; acc1 ready but 0 handler events | § **O206 t3b** → **t3c** |
+| 2026-06-13 | **TG в ленте ~15/3нед** — listen 64, принято 548/мес, visible ~4% · L1/AI+filter | § **O206** |
+| 2026-06-13 | **TG listen = все вступившие** — allowlist автозаполнение при join · filter не режет file→5 · качество = L1 на ingest, не pre-listen | § **O190-AUTO-ALLOWLIST-LISTEN** |
+| 2026-06-13 | **TG spam-кнопка** — только владелец · корпус в БД · потом жёстче `tg_spam_filter` | § **O202** |
+| 2026-06-13 | **Пульт TG на русском** — подсказки при наведении · не объяснять в чате | § **O203-OPS-TG-RU** |
+| 2026-06-13 | **Свечение карточки** при генерации отклика — вернуть glow+полоску | § **O203-FEED-DRAFT-GLOW** |
+| 2026-06-13 | **acc3 авторизация** — владелец **без телефона** · Coder/Mechanic на VPS | § **TG-ACC3-SESSION** · `TELEGRAM_ACCOUNTS.md` |
+| 2026-06-13 | **O199-w smoke UX** — feed P0 · quiz PM+Design | ⏸ после O201 tail |
+| 2026-06-13 | **O198+O171 deploy ✅** Lead verify · theme 1.18.76 · `/ops/` summary+TG on prod | `STATUS` · `TASKS` · `CODER_PROMPT` archive |
+| 2026-06-13 | **O171-D ✅** Design wireframes summary+TG · Coder § O171-OPS-ADMIN-REBUILD | `CODER_PROMPT` · `TASKS` **32** |
+| 2026-06-12 | **TG wave 4:** 127 чатов · **10 join/час** · split acc1/2/3 | **§ O188** · v3 ✅ deploy |
 | 2026-06-12 | **С рекламой не торопимся** — стабильности парсинга нет (YouDo 🔴, TG мало) · ускорять парсеры не приоритет | **ads ⏸** подтверждено · очередь: YouDo t6c → TG join/чаты → **O187-stability** (ingest SLA) · не speed-up |
 | 2026-06-09 | **TG лента:** много рекламы услуг · жёстче L1+pre-filter только для TG | **§ O170-TG-L1-FILTER** P0 |
 | 2026-06-09 | **O169** secondary выпали из feed после O165 deploy — восстановить YouDo/FRU/… | **§ O169-SECONDARY-FEED** ✅ deploy |

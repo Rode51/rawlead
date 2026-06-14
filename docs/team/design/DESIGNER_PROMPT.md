@@ -1,8 +1,47 @@
-# Designer — **→ Сейчас:** — (idle) · **Queued:** CSS-детали после Lead, если нужно
+# Designer — **→ Now:** § **O215-WP-LIVE-POLISH** — local BrowserSync iteration with owner
 
 **O96-D закрыт у Lead Designer** → **`@coder` § O96-code** · см. [`LEAD_DESIGN_PROMPT.md`](LEAD_DESIGN_PROMPT.md) § O96-D.
 
 **Канон WP:** [`REFERENCE.md`](../../design/wp/REFERENCE.md) v5 · [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md)
+
+---
+
+## § O215-WP-LIVE-POLISH — Design polish before Perf (owner 2026-06-14)
+
+**Owner decision:** O209 shipped but **visual polish not done** — do **not** start Perf wave yet. Iterate **locally** via BrowserSync with owner before any deploy.
+
+**Ticket context:** `OWNER_INTENT` § O127 (filters/cards unify) · O209 P1 deltas shipped in **1.18.84** — owner still not fully satisfied.
+
+### Workflow (mandatory)
+
+1. **Owner one-time setup** (see `TASKS.md` § BrowserSync · skill `rawlead-wp-live-dev`)
+2. **Designer session:** owner opens `http://localhost:3000/lenta/` (and home/quiz/pricing as needed) · owner points what feels wrong · Designer edits **repo** `wordpress/rawlead-kadence-child/` (`rawlead.css`, templates, partial JS)
+3. **Live inject:** BrowserSync reflects CSS without full F5 cycle
+4. **When block approved:** bump `RAWLEAD_CHILD_VERSION` in theme · handoff `@coder` or owner runs `deploy-wp-theme-vps.py`
+
+**Do not:** Playwright prod audit for every 2px tweak · deploy after each micro-change · full redesign (O209 guard still applies)
+
+### Priority pages (owner-led — confirm in session)
+
+| P | URL (via localhost:3000) | Typical pain (from owner history) |
+|---|---------------------------|-----------------------------------|
+| **1** | `/lenta/` | filter bar tier chrome · card readability · match % · spacing |
+| **2** | `/` home | hero · tier preview · match copy density |
+| **3** | `/quiz/` | flow polish post-O209 rebuild |
+| **4** | `/pricing/` · `/cabinet/` | tier chips · trial/expired banners |
+
+### Deliverables
+
+- **Session notes** in reply to owner: what changed + before/after (screenshot paths ok)
+- **Files touched** list for Lead verify before deploy
+- If scope > 1 day → `@lead-designer` short delta spec in `feed-cabinet-mvp.md` § supplement (owner approval)
+
+### DoD (wave gate)
+
+- Owner says «дизайн ок для prod» on **lenta + home + quiz** minimum
+- Then → `@lead-designer` Perf scope · **not before**
+
+**Deploy:** only after owner OK · `@coder` or owner · `deploy-wp-theme-vps.py`
 
 ---
 

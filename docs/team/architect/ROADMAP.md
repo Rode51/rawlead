@@ -8,7 +8,7 @@
 
 ## Сейчас (2026-06-14)
 
-**Стадия:** prod live · **волна 1 ingest/ops ✅** (O212–O214) · **ads ⏸** · **→ волна 3 Perf**
+**Стадия:** prod live · **→ O215 design polish (BrowserSync)** · Perf ⏸ · **ads ⏸**
 
 ### ✅ Сделано (не возвращать в hot)
 
@@ -27,7 +27,7 @@
 |-------|-----|-----|
 | **1 · TG** | t2b sync · **O207** funnel proof · O188 join ~127 | @coder |
 | **2 · Концепция** | **O208** quiz-first UI/UX · тексты · воронка · убрать ручные навыки | @lead-product → @lead-designer → @coder |
-| **3 · Perf** | Оптимизация загрузки `/lenta/` · home · quiz | @lead-designer scope → @coder |
+| **3 · Perf** | Оптимизация загрузки `/lenta/` · home · quiz | **после O215 design OK** · @lead-designer scope → @coder |
 | **4 · L2** | **O200** full regen · **≥70% × 4 категории** | @coder после «да» owner |
 | **5 · Pre-ads** | Финальный stress @50 VU · O186 security | owner + @coder |
 | **6 · GTM** | ads + portfolio | **последним** ⏸ |

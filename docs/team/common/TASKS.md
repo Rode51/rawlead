@@ -6,9 +6,9 @@
 
 ## Где мы
 
-**Волна 1:** **O207** ✅ · **O207b** ✅ · **O211** deploy ✅  
+**Волна 1:** ingest/ops ✅ · **O215:** design polish (BrowserSync) **→ сейчас**  
 **Волна 2:** **O209** ✅ theme **1.18.84** · deploy 2026-06-14  
-**До ads:** perf · L2 **70%** · stress финал
+**До ads:** Perf **после O215** · L2 **70%** · stress финал
 
 ---
 
@@ -52,8 +52,8 @@
 | **58g** | **O213** Kwork pagination (page2-3) + filter scope | @coder | ✅ Lead verify 2026-06-14 |
 | **58h** | **O213+O212 deploy** radar + API | @coder | ✅ Lead verify VPS 2026-06-14 |
 | **58i** | **O214** ops truth: cycle_age fallback + residential badge | @coder | ✅ Lead verify VPS 2026-06-14 |
-| **59** | **Perf** lenta/home/quiz | @lead-designer → @coder | **→ сейчас** (scope) |
-| **60** | **O200** L2 regen ≥**70%**×4 | @coder | волна 4 |
+| **59** | **O215** WP design polish (BrowserSync local) | @designer + owner | **→ сейчас** |
+| **60** | **Perf** lenta/home/quiz | @lead-designer → @coder | после O215 OK |
 | **61** | **Stress** финал @50 VU | owner | **перед ads** |
 
 ---
