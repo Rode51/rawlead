@@ -53,7 +53,9 @@
 | **58i** | **O214** ops truth: cycle_age fallback + residential badge | @coder | ✅ Lead verify VPS 2026-06-14 |
 | **59** | **O215** WP design polish (BrowserSync local) | @designer + owner | ✅ deploy **1.18.95** 2026-06-14 |
 | **59b** | **Tier smoke** — все уровни доступа (FOR_YOU чеклист) | owner | T1 blocked → **O216** |
-| **59c** | **O216** quiz lifecycle · match bars · trial feed · 10 ₽ smoke | @coder | **→ сейчас** |
+| **59c** | **O216** quiz lifecycle · match bars · cabinet retake | @coder | **partial ✅** code · deploy ❌ |
+| **59d** | **O216b** Neon quiz pool audit → `quiz_pool_allowlist.json` | @coder | **→ сейчас** |
+| **59e** | Deploy O216 + owner DoD D1–D7 + 10 ₽ smoke | owner + @coder | после 59d |
 | **60** | **Perf** lenta/home/quiz | @lead-designer → @coder | после tier smoke |
 | **61** | **Stress** финал @50 VU | owner | **перед ads** |
 

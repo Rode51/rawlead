@@ -1,10 +1,55 @@
 # Coder — hot queue (active)
 
-**→ Now:** § **O216-QUIZ-TIER-UX** — quiz lifecycle · match bar tiers · trial feed · smoke price 10 ₽
+**→ Now:** § **O216b-QUIZ-POOL-AUDIT** (Neon allowlist) · deploy O216 code · **O216** partial ✅ Lead verify 2026-06-14
 
 ---
 
-## § O216-QUIZ-TIER-UX — Quiz lifecycle + tier match bars + trial feed (owner 2026-06-14)
+## § O216-QUIZ-TIER-UX — PARTIAL ✅ code · deploy + pool + price pending (Lead verify 2026-06-14)
+
+**Lead verify:**
+
+| Area | Result |
+|------|--------|
+| Quiz lifecycle (COMPLETED_KEY, retake, clear-on-exit) | ✅ local `rawlead-quiz.js` |
+| Feed locked bar anon/expired/free | ✅ `renderMatchBlock` |
+| Cabinet «Пройти тест заново» | ✅ `rawlead-cabinet.js` |
+| Allowlist loader in `quiz_adaptive.py` | ✅ mechanism |
+| **`data/quiz_pool_allowlist.json`** | ❌ **file missing** — Neon audit **not done** |
+| **Deploy prod** | ❌ prod `rawlead-quiz.js` **no** COMPLETED_KEY/retake (still **1.18.95** pre-O216) |
+| **PAY_PREMIUM_RUB=10** VPS + UI | ❌ not verified · pricing PHP still **790** hardcoded |
+| pytest test_o197 + test_o195 | ✅ **24/24** local |
+
+**Owner was right:** Coder shipped **hook** for allowlist, not the **curated pool**.
+
+**Next (order):**
+1. § **O216b** — Neon audit → `data/quiz_pool_allowlist.json`
+2. Deploy theme **1.18.96+** + API (`quiz_adaptive.py`) to VPS
+3. Owner: VPS `PAY_PREMIUM_RUB=10` → smoke checkout → revert 790
+4. Owner DoD D1–D7 on prod
+
+---
+
+## § O216b-QUIZ-POOL-AUDIT — Neon curated quiz cards (P0 · blocks r1)
+
+**Blocked:** O216 r1/t5 · owner: «понятные всем, без чужих сфер».
+
+### Deliverables
+
+| # | Task |
+|---|------|
+| b1 | Script `scripts/quiz_pool_audit.py` (or one-off SQL export): query `leads` WHERE `is_visible` AND `ai_score>=60` AND `category IN (dev,design,marketing,text)`; output CSV/JSON with `id, category, title, task_summary, lead_tags` |
+| b2 | **Manual or semi-auto filter:** drop cross-domain jargon (medical, legal, …) + hyper-niche stack; prefer short everyday titles |
+| b3 | Pick **8–12 ids per niche** (+ 4 alternates) → commit **`data/quiz_pool_allowlist.json`** (flat list of int ids) |
+| b4 | Spot-check: run quiz 20 cards incognito — no «WTF» titles; log if fallback to non-allowlist |
+| b5 | pytest: allowlist file present in repo + `_load_allowlist()` non-empty in CI |
+
+**Do not:** change adaptive phase logic · only data + optional export script.
+
+**DoD:** file in repo · owner OK on sample export · quiz uses allowlist on prod after API deploy.
+
+**Deploy:** API only (allowlist file on VPS with code) · no theme required for b1–b3.
+
+---
 
 **Context:** Owner tier smoke stopped at **T1 (Trial)**. Batch of UX fixes from BrowserSync session + product rules below.
 

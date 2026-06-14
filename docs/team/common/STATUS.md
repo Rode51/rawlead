@@ -19,6 +19,42 @@
 | **TG** | monitor слушает · O212 ✅ prod — `skip_entity=N`, старт без `ids=[…]` |
 | **Ops** | **O214 ✅** — cycle_age из лога (не 154м) · residential badge when FL on fallback |
 
+---
+
+## 🚧 O216-QUIZ-TIER-UX (src + WP · 2026-06-14 · code done, deploy pending)
+
+**Files changed:**
+- `wordpress/rawlead-kadence-child/assets/js/rawlead-quiz.js` — localStorage split (SESSION_KEY / COMPLETED_KEY), retake flow, clear-on-exit, completed-on-reopen
+- `wordpress/rawlead-kadence-child/template-parts/rawlead/quiz.php` — кнопка «Пройти ещё раз» (id `rl-quiz-retake-completed`)
+- `wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js` — `renderMatchBlock`: anon/expired_trial/free → locked bar (ранее anon возвращал `""`)
+- `wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js` — «Пройти тест заново» в блоке навыков
+- `src/quiz_adaptive.py` — `quiz_pool_allowlist.json` support (allowlist filter в `_query_card`)
+- `tests/test_o197_quiz_adaptive.py` — +4 теста allowlist
+
+**pytest:** 16/16 (test_o197) · 8/8 (test_o195) ✅
+
+**t6 — price smoke (VPS, ждём owner):**
+> VPS: `PAY_PREMIUM_RUB=10` в `.env.site` → restart `rawlead-api` → YooKassa checkout 10 ₽ → owner test → **revert 790**
+> `config.py` уже env-driven — менять нечего. bump `RAWLEAD_CHILD_VERSION` если UI pricing touched.
+
+**t5 — quiz pool (data, ждём owner):**
+> Нужно заполнить `data/quiz_pool_allowlist.json` — SQL audit по `leads` (is_visible=true, ai_score≥60) per niche. Механизм загрузки в `quiz_adaptive.py` ✅; без файла — поведение прежнее.
+
+**Как проверить (DoD):**
+```
+D1  incognito: exit mid-quiz → reopen → intro (empty history)
+D2  anon complete → login → tags in Neon
+D3  anon complete → reopen quiz → result modal + «Пройти ещё раз»
+D4  retake done → profile updates; retake abandon → first profile kept
+D5  anon /lenta/: locked compat bar visible; trial: real % bar
+D6  trial feed: no delay · match sort · % visible
+D7  cabinet: «Пройти тест заново» link visible
+D8  YooKassa 10₽ checkout (owner, after VPS env change)
+D9  pytest 16/16 quiz ✅
+```
+
+**Deploy:** `deploy-wp-theme-vps.py` · API if needed (quiz_adaptive change) · price env VPS (owner)
+
 **Корень Kwork/FL:** Kwork → **O213** pagination + filter (src ✅) · FL: воскресенье, мало постинга — мб норма.  
 [`2026-06-14-kwork-fl-zero-new.md`](../../problems/2026-06-14-kwork-fl-zero-new.md)
 
