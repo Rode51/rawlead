@@ -1,40 +1,20 @@
 # Coder — hot queue (active)
 
-**→ Now:** § **O213-O212-DEPLOY** — radar + API on VPS
+**→ Now:** *(empty — wave 1 closed)* · owner smoke `/lenta/?source=kwork` + `/ops/` · next wave **Perf**
 
 ---
 
-## § O213-O212-DEPLOY — Kwork coverage + ops truth on prod
+## § O213-O212-DEPLOY — CLOSED ✅ (Lead verify VPS 2026-06-14)
 
-**Context:** O213 + O212 code ✅ Lead verify 2026-06-14 · pytest **42/42** · **not on VPS yet** (grep: no `pages=`, no `EXCHANGE_SAFE_STOPS`, no `skip_entity` in prod files).
+**Deploy:** `deploy-o213-o212-vps.py` · radar + API restarted
 
-**Files — radar restart:**
-```
-src/kwork_parser.py
-src/filters.py
-src/tg_monitor.py
-```
-
-**Files — API restart:**
-```
-src/owner_admin.py
-src/static/ops-pult.js   # if changed
-```
-
-**Steps:**
-1. Upload files to `/opt/rawlead/src/…`
-2. `systemctl restart rawlead-radar` · wait 2 kwork cycles
-3. `systemctl restart rawlead-api`
-4. Spot-check log + `/ops/`
-
-**DoD:**
-- `grep listing:kwork data/radar_site.log | tail -3` → `parsed>12 pages=2-3`
-- `grep skip_entity data/radar_site.log | tail -3` → summary lines, no `ids=[…]`
-- `/ops/` Kwork: «сегодня N» from Neon + `за цикл: parsed=… fresh=…`
-- TG card not 🔴 when monitor alive
-- pytest on VPS optional; local already green
-
-**Deploy:** `rawlead-radar` + `rawlead-api`
+| Check | Result |
+|-------|--------|
+| `listing:kwork parsed=36 pages=3` | ✅ 14:12 MSK |
+| `EXCHANGE_SAFE_STOPS` on VPS | ✅ |
+| TG `skip_entity=N` | ✅ acc1/2/3 |
+| TG start без `ids=[…]` after 14:12 | ✅ |
+| `/ops/` HTTP | ✅ 200 |
 
 ---
 
@@ -166,8 +146,10 @@ Log on allow: `pipeline:filter:exchange_safe kwork:id=… stop=…` (one line, n
 
 | § | DoD | deploy |
 |---|-----|--------|
-| **O213** | pages 1–3 + EXCHANGE_SAFE_STOPS kwork/fl · pytest 42/42 | ⏳ VPS |
-| **O212** | log no ids dump · today_new Neon · TG lamp pult · pytest 20/20 | ⏳ VPS |
+| **O213-DEPLOY** | parsed=36 pages=3 on VPS | ✅ 2026-06-14 |
+| **O212-DEPLOY** | skip_entity · no ids dump · ops 200 | ✅ 2026-06-14 |
+| **O213** | pages 1–3 + EXCHANGE_SAFE_STOPS · pytest 42/42 | ✅ |
+| **O212** | log truth + ops cards · pytest 20/20 | ✅ |
 | **O211-DEPLOY** | footer сегодня/24ч | ✅ |
 | **O207b** | replay 99/14/7 | ✅ |
 | **O209** | WP 1.18.84 | ✅ |
