@@ -1,138 +1,116 @@
 # Coder — hot queue (active)
 
-**→ Now:** § **O195-TINDER-ONBOARD-w1** · § **O196-ASYNC-DRAFT** (parallel)
-
-**O194 ✅** verify 2026-06-13 · **O193 ✅ O191 ✅ O190 ✅** → archive
-
-**Archive:** [`CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md)
+**→ Now:** § **O213-KWORK-COVERAGE** — Kwork pagination + filter scope fix
 
 ---
 
-## § O195-TINDER-ONBOARD-w1 (**→ now · 2026-06-13**)
+## § O213-KWORK-COVERAGE — Kwork page2-3 + filter scope
 
-**Goal:** `/quiz/` WP page (12 real Neon leads, Tinder UX) + localStorage profile + DB migration + two new API endpoints.
+**Ticket:** [`2026-06-14-kwork-fl-zero-new.md`](../../problems/2026-06-14-kwork-fl-zero-new.md)
 
-**Product spec:** `docs/team/product/LEAD_PRODUCT_PROMPT.md` § TINDER-ONBOARD
+**Owner symptoms:** last Kwork order 6h ago; owner sees orders on kwork.ru but radar misses them.
 
-**t1 — DB migration (Neon):**
-```sql
-ALTER TABLE user_tags
-  ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ DEFAULT NOW(),
-  ADD COLUMN IF NOT EXISTS interaction_count INT DEFAULT 0;
-```
+**Root cause (Lead verify 2026-06-14):**
+1. `kwork_parser.py` fetches **page 1 only** (12 items). New orders appear on page 2+ before we pick them up.
+2. Some new items on page 1 are blocked by word filter (`pipeline:skip filter kwork:id=…`). Stop words like `вебинар`, `логотип` etc. are too broad when applied to Kwork.
 
-**t2 — `GET /v1/quiz/cards`** (no auth):
-- 3 cards per category (dev / design / marketing / text): `is_visible=true, category=X, ai_score >= 60 ORDER BY created_at DESC LIMIT 3`
-- Fallback if < 3 results: relax to `ai_score >= 45`
-- Strip from response: `budget`, `source`, `url` — title + snippet + lead_tags only
+**Facts:** parsed=12 every cycle (page size). Neon last kwork insert 06:09 MSK. Same 12 IDs in page 1 since then. IDs 3196826/3196861/3196862/3196905 appeared fresh but got filter-skipped.
 
-**t3 — `POST /v1/me/tags/import`** (auth required):
-- Body: `{"tags": {"ui_ux": 4.0, "python": -1.0, ...}}`
-- Upsert `user_tags`: weight from payload · `last_active_at = NOW()` · `interaction_count = 1`
+### t1 — Kwork multi-page fetch
 
-**t4 — WP `/quiz/` page:**
-- New template `template-parts/rawlead/quiz.php` + `js/rawlead-quiz.js`
-- 12 cards shown sequentially (not all at once); progress bar «N из 12»
-- Buttons: **«Взял бы»** → all card tags `+2.0` · **«Не моё»** → `-1.0`
-- Weights accumulated in `localStorage {rawlead_quiz: {tags: {tag: weight, ...}}}`
-- No budget, no source, no external URL on cards
-- Result screen: top-2 niches by like-count + weekly volume estimate; CTA → TG login + muted «Посмотреть ленту →» `/lenta/`
-- After TG login success: auto-POST `/v1/me/tags/import` from localStorage, then clear key
+**File:** `src/kwork_parser.py`
 
-**DoD:**
-- `/quiz/` renders 12 cards from real Neon leads (no budget/source)
-- TG login from result screen → tags in Neon `user_tags`
-- `user_tags` schema has `last_active_at` + `interaction_count`
-- pytest: `/v1/quiz/cards` returns 12 (3/category, budget absent); `/v1/me/tags/import` upserts correctly
+- Mirror FL approach: iterate pages 2–3 (env `KWORK_MAX_PAGES` default `3`; min 1)
+- URL pattern: check how `kwork.ru/projects` paginates — likely `?page=2` query param
+- Each page: same `_extract_wants_array` + `_wants_to_projects`. Merge results, dedup by `pid`.
+- `trim_listing_at_known` applied after merge (all pages combined)
+- Log: `listing:kwork parsed=N fresh=M pages=P` (add pages count)
+- If page 2 returns error / empty, stop pagination gracefully (do not raise)
 
-**Files:** `src/api_server.py` · `src/pg_storage.py` · `wordpress/rawlead-kadence-child/template-parts/rawlead/quiz.php` · `wordpress/rawlead-kadence-child/js/rawlead-quiz.js`
+Probe VPS first to confirm pagination param: `curl -s 'https://kwork.ru/projects?page=2'` in a test — check HTML has `"wants":[` array.
 
----
+### t2 — Filter scope: Kwork-safe stops
 
-## § O195-TINDER-ONBOARD-w2 (**after w1 deploy · same ticket**)
+**File:** `src/filters.py`
 
-**Goal:** anon `/lenta/` filter lockout + weighted scoring with decay in `/v1/feed`.
+Words that are valid Kwork orders but hit our TG-designed stop list:
+- `вебинар` — on Kwork could be "сайт для вебинара" (valid)
+- `логотип`, `баннер` — on Kwork could be "добавить логотип на сайт" (valid)
+- Keep these in TG stop-list; for **Kwork and FL** add `_KWORK_SAFE_STOPS_SKIP` set: if source is kwork/fl and stop word is in safe set → don't skip
 
-**t1 — Anon filter lockout (`rawlead-feed.js`):**
-- No JWT → category chips disabled (grey); skills picker hidden
-- Replace filter area with promo strip: `«⚙ Фильтры — после настройки профиля · [Настроить ленту →]»` → `/quiz/`
-- Logged-in users: filters unchanged
+Implement: `accepts_listing(project, wide, source=None)` — pass source through from pipeline. If `source in ('kwork', 'fl')` and stop word is in `_KWORK_SAFE_STOPS_SKIP`, allow through.
 
-**t2 — Weighted `keyword_match` in `/v1/feed` (`api_server.py`):**
-```python
-now = datetime.utcnow()
-effective = {}
-for tag, weight, last_active in user_tags_rows:
-    decay = 0.95 ** ((now - last_active).days / 3)
-    eff = weight * decay
-    if eff > 0.5:
-        effective[tag] = eff
+Safe set to start: `{'вебинар', 'логотип', 'баннер', 'дизайн макета'}` (conservative)
 
-if not effective:
-    keyword_match = 50.0  # neutral fallback — no degraded ranking for new users
-else:
-    keyword_match = min(
-        sum(effective.get(t, 0) for t in lead_tags) / sum(effective.values()) * 100,
-        100.0,
-    )
-final_rank = ai_score * 0.6 + keyword_match * 0.4
-```
+### t3 — Tests
 
-**t3 — Weight delta endpoint + triggers:**
-- `POST /v1/me/tags/weight_delta {lead_id, delta, interaction_count_delta?}` → update `user_tags.weight` + `last_active_at`
-- `rawlead-feed.js`: expanded card → `delta +0.1`; «Написать отклик» click → `delta +3.0, ic_delta 2`
-- `rawlead-cabinet.js`: delete from inbox → `delta -0.5`
+- Unit `test_kwork_parser.py`: pages=2 fetches 2 html mocks, deduped, returns combined fresh
+- Unit `test_filters.py`: kwork source passes `вебинар` (safe for kwork), TG source blocks it
+- Existing tests green
 
-**DoD:**
-- Anon → disabled chips + promo strip on `/lenta/`; logged-in → filters active as before
-- Empty `user_tags` → `keyword_match = 50` (not 0); no degraded rank for new users
-- Smoke: 3 expand events → `user_tags.weight` updates visible in Neon
+### DoD
 
-**Files:** `wordpress/rawlead-kadence-child/js/rawlead-feed.js` · `src/api_server.py` · `src/pg_storage.py`
+- VPS kwork shows `listing:kwork parsed=N pages=2-3 fresh>0` within 2 cycles after restart
+- Filter: `вебинар` stop no longer blocks kwork source orders
+- pytest green (all including test_o207b_filter)
+- No regression: TG filter still blocks `вебинар` in TG posts
+
+**Deploy:** `kwork_parser.py` + `filters.py` → restart **`rawlead-radar`**
 
 ---
 
-## § O196-ASYNC-DRAFT (**parallel with O195-w1 · 2026-06-13**)
+## § O212-OPS-LOG-TRUTH — TG log noise + ops «0 новых» / TG 🔴 [PENDING DEPLOY]
 
-**Goal:** «Написать отклик» → instant UI confirmation (< 200ms); draft generates in background.
+**Ticket:** [`2026-06-14-ops-log-spam-tg-lamp.md`](../../problems/2026-06-14-ops-log-spam-tg-lamp.md)
 
-**Context:** `lead_draft_jobs` already has `status pending/done/failed`. **Only UX changes** — no L2 logic change.
+**Owner symptoms:** log «помойка» (all chat ids) · FL/Kwork/TG show «0 новых» / TG 🔴 while radar alive.
 
-**t1 — `rawlead-feed.js`:**
-- On click: fire `POST /v1/leads/{id}/draft` (existing endpoint); do **not** await inline
-- Immediately: button text → `«✅ Добавлено в кабинет»`, disabled; **no spinner, no page block**
-- On fetch error → non-blocking toast `«Ошибка, попробуй снова»`
+**Facts (VPS 2026-06-14):** all units **active** · FL `parsed=30 fresh=0` · Kwork `parsed=12 fresh=0` · TG `handler_ok` + messages · **not a crash**.
 
-**t2 — `rawlead-cabinet.js` inbox card states:**
-- `pending`: `«⏳ Черновик генерируется…»` + poll every 10s until `done/failed`
-- `failed`: `«Не удалось сгенерировать · [Повторить]»`
-- `done`: draft text as now
+### t1 — Stop chat-id log dump
 
-**DoD:**
-- Button changes < 200ms on click; no blocking wait
-- `/cabinet/` shows `pending → done/failed` with correct copy
-- No regression on existing draft display or L2 generation
+**File:** `src/tg_monitor.py`
 
-**Files:** `wordpress/rawlead-kadence-child/js/rawlead-feed.js` · `wordpress/rawlead-kadence-child/js/rawlead-cabinet.js`
+- `тг:монитор:старт` (~895): log `чатов=N file=F filter=K` — **remove** `ids=[sorted(...)]`
+- `пропуск чата {id}` (~454): do **not** log every skip on reload; either:
+  - increment counter + one summary line per reload (`skip_entity=N`), or
+  - log only at DEBUG / first occurrence per account per hour
 
----
+**Do not break:** O206 t3c watchdog · handler_ok line · join audit counts in storage
 
-## § O186-SECURITY-AUDIT (**→ backlog**)
+### t2 — Ops exchange cards truth
 
-Pentest JWT/IDOR/webhook/draft — deliver `docs/problems/…-security-audit.md`
+**Files:** `src/owner_admin.py` · optionally `src/static/ops-pult.js`
 
----
+1. **`today_new_ids`:** use Neon `new_today` from `_lead_counts_by_source` (same MSK day as O211 footer), not `health.last_new_ids`
+2. **Secondary line:** show last-cycle `parsed` / `fresh` from health (tooltip or sub-line): «за цикл: parsed=30 fresh=0»
+3. **TG status lamp:** for `source_id=tg`, use `tg_pult_lamp_state` / fresh `тг:пульс` — **not** only Neon insert gap for `last_ok_at`
+4. **`_last_log_line_for_source('tg')`:** exclude `бот_start:.*skip` · prefer `handler_ok|тг:пульс|listing:tg|health:tg`
 
-## Backlog (not now)
+### t3 — Tests
 
-**YOUDO-PREFILTER:** YouDo parser → pre-filter digital categories only → text visible 7.9%→~63% · spec: `LEAD_PRODUCT_PROMPT.md` § YOUDO-PREFILTER
+- Unit: `_last_log_line_for_source` picks handler_ok over bot_start skip (fixture lines)
+- Unit: exchange row maps `today_new_ids` from Neon mock, not health `last_new_ids`
+- Existing: `test_o171_ops_funnel.py` green
+
+### DoD
+
+- Restart radar once on VPS → log has **no** multi-line `ids=[…]` block
+- `/ops/` FL/Kwork: «сегодня N» matches Neon (may still be 0) + visible parsed/fresh hint
+- TG card **not** 🔴 when `handler_ok` + pulse <15m even if Neon TG insert 0
+- pytest green
+
+**Deploy:** `tg_monitor.py` → restart **`rawlead-radar`** · API files → restart **`rawlead-api`**
 
 ---
 
 ## Closed ✅ (hot index)
 
-O194 · O193 · O191 · O190 · O189 · O185-* · O174* · O182* · O178 · O176 · O175 · O168 → archive
+| § | DoD | deploy |
+|---|-----|--------|
+| **O212** | log no ids dump · today_new from Neon · TG lamp from pult · pytest 20/20 | ⏳ VPS |
+| **O211-DEPLOY** | footer сегодня/24ч | ✅ |
+| **O207b** | replay 99/14/7 | ✅ |
+| **O209** | WP 1.18.84 | ✅ |
 
-## Background
-
-O171 · O173 · O188 (radar auto-join, no Coder unless stuck) · [`PRODUCT_CANON.md`](../product/PRODUCT_CANON.md)
+**Archive:** [`CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md)
