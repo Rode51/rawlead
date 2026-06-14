@@ -4,56 +4,80 @@
 
 ---
 
-## § O213-KWORK-COVERAGE — Kwork page2-3 + filter scope
+## § O213-KWORK-COVERAGE — Kwork page2-3 + exchange filter scope
 
 **Ticket:** [`2026-06-14-kwork-fl-zero-new.md`](../../problems/2026-06-14-kwork-fl-zero-new.md)
 
-**Owner symptoms:** last Kwork order 6h ago; owner sees orders on kwork.ru but radar misses them.
+**Owner symptoms:** sees orders on kwork.ru (screenshot + URLs) but not in RawLead lenta/ops.
 
-**Root cause (Lead verify 2026-06-14):**
-1. `kwork_parser.py` fetches **page 1 only** (12 items). New orders appear on page 2+ before we pick them up.
-2. Some new items on page 1 are blocked by word filter (`pipeline:skip filter kwork:id=…`). Stop words like `вебинар`, `логотип` etc. are too broad when applied to Kwork.
+**Owner repro URLs (Lead verify 2026-06-14):**
+| external_id | title | in Neon? | visible | ingested MSK |
+|-------------|-------|----------|---------|--------------|
+| **3194789** | Сделать лендинг | ✅ | True | 2026-06-10 15:03 |
+| **3196704** | Парсинг сайтов | ✅ | True | 2026-06-13 18:50 |
 
-**Facts:** parsed=12 every cycle (page size). Neon last kwork insert 06:09 MSK. Same 12 IDs in page 1 since then. IDs 3196826/3196861/3196862/3196905 appeared fresh but got filter-skipped.
+→ These two **are already in DB**. If owner «не видит» — likely feed scroll/sort (7-day window, newer on top), not parser miss. **Do not re-ingest.**
+
+**Screenshot items (Lead Neon grep):**
+| title fragment | in Neon? |
+|----------------|----------|
+| «Переписать промпт для Gemini» (3196630) | ✅ visible |
+| «Поправить выгрузку фида» (3196662) | ✅ visible |
+| «Посадка сайта на wordpress» | ✅ (similar titles exist) |
+| **«Платформа для учебного центра»** | ❌ **NOT FOUND** — real gap |
+
+**Root causes:**
+1. `kwork_parser.py` fetches **page 1 only** (12 items). Orders outside top-12 never fetched → e.g. «Платформа для учебного центра».
+2. Some fresh page-1 items blocked by shared L2 filter (`pipeline:skip filter kwork:id=…`).
+3. Ops «0 новых» was UX bug (O212) — `fresh=0` = dedup of known ids, not «Kwork empty».
+
+### Filter architecture (do NOT confuse with TG)
+
+| Layer | File | Applies to |
+|-------|------|------------|
+| **TG spam / CV / seller** | `src/tg_spam_filter.py` (`is_tg_spam`, `is_tg_order_post`) | **TG only** (post-L1 guard) |
+| **TG wide soft bypass** | `filters.py` → `tg_filter_soft_bypass()` + `TG_WIDE_SOFT_STOPS` | **TG only** (`source.startswith('tg:')`) — O207b |
+| **Shared L2 word filter** | `filters.py` → `ListingWordFilter` from `docs/ops/FILTERS.md` | **kwork, fl, youdo, tg** — stop/take words |
+
+**Kwork does NOT use `tg_spam_filter`.** It uses shared L2 only. Problem: stop words in FILTERS.md were tuned for TG noise; same list blocks valid Kwork orders.
+
+**Fix t2:** add **exchange-safe bypass** for kwork+fl (NOT tg): when `source in ('kwork','fl')`, skip applying selected stop tokens. Do **not** weaken TG path.
 
 ### t1 — Kwork multi-page fetch
 
 **File:** `src/kwork_parser.py`
 
-- Mirror FL approach: iterate pages 2–3 (env `KWORK_MAX_PAGES` default `3`; min 1)
-- URL pattern: check how `kwork.ru/projects` paginates — likely `?page=2` query param
-- Each page: same `_extract_wants_array` + `_wants_to_projects`. Merge results, dedup by `pid`.
-- `trim_listing_at_known` applied after merge (all pages combined)
-- Log: `listing:kwork parsed=N fresh=M pages=P` (add pages count)
-- If page 2 returns error / empty, stop pagination gracefully (do not raise)
+- Mirror FL: pages 1–3 (env `KWORK_MAX_PAGES` default `3`)
+- URL: probe pagination (`?page=2` or site pattern) — confirm `"wants":[` in HTML
+- Merge pages, dedup by `pid`, then `trim_listing_at_known`
+- Log: `listing:kwork parsed=N fresh=M pages=P`
 
-Probe VPS first to confirm pagination param: `curl -s 'https://kwork.ru/projects?page=2'` in a test — check HTML has `"wants":[` array.
+**Acceptance probe after deploy:** «Платформа для учебного центра» appears in log as fresh within 2 cycles OR explain why (filter) with logged id.
 
-### t2 — Filter scope: Kwork-safe stops
+### t2 — Exchange-safe L2 stops (kwork + fl only)
 
-**File:** `src/filters.py`
+**File:** `src/filters.py` · **pipeline:** pass `project.source` into stop logic
 
-Words that are valid Kwork orders but hit our TG-designed stop list:
-- `вебинар` — on Kwork could be "сайт для вебинара" (valid)
-- `логотип`, `баннер` — on Kwork could be "добавить логотип на сайт" (valid)
-- Keep these in TG stop-list; for **Kwork and FL** add `_KWORK_SAFE_STOPS_SKIP` set: if source is kwork/fl and stop word is in safe set → don't skip
+Start set `_EXCHANGE_SAFE_STOPS` (conservative): `вебинар`, `логотип`, `баннер`, `дизайн макета`, `figma`, `фигма`, `монтаж`, `монтаж рилс`, `иллюстратор`
 
-Implement: `accepts_listing(project, wide, source=None)` — pass source through from pipeline. If `source in ('kwork', 'fl')` and stop word is in `_KWORK_SAFE_STOPS_SKIP`, allow through.
+- If `source in ('kwork','fl')` and matched stop ∈ `_EXCHANGE_SAFE_STOPS` → **allow** (continue to category check)
+- TG path unchanged: `tg_filter_soft_bypass` still only for `tg:*`
 
-Safe set to start: `{'вебинар', 'логотип', 'баннер', 'дизайн макета'}` (conservative)
+Log on allow: `pipeline:filter:exchange_safe kwork:id=… stop=…` (one line, no spam)
 
 ### t3 — Tests
 
-- Unit `test_kwork_parser.py`: pages=2 fetches 2 html mocks, deduped, returns combined fresh
-- Unit `test_filters.py`: kwork source passes `вебинар` (safe for kwork), TG source blocks it
-- Existing tests green
+- `test_kwork_parser.py`: multi-page mock, dedup, `pages=2`
+- `test_filters.py`: kwork passes «логотип» in title; TG post with «логотип» still blocked (no soft bypass unless order markers)
+- Regression: `test_o207b_filter.py`, `test_o171_ops_funnel.py` green
 
 ### DoD
 
-- VPS kwork shows `listing:kwork parsed=N pages=2-3 fresh>0` within 2 cycles after restart
-- Filter: `вебинар` stop no longer blocks kwork source orders
-- pytest green (all including test_o207b_filter)
-- No regression: TG filter still blocks `вебинар` in TG posts
+- VPS: `listing:kwork parsed>12 pages=2-3` within 2 cycles
+- «Платформа для учебного центра» ingested OR logged why skipped
+- 3194789/3196704 unchanged (already in DB)
+- TG filter regression: replay baseline unchanged
+- pytest green
 
 **Deploy:** `kwork_parser.py` + `filters.py` → restart **`rawlead-radar`**
 

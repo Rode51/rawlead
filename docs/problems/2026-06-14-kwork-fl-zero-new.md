@@ -37,7 +37,13 @@ Today's kwork items that appeared fresh but were blocked:
 
 Filter is using words from `docs/ops/FILTERS.md` — these kwork orders have stop-word in title/snippet (e.g. design skill words, `вебинар`, etc).
 
-**Owner check needed:** open kwork.ru/projects manually → look at what orders are showing now → compare with FILTERS.md stop list.
+**Owner repro (2026-06-14):**
+- [3194789](https://kwork.ru/projects/3194789/view) «Сделать лендинг» — **already in Neon** 2026-06-10, visible ✅
+- [3196704](https://kwork.ru/projects/3196704/view) «Парсинг сайтов» — **already in Neon** 2026-06-13 18:50 MSK, visible ✅
+- Screenshot «Платформа для учебного центра» — **NOT in Neon** ← real parser gap
+- Screenshot «Переписать промпт для Gemini» (3196630), «Поправить выгрузку фида» (3196662) — **in Neon**, visible ✅
+
+**Owner confusion:** old orders still live on kwork.ru ≠ missing from RawLead. Check `/lenta/?source=kwork` scroll down (7-day window).
 
 ---
 
