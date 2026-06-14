@@ -184,7 +184,7 @@ pytest tests/test_o214_ops_truth.py -q
 |-------|------|-----|
 | **1** | ~~**O214** ops truth~~ · owner accept | ✅ 2026-06-14 |
 | **2** | ~~**O215** WP design polish~~ · theme **1.18.95** deploy | ✅ owner accept 2026-06-14 |
-| **2a** | **Tier smoke** all access levels (checklist FOR_YOU) | owner · Monica reset ✅ |
+| **2a** | **Tier smoke** (FOR_YOU) · T1 → **O216** fixes | owner + @coder · **→ сейчас** |
 | **2b** | **Perf** lenta/home/quiz load | after tier smoke · @lead-designer → @coder |
 | **3** | «Платформа для учебного центра» в ленте | monitor / owner spot-check |
 | **4–6** | L2 70% · stress · ads | ROADMAP |

@@ -52,7 +52,8 @@
 | **58h** | **O213+O212 deploy** radar + API | @coder | ✅ Lead verify VPS 2026-06-14 |
 | **58i** | **O214** ops truth: cycle_age fallback + residential badge | @coder | ✅ Lead verify VPS 2026-06-14 |
 | **59** | **O215** WP design polish (BrowserSync local) | @designer + owner | ✅ deploy **1.18.95** 2026-06-14 |
-| **59b** | **Tier smoke** — все уровни доступа (FOR_YOU чеклист) | owner | **→ сейчас** |
+| **59b** | **Tier smoke** — все уровни доступа (FOR_YOU чеклист) | owner | T1 blocked → **O216** |
+| **59c** | **O216** quiz lifecycle · match bars · trial feed · 10 ₽ smoke | @coder | **→ сейчас** |
 | **60** | **Perf** lenta/home/quiz | @lead-designer → @coder | после tier smoke |
 | **61** | **Stress** финал @50 VU | owner | **перед ads** |
 

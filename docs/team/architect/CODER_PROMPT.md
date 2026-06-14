@@ -1,6 +1,99 @@
 # Coder — hot queue (active)
 
-**→ Now:** *(empty)* · **next:** tier smoke (FOR_YOU) → **Perf** scope от `@lead-designer`
+**→ Now:** § **O216-QUIZ-TIER-UX** — quiz lifecycle · match bar tiers · trial feed · smoke price 10 ₽
+
+---
+
+## § O216-QUIZ-TIER-UX — Quiz lifecycle + tier match bars + trial feed (owner 2026-06-14)
+
+**Context:** Owner tier smoke stopped at **T1 (Trial)**. Batch of UX fixes from BrowserSync session + product rules below.
+
+**Lead verify (read-only, root cause anon quiz):**
+- Quiz progress is **`localStorage` key `rawlead_quiz_session`** — **per browser**, **not IP**, **not server-side shared state**.
+- `beginQuizPlay()` calls `readSession()` → **resumes partial `history`** → can finish with 1 niche bar only (confidence filter in `renderCategoryBars` shows max 3 niches with `pct>0`).
+- **Not** «one quiz for all users» — but **same browser** shares session (acceptable); must **not resume incomplete** on re-entry (see t2).
+
+### Owner requirements
+
+| # | Requirement |
+|---|-------------|
+| r1 | **Quiz cards:** more **universal** tasks — understandable outside digital; reduce dev jargon in card titles/tasks shown in quiz (curate pool / filter / replace worst offenders). |
+| r2 | **Cabinet:** all logged-in users can **retake quiz** (entry in LK). |
+| r3 | **Feed match bar:** **anon** sees **locked** compat bar (like current `rl-match--free-locked`); **trial** gets **real % bar** like premium — **remove** lock from trial. |
+| r4 | **Trial feed:** same experience as **premium** — personal sort + **keyword_match %** on cards (API + JS). |
+| r5 | **Quiz exit:** if user **leaves before finish** → next open **starts from intro** (clear in-progress session). **No** resume mid-quiz. |
+| r6 | **Quiz complete (anon):** persist **completed profile** locally; on TG login → import to Neon (existing `importQuizTags`). |
+| r7 | **Quiz re-open after complete:** show **result modal** (screenshot: «Готово. Вот что мы узнали») — **not** restart cards silently. Add link/button **«Пройти ещё раз»** → starts fresh run. |
+| r8 | **Retake rules:** if retake **finished** → **replace** profile (Neon tags + local completed snapshot). If retake **abandoned** → keep **first completed** profile. |
+| r9 | **Smoke price:** temporarily **`PAY_PREMIUM_RUB=10`** on VPS + checkout amount; UI price display should match API (use existing pattern / script `scripts/_tmp_o185_t1b_smoke_price.py` if still valid). **Revert to 790** after owner payment smoke — document in STATUS. |
+
+### Files (expected)
+
+```
+wordpress/rawlead-kadence-child/assets/js/rawlead-quiz.js
+wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js
+wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js
+wordpress/rawlead-kadence-child/template-parts/rawlead/quiz.php
+wordpress/rawlead-kadence-child/assets/css/rawlead.css
+src/quiz_adaptive.py                    ← card pool / jargon filter if needed
+src/api_server.py                       ← trial feed parity (delay/sort/match) if gap
+src/config.py                           ← pay_premium_rub already env-driven
+wordpress/.../pricing-card.php        ← price from API/config, not hardcoded 790 during smoke
+scripts/_tmp_o185_t1b_smoke_price.py    ← reuse for VPS 10 ₽ if applicable
+tests/test_o195_quiz.py tests/test_o197_quiz_adaptive.py  ← extend
+```
+
+### Implementation notes
+
+**t1 — localStorage model (quiz.js)**
+- Split keys e.g. `rawlead_quiz_session` (in-progress, cleared on exit/close overlay without done) vs `rawlead_quiz_completed_v1` (canonical completed profile + category bars snapshot + `completed_at`).
+- On overlay/page **close** without `done` → `clearSession()` only (drop in-progress).
+- On `showResult` / API `done` → write **completed** snapshot; clear in-progress.
+- On quiz open: if **completed** exists → show **result screen** immediately (+ «Пройти ещё раз»).
+- Retake: set flag `retake_pending`; on new **done** → overwrite completed + `importQuizTags` if logged in; on abandon retake → restore completed from backup taken at retake start.
+
+**t2 — Feed match bar (rawlead-feed.js `renderMatchBlock`)**
+- **anon:** render `renderFreeLockedMatchBar()` (currently anon returns `""` — **change**).
+- **trial** (`subscriptionState.is_trial` or `status==='trial'` with `effective_access`): treat as **premium** for match bar — `renderCompatMatchBar`, no lock.
+- **free logged-in** (no trial access): keep lock OR clarify with owner — default: lock only **anon + expired_trial**; trial ≠ lock.
+
+**t3 — Trial feed parity**
+- Verify `/v1/feed` for trial JWT: `apply_delay=false`, match sort available, `keyword_match` populated when user has quiz tags.
+- If trial lacks tags until import — use quiz completed local tags for anon→login path; logged-in trial must show % after profile import.
+
+**t4 — Cabinet retake**
+- Button/link «Пройти тест заново» / «Настроить ленту» → opens quiz overlay (`rawleadQuizApp.open`) with retake flow (r8).
+
+**t5 — Universal cards**
+- Audit quiz lead titles for digital-only terms (API, React, парсинг, …); prefer plain client tasks in `fetch_quiz_card` ordering or small denylist + fallback queries.
+- Do **not** change 4 niche category labels in result bars without Design OK — only **card content** universal.
+
+**t6 — Price 10 ₽ smoke**
+- VPS: `PAY_PREMIUM_RUB=10` in `.env.site` · restart `rawlead-api`.
+- WP checkout uses API amount · bump `RAWLEAD_CHILD_VERSION` if pricing UI touched.
+- Owner note in STATUS: «revert 790 after smoke».
+
+### Do not break
+
+- O215 visual polish (NEO tokens) · quiz overlay on `/lenta/` · TG auth import · expired-trial mandatory banner · Monica/trial auto-start on first login.
+- Do **not** remove completed profile on anon exit after **successful** finish.
+- Do **not** store quiz state server-side keyed by IP.
+
+### DoD
+
+| # | Check |
+|---|--------|
+| D1 | Incognito anon: exit quiz mid-way → reopen → **intro**, empty history |
+| D2 | Anon complete quiz → result modal → login → tags in Neon |
+| D3 | Anon complete → open quiz again → **result modal** + «Пройти ещё раз» |
+| D4 | Retake complete → profile updates; retake abandon → first profile kept |
+| D5 | Anon `/lenta/` cards show **locked** compat bar; trial shows **real %** |
+| D6 | Trial feed: no 30m delay · match sort · % visible (T1 smoke) |
+| D7 | Cabinet: retake entry for logged-in user |
+| D8 | YooKassa checkout **10 ₽** on prod (owner test) · revert documented |
+| D9 | pytest quiz + feed tier tests green |
+
+**Deploy:** theme `deploy-wp-theme-vps.py` · API if backend touched · price env on VPS.
 
 ---
 
