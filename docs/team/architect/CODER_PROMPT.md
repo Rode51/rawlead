@@ -1,450 +1,1054 @@
 # Coder — hot queue (active)
 
-**→ Now:** § **O220-QUIZ-DEDUP** + § **O220-QUIZ-BAR-ALIGN**  
-**Next:** § **O220-L1-PROMPT-R2** · O218 Playwright · mass retag **нет**
+**→ Now:** **O271** Neon → VPS Postgres migration · O200 ⏸ · O268 фон
+
+Full closed specs → [`CODER_PROMPT_ARCHIVE`](../archive/CODER_PROMPT_ARCHIVE.md) · prod snapshot → [`PROD_FACTS.md`](../common/PROD_FACTS.md) · **migrate:** [`MIGRATE_NEON_TO_VPS_POSTGRES.md`](../../ops/MIGRATE_NEON_TO_VPS_POSTGRES.md)
 
 ---
 
-## ✅ O220-MATCH-CODE — CLOSED (Lead verify + deploy 2026-06-14)
+## § O271-NEON-TO-VPS-POSTGRES — **P0 owner go 2026-06-18**
 
-Theme **1.19.02** prod · API `lead_coverage_match` · bar only · feed ≡ cabinet · pytest **21/21** · archive [`CODER_PROMPT_ARCHIVE`](../archive/CODER_PROMPT_ARCHIVE.md) § O220-MATCH-CODE
+**Owner:** миграция без оплаты Neon · полный dump если доступен · ветка `o271/pre-vps-postgres-migration` **перед** prod cutover.
 
----
+**Runbook:** [`docs/ops/MIGRATE_NEON_TO_VPS_POSTGRES.md`](../../ops/MIGRATE_NEON_TO_VPS_POSTGRES.md)
 
-## ✅ O220-JS-SYNTAX-HOTFIX — CLOSED (Lead verify 2026-06-14)
+### Deliverables
 
-Theme **1.19.01** prod · `node --check` ✅ · ticket [`2026-06-14-feed-cabinet-js-syntax.md`](../../problems/2026-06-14-feed-cabinet-js-syntax.md) · UI stray `"` → § O220-MATCH-CODE u1
+| # | Item |
+|---|------|
+| 1 | VPS: `postgresql` · DB `rawlead` · user `rawlead` |
+| 2 | `pg_dump` off Neon → `/opt/rawlead/data/neon_pre_migration.dump` |
+| 3 | `pg_restore` → local · `.env.site` `DATABASE_URL=127.0.0.1` |
+| 4 | `scripts/migrate_neon_to_vps_postgres.py` — dry-run dump / restore / smoke |
+| 5 | Daily backup timer · update `PROD_FACTS` · `purge_old_leads` smoke |
+| 6 | Post: O270 circuit breaker still useful for local PG down |
 
----
-
-## § O220-QUIZ-DEDUP — same card 4× on retake (P1)
-
-**Ticket:** [`docs/problems/2026-06-14-quiz-duplicate-card-o217.md`](../../problems/2026-06-14-quiz-duplicate-card-o217.md)
-
-**Root:** `quiz_next_response` drops string JSON `card_id` when building `shown_ids` (`int()` fail) → dedup broken.
-
-### DoD
-
-| Step | Action |
-|------|--------|
-| 1 | `quiz_adaptive.py`: shown set from history **as strings** for O217 JSON |
-| 2 | Test: 2× `/v1/quiz/next` with same synthetic id in history → next card **≠** first |
-| 3 | Deploy API · owner retake smoke (no 4× amoCRM) |
+**DoD:** `/health` ok · лента · TG login · subscription row intact · radar `neon_insert` in log.
 
 ---
 
-## § O220-QUIZ-BAR-ALIGN — result bars same left edge (P2 UI)
+## § O270-NEON-QUOTA-RETENTION — **P0 owner 2026-06-18** (superseded by O271 migrate)
 
-**Symptom:** «Разработка» / «Маркетинг» — жёлтые полоски начинаются с разного X (label width auto).
+**Symptom:** Neon **недоступен** · VPS `purge_old_leads --dry-run` → `Your account or project has exceeded the compute time quota` · O200 regen/judge **blocked**.
 
-**Fix:** `rawlead.css` `.rl-quiz__category-bar` — fixed label column (e.g. `grid-template-columns: 7.5rem 1fr` or `minmax(7.5rem,7.5rem) 1fr`); verify overlay result modal (owner screenshot).
+**Not missing:** autocleanup **есть** — `rawlead-purge-leads.timer` **active** · сегодня **03:15** удалено **607** old + **92** delisted.
 
-Bump theme if CSS-only · deploy with dedup or separate patch OK.
+**Owner unblock (сначала):** [console.neon.tech](https://console.neon.tech) → Billing / Usage → **upgrade plan** или дождаться reset квоты · при storage full — Console → **Delete branches** / shrink compute.
 
----
-
-## § O220-L1-PROMPT-R2 — L1 few-shot after pilot judge (P1 · optional re-pilot 6 ids)
-
-**Canon:** `data/preprod_ai_prod_audit_judge.md` § L1 Top prompt-fix · pilot `data/o220_l1_retag_pilot.json`  
-**Pilot result:** l1_usable **80%** ✅ · tags avg **1.7–2.1** (target 2.5) · **6** leads still `<2` tags (3 empty)
-
-**Goal:** Surgical `_LITE_SYSTEM` / `_LITE_FEWSHOT_BLOCK` in `src/ai_analyze.py` — **no model change**, no Neon schema.
-
-### Requirements (from judge worst L1)
-
-| id | Fix |
-|----|-----|
-| **r2-1** | **dev vs marketing:** cold TG outreach / «рассылка в тг» / lead gen scripts → `primary_category=marketing`, not dev (ref #24202) |
-| **r2-2** | **infographic / slides / visual for cards** → `design`, not marketing (#24638, #24580) |
-| **r2-3** | **Tags match subject:** marketplace product card / furniture → product/visual tags, not `landing_page_design`/`ui_ux` when subject is physical goods (#24776) |
-| **r2-4** | **Min tags enforce:** if `feed_visible=true` and L1 returns `<2` lead_tags after sanitize → **retry 1×** with user hint «need ≥2 canonical_tag» (extend existing retry path ~L1843) |
-| **r2-5** | **Optional:** Xmind / diagram / scheme software → document in few-shot (judge: dev vs text #23959 — pick **one** line, align with `lead_category` canon) |
-
-### Files
-
-```
-src/ai_analyze.py          — _LITE_SYSTEM / few-shot only
-tests/test_ai_analyze.py   — or extend existing L1 smoke if present
+**When Neon accepts connections again (VPS):**
+```bash
+cd /opt/rawlead && sudo -u rawlead env PYTHONPATH=/opt/rawlead/src .venv/bin/python scripts/purge_old_leads.py --apply
 ```
 
-### Do not break
+### Deliverables (@coder)
 
-- L1 model · judge infra · `sanitize_l1_*` guards · ingest pipeline
+| # | Item |
+|---|------|
+| 1 | **`scripts/probe_neon_storage.py`** — row counts + `pg_total_relation_size` top tables · no secrets in output |
+| 2 | **Circuit breaker** — on `compute time quota` / `storage limit` in `pg_storage` / radar: pause Neon writes **30–60 min** · log `neon:quota_pause` once · не спамить reconnect |
+| 3 | **Ops** — `/ops/` или health: last purge timer result · Neon reachability ping |
+| 4 | **Optional env** `LEADS_RETENTION_DAYS` (default 7) · document in `.env.example` |
+| 5 | **Deploy** — ensure `rawlead-purge-leads.timer` enabled on VPS · `docs/problems/2026-06-18-neon-quota-exceeded.md` |
 
-### DoD
+**Do not:** DELETE users/tags/subscriptions · не трогать YouDo O268 без отдельного тикета.
 
-| # | Check |
-|---|--------|
-| R1 | 3–5 new few-shot lines (RU examples) in prompt |
-| R2 | Retry when feed_visible + `<2` tags after sanitize |
-| R3 | pytest green |
-| R4 | **No VPS deploy required for verify** — owner may re-run 6 thin ids via `o220_l1_retag_pilot.py --lead-ids …` if script extended, or manual replay 6 ids |
-
-**Deploy:** `ai_analyze.py` → VPS `/opt/rawlead/src/` + restart **`rawlead-radar`** (L1 on ingest) · API optional same file
-
-**Not in scope:** mass retag 2264 · L2 prompt (separate track if owner wants design send 65%)
+**Resume O200** только после Neon green + purge `--apply` ok.
 
 ---
 
-## Closed index
+## § O200-L2-CATEGORY-WAVE — **P0 owner go 2026-06-18**
 
-| § | Status |
-|---|--------|
-| **O220-MATCH-CODE** | ✅ deploy **1.19.02** · `lead_coverage_match` · bar only 2026-06-14 |
-| **O220-FEED** | ✅ deploy 1.19.00+ |
-| **O219** | ✅ deploy 1.18.97 · archive `CODER_PROMPT_ARCHIVE` |
-| **O220-L1-RETAG** | ✅ code · owner apply+judge ⏳ |
+**Owner:** «помчали» — regen + judge **≥70% × 4 категории** · гейт до ads (ROADMAP волна 4).
 
----
+**Goal:** shared L2 `reply_draft` · judge `send_as_is` **≥70%** overall **и** по **dev / design / marketing / text** (n≥10 на категорию в выборке).
 
-**Owner batch (one deploy):** cabinet UX · anon locked match bar · auto trial on first TG login · hide synthetic badge · canonical quiz on `/lenta/#quiz`.
-
-### Requirements
-
-| id | Fix | Detail |
-|----|-----|--------|
-| **r1** | **Yellow square in LK** | Stray `#rl-cabinet-trial-badge` or skeleton chip under header — hide when empty; do not render yellow block without trial text |
-| **r2** | **Hide user skills in LK** | Quiz-first (O208): hide `#rl-cabinet-tags`, label «Твои навыки», «+ Добавить», skills modal entry from head · keep tags in Neon/API |
-| **r3** | **Retake button** | «Пройти ещё раз» / «Пройти тест заново» — **not** black `rl-cabinet-tag` chip · use `rl-btn rl-btn--ghost` · place **directly under** `.rl-cabinet-head__lead` (after «Отклики с ленты…»), not in tags row · opens `/lenta/#quiz` retake (`rawleadQuizApp.retake`) |
-| **r4** | **Anon match bar** | Locked compat bar on every feed card for **anon** · root cause: CSS hides `.rl-row--auth-only` for `[data-tier="anon"]` (`rawlead.css` ~8144) while `renderMatchBlock` wraps bar in that class — fix class/CSS so anon sees lock bar |
-| **r5** | **Tier match bars** | **Trial + active Premium:** real `%` bar, no lock · **Anon + expired trial + expired premium (no access):** locked bar · `free` logged-in without access: locked (upsell) |
-| **r6** | **Auto trial first TG login** | **O208-B4 / O107 amended:** on `auth_telegram` + `_complete_bot_auth`, if `trial_used_at IS NULL` and no active premium → `start_trial()` + `notify_trial_started()` · skip owner/beta · Monica test after full wipe |
-| **r7** | **Hide synthetic badge** | `rawlead-quiz.js`: `source=synthetic` → no visible pill (API field stays for O218 j7) |
-| **r8** | **Canonical quiz URL** | Single entry: **`/lenta/#quiz`** overlay · `/quiz/` → **301** (or `template_redirect`) to `/lenta/#quiz` · update `quizUrl` in `functions.php` + PHP/JS links (`rawlead_page_url('quiz')` → lenta hash or helper `rawlead_quiz_url()`) · do **not** delete WP page without redirect |
-
-### Files
-
-```
-wordpress/rawlead-kadence-child/page-cabinet.php
-wordpress/rawlead-kadence-child/assets/js/rawlead-cabinet.js
-wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js
-wordpress/rawlead-kadence-child/assets/js/rawlead-quiz.js
-wordpress/rawlead-kadence-child/assets/css/rawlead.css
-wordpress/rawlead-kadence-child/functions.php
-wordpress/rawlead-kadence-child/page-quiz.php          ← redirect stub OK
-wordpress/rawlead-kadence-child/template-parts/rawlead/hero.php
-wordpress/rawlead-kadence-child/template-parts/rawlead/feed-strip.php
-src/api_server.py                                      ← r6 auto trial
-src/trial_subscription.py                              ← reuse start_trial
-tests/test_trial_subscription.py                       ← extend auto-start on auth
-tests/test_o197_quiz_adaptive.py                       ← if quiz URL touched
-```
+**Context:** L2 aggregate **71.8%** ✅ · per-category ⏳ · playbooks r2 в `l3_human_style.py` · `primary_category` в L2 payload · `deploy-o200-l2-vps.py`.
 
 ### Steps
 
-**t1 — Cabinet head (`page-cabinet.php` + `rawlead-cabinet.js` + CSS)**
-- Hide skills block (r2); move retake button under lead (r3); fix trial badge empty state (r1).
-
-**t2 — Feed match bar (`rawlead-feed.js` + CSS)**
-- `renderMatchBlock`: lock only `anon | expired_trial | free-without-access`; trial/premium → `renderCompatMatchBar`.
-- Remove/adjust `.rl-lead-card[data-tier="anon"] .rl-row--auth-only { display:none }` or use `.rl-row--match-tier` for match row (r4,r5).
-
-**t3 — Auto trial (`api_server.py`)**
-- After `_upsert_telegram_user` in both auth paths: try `start_trial`; on success commit + notify; swallow `TrialStartError` for already_used/premium.
-
-**t4 — Quiz URL (`functions.php` + links)**
-- `rawlead_quiz_url()` → `/lenta/#quiz`; redirect `/quiz/`; retake/cabinet links use hash overlay.
-
-**t5 — Synthetic badge (`rawlead-quiz.js`)** — r7.
-
-### Do not break
-
-- O216 quiz lifecycle · retake rules · `importQuizTags` · expired-trial banner · O217 synthetic API · Monica wipe is **ops** (owner), not code.
-
-### DoD
-
-| # | Check |
+| # | Action |
 |---|--------|
-| D1 | LK logged-in: **no** skill chips row · retake = normal ghost button under lead text |
-| D2 | LK: **no** yellow stray square under header |
-| D3 | Anon `/lenta/`: **locked** compat bar on cards (visible, with lock icon) |
-| D4 | Trial Monica after wipe + TG login: `plan=trial` · real match % · no lock |
-| D5 | Expired trial/premium: locked bar returns |
-| D6 | `/quiz/` → redirects to `/lenta/#quiz` · overlay works · no duplicate standalone quiz UX |
-| D7 | Quiz card: no «synthetic» pill · pytest green · bump `RAWLEAD_CHILD_VERSION` |
+| 1 | **Deploy** (if not on VPS): `python scripts/deploy-o200-l2-vps.py` |
+| 2 | **Regen** stratified visible leads: `scripts/regen_shared_reply_drafts.py --profile site --apply --limit 80` |
+| 3 | **Judge:** `scripts/preprod_ai_prod_audit.py --profile site --judge --judge-limit 40` (stratified, fresh drafts) |
+| 4 | **Gate:** `send_as_is_pct ≥ 70` overall · **each** cat n≥10 → `send_as_is_pct ≥ 70` · `avg_combined_3 ≥ 4.0` |
+| 5 | **Fail:** правки **Category playbooks** в `l3_human_style.py` · re-regen worst cat · pytest `test_l3_human_style.py -k o200` |
+| 6 | **Artifacts:** `data/preprod_o200_judge.json` + `data/preprod_o200_judge_human.md` (таблица 4×cat %, worst 3/cat) |
 
-**Deploy:** theme rsync + restart API if t3 · owner re-tests Monica first-login.
+**Pilot (optional first):** `--limit 40` regen + judge 40 (10×4) → если PASS, full 80.
 
----
+**Constants:** `_JUDGE_L2_SEND_MIN_PER_CAT` сейчас **0.80** — для owner gate **70%** выставить **0.70** или явно в artifact «gate=70% owner».
 
-**Next:** owner tier smoke · **O218 Playwright** after O219 deploy
+**Do not break:** radar/API ingest · YouDo O268 · cabinet on-demand L2 — только **shared** `leads.reply_draft`.
 
-## § O218-PLAYWRIGHT-QUIZ-E2E — human-like UI/quiz journeys (P1 · pre-ads gate · after O219)
-
-**Owner 2026-06-14:** Playwright · multi-user · quiz scenarios · **mobile 390 + desktop** · no state bleed.
-
-**Spec:** [`OWNER_INTENT.md`](OWNER_INTENT.md) § **O218-w** · accounts [`PREPROD_ACCOUNTS.md`](../../ops/PREPROD_ACCOUNTS.md)
-
-### Scenarios (min)
-
-| id | Flow | assert |
-|----|------|--------|
-| j1 | anon abandon mid-quiz → reopen intro | empty history · no resume |
-| j2 | anon complete → result + retake button | `COMPLETED_KEY` set |
-| j3 | anon complete → TG login | Neon `user_tags` import |
-| j4 | retake done vs retake abandon | profile replace vs keep first |
-| j5 | anon locked match bar · trial real % | tier-specific DOM |
-| j6 | cabinet retake link | overlay opens retake |
-| j7 | synthetic card title on prod | `source=synthetic` in **API/Network** only · **no visible badge**
-
-### Implementation
-
-| # | Task |
-|---|------|
-| t1 | `tests/e2e/` or extend preprod script — **separate browser context per persona** |
-| t2 | Viewports: **1280 desktop** + **390 mobile** (duplicate critical paths j1,j2,j5,j7) |
-| t3 | Use Monica + dedicated anon JWT users · reset subscription SQL hook or fixture between runs |
-| t4 | Output `data/preprod_quiz_e2e.json` · fail screenshots |
-| t5 | CI/local: `pytest` marker or standalone playwright cmd documented in TASKS |
-
-**Do not break:** O37c unrelated flows · production data (use test tg ids only).
-
-**DoD:** all j1–j7 green desktop + j1,j2,j5,j7 green mobile · Lead verify before ads gate.
+**DoD:** artifact с ✅ по 4 категориям · Lead verify · `TASKS`/`STATUS` update.
 
 ---
 
-## § O217-DEPLOY — VPS API + quiz_cards_v1.json (P0 · code ✅)
+## § O268 — ✅ closed (watch фон)
 
-**Lead verify 2026-06-14:** local code ✅ · prod quiz **still Neon** (`source=kwork`, card_id=23958) until this deploy.
-
-| Step | Task |
-|------|------|
-| d1 | `python scripts/deploy-o217-quiz-vps.py` |
-| d2 | Prod: `/wp-json/rawlead/v1/quiz/start` → `card.source=synthetic` · title from PM pack |
-| d3 | Owner: incognito quiz — PM titles, not Kwork junk |
-
-**DoD:** script prints `DEPLOY OK` · `quiz_cards_v1=56` · `quiz_source=synthetic`
+Ingest **14:26** `parsed=50` DC · O268 ephemeral carousel · spec → STATUS § O268 · backlog O269 RU-after-DC optional.
 
 ---
 
-## § O217-QUIZ-SYNTHETIC-CODE — summary ✅ code (Lead verify 2026-06-14)
+**Diagnosis:**
 
-| Area | Result |
+| Факт | Вывод |
 |------|--------|
-| `data/quiz_cards_v1.json` | ✅ **56** (14/niche: 8+2+4) · pilot 20 ids present |
-| Tag lint | ✅ all `skills_on_like` ∈ CANONICAL_TAGS |
-| `quiz_adaptive.py` | ✅ JSON-first · Neon fallback if file missing |
-| pytest | ✅ **59/59** (o217 + o197 + o195) |
-| `.gitignore` | ✅ `!data/quiz_cards_v1.json` |
-| **Deploy prod** | ❌ API still allowlist/Neon on prod |
+| 10:04 ok | one-shot camoufox · cold `goto` · old FL DC `.197` |
+| 13:16–13:28 fail | sticky worker · persistent profile · reload 150s на SP stub |
+| `youdo_sticky_worker`: cookies exist → **reload вместо goto** | «отравленный» profile после SP → reload trap |
+| O264 pool | только `128.237` + `130.67` — **.197 не в primary** |
+| RU off | нет seed burst когда DC мёртв |
+
+**Goal:** вернуть pass rate «как раньше» (периодические ok на DC) **без** 24/7 RU · RU только budgeted burst.
+
+**Do not break:** O254 ops hard reset · detail subprocess · `fetch_every_n=4` · playwright pin 1.58.
+
+### Deliverables
+
+| # | Item | Behaviour |
+|---|------|-----------|
+| **A** | **Profile poison fix** | On ServicePipe fail / `html_len<5000`: `_wipe_youdo_persistent_profiles(proxy_url)` · log `profile_wiped=sp` · **never** auto-reload when last sticky result was antibot (cookies alone ≠ warm) |
+| **B** | **Fetch path order** | Slot 1 listing: **ephemeral cold goto** (10:04 path) · sticky+persistent **only after** first `html_len>100000` in session OR env `YOUDO_STICKY_AFTER_OK=1` |
+| **C** | **Reload fast-fail** | On sticky reload: if still `_youdo_html_is_servicepipe` after **15s** → abort (not 150s) · rotate slot |
+| **D** | **DC pool restore** | VPS: `YOUDO_DC_PROXY_URLS` = same 4 as `FL_PROXY_URLS` (incl. **`194.226.236.197`**) · `YOUDO_O191_DC_SLOTS=4` · keep new IPs in pool |
+| **E** | **RU budget burst** | `YOUDO_RU_RETRY_MAX=1` · **only last** slot after all DC fail in fetch · `YOUDO_SERVICEPIPE_EARLY_RU=0` · env `YOUDO_RU_BURST_MAX_PER_DAY=2` (storage counter) · log `ru_burst=n/max` |
+| **F** | **Profile rotate** | Optional env `YOUDO_PROFILE_GENERATION=2` → new dir suffix `youdo_{hint}_g2/` after wipe (owner «поменять профиль») |
+| **G** | Deploy | `scripts/deploy-o268-youdo-recovery-vps.py` — wipe `data/youdo_*` once · patch env · restart radar |
+| **H** | Tests | `tests/test_o268_youdo_recovery.py` — reload trap · wipe on SP · ephemeral-first · RU burst cap mock |
+| **I** | Docs | `docs/problems/2026-06-16-youdo-antibot-browser.md` § O268 |
+
+### VPS env (target)
+
+```text
+YOUDO_STICKY_SESSION=1
+YOUDO_PERSISTENT_PROFILE=1
+YOUDO_STICKY_AFTER_OK=1
+YOUDO_GOTO_WAIT_UNTIL=domcontentloaded
+YOUDO_SERVICEPIPE_WAIT_SEC=90
+YOUDO_SOFT_SERVICEPIPE_BAN=1
+YOUDO_STICKY_RELOAD_SP_ABORT_SEC=15
+YOUDO_O191_DC_SLOTS=4
+YOUDO_RU_RETRY_MAX=1
+YOUDO_RU_BURST_MAX_PER_DAY=2
+YOUDO_SERVICEPIPE_EARLY_RU=0
+YOUDO_PROFILE_GENERATION=2
+```
+
+Revert `networkidle` default on slot 1 (too slow on SP stub).
+
+### Accept / DoD
+
+1. pytest O268 + O267 + O266 + `test_youdo_human.py` green.
+2. VPS deploy → within **6h**: `youdo:ingest done=50` **or** trace `html_len>100000` on DC without RU.
+3. RU traffic: ≤2 listing fetches/day unless owner raises cap.
+4. Log shows `sticky_goto` or ephemeral slot1 before first ok; no 150s reload on 1712b.
 
 ---
 
-## § O216-DEPLOY — VPS + gitignore (P0 · after code ✅)
+## § O267-YOUDO-BROWSER-REGRESSION — **✅ code/deploy · ❌ prod DoD** (Lead 2026-06-18)
 
-**Lead verify 2026-06-14:** O216 + O216b **code accepted** · prod still **1.18.95** · allowlist **not in git** (`.gitignore data/*`).
+**Coder ✅:** persistent profile · soft SP ban · networkidle default · SP wait 90s · sticky worker `user_data_dir` · deploy script.
 
-| Step | Task |
-|------|------|
-| d0 | `.gitignore`: add `!data/quiz_pool_allowlist.json` (whitelist curated pool for repo + CI) |
-| d1 | `python scripts/deploy-o216-quiz-vps.py` — theme **1.18.96** + API + allowlist |
-| d2 | Prod curl: `rawlead-quiz.js` has `COMPLETED_KEY` · `/lenta/` `ver=1.18.96` |
-| d3 | Owner: `PAY_PREMIUM_RUB=10` in `.env.site` → restart API → checkout smoke → revert **790** |
-
-**DoD:** deploy script prints `DEPLOY OK` · owner D1–D9 from STATUS · pytest **26/26** unchanged.
-
-**Do not break:** O215 CSS/UX · locked bar only anon/expired/free · trial = premium match bar.
+**Lead verify:**
+| Check | Result |
+|-------|--------|
+| `pytest test_o267 + o266 + youdo_human` | ✅ **30/30** |
+| Syntax `exchange_browser_fetch.py` | ✅ |
+| VPS env O267 | ✅ `PERSISTENT_PROFILE=1` · `networkidle` · `SOFT_SERVICEPIPE=1` |
+| VPS profile dirs | ✅ `data/youdo_128.237…` (Firefox profile files) |
+| Prod `sticky_goto` / ingest | ❌ reload trap · last ok **10:04** ephemeral `.197` |
+| **→** | **O268** recovery package |
 
 ---
 
-## § O216 + O216b — summary ✅ code (Lead verify 2026-06-14)
+## § O267-YOUDO-BROWSER-REGRESSION — spec (closed)
 
-| Area | Result |
+**Intent:** owner: «раньше YouDo **нормально работал**, падал периодически» → после O190–O266 pass rate упал · гипотеза: **холодный Camoufox каждый цикл** без cookies, не только ServicePipe lottery.
+
+**Goal:** вернуть поведение **«теплый посетитель с profile на диске + reload»**, как до ephemeral-subprocess; O266 sticky — база, O267 — **persistent profile + мягче teardown + длиннее wait**.
+
+**Do not break:** O254 ops hard reset · O266 sticky protocol · DC-only O264 (`128.237` + `130.67`) · **RU fallback off** · detail subprocess · `fetch_every_n=4`.
+
+### Root cause (Lead triage)
+
+| Было (~O156) | Стало (prod) |
+|--------------|--------------|
+| `_launch_youdo_persistent_context` · `user_data_dir` на диске | Camoufox **new context** каждый fetch / worker spawn |
+| cookies между циклами | cold visitor → ServicePipe 1712b чаще |
+| ingest `parsed=50` регулярно (09.06) | редкие окна (01:35, 10:04) на том же IP |
+
+### Deliverables
+
+| Item | Path / behaviour |
+|------|------------------|
+| **Persistent profile** | `YOUDO_PERSISTENT_PROFILE=1` · dir `data/youdo_{proxy_hint}/` per DC · reuse in **`youdo_sticky_worker.py`** (prefer `launch_persistent_context` or equivalent Camoufox profile dir) |
+| **Sticky + profile** | worker spawn **once per proxy** · profile survives worker restart within TTL · `goto` only when no valid cookies / cold |
+| **Stop double-cold** | remove / gate `(_youdo_is_camoufox() and slots_tried == 1)` → `_fetch_youdo_ephemeral` when sticky+persistent on |
+| **Goto wait** | default `YOUDO_GOTO_WAIT_UNTIL=networkidle` slot 1 (env override ok) |
+| **ServicePipe wait** | on 1712b stub: poll page up to **`YOUDO_SERVICEPIPE_WAIT_SEC=90`** DC before fail (reuse `_youdo_wait_servicepipe_clear`) |
+| **Soft fail** | `YOUDO_SOFT_SERVICEPIPE_BAN=1`: first servicepipe on DC **in fetch** → no `_ban_url` / no hard_reset streak=1 · rotate slot ok · ban only on 2nd SP same fetch or hard antibot |
+| **Env VPS** | see below |
+| **Deploy** | `scripts/deploy-o267-youdo-regression-vps.py` |
+| **Tests** | `tests/test_o267_youdo_persistent_profile.py` · extend O266 if needed |
+| **Docs** | `docs/problems/2026-06-16-youdo-antibot-browser.md` § O267 · `.env.example` |
+
+### VPS env (after deploy)
+
+```text
+YOUDO_STICKY_SESSION=1
+YOUDO_PERSISTENT_PROFILE=1
+YOUDO_GOTO_WAIT_UNTIL=networkidle
+YOUDO_SERVICEPIPE_WAIT_SEC=90
+YOUDO_SOFT_SERVICEPIPE_BAN=1
+YOUDO_MAX_DC_BANS_PER_FETCH=1
+YOUDO_O191_DC_SLOTS=2
+YOUDO_RU_RETRY_MAX=0
+YOUDO_SERVICEPIPE_EARLY_RU=0
+```
+
+Keep O264 DC URLs unchanged.
+
+### Accept / DoD
+
+1. `pytest tests/test_o267*.py tests/test_o266*.py tests/test_youdo_human.py -q` green.
+2. Sticky worker uses **same profile dir** on 2 sequential listing fetches (unit: path stable · mock).
+3. **VPS deploy** → within **24h** at least one:
+   - `youdo:trace stage=sticky_goto` · `html_len>100000` · **or**
+   - `youdo:ingest done=50` · **or**
+   - next allowed cycle: `stage=sticky_reload` · `goto_ms` **<** cold baseline (~10s vs 30s+).
+4. No regression: ops `youdo_hard_reset` still tears down profile + sticky worker.
+5. Lead verify: grep `sticky_` + `html_len=1` in `radar_site.log`.
+
+**Not in scope:** RU burst · new DC IPs · night window scheduler (→ backlog if O267 insufficient).
+
+**Ticket:** [`2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md)
+
+---
+
+## § O266a-YOUDO-STICKY-TEST-FIX — ✅ (Lead 2026-06-18)
+
+**Fix:** `test_youdo_human.py` setUp `YOUDO_STICKY_SESSION=0` · `_youdo_fetch_tier_plan` patch on slot tests.
+
+**Verify:** `pytest tests/test_youdo_human.py tests/test_o266_youdo_sticky_session.py -q` → **19/19** ✅
+
+---
+
+## § O266-YOUDO-STICKY-SESSION — **✅ code · ⏳ prod ingest** (Lead 2026-06-18)
+
+**Coder ✅ code:** `youdo_sticky_worker.py` · sticky manager in `exchange_browser_fetch.py` · `youdo_parser` hard_reset skip when warm · pytest **9/9** · deploy script.
+
+**Lead verify:**
+| Check | Result |
+|-------|--------|
+| `pytest tests/test_o266_youdo_sticky_session.py` | ✅ **9/9** |
+| `exchange_browser_fetch.py` syntax | ✅ compiles |
+| VPS deploy + env `YOUDO_STICKY_SESSION=1` | ✅ radar **active** |
+| `test_youdo_human.py` + O266 | ✅ **19/19** (O266a) |
+| Prod `sticky_goto` / `sticky_reload` | ⏳ watch — ServicePipe 1712b блокирует warm |
+
+---
+
+## § O266-YOUDO-STICKY-SESSION — spec (closed)
+
+**Intent:** [`OWNER_INTENT.md`](OWNER_INTENT.md) backlog YouDo ingest · owner: «зайти на страницу, пробиться, дальше **обновлять**, не выходить».
+
+**Problem:** prod Camoufox = **one-shot** `youdo_fetch_worker.py` subprocess каждый `fetch_every_n` цикл → cold `goto` → ServicePipe 1712b снова. Успех **10:04** был на **2-м slot retry** после fail (270 KB), не на RU.
+
+**Goal:** после первого **valid listing HTML** (`html_len≥8000`, not servicepipe, has cards) — **держать browser session** на активном DC proxy; следующие listing fetch = **`page.reload()`** (warm path), не новый subprocess + goto.
+
+**Do not break:** O254 ops hard reset · traffic_guard · `fetch_every_n=4` · DC-only pool (O264: `128.237` + `130.67`, RU fallback off) · detail fetch subprocess ok separate.
+
+### Design (recommended)
+
+**A. Sticky worker subprocess** (extends O190, avoids asyncio in uvicorn):
+
+| Piece | Path / behaviour |
+|-------|------------------|
+| Worker | `scripts/youdo_sticky_worker.py` — long-lived Camoufox AsyncCamoufox **one page** per `--proxy` |
+| Protocol | stdin/stdout **JSON lines**: `{"cmd":"goto"|"reload"|"teardown","url":...}` → `{"html":...,"stage":"sticky_goto"|"sticky_reload",...}` or `{"error":...}` |
+| Parent | `exchange_browser_fetch.py`: manager keeps worker PID + proxy binding; spawn on first listing fetch; reuse while warm |
+| Fallback | `YOUDO_STICKY_SESSION=0` or worker dead → existing one-shot `youdo_fetch_worker.py` |
+
+**Warm path:** session warm iff last listing returned valid HTML for **same** `proxy_url` within `YOUDO_STICKY_MAX_AGE_SEC` (default **3600**).
+
+**Listing fetch logic:**
+
+1. **Cold (`sticky_goto`):** current camoufox path — goto listing URL · servicepipe wait · list_view if needed · validate HTML.
+2. **Warm (`sticky_reload`):** `page.reload(wait_until=...)` · `_youdo_wait_listing_ready_async` · validate · **no** new browser launch.
+3. On reload antibot/servicepipe → **one** cold retry same cycle; then normal slot rotate / ban (existing O260).
+
+**Hard reset / teardown policy (critical):**
+
+| Event | Sticky worker |
+|-------|---------------|
+| `youdo_hard_reset` ops / manual | **kill** sticky + existing teardown |
+| `fail_streak=1` servicepipe on **cold** fetch | **do not** kill sticky if worker not started yet |
+| Valid HTML → fail on **parse** only | keep sticky |
+| `_validate_youdo_html` antibot / servicepipe on **warm reload** | kill sticky · cold next cycle |
+| Proxy URL change (DC rotate) | kill sticky · spawn for new proxy |
+| `YOUDO_STICKY_MAX_AGE_SEC` exceeded | kill · cold goto |
+| `youdo_browser_teardown()` | kill sticky always |
+
+**Trace (radar log):** `youdo:trace stage=sticky_goto|sticky_reload|sticky_teardown` · `proxy_hint` · `html_len` · `warm=1|0`.
+
+### Env (VPS `.env.site` after deploy)
+
+```text
+YOUDO_STICKY_SESSION=1
+YOUDO_STICKY_MAX_AGE_SEC=3600
+YOUDO_STICKY_RELOAD_WAIT_UNTIL=domcontentloaded
+```
+
+Keep O264: `YOUDO_O191_DC_SLOTS=2` · `YOUDO_RU_RETRY_MAX=0` · `YOUDO_SERVICEPIPE_EARLY_RU=0`.
+
+### Files
+
+| File | Change |
 |------|--------|
-| Quiz lifecycle · retake · clear-on-exit | ✅ `rawlead-quiz.js` + `quiz.php` |
-| Feed locked bar anon/expired/free; trial → premium tier | ✅ `renderMatchBlock` |
-| Cabinet «Пройти тест заново» | ✅ `rawlead-cabinet.js` |
-| Allowlist loader + SQL filter | ✅ `quiz_adaptive.py` |
-| **`data/quiz_pool_allowlist.json`** | ✅ **64 ids** local · ⚠️ **gitignored** — d0 |
-| `scripts/quiz_pool_audit.py` | ✅ export script |
-| pytest test_o197 + test_o195 | ✅ **26/26** |
-| **Deploy prod** | ❌ still **1.18.95**, no `COMPLETED_KEY` on prod |
-| **PAY_PREMIUM_RUB=10** | ❌ not set · pricing PHP **790** (OK until smoke) |
+| `scripts/youdo_sticky_worker.py` | **new** — long-lived worker |
+| `scripts/youdo_fetch_worker.py` | optional shared helpers import; keep one-shot for detail / fallback |
+| `src/exchange_browser_fetch.py` | sticky manager · wire listing fetch · teardown hooks · **fix IndentationError ~3055** if present locally |
+| `src/youdo_parser.py` | trace stages · narrow auto `youdo_hard_reset` when sticky warm (no teardown on streak=1 alone) |
+| `tests/test_o266_youdo_sticky_session.py` | env gate · warm/cold selection · teardown rules · mock protocol |
+| `scripts/deploy-o266-youdo-sticky-vps.py` | deploy worker + src + restart radar |
+| `.env.example` | document env keys |
+| `docs/problems/2026-06-16-youdo-antibot-browser.md` | § O266 note |
+
+### Accept / DoD
+
+1. `pytest tests/test_o266_youdo_sticky_session.py -q` green.
+2. Local smoke: two sequential listing fetches same proxy → 2nd uses `sticky_reload` in trace (mock or headed optional).
+3. **VPS deploy** → within 2 cycles after first `html_len>100k`: next allowed fetch logs **`sticky_reload`** and `parsed=50` without full 30s cold goto (compare goto_ms).
+4. Ops «Restart YouDo» / `youdo_hard_reset` still kills sticky worker (verify PID gone).
+5. No regression: `tests/test_youdo_human.py` · `test_exchange_browser_fetch.py` youdo worker paths.
+
+**Probe after deploy:** `grep 'sticky_' /opt/rawlead/data/radar_site.log | tail -20` · `youdo:ingest done`.
+
+**Ticket:** [`2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md)
 
 ---
 
-**O216 code ✅ deploy 1.18.96** — details → [`CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) · follow-up UX → **§ O219** above.
+## § O218-PLAYWRIGHT-QUIZ-E2E — ✅ prod (2026-06-18)
+
+Gate pre-ads **green** · desktop 8/8 · mobile 5/5 · theme `ver=1.19.20` · full spec → archive / git history.
 
 ---
 
-## § O215-WP-POLISH — CLOSED ✅ (Lead verify+deploy 2026-06-14)
+## § O218-PLAYWRIGHT-QUIZ-E2E — spec (closed)
 
-**Theme:** **1.18.95** · `deploy-wp-theme-vps.py` · prod HTML `ver=1.18.95` ✅
+**Intent:** [`OWNER_INTENT.md`](OWNER_INTENT.md) § **O218-w** · automated Playwright **quiz lifecycle + tier match bars** · multi-persona · **desktop + mobile 390** · no shared `localStorage` between personas.
 
-| Check | Result |
-|-------|--------|
-| VPS theme version | ✅ 1.18.95 |
-| `/lenta/` HTTP | ✅ 200 |
-| `/v1/quiz/start` | ✅ 200 |
-| Owner accept O215 | ✅ |
+**Why:** manual tier smoke misses regressions (Monica trial % vs anon lock · retake vs first profile · Neon tag import · quiz mid-exit restore).
 
-**Next:** tier smoke all plans · Monica reset for first-login trial test.
+**Do not duplicate:** `scripts/preprod_playwright/ux_audit.py` (O37c U1–U10 pixel audit) · `ux_journey.py` J1–J11 feed/draft journeys — **reuse** `feed_ui.py` helpers only.
 
----
+### Deliverables
 
-**Deploy:** `deploy-o214-ops-truth-vps.py` · API restarted
+| Item | Path |
+|------|------|
+| Runner | `scripts/preprod_playwright/quiz_e2e.py` |
+| Shared helpers | extend `feed_ui.py` **or** `quiz_ui.py` in same dir (quiz nav, answer loop, result assert) |
+| CI hook | `tests/test_o218_quiz_e2e.py` — **skip** unless `RAWLEAD_O218_E2E=1` (prod URL, slow) |
+| Artifact | `data/preprod_quiz_e2e.json` + `data/preprod_quiz_e2e/` screenshots on fail |
+| Docs | append runbook to `docs/ops/PREPROD_STRESS_RUN.md` § O218 (commands only) |
 
-| Check | Result |
-|-------|--------|
-| `_cycle_ts_from_log` on VPS | ✅ |
-| `cycle_age_min` live | ✅ **3м** (was 154м) · `radar_lamp=ok` |
-| `residential_active` in proxy groups | ✅ |
-| clear-bans tooltip | ✅ |
-| pytest 19/19 (O214 + O171) | ✅ |
+### CLI
 
-**Note:** `fl_tier=residential` badge shows **only when DC exhausted** and FL on fallback. If DC alive again → badge hidden, FL 🟢 — correct.
+```text
+.venv\Scripts\python.exe scripts\preprod_playwright\quiz_e2e.py --base-url https://rawlead.ru
+.venv\Scripts\python.exe scripts\preprod_playwright\quiz_e2e.py --viewport mobile --ids j1,j2,j5
+.venv\Scripts\python.exe scripts\preprod_playwright\quiz_e2e.py --headed --slow-mo 100
+```
 
----
+Exit **0** iff all selected scenarios pass · exit **1** on any fail · JSON always written.
 
-## § O213-O212-DEPLOY — CLOSED ✅ (Lead verify VPS 2026-06-14)
+### Scenarios (isolated browser context each run)
 
-**Deploy:** `deploy-o213-o212-vps.py` · radar + API restarted
+| id | Scenario | Viewports | Isolation / notes |
+|----|----------|-----------|-------------------|
+| **j1** | Anon: exit mid-quiz → reopen → intro restored (not stuck on card N) | 1280 + **390×844** | fresh context · no JWT |
+| **j2** | Anon: complete → result modal → «ещё раз» / restart → new session | 1280 + 390 | fresh context |
+| **j3** | Anon complete → login → tags persisted in Neon | 1280 | **separate** test user (not Monica) · after complete call `GET /v1/quiz/...` or Neon read tag count ↑ · prefer `preprod_mint_token.py` JWT inject **after** anon quiz if TG widget blocked headless — document in runner |
+| **j4** | Retake: finish → profile update; retake abandon → first profile kept | 1280 | logged-in JWT · `sessionStorage rawlead_quiz_retake` · assert `rawlead_quiz_completed_v1` backup behaviour per `rawlead-quiz.js` |
+| **j5** | Logged-in Monica vs anon: real `.rl-match` bar · anon locked only | 1280 + 390 | **Monica prod state ✅ 2026-06-17** — plan **agent** active until **2026-07-15** · 27 quiz tags · **no Neon wipe** · `feed_ui.assert_match_for_tier(card, "premium")` for Monica · `"anon"` for anon context |
+| **j6** | Cabinet «Пройти тест заново» opens overlay / retake flow | 1280 | logged-in context · `/cabinet/` |
+| **j7** | Synthetic quiz cards visible (`source=synthetic` or PM title substring in card) | 1280 + 390 | DOM assert on `#rl-quiz-card-source` / title · badge hidden per O219 |
 
-| Check | Result |
-|-------|--------|
-| `listing:kwork parsed=36 pages=3` | ✅ 14:12 MSK |
-| `EXCHANGE_SAFE_STOPS` on VPS | ✅ |
-| TG `skip_entity=N` | ✅ acc1/2/3 |
-| TG start без `ids=[…]` after 14:12 | ✅ |
-| `/ops/` HTTP | ✅ 200 |
+**Persona rule:** one context = one persona (anon A / anon B / Monica / acc1 JWT) — **never** reuse storage across rows in same process without `browser.new_context()`.
 
----
+**Quiz entry:** canonical **`/lenta/#quiz`** (not legacy `/quiz/` only) · open overlay via hash or CTA consistent with prod.
 
-## § O213-KWORK-COVERAGE — Kwork page2-3 + exchange filter scope [CODE ✅]
+**Answer loop:** click `#rl-quiz-like` / `#rl-quiz-nope` until `rl-quiz-stage--cards` ends · timeout per scenario ≤3 min · handle `#rl-quiz-early-btn` if shown.
 
-**Ticket:** [`2026-06-14-kwork-fl-zero-new.md`](../../problems/2026-06-14-kwork-fl-zero-new.md)
+**API asserts (where applicable):** `GET /wp-json/rawlead/v1/quiz/start` · `POST .../next` status 200 · after j3 logged-in import — optional Neon `user_tags` count via existing probe script (env `DATABASE_URL` local only — **no secrets in artifact**).
 
-**Owner symptoms:** sees orders on kwork.ru (screenshot + URLs) but not in RawLead lenta/ops.
+### Env / accounts
 
-**Owner repro URLs (Lead verify 2026-06-14):**
-| external_id | title | in Neon? | visible | ingested MSK |
-|-------------|-------|----------|---------|--------------|
-| **3194789** | Сделать лендинг | ✅ | True | 2026-06-10 15:03 |
-| **3196704** | Парсинг сайтов | ✅ | True | 2026-06-13 18:50 |
+| Env | Use |
+|-----|-----|
+| `RAWLEAD_PREPROD_ACCESS_TOKEN` | acc1 JWT — j4/j6 |
+| `RAWLEAD_MONICA_TOKEN` | Monica JWT — j5 logged-in half · mint via `grant_premium_local.py --username RawLead --plan agent` (do **not** change her Neon sub) · write to `.env.site` in Coder session |
+| `DATABASE_URL` | optional Neon verify j3/j4 — skip if unset |
 
-→ These two **are already in DB**. If owner «не видит» — likely feed scroll/sort (7-day window, newer on top), not parser miss. **Do not re-ingest.**
+**Monica (O218 j5):** tg **8688264540** · Neon `user_id` **`8d5afb3d-e8bd-4970-a33d-21c3ddeafdef`** · `@RawLead` display · **agent premium OK** (same feed tier `premium` + real match bar as trial). Full wipe only for **auto-trial smoke** in `FOR_YOU.md`, not for O218 j5.
 
-**Screenshot items (Lead Neon grep):**
-| title fragment | in Neon? |
-|----------------|----------|
-| «Переписать промпт для Gemini» (3196630) | ✅ visible |
-| «Поправить выгрузку фида» (3196662) | ✅ visible |
-| «Посадка сайта на wordpress» | ✅ (similar titles exist) |
-| **«Платформа для учебного центра»** | ❌ **NOT FOUND** — real gap |
+See [`docs/ops/PREPROD_ACCOUNTS.md`](../../ops/PREPROD_ACCOUNTS.md) · **never** owner JWT `164786fe-…`.
 
-**Root causes:**
-1. `kwork_parser.py` fetches **page 1 only** (12 items). Orders outside top-12 never fetched → e.g. «Платформа для учебного центра».
-2. Some fresh page-1 items blocked by shared L2 filter (`pipeline:skip filter kwork:id=…`).
-3. Ops «0 новых» was UX bug (O212) — `fresh=0` = dedup of known ids, not «Kwork empty».
+### Accept
 
-### Filter architecture (do NOT confuse with TG)
+1. `quiz_e2e.py` green on prod URL for **j1–j7** desktop; **j1,j2,j5,j7** also pass at **390×844**.
+2. Artifact JSON lists each scenario: `id`, `viewport`, `pass`, `ms`, `error`, optional `screenshot`.
+3. `pytest tests/test_o218_quiz_e2e.py -q` — skip by default · 1 smoke test that imports runner module.
+4. No regression to existing `smoke.py` / `ux_journey.py`.
 
-| Layer | File | Applies to |
-|-------|------|------------|
-| **TG spam / CV / seller** | `src/tg_spam_filter.py` (`is_tg_spam`, `is_tg_order_post`) | **TG only** (post-L1 guard) |
-| **TG wide soft bypass** | `filters.py` → `tg_filter_soft_bypass()` + `TG_WIDE_SOFT_STOPS` | **TG only** (`source.startswith('tg:')`) — O207b |
-| **Shared L2 word filter** | `filters.py` → `ListingWordFilter` from `docs/ops/FILTERS.md` | **kwork, fl, youdo, tg** — stop/take words |
-
-**Kwork does NOT use `tg_spam_filter`.** It uses shared L2 only. Problem: stop words in FILTERS.md were tuned for TG noise; same list blocks valid Kwork orders.
-
-**Fix t2:** add **exchange-safe bypass** for kwork+fl (NOT tg): when `source in ('kwork','fl')`, skip applying selected stop tokens. Do **not** weaken TG path.
-
-### t1 — Kwork multi-page fetch
-
-**File:** `src/kwork_parser.py`
-
-- Mirror FL: pages 1–3 (env `KWORK_MAX_PAGES` default `3`)
-- URL: probe pagination (`?page=2` or site pattern) — confirm `"wants":[` in HTML
-- Merge pages, dedup by `pid`, then `trim_listing_at_known`
-- Log: `listing:kwork parsed=N fresh=M pages=P`
-
-**Acceptance probe after deploy:** «Платформа для учебного центра» appears in log as fresh within 2 cycles OR explain why (filter) with logged id.
-
-### t2 — Exchange-safe L2 stops (kwork + fl only)
-
-**File:** `src/filters.py` · **pipeline:** pass `project.source` into stop logic
-
-Start set `_EXCHANGE_SAFE_STOPS` (conservative): `вебинар`, `логотип`, `баннер`, `дизайн макета`, `figma`, `фигма`, `монтаж`, `монтаж рилс`, `иллюстратор`
-
-- If `source in ('kwork','fl')` and matched stop ∈ `_EXCHANGE_SAFE_STOPS` → **allow** (continue to category check)
-- TG path unchanged: `tg_filter_soft_bypass` still only for `tg:*`
-
-Log on allow: `pipeline:filter:exchange_safe kwork:id=… stop=…` (one line, no spam)
-
-### t3 — Tests
-
-- `test_kwork_parser.py`: multi-page mock, dedup, `pages=2`
-- `test_filters.py`: kwork passes «логотип» in title; TG post with «логотип» still blocked (no soft bypass unless order markers)
-- Regression: `test_o207b_filter.py`, `test_o171_ops_funnel.py` green
-
-### DoD
-
-- VPS: `listing:kwork parsed>12 pages=2-3` within 2 cycles
-- «Платформа для учебного центра» ingested OR logged why skipped
-- 3194789/3196704 unchanged (already in DB)
-- TG filter regression: replay baseline unchanged
-- pytest green
-
-**Deploy:** `kwork_parser.py` + `filters.py` → restart **`rawlead-radar`**
+**Order:** owner deferred Metrika smoke · YouDo ⏸ · **O218 blocks M1 ads** per `ROADMAP.md` wave 6.
 
 ---
 
-## § O212-OPS-LOG-TRUTH — TG log noise + ops «0 новых» / TG 🔴 [PENDING DEPLOY]
+## § O262k-YOUDO-DC-DIAG — ✅ VPS probe (2026-06-17)
 
-**Ticket:** [`2026-06-14-ops-log-spam-tg-lamp.md`](../../problems/2026-06-14-ops-log-spam-tg-lamp.md)
+**DC slot 1** (`185.147.131.15:8000`) · Camoufox · `html_len=1712` · **servicepipe** · `data_id=0` · не map/list.
 
-**Owner symptoms:** log «помойка» (all chat ids) · FL/Kwork/TG show «0 новых» / TG 🔴 while radar alive.
+**Scripts:** `probe_youdo_dc_page.py` · `deploy-o262k-youdo-dc-probe-vps.py` · `data/o262k_dc_probe.json`
 
-**Facts (VPS 2026-06-14):** all units **active** · FL `parsed=30 fresh=0` · Kwork `parsed=12 fresh=0` · TG `handler_ok` + messages · **not a crash**.
+**Env VPS:** `YOUDO_O191_DC_SLOTS=4` · `YOUDO_DC_PROXY_URLS` restored · `dc_alive=3/4`
 
-### t1 — Stop chat-id log dump
-
-**File:** `src/tg_monitor.py`
-
-- `тг:монитор:старт` (~895): log `чатов=N file=F filter=K` — **remove** `ids=[sorted(...)]`
-- `пропуск чата {id}` (~454): do **not** log every skip on reload; either:
-  - increment counter + one summary line per reload (`skip_entity=N`), or
-  - log only at DEBUG / first occurrence per account per hour
-
-**Do not break:** O206 t3c watchdog · handler_ok line · join audit counts in storage
-
-### t2 — Ops exchange cards truth
-
-**Files:** `src/owner_admin.py` · optionally `src/static/ops-pult.js`
-
-1. **`today_new_ids`:** use Neon `new_today` from `_lead_counts_by_source` (same MSK day as O211 footer), not `health.last_new_ids`
-2. **Secondary line:** show last-cycle `parsed` / `fresh` from health (tooltip or sub-line): «за цикл: parsed=30 fresh=0»
-3. **TG status lamp:** for `source_id=tg`, use `tg_pult_lamp_state` / fresh `тг:пульс` — **not** only Neon insert gap for `last_ok_at`
-4. **`_last_log_line_for_source('tg')`:** exclude `бот_start:.*skip` · prefer `handler_ok|тг:пульс|listing:tg|health:tg`
-
-### t3 — Tests
-
-- Unit: `_last_log_line_for_source` picks handler_ok over bot_start skip (fixture lines)
-- Unit: exchange row maps `today_new_ids` from Neon mock, not health `last_new_ids`
-- Existing: `test_o171_ops_funnel.py` green
-
-### DoD
-
-- Restart radar once on VPS → log has **no** multi-line `ids=[…]` block
-- `/ops/` FL/Kwork: «сегодня N» matches Neon (may still be 0) + visible parsed/fresh hint
-- TG card **not** 🔴 when `handler_ok` + pulse <15m even if Neon TG insert 0
-- pytest green
-
-**Deploy:** `tg_monitor.py` → restart **`rawlead-radar`** · API files → restart **`rawlead-api`**
+**Ticket:** [`2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md)
 
 ---
 
-## Closed ✅ (hot index)
+## § O262k-YOUDO-DC-DIAG — spec (closed)
 
-| § | DoD | deploy |
-|---|-----|--------|
-| **O214-DEPLOY** | cycle_age 3м not 154м · residential badge · pytest 19/19 | ✅ 2026-06-14 |
-| **O213-DEPLOY** | parsed=36 pages=3 on VPS | ✅ 2026-06-14 |
-| **O212-DEPLOY** | skip_entity · no ids dump · ops 200 | ✅ 2026-06-14 |
-| **O213** | pages 1–3 + EXCHANGE_SAFE_STOPS · pytest 42/42 | ✅ |
-| **O212** | log truth + ops cards · pytest 20/20 | ✅ |
-| **O211-DEPLOY** | footer сегодня/24ч | ✅ |
-| **O207b** | replay 99/14/7 | ✅ |
-| **O209** | WP 1.18.84 | ✅ |
+**Owner decision:** RU-only **не вариант** (дорого). DC **раньше заходил нормально** — была «карта + клик», не антибот. Нужен **DC probe**: во что упирается сейчас (HTML/текст), **без RU carousel**.
 
-**Archive:** [`CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md)
+**Tasks:**
+
+1. Script `scripts/probe_youdo_dc_page.py`: DC proxy slot 1 · listing URL · **Camoufox** (prod) · опц. **Playwright Chromium** compare.
+2. Output: `html_len`, snippet 500–800 chars, flags (`servicepipe`, `pokazat_spiskom`, `data_id_count`, map vs list) · save HTML to `data/debug_listings/`.
+3. **Не трогать** radar ingest / RU fallback / wall-clock в этом §.
+4. Env note: после probe вернуть **DC-first** (`YOUDO_O191_DC_SLOTS=4`, keep `YOUDO_DC_PROXY_URLS`).
+
+**Accept:** один прогон VPS → owner видит **что отдаёт YouDo на DC**.
+
+**Ticket:** [`2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) § O262k
+
+---
+
+## § O262j — ❌ cancelled (owner: RU дорого, DC path)
+
+~~RU-only / DC_SLOTS=0 / unset YOUDO_DC_PROXY_URLS~~ — отменено.
+
+---
+
+## § O262i-YOUDO-3-CONFLICTS — ⚠️ partial verify (2026-06-17)
+
+**Symptom:** feed YouDo stale · `youdo:ingest done=0 new=0` all evening.
+
+**Prod evidence:**
+
+1. **`YOUDO_O191_DC_SLOTS=0` ineffective** — `_youdo_dc_slot_count()` uses `max(1, int(raw))` → still DC. Cycle 13 `21:15:54 tier=dc`.
+2. **`RADAR_CYCLE_WALL_SEC=600` < YouDo outer 750s** — `21:24:08 цикл:watchdog:kill` mid-fetch on RU.
+3. **Orphan parse** — `20:12 outcome=ok parsed=50` + wall kill → `youdo:ingest done=0`.
+
+**Last ok:** `19:19:49` RU when `dc_alive=0/4`.
+
+**Lead verify:** pytest **16/16** · deploy ✅ · conflict **#2 fixed** (no watchdog>600 on long RU) · conflict **#1 still broken** on prod → **O262j**.
+
+**Tasks:** allow DC_SLOTS=0 · cycle wall ≥900 · ingest regression test · deploy script.
+
+**Files:** `exchange_proxy.py` · `main.py` · `tests/test_o262i_youdo_conflicts.py`
+
+**Ticket:** [`2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) § O262i
+
+---
+
+## § O262h-YOUDO-WALL-CLOCK-RACE — ✅ prod deploy (2026-06-17)
+
+**Deploy Lead:** `deploy-o262h-youdo-wall-clock-vps.py` ✅ · env carousel=150 grace=90 · radar+api active.
+
+**Ingest watch:** `grep 'youdo:ingest done'` · `YouDo │ скачано 50` · fetch_every_n=4 (~15–20 мин).
+
+**Ticket:** [`2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) § O262h
+
+---
+
+## § O262g-YOUDO-STUCK-LEADS — ✅ prod deploy (2026-06-17)
+
+**Deploy Lead:** `deploy-o262g-youdo-stuck-vps.py` ✅ · requeue **500/1000** (limit) · radar+api active · `YOUDO_DETAIL_FETCH=0`.
+
+**Diag prod:** invisible=1000 · was `МИМО:981` `OK:13` `l1_failed:6` · backlog drain `конвейер:L1=20–24`.
+
+**Smoke:** `/lenta/` youdo · повтор requeue для оставшихся 500 при необходимости.
+
+---
+
+## § O262f-YOUDO-FULL-RECOVERY — ✅ deploy (2026-06-17)
+
+**Verify+deploy Lead:** pytest **8/8** ✅ · deploy ✅ `deploy-o262f-youdo-recovery-vps.py` · env O262f on VPS · `ru_early` in code.
+
+**Ingest watch:** last ok probe **17:36** `parsed=50` · post-deploy cycles may still fail — smoke `ru_early` + `kind=ok` 2–3 cycles.
+
+**Ticket:** [`2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) § O262f
+
+---
+
+## § O262e-YOUDO-ANTIBOT-INGEST — ✅ mechanic partial (2026-06-17)
+
+**Mechanic ✅:** ServicePipe detect/wait + fast-fail · pytest **4/4** · deploy ✅ VPS · `goto_ms` **~4.6s** (было ~98s).
+
+**Prod ingest ❌:** после deploy всё ещё `html_len=1701` · `parsed=0` · last `kind=ok` **14:29** `new=0`. Лог `servicepipe_wait` пока не виден — fast-fail работает.
+
+**Triage ✅:** PG **474** visible youdo · свежие insert часто `is_visible=false` (L1) · owner «нет в ленте» = ingest 🔴 + мало fresh visible.
+
+**→ Full fix owner P0:** § **O262f** above.
+
+**Ticket:** [`2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) § O262e
+
+---
+
+## § O265b-TG-DRAFT-RATE-LIMIT — ✅ prod (2026-06-17)
+
+**Verify Lead:** pytest **16/16** O265+O50 ✅ · deploy ✅ Lead · VPS `draft_rate_limit_retry_after` in TG path.
+
+---
+
+## § O265-MATCH-PUSH-BOT-4BTN — ✅ prod (2026-06-17)
+
+**Verify Lead:** pytest **16/16** ✅ · deploy ✅ `scripts/deploy-o265-match-push-bot-vps.py` · api+bot-poll active · `o265_ok`.
+
+**Smoke owner:** следующий match-push → 4 кнопки · «Не моё» → `tg:push:nope` · «Отклик» 6-й/час = лимит.
+
+---
+
+## § O262d-YOUDO-LIST-VIEW-SELECTOR — ✅ prod verify (2026-06-17)
+
+**Verify Lead:** pytest **25/25** · deploy ✅ (~15:00 MSK) · prod ingest still 🟡 antibot shell 1712b · last ok **14:29** `new=0` · **→ Mechanic** if next cycles fail after DC unban.
+
+---
+
+## § O262b-YOUDO-LIST-VIEW-TRACE — ⚠️ verify (trace ✅ · click ❌ prod 2026-06-17)
+
+**Verify Lead 2026-06-17 ~14:20 MSK:** pytest **5/5** · deploy ✅ · log `youdo:trace stage=list_view clicked=0 selector=none` (6+ cycles) · `parsed=0` · antibot shell **1712b** (0× «списком»).
+
+**Корень:** клик сразу после `goto` — HTML ещё **1712b** → `force=false` · кнопки нет в DOM. SPA потом не догоняется вторым кликом. **→ O262c** wait+retry.
+
+---
+
+## § O262c-YOUDO-LIST-VIEW-WAIT-RETRY — ✅ prod verify (2026-06-17)
+
+**Verify Lead:** pytest **19/19** · deploy ✅ · **14:29:53** `clicked=1 data_id=50 parsed=50` · intermittent · **→ O262d** selector gate + pass2 on false click.
+
+---
+
+## Closed index (hot summary)
+
+| § | Status |
+|---|--------|
+| **O265b** TG draft rate limit | ✅ prod **2026-06-17** |
+| **O265** match-push bot 4 кнопки | ✅ prod **2026-06-17** |
+| **O262f** YouDo full recovery (RU early + carousel) | ⏳ **P0** owner |
+| **O262e** YouDo ServicePipe wait/fast-fail | ✅ mechanic partial |
+| **O262c** YouDo list-view wait+retry | ✅ prod **2026-06-17** · parsed=50 @14:29 |
+| **O262b** YouDo list-view trace + force click | ✅ prod |
+| **O262** YouDo map→list click «Показать списком» | ✅ prod · trace ❌ → **O262b** |
+| **O261** Parser auto-recovery (FL rotate + YouDo ban-limit + ops) | ✅ prod **2026-06-17** |
+| **O254b** ops cache-bust + re-bind | ✅ deploy |
+| **O255** YouDo hard reset @ fail 1 + rate cap | ✅ prod |
+| **O252** TG content dedup | ✅ prod **2026-06-17** |
+| **O250d** push km parity | ✅ prod |
+| **O253** JWT session heal | ✅ prod |
+| **O250c** push debug/proxy | ✅ prod |
+| **O250b** push match parity | ✅ prod |
+| **O250** UUID crash | ✅ prod |
+| **O237** Yandex Metrika | ✅ prod **1.19.20** · owner smoke ⏸ |
+| **O251** repo hygiene | ✅ |
+| **O248** TG join v4 | ✅ prod |
+| **O247b** quota toolbar | ✅ prod |
+| **O247-HOTFIX** | ✅ **1.19.18** |
+| **O249** perfect badge | ✅ **1.19.19** prod |
+| **O244–O246** | ✅ **1.19.16** |
+| **O233** FL auto-recovery | ✅ prod |
+| **O256** FL soft antibot + html_snip | ✅ prod |
+| **O257** parser stability audit + fixes | ✅ prod **2026-06-16** |
+| **O258** playwright chromium + probe cron | ✅ prod **2026-06-16** |
+| **O259** YouDo DC carousel (FL pool) | ✅ prod **2026-06-16** |
+| **O260** YouDo DC-first tier canon | ✅ prod **2026-06-16** |
+
+---
+
+## § O262-YOUDO-LIST-VIEW — ✅ prod (2026-06-17)
+
+**Intent (owner):** `/tasks-all-opened-all` открывается как **карта**; задания видны только после **«Показать списком»**. Радар ждал `data-id` на карте → `parsed=0`.
+
+**Fix:** `_youdo_click_list_view_if_needed(_async)` перед `_youdo_wait_listing_ready` · log `fetch:youdo stage=list_view_click` · env `YOUDO_LIST_VIEW_CLICK=1` (default).
+
+**Tests:** `tests/test_o262_youdo_list_view.py` **6/6**
+
+**Post-deploy (2026-06-17):** antibot shell **1712b** на VPS **не содержит** «Показать списком» (0× grep) → клик не срабатывает пока antibot. O262 сработает когда страница грузится полностью.
+
+**Deploy:** вместе с O261 (`exchange_browser_fetch.py` + env patch).
+
+---
+
+## § O261-PARSER-AUTO-RECOVERY — ✅ prod (2026-06-17)
+
+**Intent (owner):** парсеры падают и не поднимаются без ручного вмешательства.
+Два конкретных бага по логам:
+1. **FL** — `ERR_PROXY_CONNECTION_FAILED` на одном DC · пул `alive=4/4` но сайт не открывается · нет авто-rotate
+2. **YouDo** — один listing-fetch банит **все 4 DC + node** → `dc_alive=0/4` на **1 час** TTL; авто-unban есть, но ждёт TTL без recovery
+
+Дополнительно:
+3. **Кнопка «Сбросить баны» в `/ops/`** вызывает `clear_all_bans()` — сбрасывает **все** биржи включая YouDo. Но кнопка помечена как «FL» — вводит в заблуждение. Нужно добавить **отдельную кнопку «Сбросить баны YouDo»**.
+
+**Ticket:** [`docs/problems/2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) § O261
+
+**Логи подтверждающие баги:**
+```
+# FL bug (2026-06-17):
+fetch:fl  ERR_PROXY_CONNECTION_FAILED  proxy_hint=194.226.236.204:8000  alive=4/4
+fetch:fl  stage=fallback httpx  outcome=fail  cascade exhausted
+listing:fl  parsed=0  (7 циклов подряд, слот не переключился)
+
+# YouDo bug (2026-06-17):
+dc_alive=0/4 · youdo_bans=8 (4 DC + 3 node) · TTL left ~35 min
+один fetch: DC1→DC2→DC3→DC4→node1 все SPA → dc_alive=0 на 1ч
+```
+
+**Read first:** `exchange_proxy.py` `_ban_url`, `_prune_expired_bans`, `youdo_dc_alive_urls`, `_BAN_TTL_SEC` ·
+`exchange_browser_fetch.py` `fetch_listing_html_browser_slots` ·
+`fl_parser.py` `_fl_allow_httpx_fallback` ·
+`proxy_ops.py` `run_proxy_control` `clear-bans` ·
+`owner_admin.py` рендер кнопок прокси (`_render_proxy_slot_actions`, `rl-proxy-clear-bans`)
+
+### Scope
+
+**Fix 1 — FL connection failed → rotate DC**
+
+- В `exchange_browser_fetch.py` slot loop (FL path): `ERR_PROXY_CONNECTION_FAILED` или `net::ERR_PROXY` → treat as dead-slot → **ban FL slot** (short TTL `FL_DEAD_PROXY_BAN_TTL_SEC` default **300** сек) + **retry next DC** (как YouDo carousel)
+- Не путать с antibot (которое сейчас жжёт через `_fl_browser_antibot_fail` с hard reset)
+- Log: `fetch:fl stage=dead_proxy_rotate slot=N proxy_hint=…`
+- httpx fallback тоже должен пробовать **следующий DC** если cascade exhausted on same slot
+
+**Fix 2 — YouDo: max 1 DC-ban per listing fetch**
+
+- В slot loop YouDo: если SPA → ban **только текущий слот** · stop after `YOUDO_MAX_DC_BANS_PER_FETCH=2` bans in one fetch (не выжигать весь пул)
+- Оставшиеся DC: попробовать в **следующем цикле** (через `fetch_every_n`), не в этом же fetch
+- Log: `fetch:youdo stage=dc_ban_limit_reached bans_this_fetch=N dc_alive=M/4`
+
+**Fix 3 — YouDo: auto-unban DC при dc_alive=0**
+
+- В `youdo_parser.py` или `exchange_proxy.py`: если `dc_alive=0` **более `YOUDO_AUTO_UNBAN_MIN` минут** (default **20**) → вызвать `clear_youdo_source_bans(dc_only=True)` + `youdo_hard_reset` + log `fetch:youdo tier=dc_auto_unban`
+- `dc_only=True` — не сбрасывать node-proxy баны (они отдельные, менее ценные)
+- Таймер: SQLite key `youdo_dc_banned_since` — пишем при переходе `dc_alive 1→0`, читаем при каждом fetch_begin
+
+**Fix 4 — Ops кнопки: YouDo bans отдельно**
+
+- `proxy_ops.py`: добавить action `"clear-youdo-bans"` → вызывает `clear_youdo_source_bans()` + `youdo_hard_reset`
+- `owner_admin.py`: рядом с существующей кнопкой «Сбросить баны» (которая all) добавить кнопку **«Сбросить баны YouDo»** — action `clear-youdo-bans` · только в секции YouDo или proxies
+- JS: `ops-pult.js` — обработчик для новой кнопки (как у `rl-proxy-clear-bans`)
+- Log на сервере: `ops: youdo bans cleared N`
+
+### Tests
+
+`tests/test_o261_parser_auto_recovery.py`:
+- FL dead proxy → ban short TTL + rotate to next DC (не antibot path)
+- YouDo: после `YOUDO_MAX_DC_BANS_PER_FETCH=1` — второй DC не банится в том же fetch
+- YouDo: `dc_alive=0` > `YOUDO_AUTO_UNBAN_MIN` → auto-unban + hard_reset triggered
+- Ops `clear-youdo-bans` → только youdo:* bans cleared · fl:* intact
+
+### Deploy
+
+`scripts/deploy-o261-parser-auto-recovery-vps.py`:
+- Upload `src/exchange_proxy.py` · `src/exchange_browser_fetch.py` · `src/youdo_parser.py` · `src/proxy_ops.py` · `src/owner_admin.py` · `src/static/ops-pult.js`
+- `.env.site` patch: `YOUDO_MAX_DC_BANS_PER_FETCH=2` · `YOUDO_AUTO_UNBAN_MIN=20` · `FL_DEAD_PROXY_BAN_TTL_SEC=300`
+- Restart radar · verify: `fetch:fl tier=dc` on all 4 slots · `fetch:youdo dc_alive` not 0 after clear
+
+**Do not break:** O260 DC-first · O255 hard reset rate cap · O257 httpx fallback · O259 carousel · FL antibot path (soft reset streak)
+
+**DoD:**
+- FL: `ERR_PROXY_CONNECTION_FAILED` → log `dead_proxy_rotate` + next DC · no manual action needed
+- YouDo: single fetch бан ≤ `YOUDO_MAX_DC_BANS_PER_FETCH` DC · `dc_alive=0` > 20 мин → auto clear + log
+- `/ops/` кнопка «Сбросить баны YouDo» работает отдельно от FL
+- pytest `test_o261_*` green · `.env.example` documented
+
+---
+
+## § O260-YOUDO-DC-FIRST-CANON — ✅ prod (2026-06-16)
+
+**Intent (owner):** после O259 карусель DC работает на retry, но **первый слот listing = node-proxy** (`gate.node-proxy.com`) — жжёт residential-трафик · нет денег на постоянный RU. Канон: **DC primary (4 как FL) → RU/node только если все DC в ban или исчерпаны в fetch → автоматически обратно на DC когда ban TTL прошёл**.
+
+**Symptom (prod 2026-06-16 post-O259):**
+```
+fetch:youdo proxy=gate.node-proxy.com:10004 slot=6/26 alive=26/26   # log
+youdo:trace stage=slot_retry proxy_hint=194.226.236.204:8000      # DC only on retry
+fetch:youdo outcome=ok parsed=50                                  # sometimes on node, not DC
+```
+Owner policy (unchanged): residential **extreme fallback only** · node-proxy слоты делят **общий traffic quota** — не жечь RU · при «банах летят» на DC → **hard reset + следующий DC**, не node.
+
+**Root cause (Lead verify):**
+1. `_active_slot["youdo"]` индексирует **полный** `YOUDO_PROXY_URLS` (DC+26×node) — persisted slot=6 → node в `proxy_log_hint` / ops.
+2. `exchange_primary_proxy_url("youdo")` частично чинит fetch (возвращает `dc_alive[0]`), но **логи/ops/funnel** показывают node · `_slot_index` на full list может снова выбрать RU когда node не banned.
+3. После RU-fallback **нет realign** на DC при `_prune_expired_bans` / новом цикле — остаёмся на node tier.
+4. `youdo_browser_slot_urls()` append `ru_alive` в тот же список — при `YOUDO_SLOT_RETRY_ON_TIMEOUT=3` RU может попасть в retry **до** исчерпания всех DC (если dc_alive мало).
+
+**Ticket:** [`docs/problems/2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) § O260
+
+**Read first:** `exchange_proxy.py` — `_youdo_dc_pool`, `_youdo_ru_pool`, `youdo_browser_slot_urls`, `exchange_primary_proxy_url`, `proxy_log_hint`, `_pool_status_slice`, `_prune_expired_bans`, `youdo_browser_slot_fail` · `exchange_browser_fetch.py` slot loop ~2118 · O259 tests.
+
+### Canon (must implement)
+
+```
+Listing fetch:
+  tier=dc  → rotate YOUDO_DC_PROXY_URLS (4 FL DC) · ban youdo:host on SPA
+  DC fetch исчерпан (все слоты fetch fail) но dc_alive>0:
+    → youdo_hard_reset (camoufox teardown) + следующий alive DC · log tier=dc_hard_reset
+    → НЕ tier=ru · не ждать пока dc_alive=0 если ещё есть живые DC
+  tier=ru  → ONLY if youdo_dc_alive=0/4 (все DC в ban) · max 1 node slot за fetch · log tier=ru_fallback
+    (node slots share traffic quota — один порт, не карусель по RU)
+  ban TTL expires (EXCHANGE_PROXY_BAN_TTL_SEC, default 1h):
+    → realign active slot to first alive DC · log fetch:youdo tier=dc_restored
+  NEVER: node/RU as slot 1 when youdo_dc_alive>0
+```
+
+### Scope
+
+1. **Separate tier indexing (code)**
+   - `_active_slot` для youdo: индекс только в **DC pool** (`_youdo_dc_pool`), не в full `YOUDO_PROXY_URLS`.
+   - Новый helper `youdo_listing_slot_urls(*, include_ru: bool)` → ordered `[dc…]` или `[dc…]+[ru…]` только когда `include_ru=True`.
+   - `exchange_primary_proxy_url("youdo")` → first alive DC from DC pool rotation; **never** RU if `youdo_dc_alive_urls()` non-empty.
+   - `proxy_log_hint("youdo")` → `host:port tier=dc slot=i/4 alive=a/4` (DC pool metrics) · отдельно `ru_alive=n` if needed · **не** slot=6/26 full list.
+
+2. **Fetch slot builder**
+   - Phase 1 = **DC only** (up to `YOUDO_DC_RETRY_MAX=4` or `YOUDO_SLOT_RETRY_ON_TIMEOUT`).
+   - Phase 1 all failed **and** `youdo_dc_alive>0` → **`youdo_hard_reset`** (O255 rate cap ok) + **one** retry pass on next alive DC(s) in same cycle — log `tier=dc_hard_reset` · **no RU**.
+   - Phase 2 = **max 1 RU slot** (`YOUDO_RU_RETRY_MAX=1`) **only if** `youdo_dc_alive=0/4` after phase 1 + hard reset retry.
+   - Log each attempt: `fetch:youdo tier=dc|dc_hard_reset|ru|dc_restored proxy_hint=… slot=n`.
+
+3. **Hard reset vs RU (owner 2026-06-16)**
+   - Revise O259 `_on_youdo_fetch_fail`: skip hard reset **only** while DC carousel still has untried slots **in current fetch**; after all DC slots in fetch failed → **allow hard reset even if `dc_alive>0`** (баны полетели — новое лицо + другой DC).
+   - Hard reset **never** substitutes for RU when `dc_alive=0` — там tier=ru (1 slot max).
+   - RU pool: **no multi-slot carousel** — shared traffic quota; one attempt per fetch max.
+
+4. **DC restore after ban TTL**
+   - In `_prune_expired_bans()` or `exchange_fetch_begin("youdo")`: if `youdo_dc_alive_urls()` became non-empty after prune → `youdo_realign_to_dc_tier()`.
+   - Log: `fetch:youdo tier=dc_restored dc_alive=N/4`.
+
+5. **youdo_browser_slot_fail**
+   - DC fail → ban + advance within DC pool only.
+   - RU fail → ban RU slot · **do not** set active DC index to RU position in full list.
+   - When last DC banned → allow RU for **this fetch only** (max 1); next cycle after TTL → dc_restored.
+
+6. **Ops / status**
+   - `_pool_status_slice` / cascade for youdo: show **DC pool** (4) + `ru_pool_alive` separately — not merged 26/26 misleading green.
+
+7. **Deploy + VPS env**
+   - `scripts/deploy-o260-youdo-dc-first-vps.py`:
+     - Upload touched `src/` · patch `.env.site` if needed:
+       - `YOUDO_DC_PROXY_URLS` = FL 4 DC (already from O259)
+       - `YOUDO_O191_DC_SLOTS=4`
+       - optional `YOUDO_RU_RETRY_MAX=1`
+     - On deploy: run `youdo_realign_to_dc_tier()` once (or reset active slot) · restart radar.
+     - Verify: next `fetch:youdo` log shows `tier=dc` · **not** `gate.node-proxy` as slot 1 unless `dc_alive=0/4`.
+
+8. **Tests** `tests/test_o260_youdo_dc_first.py`
+   - dc_alive>0 → primary + slot1 never in `_youdo_ru_pool`.
+   - all DC slots fail in fetch but dc_alive>0 → `tier=dc_hard_reset` · no RU.
+   - all DC banned (dc_alive=0) → one RU retry · log tier=ru_fallback.
+   - simulate ban expiry → `dc_restored` · primary back to DC.
+   - `proxy_log_hint` shows dc slot 1/4 not 6/26.
+   - FL bans untouched · O259 carousel tests still green.
+
+**Do not break:** O259 DC carousel · O255 rate cap / hourly cap · O257 ru_pool_dead skip · probe cron.
+
+**DoD:**
+- Prod: `dc_alive>=1` → **zero** `tier=ru` on slot 1 · hard reset ok when DC fetch exhausted (`tier=dc_hard_reset`).
+- `dc_alive=0/4` → max 1 `tier=ru` · after TTL → `tier=dc_restored`.
+- pytest `test_o260_*` + `test_o259_*` green.
+- `.env.example` document tier env vars.
+
+---
+
+## § O259-YOUDO-DC-CAROUSEL — ✅ prod (2026-06-16)
+
+**Intent (owner):** YouDo падает `SPA shell without task cards` на **том же camoufox + DC IP** после O255 hard_reset. Имеет смысл **крутить те же 4 DC, что FL**, до RU tier — не жечь residential.
+
+**Context (prod 2026-06-16):**
+```
+fetch:youdo outcome=fail reason=browser  # SPA shell
+youdo:trace stage=hard_reset fail_streak=1
+fetch:youdo proxy=185.147…  # часто 1 DC; FL крутит 4
+```
+FL и YouDo bans **раздельные** (`fl:host:port` vs `youdo:host:port`) — общий физический IP ok.
+
+**Ticket:** [`docs/problems/2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) § O259
+
+**Read first:** `exchange_proxy.py` `_youdo_dc_pool` · `youdo_browser_slot_urls` · `youdo_browser_slot_fail` · `exchange_browser_fetch.py` `_is_youdo_slot_retryable` · slot loop ~L2119–2240 · O255 hard_reset in `youdo_parser.py`.
+
+### Scope
+
+1. **DC pool = FL DC (env, не merge в коде)**
+   - На VPS `.env.site`: `YOUDO_DC_PROXY_URLS` = те же 4 URL, что `FL_PROXY_URLS` (copy-paste, без RU).
+   - `YOUDO_O191_DC_SLOTS=4` (или auto = `len(YOUDO_DC_PROXY_URLS)`).
+   - `YOUDO_PROXY_URLS` = DC×4 + RU tail (node-proxy) без изменения RU policy.
+   - **Do not** share ban tables with FL · **do not** auto-ban FL when YouDo fails.
+
+2. **Carousel policy (DC before hard_reset)**
+   - При `SPA shell` / antibot HtmlFetchError на listing: **ban `youdo:slot` + slot_retry следующий DC** в том же fetch (до `YOUDO_SLOT_RETRY_ON_TIMEOUT`, default 3).
+   - Fix if missing: `_is_youdo_slot_retryable` must match **`spa shell`** (сейчас `SPA shell without task cards` может **не** matсhить `antibot` marker — verify in code).
+   - `youdo_browser_slot_fail`: ban/advance по **DC pool** (`_youdo_dc_pool`), не по full `YOUDO_PROXY_URLS` — иначе RU попадает в carousel раньше policy O191.
+   - **Hard reset (O255)** только после исчерпания DC retry в цикле **или** все `youdo_dc_alive=0` — не на fail@1 с тем же единственным DC.
+   - Log: `fetch:youdo stage=dc_rotate slot=N proxy_hint=… reason=spa_shell` · `fetch:youdo dc_alive=N/4`.
+
+3. **Residential tier (unchanged)**
+   - RU только после DC exhausted / `slot_retry` на RU (O191) · если `youdo_ru_alive_urls()` empty → `fetch:youdo reason=ru_pool_dead` (O257).
+   - **No** поднятие RU в primary из-за SPA на одном DC.
+
+4. **Tests**
+   - `tests/test_o259_youdo_dc_carousel.py`:
+     - DC pool 4 · fail slot1 SPA → ban youdo:1 · retry slot2 without hard_reset.
+     - `SPA shell without task cards` → retryable.
+     - DC all banned → hard_reset path or pool_exhausted (mock).
+     - FL ban table untouched when YouDo bans same host:port.
+   - Extend O255/O257 suites · green.
+
+5. **Deploy**
+   - `scripts/deploy-o259-youdo-dc-carousel-vps.py`:
+     - Patch `.env.site` lines (YOUDO_DC*, YOUDO_O191_DC_SLOTS) — **no secrets in script**; read from local `.env` or prompt owner vars.
+     - Upload touched `src/` · restart radar · one `restart_radar_youdo_cycle.py` or wait 1 cycle.
+     - Print: `youdo_dc_alive=` · last 5 `fetch:youdo` lines.
+
+**Do not break:** O255 rate cap / hourly cap · O254 camoufox teardown · O257 fetch outcome logs · FL DC pool / httpx fallback · probe cron O258.
+
+**DoD:**
+- Prod: при SPA на DC1 log показывает rotate на DC2+ **до** `hard_reset` (или `parsed>0` на другом DC).
+- `youdo_dc_alive` до 4/4 на старте · RU не используется пока жив хотя бы 1 DC.
+- pytest `test_o259_*` green · `.env.example` documented.
+
+---
+
+## § O258-PLAYWRIGHT-PROBE-CRON — ✅ prod (2026-06-16)
+
+**Intent (owner):** после O257 FL живёт на httpx fallback · на VPS **нет** Playwright chromium (`BrowserType.launch: Executable doesn't exist`). Нужно: (1) починить browser-path · (2) **cron probe** → алерт в **@FLPARSINGBOT** до того как owner заметит утром.
+
+**Context (O257 prod):**
+```
+fetch:fl outcome=fail reason=browser_error err=... chromium_headless_shell-1208 ... Executable doesn't exist
+fetch:fl stage=fallback httpx outcome=ok → parsed=30
+```
+Residential **не трогать** — DC primary · res только когда `alive=0` DC (TTL 1h) · см. `exchange_proxy.py` `_fl_pool_triple`.
+
+**Ticket:** [`docs/problems/2026-06-16-parser-stability-audit.md`](../../problems/2026-06-16-parser-stability-audit.md) § O258
+
+### Scope
+
+1. **Playwright chromium on VPS (site profile)**
+   - In deploy script: `sudo -u rawlead` from `/opt/rawlead`: `.venv/bin/playwright install chromium` (+ `install-deps` if needed, non-interactive).
+   - Smoke: `sudo -u rawlead .venv/bin/python -c "from playwright.sync_api sync_playwright; ... launch chromium"` → OK.
+   - Pin/note playwright version in deploy output (match `requirements.txt`).
+   - **Do not** reinstall on every deploy — idempotent check (skip if binary exists).
+
+2. **Probe alert script**
+   - Extend `scripts/probe_parsers_health_vps.py` **or** add `scripts/probe_parsers_health_alert_vps.py`:
+     - Run existing probe logic (read `radar_site.log` tail · `fetch:{fl,kwork,youdo} outcome=`).
+     - If `status=fail` OR source `outcome=fail` with `reason` not in allowlist (`browser_error` ok if subsequent httpx ok in same cycle — see below) → send via `health_check.send_flparsing_admin_text`.
+     - Message prefix: `FLPARSING · парсеры` · include per-source: outcome, reason, parsed, last line snippet.
+     - Cooldown: `PARSER_PROBE_ALERT_COOLDOWN_SEC` default **1800** (30 min) via SQLite setting or file lock — no spam.
+     - **FL special:** if last line is `outcome=fail reason=browser_error` but same cycle has `stage=fallback httpx outcome=ok` → treat FL as **ok** (O257 design).
+
+3. **Cron / systemd timer on VPS**
+   - Add `scripts/install-parser-probe-cron-vps.py` or document in deploy script:
+     - Run every **15 min**: `sudo -u rawlead env RADAR_PROFILE=site PYTHONPATH=... python scripts/probe_parsers_health_alert_vps.py`
+     - Log to `/opt/rawlead/data/parser_probe.log` (rotate ok).
+   - Deploy script runs install once.
+
+4. **Tests**
+   - `tests/test_o258_probe_alert_logic.py` — mock log lines: browser fail + httpx ok → no alert; sustained fail → alert payload.
+   - pytest green with O257 suite.
+
+5. **Deploy**
+   - `scripts/deploy-o258-playwright-probe-vps.py` — chromium install if missing · upload probe/alert scripts · install cron · run probe once · print summary.
+
+**Do not break:** O257 httpx auto fallback · residential tier rules · O255/O254 YouDo · FLPARSING bot identity check in `send_flparsing_admin_text`.
+
+**DoD:**
+- VPS: `playwright install chromium` OK for rawlead · FL browser subprocess succeeds OR explicit log if still fail.
+- Cron active · manual run sends **no** alert when FL ok via httpx.
+- Manual run **does** alert when e.g. `fetch:youdo outcome=fail` sustained 30+ min (use test log fixture in unit test; prod verify optional).
+- `.env.example` lines for cooldown env if added.
+
+---
+
+## § O257-PARSER-STABILITY-AUDIT — ✅ prod (2026-06-16)
+
+**Intent (owner):** parsers fall daily · need **audit + prod-grade stability** · clear logs · no silent `parsed=0` · fewer orphan processes · tools to catch before owner wakes up.
+
+**Ticket:** [`docs/problems/2026-06-16-parser-stability-audit.md`](../../problems/2026-06-16-parser-stability-audit.md)
+
+**Read first:** ticket TL;DR · `fl_parser.py` `_fl_allow_httpx_fallback` · `main.py` `restart_source_*` · `exchange_browser_fetch.py` `fl_hard_reset` · prod log samples in ticket.
+
+### Phase 1 — Audit (deliverable: update ticket § A–D)
+
+1. Map fetch/recovery/process paths for **fl / kwork / youdo** (table in ticket).  
+2. List **conflicting recovery** (e.g. O256 → `fl_hard_reset` → `restart_source_fl` → context close every cycle while subprocess still empty).  
+3. Add **`scripts/audit_parser_processes_vps.py`** — SSH/local safe · counts worker/camoufox/chromium pids · no secrets · stdout report.
+
+### Phase 2 — FL P0 fixes (must ship)
+
+1. **Auto httpx fallback** when browser/subprocess returns `None`/empty OR raises `HtmlFetchError` — **do not rely on** `FL_HTTPX_FALLBACK=1` env alone. Log: `fetch:fl stage=fallback httpx outcome=ok|fail`.  
+   - Rationale: VPS curl 200 ~330KB · `FL_LISTING_SUBPROCESS=1` currently **disables** httpx (O210) — mismatch with `FOR_YOU.md` / `RUN.md`.  
+2. **Fix restart loop:** `fl_hard_reset` / O256 soft reset — teardown inline; **do not** set `restart_source_fl=1` if that causes pre-fetch context wipe loop without fixing subprocess. Document chosen behavior in ticket.  
+3. **Pipeline log every FL failure:** `fetch:fl outcome=fail reason=<code> proxy_hint=... stderr_tail=...` in `radar_site.log` (not journal-only).  
+4. Subprocess fail: include last JSON line / stderr tail in pipeline log.
+
+### Phase 3 — Observability (same PR if small)
+
+1. Standard **`fetch:{src} outcome=... reason=...`** for fl/kwork/youdo listing fetch end.  
+2. **`/ops/`** exchanges row: expose `last_fail_reason` (from health/settings or last log parse).  
+3. **`scripts/probe_parsers_health_vps.py`** — runs listing smoke (or reads last 3 cycles from log) · exit 0/1 · JSON for Lead · document in ticket § E.
+
+### Phase 4 — YouDo hardening (same PR or follow-up commit)
+
+1. Before RU slot_retry: if `youdo_ru_alive_urls()` empty or probe fails → **skip RU tier** · log `fetch:youdo reason=ru_pool_dead`.  
+2. `youdo:trace fetch_end` include `reason=` when `parsed=0` (browser_empty, antibot, cooldown, …).
+
+### Tests
+
+- `tests/test_o257_fl_httpx_fallback_on_browser_fail.py` — mock browser fail → httpx returns HTML → parsed>0  
+- `tests/test_o257_fetch_outcome_log.py` — pipeline line format  
+- `tests/test_o257_restart_source_no_loop.py` — soft reset does not infinite restart_source  
+- Extend existing FL/YouDo tests · do not break O255/O256 suites
+
+### Deploy
+
+- **`scripts/deploy-o257-parser-stability-vps.py`** — upload touched `src/` + scripts · restart radar · run probe · print last 5 `fetch:* outcome=` lines  
+- **`.env.example`** — document new env if any; prefer **sensible defaults** over owner manual flags
+
+**Do not break:** O255 YouDo rate cap · O254 teardown · O252 scope · TG · push · ops restart buttons
+
+**DoD:**
+
+- Ticket § A–D filled · § Verify checkboxes ticked by Coder  
+- Prod: `listing:fl parsed>=25` ≥3 cycles **or** explicit `outcome=fail reason=` with actionable text  
+- `pytest tests/test_o257_* -q` green · probe script documented  
+- Lead can run deploy script + probe without reading code
+
+---
+
+## § O256-FL-ANTIBOT-SOFT-DETECT — ✅ prod (2026-06-16)
+
+**Intent (owner):** FL крутится вхолостую при `parsed=0 alive=4/4` — freelance.ru отдаёт antibot HTML, прокси не банится, O233 не триггерит. Нужен детект «soft antibot» и hard reset без ban.
+
+**Ticket:** [`docs/problems/2026-06-16-fl-parsed-zero-no-proxy-ban.md`](../../problems/2026-06-16-fl-parsed-zero-no-proxy-ban.md)
+
+**Also write deploy script:** `scripts/deploy-o256-fl-antibot-vps.py` (uploads `fl_parser.py` + `radar_status.py` + restart radar) — Coder пишет, Lead деплоит.
+
+**Scope:**
+
+1. **`fl_parser.py`:** при `parsed=0 streak >= 5 AND bans_cleared == 0` → вызвать `fl_hard_reset()` + выставить `restart_source_fl` в storage (как при proxy ban). Log: `fl_listing:soft_antibot_reset streak=N`.
+2. **`fl_parser.py`:** при каждом `parsed=0` (browser fetch) — log первые 300 байт ответа: `fl_listing:html_snip snip=<encoded[:300]>`. Позволяет за 5 сек понять «captcha» vs «пустая выдача».
+3. **`radar_status.py`:** `parsed=0 streak > 10 AND bans_cleared=0` → статус 🔴 `antibot_soft` (отдельно от `pool_exhausted`).
+4. **`deploy-o256-fl-antibot-vps.py`:** загрузить `src/fl_parser.py` + `src/radar_status.py` → restart radar → verify `listing:fl` в логе.
+
+**Do not break:** O233 auto-recovery (ban path) · O215 two-tier proxy · O222 hard reset on ban · proxy ban TTL.
+
+**Files:** `src/fl_parser.py` · `src/radar_status.py` · `scripts/deploy-o256-fl-antibot-vps.py` · tests
+
+**DoD:** `listing:fl parsed=0 streak=5 bans_cleared=0` → log `fl_listing:soft_antibot_reset` + `restart_source_fl` установлен · log `fl_listing:html_snip` при каждом parsed=0 · 🔴 antibot_soft в /ops/ при streak>10.
+
+---
+
+## § O255-YOUDO-HARD-RESET-1 — ✅ code · deploy ⏳ (P1, owner 2026-06-16)
+
+**Intent (owner):** как FL browser fail — **с первого провала** hard reset («новое лицо»), без 30+30 мин cooldown на fail 1–2. **Подстраховка** от бесконечного hammering.
+
+**Ticket:** [`docs/problems/2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md)
+
+**Scope:**
+
+1. **Default** `YOUDO_HARD_RESET_FAILS=1` (env override ok) · убрать ветку `set_youdo_cooldown(30min)` когда срабатывает auto hard reset.
+2. **Rate limit между auto hard reset:** `YOUDO_HARD_RESET_MIN_SEC` (default **120**). SQLite `youdo_last_hard_reset_at`. Если fail → hard reset, но с прошлого reset < MIN_SEC → **короткий cooldown** `YOUDO_SHORT_COOLDOWN_MIN` (default **5**), log `hard_reset_rate_limited` · **не** 30 min.
+3. **Hourly cap:** `YOUDO_HARD_RESET_MAX_PER_HOUR` (default **8**). Счётчик в settings (rolling hour ok). При превышении → существующий **traffic_guard** (~90 min), log `hard_reset_hourly_cap` · **не** hard reset.
+4. На каждом успешном auto hard reset: bump hourly counter · update `youdo_last_hard_reset_at` · existing teardown unchanged.
+5. **`.env.example`** + prod `.env.site` lines (deploy note for Lead):
+   - `YOUDO_HARD_RESET_FAILS=1`
+   - `YOUDO_HARD_RESET_MIN_SEC=120`
+   - `YOUDO_HARD_RESET_MAX_PER_HOUR=8`
+   - `YOUDO_SHORT_COOLDOWN_MIN=5`
+6. **pytest** `tests/test_o254_youdo_restart.py` extend or `tests/test_o255_youdo_hard_reset_rate.py` — fail@1 reset · rate limit → short cooldown · hourly cap → guard.
+
+**Do not break:** ops `/ops/` manual restart · O254 teardown · traffic_guard on non-reset path · `fetch_every_n`.
+
+**Already in place (no code):** `fetch_every_n=4` · `invalidate_browser_slot` on fail · ops button + radar restart.
+
+**Files:** `src/youdo_parser.py` · `.env.example` · tests
+
+**DoD:** deploy radar · log on fail: `hard_reset reason=auto_fail_streak=1` OR `hard_reset_rate_limited` · no 30min cooldown on first browser/antibot fail.
+
+---
+
+## § O254b-OPS-RESTART-CACHE-BUST — ✅ deploy (2026-06-16)
+
+**Ticket:** [`docs/problems/2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) § post-deploy triage
+
+**Symptom:** O254 deploy ✅ · owner: кнопка «Перезапустить источник» мёртвая · nginx **0×** `POST /ops/control` · `hard_reset` в journal нет.
+
+**Root cause (Lead verify):** prod отдаёт новый JS, но вкладка до deploy держит старый `ops-pult.js` (polling funnel не reload script). Delegation bind один раз при load — после hydrate не перепривязывается (belt: re-bind).
+
+**Scope:**
+1. `owner_admin.py` — `<script src="/ops/static/ops-pult.js?v=…">` (`_VERSION` или mtime)
+2. `ops-pult.js` — вызов `bindRestartSourceDelegation()` в конце `hydrateDashboardFallback` `.then` (после `exEl.innerHTML = renderExchangesHtml`)
+3. pytest не обязателен · smoke: deploy api → owner Ctrl+Shift+R → POST в nginx · journal `fetch:youdo hard_reset`
+
+**Do not break:** O205 shell hydrate · existing `.rl-ctl` handlers
+
+**Files:** `src/owner_admin.py` · `src/static/ops-pult.js`
+
+---
+
+## § O254-OPS-YOUDO-RESTART — ✅ deploy (smoke partial)
+
+**Ticket:** [`docs/problems/2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md)
+
+**Prod:** 5 files · api+radar restart 04:36 UTC · grep OK · prod JS has delegation.
+
+**Owner smoke:** ❌ button · YouDo ingest still `Connection closed` → **O254b** + **@mechanic**
+
+---
+
+## § O252-TG-CONTENT-DEDUP — ✅ code · deploy ⏳ (P1)
+
+**Symptom:** duplicate TG cards same text · [`2026-06-15-push-down-tg-dedup.md`](../../problems/2026-06-15-push-down-tg-dedup.md)
+
+**Scope:** content_hash conflict → `dup_abort` · no `content_hash=""` retry · pytest · deploy API+radar.
+
+**DoD:** one post → one card in `/lenta/`.
+
+**Files:** `lead_pipeline.py` · `tests/test_tg_content_dedup_o252.py`
+
+---
+
+## § O237-YANDEX-METRIKA — ✅ code · theme deploy ⏳
+
+**Counter:** `109860210` · owner snippet → [`FOR_YOU.md`](../../FOR_YOU.md).
+
+**Scope:** `inc/yandex-metrika.php` · goals quiz/trial/checkout · theme **1.19.20** · skip local + `/ops/`.
+
+**Deploy:** `scripts/deploy-o237-metrika-vps.py` or `deploy-wp-theme-vps.py` · wp-config `YANDEX_METRIKA_ID`.
+
+**DoD:** view-source `/lenta/` → tag id 109860210 · goals fire in Metrika.
+
+---
+
+## § O200-L2 — queued (волна 4)
+
+Regen judge ≥70%×4 · see archive § O200.
+
+---
+
+## Archive pointer
+
+O250/O250b/O250c/O250d/O253 full specs → [`CODER_PROMPT_ARCHIVE`](../archive/CODER_PROMPT_ARCHIVE.md) (hot trim 2026-06-16).
+
+O251 REPO_HYGIENE → [`docs/ops/REPO_HYGIENE.md`](../../ops/REPO_HYGIENE.md) ✅ done.

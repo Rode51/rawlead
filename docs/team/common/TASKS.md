@@ -1,179 +1,73 @@
 # TASKS (активное)
 
-**Снимок:** [`STATUS.md`](STATUS.md)
+**Снимок:** [`STATUS.md`](STATUS.md) · **Prod:** [`PROD_FACTS.md`](PROD_FACTS.md) · **Roadmap:** [`ROADMAP.md`](../architect/ROADMAP.md)
 
 ---
 
-## Где мы
+## Где мы (2026-06-18)
 
-**Волна 1:** ingest/ops ✅ · **O215:** design polish ✅ theme **1.18.95** deploy 2026-06-14  
-**Волна 2:** tier smoke (all plans) **→ сейчас** · **Perf** после smoke  
+**→ Now:** **O271** Neon → VPS Postgres · O200 ⏸ · O268 фон
 
----
-
-## До soft ads (owner 2026-06-13)
-
-| Волна | § | Кто |
-|-------|---|-----|
-| 1 TG | t2b · O207 · join | @coder |
-| 2 Концепция | **O208** + **O217** synthetic quiz pack | @lead-product |
-| 3 Perf | lenta/home/quiz load | Design scope → @coder |
-| 4 L2 | O200 regen **≥70%×4** | @coder |
-| 5 SEO + analytics | **O113-seo** · Яндекс.Метрика (счётчик + цели) | @coder · owner ID |
-| 6 Pre-ads QA | **O218** Playwright quiz/UX E2E · mobile+desktop · stress @50 · security | @coder |
-| 7 GTM | ads | ⏸ |
-
-**Гейт ads:** tier smoke ✅ · **O218 Playwright green** · L2 **70%**×4 · stress green · **SEO** · **Метрика на prod**.
+**Инцидент:** Neon compute quota exceeded · **миграция на local PG** (owner go) · autocleanup timer ✅ (03:15 −699 rows)
 
 ---
 
-## Шаги (hot)
+## Очередь (hot)
 
 | # | Что | Кто | Статус |
 |---|-----|-----|--------|
-| **43** | O203-HOTFIX + O199 | @coder | ✅ Lead local |
-| **44** | Deploy **1.18.81** + VPS hotfix | owner | ✅ |
-| **45** | Prod smoke | owner | ⚠️ filter ❌ |
-| **46** | **O204** filter + msgs stats | @coder | ✅ Lead verify |
-| **48** | **O205** t2+t5 spam+ops CSP | @coder | ✅ deploy |
-| **49** | **O205** t1+t6+t7 fast ops+TG+banner | @coder | ✅ deploy |
-| **50** | **O205** t10+t11+t13 deploy | Lead | ✅ 2026-06-13 |
-| **51** | Owner smoke O205 (чеклист) | owner | **→ сейчас** |
-| **52** | **O206** t1–t4 deploy | Lead | ✅ 2026-06-13 |
-| **53** | Owner smoke test group | owner | ✅ мгновенно |
-| **56** | **O206 t3c** watchdog zombie | @coder | ✅ Lead verify+deploy |
-| **55** | **O206 t2b** sync chat_ids | @coder | ✅ Lead verify 2026-06-14 |
-| **57** | **O207** TG funnel · history sample + replay | @coder | ✅ Lead verify 2026-06-14 |
-| **58** | **O209** match-first UX+copy | @coder | ✅ Lead verify+deploy 2026-06-14 |
-| **58b** | **FL-PROXY-STABILITY** + residential env | Lead | ✅ 2026-06-14 |
-| **58d** | **O207b** TG filter tune (8 false blocks) | @coder | ✅ Lead verify 2026-06-14 |
-| **58e** | **O207b** deploy radar + **O211** deploy API footer | @coder | ✅ Lead verify 2026-06-14 |
-| **58f** | **O212** ops log spam + TG 🔴 false + «0 новых» UX | @coder | ✅ Lead verify 2026-06-14 |
-| **58g** | **O213** Kwork pagination (page2-3) + filter scope | @coder | ✅ Lead verify 2026-06-14 |
-| **58h** | **O213+O212 deploy** radar + API | @coder | ✅ Lead verify VPS 2026-06-14 |
-| **58i** | **O214** ops truth: cycle_age fallback + residential badge | @coder | ✅ Lead verify VPS 2026-06-14 |
-| **59** | **O215** WP design polish (BrowserSync local) | @designer + owner | ✅ deploy **1.18.95** 2026-06-14 |
-| **59b** | **Tier smoke** — все уровни доступа (FOR_YOU чеклист) | owner | T1 blocked → **O216** |
-| **59c** | **O216** quiz lifecycle · match bars · cabinet retake | @coder | ✅ code Lead verify |
-| **59d** | **O216b** Neon quiz pool audit → `quiz_pool_allowlist.json` | @coder | ✅ **64 ids** · ⚠️ gitignore |
-| **59e** | Deploy O216 + owner DoD D1–D9 + 10 ₽ smoke | owner + @coder | ✅ theme **1.18.96** · owner smoke **→ сейчас** |
-| **60** | **Perf** lenta/home/quiz | @lead-designer → @coder | после tier smoke |
-| **61** | **Stress** финал @50 VU | owner | **перед ads** |
-| **62** | **O113-seo** — title/meta, sitemap, OG ключевых страниц | @coder | после Perf · **до ads** |
-| **63** | **Яндекс.Метрика** — счётчик в теме + цели quiz/trial/pay | @coder · owner | после 62 · **до ads** |
-| **64** | **O217** synthetic quiz — PM spec + pilot 20 | @lead-product | ✅ owner pilot OK |
-| **64b** | **O217** code 56 cards + API JSON source + deploy | @coder | ✅ Lead deploy 2026-06-14 |
-| **65** | **O218** Playwright UX/quiz E2E — multi-user · mobile 390 + desktop | @coder | после O219 · **до ads** |
-| **66** | **O219** LK UX · anon match bar · auto-trial · `/quiz/` redirect | Lead | ✅ deploy 2026-06-14 |
-| **67** | **O220-MATCH-PM** — A–F rank UX | @lead-product | ✅ owner OK 2026-06-14 |
-| **68** | **O220-FEED** r0+r1 quiz lock · 10/ч | @coder | ✅ code · deploy ⏳ |
-| **69** | **O220-MATCH-CODE** A–F (D + bar-only UI) | @coder | ✅ deploy **1.19.02** 2026-06-14 |
-| **70** | **O220-FEED** r2–r7 UX · checkout | @coder | ✅ deploy |
-| **71** | **O220 deploy** API + theme **1.19.00** | Lead | ✅ 2026-06-14 |
-| **72** | **O220-L1-RETAG-PILOT** | @coder + owner | ✅ apply+judge 2026-06-14 |
-| **73** | **O220-L1-PROMPT-R2** — few-shot + min 2 tags retry | @coder | ⏸ после **69** |
-| **74** | **O220-JS-SYNTAX-HOTFIX** — feed/cabinet `node --check` | @coder | ✅ **1.19.01** prod |
-| **75** | **O220-QUIZ-DEDUP** — string card_id shown set (API) | @coder | **→ now** |
-| **76** | **O220-QUIZ-BAR-ALIGN** — category bar grid CSS | @coder | with **75** |
-| **77** | **O220-MATCH-UI** — stray `"` · feed≡cabinet bar | @coder | ✅ in **69** |
-
-## План O208 (owner 2026-06-13)
-
-Quiz-first: UI/UX · тексты · воронка · **без ручного выбора навыков**.  
-PM: `LEAD_PRODUCT_PROMPT` § O199 · Design: § O199-QUIZ-UX · `ROADMAP` § O208.
+| **0** | **O271** Neon → VPS Postgres (full dump) | @coder + Lead ops | 🔴 P0 **2026-06-18** · ветка `o271/pre-vps-postgres-migration` |
+| **0b** | **O270** Neon quota probe + circuit breaker | @coder | ⏸ после O271 cutover |
+| **1** | **O200** L2 regen judge ≥70%×4 | @coder | ⏸ **blocked Neon** |
+| **3** | **O237** Metrika goals UI | owner | ⏸ smoke отложен · код **1.19.20** ✅ prod |
+| **4** | **M1** TG test ads (≤5k ₽) | @lead-marketing + owner | ⏳ после O218 + L2 |
+| **5** | **Portfolio P0** skills + refs с нуля | @lead-portfolio + owner + Claude Code | ⏳ |
+| — | **O262k** YouDo DC probe | @coder | ✅ servicepipe 1712b |
+| — | **O252** TG content dedup | @coder | ✅ prod (Lead verify) |
+| — | **O265** + **O265b** bot | @coder | ✅ prod **2026-06-17** |
 
 ---
 
-## План O207 (owner 2026-06-13)
+## Закрыто недавно (где смотреть)
 
-**Цель:** понять, **есть ли заказы в группах** и **точно ли** их режет filter/L1 — не listen/handler.
+| Блок | Статус | Тесты / spec |
+|------|--------|--------------|
+| **O209** match-first UX/copy/quiz | ✅ theme 1.18.84 | [`wave-o209-match-brief.md`](../design/wp/wave-o209-match-brief.md) |
+| **O217** quiz cards pack | ✅ | `tests/test_o217_quiz_cards.py` |
+| **O197** adaptive quiz | ✅ | `tests/test_o197_quiz_adaptive.py` · `test_o195_quiz.py` |
+| **O195** tags import + weight_delta | ✅ | `tests/test_o195_quiz.py` |
+| **O220** feed draft instant | ✅ | `tests/test_o220_feed_draft.py` |
+| **O225** match floors 20/10 | ✅ | `tests/test_o225_match_floors.py` |
+| **O224** compatibility | ✅ | `tests/test_o224_compatibility.py` |
+| **O250/O253** push UUID + JWT heal | ✅ prod | `tests/test_match_push_o250.py` · `test_o253_jwt_session_heal.py` |
+| **Match push core** | ✅ | `tests/test_match_push.py` · `test_match_push_o50.py` · `test_match_f2.py` |
+| **O261–O262d** YouDo parser recovery + list view | ✅ prod | `tests/test_o261_*` · `test_o262*` · `test_o262d_*` |
+| **O109** push deeplink `?lead=` | ✅ | theme feed JS |
 
-1. Truth ladder + per-chat health в `/ops/tg`
-2. Sample skip audit — owner метит «заказ / шум»
-3. Filter lab — replay корпуса до деплоя правок
-4. Golden posts в test group
-
-Детали: [`ROADMAP.md`](../architect/ROADMAP.md) § **O207** · тикет [`tg-feed-volume`](../problems/2026-06-13-tg-feed-volume.md)
+Архив закрытых § → [`CODER_PROMPT_ARCHIVE`](../architect/CODER_PROMPT_ARCHIVE.md)
 
 ---
 
-## Local smoke (перед VPS — обязательно)
+## До рекламы (ROADMAP волны)
+
+| Волна | Что | Статус |
+|-------|-----|--------|
+| **1 TG** | t2b sync · O207 funnel · join v4 ~304 | 🟡 фон |
+| **2 Quiz** | O208/O217/O197 | ✅ большая часть |
+| **3 Perf** | lenta/home/quiz load | ⏳ после design scope |
+| **4 L2** | O200 regen 70%×4 | ⏳ |
+| **5 Analytics** | O237 Metrika · O113 SEO | ⏸ owner smoke · код ✅ |
+| **6 QA** | O218 Playwright | ✅ prod green |
+| **7 GTM** | M1 ads · portfolio | ⏸ |
+
+**Гейт GTM:** O218 green · O200 70%×4 · Metrika live · tier smoke ✅
+
+---
+
+## Probe (owner/Lead)
 
 ```powershell
 cd C:\Users\hramo\uisness
-python -m pytest tests/test_o175_feed_inbox.py tests/test_o202_tg_spam_corpus.py tests/test_o171_ops_funnel.py -q
+python scripts/deploy-o258-playwright-probe-vps.py
+python scripts/_lead_o261_o262_post_deploy.py grep   # YouDo trace
 ```
-
-**WP UI (один раз):**
-```powershell
-.venv\Scripts\python.exe scripts\wp_link_theme_local.py --force
-cd wordpress\rawlead-kadence-child
-npm.cmd install
-npm.cmd run dev
-```
-Если `npm` в PowerShell ругается на ExecutionPolicy — используй **`npm.cmd`**, не `npm`.
-
-Браузер: `http://localhost:3000/lenta/` (прокси на `radarzakaz.local`).
-
-**Кабинет локально:** junction ≠ вход. Нужны оба:
-1. LocalWP **radarzakaz** → Start
-2. API локально: `uvicorn` (см. `docs/ops/RUN.md` §5) + в `wp-config.php`: `RAWLEAD_API_URL` → prod **или** `http://127.0.0.1:18766`
-3. Вход TG на `http://radarzakaz.local/cabinet/` — виджет на HTTP часто **не работает**; для UI-тестов ленты достаточно **prod API** + local WP.
-
-**/ops/ локально не тестируется** — только `https://rawlead.ru/ops/` (пароль пульта, не кабинет TG).
-
-**Проверить локально:** фильтр TG · спам · glow → **потом** `deploy-wp-theme-vps.py`.
-
-**Радар/ops control** — только VPS; баннер «Перезапустить радар» сейчас **только скролл** → **Управление** → `Radar: перезапуск`.
-
-### 1. Deploy (PowerShell, по порядку)
-
-```powershell
-cd C:\Users\hramo\uisness
-python scripts/deploy-o190-tg-join-listen-vps.py
-python scripts/deploy-wp-theme-vps.py
-```
-
-**Ожидай:**
-- `o190_tg_join_listen_deploy_ok` + `active` (радар)
-- theme **1.18.82** на сайте
-
-**Если API 502 после deploy:** на VPS должен быть `tg_spam_corpus.py` — скрипт выше заливает его; `systemctl restart rawlead-api`.
-
----
-
-### 2. Чеклист smoke
-
-#### A. API (30 сек)
-- [ ] `https://api.rawlead.ru/v1/feed?limit=1` → **200**, не 502
-- [ ] Hard refresh `/lenta/` (Ctrl+F5) — новая версия CSS
-
-#### B. `/ops/` → Telegram
-- [ ] Колонки на русском: **Аккаунт · Состояние · Слушают · …**
-- [ ] **acc1/acc2:** 🟢 или 🟡 (не 🔴) при **X · X · X** и без auth_error
-- [x] **acc3:** 24/24 · лампы 🟢
-- [ ] **Сообщения:** сессия + всего (после O204)
-- [ ] Наведи на лампу/состояние — tooltip **причина** (`lamp_reason_ru`)
-- [ ] Под таблицей: **«Очередь: N готово · …»**
-
-#### C. `/lenta/` анон (инкогнито)
-- [ ] Карточки грузятся
-- [ ] TG-карточка (владелец) → **«Спам»** → «Учтём в фильтре» · карточка исчезла
-- [ ] Ошибки спама: 403 → «Только владелец» · 404 → «Уже скрыт» (если повторный клик)
-- [ ] **«Написать отклик»** → **карточка жёлто пульсирует** + полоска и пульс на кнопке
-
-#### D. `/lenta/` залогинен (`/cabinet/` → Лента)
-- [x] Карточки грузятся — **нет** «Не удалось загрузить»
-- [x] **Нет** кнопки «Навыки» / ручного picker
-- [x] «Написать отклик» → glow + toast черновика
-- [ ] **Сортировка → Telegram → Применить** — только TG-карточки (**❌ O204**)
-- [ ] TG → **«Спам»** → «Учтём в фильтре»
-
-#### E. Опционально
-- [ ] `python scripts/tg_spam_corpus_export.py` — count +1 после «Спам»
-
----
-
-### 3. Отчёт Lead
-
-Напиши: «smoke ок» или что красное (скрин + acc + URL). Lead закроет § в промпте.
