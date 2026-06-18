@@ -95,7 +95,7 @@ class L1PoolTest(TestCase):
         cfg.l1_max_workers = 2
         pg = MagicMock(spec=NeonLeadStorage)
         pg.enabled = True
-        pg.update_after_lite = MagicMock()
+        pg.update_after_lite = MagicMock(return_value=1)
         pg.fetch_lead_id = MagicMock(return_value=1)
         errors: list[str] = []
 

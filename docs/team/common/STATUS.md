@@ -6,15 +6,35 @@
 
 > Hot ≤80 строк · детали → [`archive/STATUS_ARCHIVE.md`](../archive/STATUS_ARCHIVE.md)
 
-**Next:** **O271** Neon → VPS Postgres · O200 ⏸ · O268 watch · ветка `o271/pre-vps-postgres-migration`
+**Next:** **O280** WP→Next · O200 ⏸ · rode51.ru DNS
+
+**Откат до переноса:** ветка `o280/pre-wp-to-next-migration` · тег `backup/pre-wp-next-2026-06-18` · локальный бэкап `D:\Backups\uisness\2026-06-18_2348`
 
 ---
 
-## O271 VPS Postgres migration — 🔴 P0 (2026-06-18)
+## O280 WP → Next UI — 🔴 P0 до ads (2026-06-18)
 
-**Owner go:** миграция без оплаты Neon · runbook [`MIGRATE_NEON_TO_VPS_POSTGRES.md`](../../ops/MIGRATE_NEON_TO_VPS_POSTGRES.md).
+**Handoff:** [`WP_TO_NEXT_HANDOFF.md`](../architect/WP_TO_NEXT_HANDOFF.md) · пакет `web/` · API не трогаем.
 
-**Git:** branch `o271/pre-vps-postgres-migration` — commit **перед** cutover `DATABASE_URL` on prod.
+---
+
+## O272 quiz→feed tags sync — ✅ prod (2026-06-18)
+
+**Fix:** `rawlead-tags-imported` → `reloadTagsFromSync()` в feed + cabinet · `pytest` **4/4** · theme deploy ✅
+
+**Owner smoke:** `/lenta/` → квиз без reload → замочки снимаются · при старом кэше JS — один раз **Ctrl+Shift+R**
+
+---
+
+## O271 VPS Postgres migration — ✅ cutover · login fix (2026-06-18)
+
+**Prod DB:** `DATABASE_URL` → **127.0.0.1** (local Postgres) · Neon только в `NEON_DATABASE_URL` (архив, не используется).
+
+**Post-cutover:** `rawlead-bot-poll` **не перезапускался** → бот ходил в Neon → `bot_auth:fail db error` · **fix:** `systemctl restart rawlead-bot-poll` **07:54 UTC**.
+
+**Owner seed:** uuid `#1` · `tg_user_id=1342741103` · `plan=owner`.
+
+**Smoke:** API `/health` ok · повторить TG login после restart bot-poll.
 
 ---
 

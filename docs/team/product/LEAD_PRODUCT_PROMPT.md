@@ -2,10 +2,598 @@
 
 **Дата:** 2026-05-24 · с владельцем  
 **Принято Lead Architect:** 2026-05-24 — `ROADMAP.md`, `LEAD_DESIGN_PROMPT.md`, ревизия `TASKS`/`STATUS`/`CODER_PROMPT`  
-**→ Статус:** § **TINDER-ONBOARD — → now (2026-06-13)** · § PRODUCT-CANON-AUDIT · § O174-COPY · § O116-COPY ✅
+**→ Статус:** § **O221 r7+r8 ✅** (130 cards · deploy prod 2026-06-15) · § **O217** v1 **✅**
+
+---
+
+## § O221-QUIZ-COVERAGE — полное покрытие квиза (**→ now · owner 2026-06-14**)
+
+**Суть запроса owner:** не «добавить JS в dev», а **нигде не было дыр** — квиз должен **измерять** то, что реально в ленте, по **всем 4 нишам**. v1 (56 карточек) = pilot, не coverage.
+
+**Метод:** тот же класс research, что § SKILLS-TOOLS-RESEARCH (E2), но артефакт = **матрица покрытия + пак v2**, не каталог UI.
+
+### Фаза 0 — факты (Lead verify Neon + repo · 2026-06-14)
+
+| Ниша | Tier-A в каталоге | v1 quiz покрывает | Prod-теги ≥30 лидов **без** v1 `skills_on_like` |
+|------|-------------------|-------------------|--------------------------------------------------|
+| **dev** | 7 | **4/7** (нет js, llm, scraping) | html_css, server_administration, php, tilda_dev, mobile_dev, data_analysis… |
+| **design** | 4 | 4/4 Tier-A, но **162** video_editing лидов · **109** illustration · **92** motion | illustration, motion_design, presentation_design, threed_modeling… |
+| **marketing** | 6 | **5/6** (нет google_ads) | **146** content_marketing · **51** web_analytics · **33** chatbot_marketing · vk_ads… |
+| **text** | 6 | **5/6** (нет translation) | **34** transcription · script_writing · product_description |
+
+**Вывод:** дыры **системные** — 12 quiz-signals ≠ Tier-A ≠ top prod tags. Одного «расширить dev» недостаточно.
+
+### Фаза 1 — Research agent (**@mechanic** · Gemini ~2M · read-only Neon)
+
+**Промпт:** [`QUIZ_COVERAGE_RESEARCH_PROMPT.md`](QUIZ_COVERAGE_RESEARCH_PROMPT.md) *(новый — см. ниже)*
+
+| # | Deliverable |
+|---|-------------|
+| r1 | **`data/quiz_coverage_matrix.csv`** — строка = canonical tag · cols: niche, tier, prod_lead_cnt, quiz_v1_cards, quiz_v1_skills, gap_class P0/P1/P2 |
+| r2 | **`docs/team/product/QUIZ_COVERAGE_GAPS.md`** — human summary: top-10 дыр/нишу + примеры реальных лидов (id, title, tags) |
+| r3 | **Signal map v2** — расширить § O217-w: не 3 signal/нишу, а **все Tier-A + top prod P0** (owner approve списка) |
+| r4 | **Card budget** — мин. **3 anchor + 1 trap + 1 boundary** на каждый P0 signal · target **~150–200** cards |
+| r5 | **Simulation spec** — 100 synthetic quiz paths → expected match vs random prod sample (acceptance для Coder) |
+
+**Не делать в research:** писать JSON карточек (это PM r6) · менять rank.py · менять adaptive (Coder после r5).
+
+### Фаза 2 — PM card pack (**@lead-product** + owner)
+
+| # | Deliverable |
+|---|-------------|
+| r6 | Pilot **40** cards (10/niche) по matrix P0 — owner «нет WTF» |
+| r7 | Full **`data/quiz_cards_v2.json`** + lint tag_id ∈ CANONICAL_TAGS | **✅ 2026-06-15** |
+| r8 | Handoff → @lead-architect → Coder § **O221-QUIZ-ADAPTIVE** | ✅ deploy **2026-06-15** |
+
+### Фаза 3 — Code (**@coder**, после r7)
+
+Adaptive niche-deep · shuffle · dedup · CI **`tests/test_quiz_coverage.py`**: every Tier-A tag ∈ ≥2 cards · every P0 prod tag reachable via quiz path simulation.
+
+### Критерий «нигде нет дыр» (owner gate)
+
+1. **Tier-A:** каждый tag из `TIER_A_BY_NICHE` — ≥2 anchor-карточки в v2.  
+2. **Prod P0:** каждый tag с ≥5% лидов ниши — signal или `skills_on_like` в квизе.  
+3. **Simulation:** median match на 50 random niche-leads после типичного quiz ≥ **40%** (dev/design/marketing/text отдельно).  
+4. **UX:** ≥12 unique card_ids на 20-card run · no 4× duplicate (dedup).
+
+**Фаза 1 ✅ (2026-06-15):** [`QUIZ_COVERAGE_GAPS.md`](QUIZ_COVERAGE_GAPS.md) · [`data/quiz_coverage_matrix.csv`](../../../data/quiz_coverage_matrix.csv) · 14 «нулевой match» P0 tags · simulation spec в GAPS § Card budget.
+
+**→ Фаза 2 r6 ✅ (owner 2026-06-15):** pilot **40** принят · **→ r7** full ~130 cards.
+
+**→ r7 ✅ (Lead Product 2026-06-15):** `data/quiz_cards_v2.json` — **130 cards** (40 pilot→v2 + 90 new) · **45 signals** · lint 0 bad tags · dev:32 / design:32 / mkt:33 / text:33 · **→ r8** handoff @lead-architect.
+
+### r8 — Handoff to @lead-architect (→ Coder § O221-QUIZ-ADAPTIVE)
+
+**Файл:** `data/quiz_cards_v2.json` (130 cards, pack_version=v2)
+
+**Что сделать @coder (§ O221-QUIZ-ADAPTIVE):**
+
+| # | Task |
+|---|------|
+| 1 | Extend `QUIZ_SIGNALS` in `quiz_adaptive.py` — add 35 new signals from v2 (see list below) |
+| 2 | Load v2 pack: `_load_json_cards("quiz_cards_v2.json")` — merge alongside v2-pilot (or replace) |
+| 3 | `_pick_json_candidate`: pick by signal, shuffle candidates, skip shown_ids |
+| 4 | CI: `tests/test_quiz_coverage.py` — every Tier-A tag ∈ ≥2 anchor cards · every P0 tag reachable |
+| 5 | Deploy: `quiz_adaptive.py` + `quiz_cards_v2.json` → VPS `/opt/rawlead/` · restart `rawlead-api` |
+
+**New signals to add to `QUIZ_SIGNALS` (v2 additions):**
+```
+dev: server_administration, javascript, web_scraping, tilda_dev,
+     ecommerce_dev, data_analysis, llm_integration, html_css,
+     telegram_bot_dev
+design: presentation_design, threed_modeling, infographic_design,
+        illustration, motion_design, web_design, figma
+marketing: marketplace_promotion, chatbot_marketing, web_analytics,
+           google_ads, email_marketing, content_marketing, seo,
+           yandex_direct, technical_seo
+text: translation, transcription, product_description, script_writing,
+      seo_copywriting, technical_writing, editing_proofreading,
+      article_writing, copywriting, sales_copywriting
+```
+
+**Acceptance (Coder):**
+- [x] `pytest tests/test_quiz_coverage.py` — Tier-A ≥2 · P0 reachable (**64/64** suite)
+- [x] `pytest tests/test_o197_quiz_adaptive.py` — dev 20-pick ≥12 unique
+- [ ] VPS smoke: owner retake dev → JS/TG leads match **>0%**
+
+### Owner gate — signals v2 (approve before Coder deploy)
+
+Подтверди **да/нет** по строкам «must» из GAPS § Recommended signals v2 · pilot покрывает только **quiz=N + expand=N + P0**:
+
+| niche | pilot signals (10 cards) | closes zero-match tags |
+|-------|--------------------------|------------------------|
+| dev | `server_administration`, `javascript`, `web_scraping`, `tilda_dev` | 7 из 7 critical |
+| design | `presentation_design`, `threed_modeling`, `infographic_design`, `illustration` | 3 must + illustration P0 |
+| marketing | `marketplace_promotion`, `target_ads`, `chatbot_marketing` | marketplace must + target frequency |
+| text | `translation`, `transcription`, `product_description` | 3 must (Tier-A translation) |
+
+**Expand-only (не в pilot, owner decide later):** dev `html_css`/`php` ← wordpress_dev · design `motion_design` ← banner_design · marketing `web_analytics` ← seo.
+
+**Coder dependency (r8):** новые `signal` id → расширить `QUIZ_SIGNALS` в `quiz_adaptive.py` **до** lint pilot JSON · иначе `test_o217` падает.
+
+### r6 — Pilot 40 cards · owner spot-check «нет WTF»
+
+Формат = § O217 p3 · `pack_version: "v2-pilot"` · `skills_on_dislike: []` · trap `signal: null`.
+
+| id | type | niche | signal | cx | title | skills_on_like |
+|----|------|-------|--------|----|-------|----------------|
+| qc2_dev_srv_01 | anchor | dev | server_administration | 2 | Настроить VPS под игровой сервер Rust: установка, автозапуск, бэкапы | server_administration |
+| qc2_dev_srv_02 | anchor | dev | server_administration | 3 | Перенести WordPress на новый хостинг: DNS, SSL, миграция БД без даунтайма | server_administration, wordpress_dev |
+| qc2_dev_srv_03 | trap | dev | — | 1 | Написать bash-скрипт парсинга цен конкурентов с маркетплейса | web_scraping, python |
+| qc2_dev_js_01 | anchor | dev | javascript | 2 | Сендер формы на сайте: валидация, отправка в Telegram без перезагрузки | javascript, api_integration |
+| qc2_dev_js_02 | anchor | dev | javascript | 3 | React-лендинг SaaS: адаптив, форма регистрации, интеграция с REST API | javascript, api_integration |
+| qc2_dev_js_03 | boundary | dev↔design | javascript | 2 | Анимированный интерактивный прототип лендинга в Figma + экспорт в HTML/CSS | javascript, ui_ux, figma |
+| qc2_dev_scrape_01 | anchor | dev | web_scraping | 2 | Спарсить каталог товаров конкурента (500 SKU) в CSV для анализа цен | web_scraping, python |
+| qc2_dev_scrape_02 | anchor | dev | web_scraping | 3 | Telethon-бот: мониторинг TG-каналов конкурентов, дайджест новых постов | web_scraping, telegram_bot_dev |
+| qc2_dev_tilda_01 | anchor | dev | tilda_dev | 1 | Собрать лендинг на Tilda по готовому макету: 7 блоков, формы, аналитика | tilda_dev |
+| qc2_dev_tilda_02 | anchor | dev | tilda_dev | 2 | Интернет-магазин на Tilda: каталог 40 позиций, корзина, оплата ЮKassa | tilda_dev, ecommerce_dev |
+| qc2_design_pres_01 | anchor | design | presentation_design | 2 | Pitch deck для инвесторов IT-стартапа: 15 слайдов, единый визуальный стиль | presentation_design |
+| qc2_design_pres_02 | anchor | design | presentation_design | 1 | Оформить презентацию для вебинара (40 слайдов) по брендбуку заказчика | presentation_design, brand_identity |
+| qc2_design_pres_03 | trap | design | — | 1 | Написать текст выступления спикера к готовым слайдам вебинара | script_writing, copywriting |
+| qc2_design_3d_01 | anchor | design | threed_modeling | 2 | 3D-модель упаковки косметики для рендера на маркетплейс (Blender) | threed_modeling |
+| qc2_design_3d_02 | anchor | design | threed_modeling | 3 | Low-poly 3D-сцена для мобильной игры: 5 объектов, UV, текстуры | threed_modeling |
+| qc2_design_3d_03 | trap | design | — | 1 | Смонтировать 3D-обзор продукта из готовых рендеров в 60-сек видео | video_editing, motion_design |
+| qc2_design_info_01 | anchor | design | infographic_design | 2 | Инфографика для карточки товара на WB: преимущества, размерная сетка | infographic_design |
+| qc2_design_info_02 | anchor | design | infographic_design | 2 | Серия из 5 инфографик для Ozon: сравнение с конкурентами, USP | infographic_design, banner_design |
+| qc2_design_ill_01 | anchor | design | illustration | 2 | Иллюстрации для детской книги: 8 разворотов, единый стиль персонажей | illustration |
+| qc2_design_ill_02 | anchor | design | illustration | 1 | Апскейл и ретушь фотографий товаров для каталога (batch 50 шт.) | illustration |
+| qc2_mkt_mp_01 | anchor | marketing | marketplace_promotion | 2 | Вывести 20 SKU на Ozon: карточки, SEO-поля, ставки, аналитика продаж | marketplace_promotion |
+| qc2_mkt_mp_02 | anchor | marketing | marketplace_promotion | 3 | Стратегия продвижения на Wildberries: внутренняя реклама + акции + A/B фото | marketplace_promotion |
+| qc2_mkt_mp_03 | trap | marketing | — | 1 | Сверстать HTML-шаблон email-рассылки для базы подписчиков | email_marketing |
+| qc2_mkt_tads_01 | anchor | marketing | target_ads | 2 | Таргет VK Ads для онлайн-школы: 3 креатива, lookalike, пиксель | target_ads |
+| qc2_mkt_tads_02 | anchor | marketing | target_ads | 2 | Meta Ads (Instagram/Facebook) для e-commerce: ROAS-оптимизация, 5 ad set | target_ads, smm |
+| qc2_mkt_tads_03 | boundary | marketing↔design | target_ads | 1 | Подготовить 10 креативов для таргета: баннеры + тексты по ТЗ маркетолога | target_ads, banner_design |
+| qc2_mkt_bot_01 | anchor | marketing | chatbot_marketing | 2 | Воронка Salebot: квиз → сегментация → рассылка оффера в Telegram | chatbot_marketing, email_marketing |
+| qc2_mkt_bot_02 | anchor | marketing | chatbot_marketing | 2 | Senler-бот для VK-сообщества: автоответы, сбор заявок, интеграция с CRM | chatbot_marketing |
+| qc2_mkt_bot_03 | anchor | marketing | chatbot_marketing | 3 | Чат-бот поддержки на сайте: FAQ, передача оператору, сбор NPS | chatbot_marketing, api_integration |
+| qc2_mkt_bot_04 | trap | marketing | — | 1 | Написать 10 SEO-статей для блога интернет-магазина | seo_copywriting, article_writing |
+| qc2_text_tr_01 | anchor | text | translation | 2 | Редакционный перевод EN→RU IT-документации (API guide, 40 стр.) | translation, technical_writing |
+| qc2_text_tr_02 | anchor | text | translation | 2 | Перевод маркетинговых материалов RU→EN: лендинг + 5 email-писем | translation, copywriting |
+| qc2_text_tr_03 | boundary | text↔marketing | translation | 2 | Локализация рекламных креативов для выхода на рынок Казахстана | translation, target_ads |
+| qc2_text_tr_04 | trap | text | — | 1 | Вычитать русский текст лендинга без перевода с другого языка | editing_proofreading |
+| qc2_text_transcr_01 | anchor | text | transcription | 1 | Транскрибация 90-мин вебинара: таймкоды, спикеры, выделение action items | transcription |
+| qc2_text_transcr_02 | anchor | text | transcription | 2 | Расшифровка 20 подкаст-эпизодов + саммари ключевых тезисов для блога | transcription, article_writing |
+| qc2_text_transcr_03 | trap | text | — | 1 | Написать сценарий подкаста на основе расшифровки интервью | script_writing |
+| qc2_text_pd_01 | anchor | text | product_description | 2 | Описания 100 товаров для Ozon/WB: SEO-ключи, УТП, без воды | product_description, seo_copywriting |
+| qc2_text_pd_02 | anchor | text | product_description | 1 | Карточки товаров для интернет-магазина мебели: характеристики + продающий текст | product_description |
+| qc2_text_pd_03 | boundary | text↔design | product_description | 2 | Тексты для карточек маркетплейса + ТЗ дизайнеру на инфографику блоков | product_description, infographic_design |
+
+**Acceptance r6:**
+- [x] Owner: signals v2 gate **approve** (owner **2026-06-15**)
+- [x] Owner: pilot 40 spot-check **«принимаю pilot»** (owner **2026-06-15**)
+- [x] PM: все tags ∈ `CANONICAL_TAGS` (Lead verify **2026-06-15** — 33 tags, 0 bad)
+- [x] Lead: **40** cards · **10/ниша** · design/marketing/text P0 critical ✅ · dev **5/7** critical signals (→ r7: `data_analysis`, `llm_integration`)
+
+**После r6:** **→ r7** ~130 cards (@lead-product) · **→ r8** `@coder` § **O221-QUIZ-ADAPTIVE** (pilot JSON + `QUIZ_SIGNALS` — **unblocked**).
+
+---
+
+## § O221-QUIZ-POOL-V2 — (merged → § O221-QUIZ-COVERAGE выше)
+
+*Legacy name · см. § O221-QUIZ-COVERAGE.*
+
+**Owner pain:** «шёл в разработку» → лид «JS + TG-бот» **0%** · в квизе **одно и то же** · профиль не покрывает реальные заказы.
+
+**Root (Lead verify):**
+
+| # | Факт |
+|---|------|
+| 1 | Пак **v1 = 56** карточек (14/ниша) — MVP pilot, не полный охват каталога |
+| 2 | Dev signals **только 3:** python · wordpress_dev · api_integration — **`javascript` нет в квизе** |
+| 3 | `telegram_bot_dev` — **1** boundary-карточка; типичный dev-профиль после квиза = python/wp/api |
+| 4 | Match `lead_coverage_match`: лид с `javascript` + `telegram_bot_dev` vs профиль без них → **0%** (ожидаемо при текущем паке) |
+| 5 | Повторы: dedup-баг O220-QUIZ-DEDUP + `_query_card_json` берёт `candidates[0]` — мало вариантов на signal |
+
+**PM deliverables (v2):**
+
+| # | Артефакт |
+|---|----------|
+| p0 | **Gap audit:** top-20 dev lead_tags на prod (YouDo/FL) vs `skills_on_like` v1 → список **missing signals** |
+| p1 | **Расширить signals dev** (owner+PM): минимум **`javascript`**, **`telegram_bot_dev`** (+ php/html_css по audit) — правка § O217-w таблицы |
+| p2 | **Матрица v2:** **≥8–12 anchor/signal** · **≥6 trap+boundary/niche** · target **~120–160** cards · `pack_version: "v2"` |
+| p3 | **Карточки под реальные паттерны:** TG-бот · парсер · GAS · React-лендинг · CRM-интеграция · не только python/wp |
+| p4 | Pilot **30** owner spot-check → Coder lint + deploy |
+
+**Coder (после PM pilot):** `CODER_PROMPT` § **O221-QUIZ-ADAPTIVE** — niche-deep pick · shuffle candidates · dedup strings.
+
+**→ @lead-architect:** после p0 audit — очередь Coder.
+
+---
+
+## § O220-MATCH-PM — низкий % совместимости после квиза (**✅ решение owner 2026-06-14**)
+
+**Канон:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md) § **O220-w п.1** · `CODER_PROMPT` § O220-MATCH-PM  
+**Параллельно:** Coder § O220-FEED-DRAFT-UX (r0 замок до квиза — **PM не блокирует**)
+
+---
+
+### Диагноз (из Neon + rank.py · 2026-06-14)
+
+**Neon prod: 2264 видимых лида**
+
+| Метрика | Факт |
+|---------|------|
+| Лидов с тегами | **90%** (10% без тегов → B) |
+| Среднее тегов на лид | **1.8** ← корень проблемы |
+| 1–2 тега на лид | **78% всех лидов** |
+| Топ-тег (api_integration) | только **8.8%** ленты — лента очень разнородная |
+
+**Почему 8% после квиза:**
+
+| # | Причина |
+|---|---------|
+| P1 | **Формула user-side precision** — `Σ(weight×match)/Σ(weight)` = «сколько ВСЕХ моих навыков есть в лиде»; при 4 тегах у пользователя и 1 теге у лида (даже совпавшем) → **25%** максимум |
+| P2 | **Мало тегов у лидов** — 1.8 avg; лид с 1 тегом физически не может дать >33–50% |
+| P3 | **Лиды без тегов** — 10% (217 шт) → `rank.py:112` возвращает 0 немедленно |
+| P4 | **Узкий профиль** — 10 карточек квиза дают 2–3 тега, знаменатель мал |
+
+**Потолок без изменений:** ≈ 40–50% даже на идеальных лидах при текущем 1.8 тегов/лид.  
+**Цель:** 70–90% на релевантных лидах в топе ленты.
+
+---
+
+### ✅ Решение owner: A + B + C + D + E + F (все леверы)
+
+#### A — Умные подписи вместо сырых цифр (JS/copy, rank.py не трогать)
+
+| raw % | Сейчас | После |
+|-------|--------|-------|
+| lead без тегов | «0%» | нейтральная серая полоска, без числа |
+| 1–24% | «8% совместимости» | «Не ваша ниша» (amber) |
+| 25–59% | «40% совместимости» | «Частичное совпадение · 40%» |
+| 60%+ | «73%» | «Хорошее совпадение · 73%» |
+
+**Copy breakdown (при клике «?»):**  
+> «% — сколько ваших навыков востребовано в этом заказе. Нет тегов или другая ниша — полоска без числа.»
+
+**Файлы:** `rawlead-feed.js` · `rawlead-cabinet.js` · CSS
+
+---
+
+#### B — Лид без тегов → `None`, не 0% (одна строка rank.py)
+
+`keyword_match()`: если `not lead_set` → вернуть `None` (не `0`).  
+JS: `null` = серая полоска «–», не «0%».  
+**Файлы:** `src/rank.py` · `tests/test_match_push.py` · JS
+
+---
+
+#### C — Квиз 13–15 карточек (шире профиль)
+
+Было 10 → станет 13–15 карточек в первом квизе. Никакого «второго этапа» — просто первый квиз длиннее.  
+Профиль: 3–5 тегов вместо 2–3.  
+**Файлы:** `src/quiz_adaptive.py` (порог завершения) · `rawlead-quiz.js`
+
+---
+
+#### D — Формула Lead-Coverage Match (лид определяет знаменатель)
+
+**Проблема текущей формулы:** знаменатель = сумма весов ВСЕГО профиля пользователя → лишние навыки штрафуют. Пользователь с `{python, fastapi, figma, copywriting}` на лид `[python, fastapi]` получает **60%** вместо **100%**.
+
+**Правило (owner 2026-06-14):**
+> «Если у пользователя есть все что нужно лиду — должно быть 100%, лишние навыки не должны влиять.»
+
+**Новая формула:**
+```
+score = Σ(user_weight[tag] for tag in lead_tags if user_has(tag))
+      / Σ(max(user_weight[tag], REF_W) for tag in lead_tags)
+      × 100
+```
+- Знаменатель = только теги **лида** (не весь профиль)
+- `REF_W` = reference weight (≈ 4.0) для тегов лида которых у пользователя нет совсем
+- Лишние навыки пользователя → **не влияют**
+
+**Примеры:**
+
+| Профиль пользователя | Теги лида | Score |
+|----------------------|-----------|-------|
+| `{python:8, fastapi:4, figma:2, copywriting:2}` | `[python, fastapi]` | **100%** ✅ |
+| `{python:8, django:4}` | `[python, fastapi]` | **67%** — нет fastapi |
+| `{python:4}` | `[python, fastapi]` | **50%** — только половина |
+| `{figma:6}` | `[python, fastapi]` | **0%** → «–» |
+
+**Узкие навыки весят больше:** частично решается через квиз — частые свайпы fastapi-задач → вес fastapi растёт. Полная IDF-рарность — отдельная задача после запуска.
+
+**Файлы:** `src/rank.py` (новая функция `lead_coverage_match`) · `tests/test_match_push.py`  
+**Не ломает:** текущую `keyword_match` — добавляется рядом; `api_server.py` переключается на новую.
+
+---
+
+#### E — Больше тегов у лидов (fix промпта L1)
+
+Сейчас L1 извлекает 1.8 тега в среднем. Нужно 3–4.  
+**Правка:** в промпт L1 добавить полный список CANONICAL_TAGS (51 тег) + инструкцию «от 2 до 5 тегов, не меньше».  
+**Эффект:** новые лиды сразу богаче; ретегирование 2264 существующих — опционально (отдельный скрипт).  
+**Файлы:** `src/ai_enricher.py` или где L1-промпт · `tests/`
+
+---
+
+#### F — Карта синонимов (скрытые теги, без AI)
+
+Статический словарь в `rank.py`: если у лида есть тег X → для расчёта матча добавить Y, Z (пользователь не видит, только match-алгоритм).
+
+```
+wordpress_dev  → [html_css, php]
+python         → [api_integration]
+smm            → [content_marketing]
+ui_ux          → [figma, brand_identity]
+video_editing  → [motion_design]
+seo            → [content_marketing, article_writing]
+copywriting    → [content_marketing, smm, sales_copywriting]
+article_writing → [technical_writing, seo_copywriting, seo]
+```
+
+**Надёжнее AI:** не галлюцинирует, работает на всех текущих лидах сразу, без переинжестирования.  
+**Файлы:** `src/rank.py` (`TAG_SYNONYMS` dict) · `tests/test_match_push.py`
+
+---
+
+### Покрытие по нишам (Neon prod · 2026-06-14 · 2255 visible leads)
+
+| Ниша | Лидов с % | % ленты | Без «–» |
+|------|-----------|---------|---------|
+| **Design** | 734 | **33%** ✅ | норм |
+| **Dev** | 562 | **25%** ✅ | норм |
+| **Marketing** | 369 | **16%** ⚠️ | терпимо |
+| **Text** | 132 | **6%** ❌ | мало |
+| Без ниши вообще | 461 | 20% | «–» всем |
+
+**⚠️ ops-note (не для пользователей):** текстовая ниша слабо представлена в ленте (FL/Kwork дают мало чистых copywriting/article_writing лидов). Копирайтеры после квиза увидят «–» на ~90% карточек. С синонимами F: +~150 лидов из marketing → итого ~280 (12%) — лучше, но всё равно мало. Владелец: наполнять text-нишу активно не планируем на старте — аудитория «против AI», в ленте её мало органически. Приоритет — dev + design + marketing.
+
+---
+
+### Ожидаемый результат после A–F
+
+| Состояние | Топ-лид в ленте |
+|-----------|----------------|
+| Сейчас | 8% среднее · ≤40% на лучших |
+| После A+B | те же % · UI стал понятным |
+| После D+F | **70–90%** на релевантных лидах |
+| После E | ещё +10–20% coverage за счёт богатых тегов у новых лидов |
+
+---
+
+### Приоритет и порядок
+
+| Приоритет | Что | Эффект |
+|-----------|-----|--------|
+| **P0** | A + B | UX-чистота сразу |
+| **P0** | D + F | 70–90% на топе ленты — **главное** |
+| **P1** | E (промпт L1) | Богаче теги на новых лидах |
+| **P2** | C (квиз 13–15) | Шире профиль, умеренный эффект |
+
+---
+
+### Handoff → @lead-architect
+
+```
+@lead-architect
+PM § O220-MATCH-PM ✅ owner OK: все A–F · LEAD_PRODUCT_PROMPT.md § O220-MATCH-PM
+Нужно: CODER_PROMPT § O220-MATCH-CODE
+Приоритет: B+D+F = P0 · E = P1 · C = P2 · A-min (скрыть «0%» → «–») = P0
+D = новая функция lead_coverage_match (знаменатель = теги лида, не весь профиль); api_server переключается на новую; текущую keyword_match не удалять
+Text-ниша: low priority на старте (6% ленты); синонимы F покрывают через marketing
+```
+
+---
+
+## § O217-QUIZ-SYNTHETIC-PACK — авторские карточки квиза (**→ now · owner 2026-06-14**)
+
+**Канон:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md) § **O217-w** · файл (Coder): `data/quiz_cards_v1.json`
+
+**p0 — Аудит каталога v0.5 vs 12 quiz-signals:** все 12 ∈ CANONICAL_TAGS · новых тегов не нужно · `pending_tags` не задействован.
+
+| signal | tag | tier | | signal | tag | tier |
+|--------|-----|------|-|--------|-----|------|
+| python | `python` | A ✅ | | smm | `smm` | A ✅ |
+| wordpress_dev | `wordpress_dev` | A ✅ | | yandex_direct | `yandex_direct` | A ✅ |
+| api_integration | `api_integration` | A ✅ | | seo | `seo` | A ✅ |
+| ui_ux | `ui_ux` | A ✅ | | copywriting | `copywriting` | A ✅ |
+| video_editing | `video_editing` | B ✅ | | article_writing | `article_writing` | A ✅ |
+| brand_identity | `brand_identity` | L3→logo_design ✅ | | editing_proofreading | `editing_proofreading` | A ✅ |
+
+**p1 — Schema:** → `OWNER_INTENT.md` § O217-w · `pack_version: "v1"`
+
+**p2 — Матрица пула v1 (~56 карточек):** 4 ниши × (8 anchor + 2 boundary + 4 trap) = 14/нише · Граничные пары: dev↔design · dev↔text · design↔marketing · marketing↔text
+
+**p3 — Pilot 20 карточек · owner spot-check «нет WTF»**
+
+| id | type | niche | signal | cx | title | skills_on_like |
+|----|------|-------|--------|----|-------|----------------|
+| qc_dev_python_01 | anchor | dev | python | 2 | FastAPI-сервис: вебхуки Stripe → запись в PostgreSQL | python, api_integration |
+| qc_dev_wp_01 | anchor | dev | wordpress_dev | 1 | Правки WP-сайта: форма обратной связи + отправка на email | wordpress_dev |
+| qc_dev_api_01 | anchor | dev | api_integration | 2 | amoCRM ↔ Google Sheets: двусторонняя авто-синхронизация сделок | api_integration, python |
+| qc_dev_boundary_01 | boundary | dev↔design | python | 2 | TG-бот для записи клиентов — inline-кнопки строго по Figma-макету | telegram_bot_dev |
+| qc_dev_trap_01 | trap | dev | — | 1 | Написать статью «FastAPI vs Flask»: сравнение с примерами кода | article_writing, technical_writing |
+| qc_design_uiux_01 | anchor | design | ui_ux | 2 | Figma-прототип мобильного приложения доставки еды — 5 экранов | ui_ux, figma |
+| qc_design_video_01 | anchor | design | video_editing | 2 | Смонтировать 10 Reels из raw-видео: субтитры + переходы в бренд-стиле | video_editing |
+| qc_design_brand_01 | anchor | design | brand_identity | 2 | Логотип + фирмстиль (визитки, шаблон презентации) для IT-стартапа | logo_design, brand_identity |
+| qc_design_boundary_01 | boundary | design↔marketing | ui_ux | 1 | Шаблоны Stories и постов Instagram в фирменном стиле компании | banner_design, ui_ux |
+| qc_design_trap_01 | trap | design | — | 1 | Нарисовать схему архитектуры микросервисов для техдокументации | technical_writing |
+| qc_mkt_smm_01 | anchor | marketing | smm | 2 | Вести SMM в ВК и TG: контент-план + 15 постов/месяц | smm, content_marketing |
+| qc_mkt_direct_01 | anchor | marketing | yandex_direct | 2 | Яндекс Директ для интернет-магазина: ключи, группы, ставки, UTM | yandex_direct |
+| qc_mkt_seo_01 | anchor | marketing | seo | 3 | SEO-аудит + семантическое ядро + рекомендации по структуре (50+ стр.) | seo, technical_seo |
+| qc_mkt_boundary_01 | boundary | marketing↔text | seo | 2 | 5 SEO-статей для блога строительной компании — ключи и структура даны | seo_copywriting, article_writing |
+| qc_mkt_trap_01 | trap | marketing | — | 1 | Нарисовать макет email-рассылки в Figma (HTML не нужен) | ui_ux, figma |
+| qc_text_copy_01 | anchor | text | copywriting | 2 | Продающий лендинг для онлайн-курса: структура + полный текст | copywriting, sales_copywriting |
+| qc_text_article_01 | anchor | text | article_writing | 1 | 5 экспертных статей для Хабра о Python-экосистеме, от 3000 слов | article_writing, technical_writing |
+| qc_text_edit_01 | anchor | text | editing_proofreading | 2 | Редактура и корректура White Paper (30 стр.) по финтех-продукту | editing_proofreading |
+| qc_text_boundary_01 | boundary | text↔dev | article_writing | 2 | Документация для REST API: OpenAPI-спека + руководство разработчика | technical_writing, article_writing |
+| qc_text_trap_01 | trap | text | — | 1 | Собрать семантическое ядро в Key Collector — 200 ключей по нише | seo, technical_seo |
+
+**p4 — Правила весов** (per TINDER-ONBOARD): «Взял бы» → `skills_on_like[]: weight += 2.0, interaction_count += 1` · «Не моё» → `weight -= 1.0` · `skills_on_dislike[] = []` для v1 · boundary начисляет обеим нишам, лента ранжирует сама.
+
+**p5 — Adaptive O197 без изменений.** Меняется только источник: `Neon raw_leads → quiz_cards_v1.json` (статичный JSON, загружается при старте API).
+
+**Acceptance:**
+- [x] Owner spot-check pilot 20 → **«принимаю»** owner 2026-06-14
+- [x] PM spec p0–p5 · pilot table 20 · matrix ~56 — **Lead verify 2026-06-14**
+- [ ] `data/quiz_cards_v1.json` — Coder: 56 карточек, all tag_id ∈ CANONICAL_TAGS (CI lint)
+- [ ] `POST /v1/quiz/next` source = JSON, not Neon · deprecate `quiz_pool_allowlist.json`
+
+**Handoff → @lead-architect:**
+```
+@lead-architect
+PM pilot ✅ (после owner spot-check): LEAD_PRODUCT_PROMPT.md § O217-QUIZ-SYNTHETIC-PACK
+Нужно: CODER_PROMPT § O217-code (swap leads→quiz_cards_v1.json; CI lint tag_id∈CANONICAL_TAGS)
+Deprecate: data/quiz_pool_allowlist.json (после deploy O217)
+```
+
+---
 
 **Ставка:** **B — Открытая площадка + ИИ-агент по подписке** (согласовано в чате `@lead-product` 2026-05-24, замена ставки A)  
 **Vision:** [`PRODUCT_VISION.md`](PRODUCT_VISION.md) **v0.12** (Premium 790 ₽ · O105 · O101)
+
+---
+
+## § O199-ONBOARD-COPY — Quiz-first (**⏸ merged → Design § O209-MATCH-EXPERIENCE**)
+
+Copy на экранах — **не PM**, а **Lead Designer** в единой спеке O209. PM оставляет только product rules ниже.
+
+---
+
+## § O208-MONETIZATION — Лимиты · K · воронка auth (**✅ tier freeze · copy → O209**)
+
+**Канон:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md) § **O208-B** · O101 · O107 · O116 · O174.
+
+**Owner decisions (зафиксировано):**
+- **5 откликов/час** — **все** планы (free, trial, premium). Заменить copy «10/час» в pricing/FAQ/how/home.
+- **L3 judge pilot** → финальное **K** (8–12): после K генераций карточка **исчезает из ленты** для новых (inbox у кого уже есть черновик).
+- **Не показывать на карточке:** просмотры · «осталось N откликов» — только в FAQ/pricing/429.
+
+**PM workshop — воронка (**✅ freeze owner 2026-06-14**):**
+
+| Tier | Delay | Drafts | Push | Match/rank | Quiz | Hourly | Notes |
+|------|-------|--------|------|------------|------|--------|-------|
+| **Anon** | **30 мин** | ❌ | ❌ | **flat** (хронол., без km) | promo CTA | — | supersede O11 15 мин |
+| **Trial** (первый TG-login) | **instant** | ✅ | ✅ | **full personalized** | ✅ learns | **5/h** | auto 3d бесплатно |
+| **Expired-trial / free** | **30 мин** | ❌ | ❌ | **flat** (как anon) | сохранён, не в rank | — | **баннер обязателен** |
+| **Premium** | **instant** | ✅ | ✅ | **full personalized** | ✅ learns | **5/h** | 790₽/мес |
+
+**✅ РЕШЕНО (owner 2026-06-14):**
+- **Auto-trial** при **первом TG-login** → 3 дня бесплатно
+- **Expired-trial = anon-plus-pain:** flat feed + **30 мин** (оба tier одинаково)
+- **Баннер expired** — owner согласен 100% (не тихая деградация)
+- **Supersedes:** O174 1₽ trial · O107 кнопка · O116 free-TG instant
+
+**Quiz-first guard (Coder brief):** flat = km-sort off · min_match ignored · filter bar hidden/disabled · chronological `published_at` desc.
+
+**Deliverables:**
+- [x] Таблица tier × rights — **freeze**
+- [x] Copy/UI — **→ Design § O209** (единый поток)
+- [ ] Опционально: one-liner vision v0.13 «match-first» — после приёмки O209
+
+**Handoff:** `@lead-designer` § **O209-MATCH-EXPERIENCE** → `@designer` → `@coder`
+
+---
+
+## § O171-ADMIN-RESEARCH — Owner Command Center (**✅ w1 shipped · tail w2 `/status` · 2026-06-13**)
+
+**Owner (O171-w 2026-06-10):** лампы врут — YouDo 🟢 при 0 лидов; FL 🟡 когда биржа жива; `/status` и push не дают «что делать» не-программисту. **→ полное переосмысление `/ops/` + FLPARSING-бота.**
+
+**Канон:** [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md) § **O171-w** · **Уже есть:** O121-D ✅ wireframes прокси + mini-nav → **не дублировать**.
+
+**Scope:** только `/ops/` + @FLPARSINGBOT. Публичные карточки/страницы — **другой чат, out of scope**.
+
+---
+
+### JTBD владельца
+
+| # | Работа (Jobs-to-be-done) |
+|---|--------------------------|
+| J1 | Понять за 30 сек с телефона: жив ли радар прямо сейчас |
+| J2 | Разобрать 🟡/🔴: биржа пустая, парсер сломан или фильтр режет |
+| J3 | Получить пуш только при реальном инциденте — не «мусор» |
+| J4 | 0 лидов: найти место обрыва в воронке process→fetch→parsed→new→L1→visible |
+| J5 | Починить без SSH (restart radar/bot, probe proxy, manual delist) |
+
+---
+
+### IA Owner Command Center — 7 блоков
+
+| # | Блок | Зачем |
+|---|------|-------|
+| 1 | **Сводка** | 5 ламп «жив/нет» за 5 сек + суммарный диагноз воронки |
+| 2 | **Биржи** | FL · Kwork · YouDo · secondary: 🟢🟡🔴 + причина + lag мин |
+| 3 | **TG** | acc1/acc2/acc3 join/listen/strikes · Bot API pool O120 failover |
+| 4 | **Прокси** | **→ O121-D ✅ уже есть** — 3 группы; wireframes не трогать |
+| 5 | **Управление** | radar pause/restart · site · delist — KEEP существующий |
+| 6 | **Лиды** | последние N · consumer lag · L1 queue depth |
+| 7 | *(мини-нав)* | Сводка · Биржи · TG · Прокси · Управление · Лиды |
+
+---
+
+### «Ступени правды» per source
+
+```
+process alive → fetch OK → parsed ≥ N → new (дедуп > 0) → L1 done → visible > 0
+```
+
+| Ступень | Метрика | Норма |
+|---------|---------|-------|
+| **process** | radar PID alive · last\_cycle < 15 мин | 🟢 |
+| **fetch** | HTTP 200 / browser OK · retry ≤ 3 | 🟢 |
+| **parsed** | N карточек за цикл | FL ≥ 5 · Kwork ≥ 5 · YouDo ≥ 5 |
+| **new** | parsed − dups | > 0 за 1 ч (норм = пустая биржа) |
+| **L1** | ai\_score присвоен · очередь < 50 | 🟢 |
+| **visible** | `is_visible=true` новых за 24 ч | ≥ 10; иначе 🟡 |
+
+**Диагноз «0 лидов»:** last 🔴 ступень = место обрыва → человеческий текст в блоке Сводка и пуш.
+
+---
+
+### /status + push (FLPARSING-бот)
+
+**/status — структура ответа:**
+```
+📊 Радар: жив · цикл 8 мин назад
+🔴 FL: fetch timeout (3 попытки) → [Проверить прокси FL]
+🟢 Kwork: parsed=12 · new=4 · L1 ok · visible+3
+🟡 YouDo: parsed=0 · fetch ok · нет новых (биржа пустая)
+🟢 TG: acc2 слушает 127 чатов · acc3 join идёт
+🟢 L1: очередь 0 · avg 2.1 с
+```
+
+**Push — только при реальном инциденте:**
+
+| Триггер | Текст | Частота |
+|---------|-------|---------|
+| fetch fail × 3 подряд | `🔴 FL · fetch timeout — проверь прокси` | 1 / 30 мин |
+| visible = 0 и parsed > 0 за 3 ч | `🔴 L1 завис — очередь N, visible 0 за 3 ч` | 1 / 1 ч |
+| radar молчит > 20 мин | `🔴 Радар молчит > 20 мин — перезапусти` | 1 / 20 мин |
+| proxy auto-switch | `FLPARSING · прокси: слот N → слот M` | O120 уже есть |
+
+**Не пушить:** «0 новых» когда биржа пустая (норм), re-check OK, ротация кеша.
+
+---
+
+### Out of scope (O171)
+
+- Публичные страницы, карточки, лента, /quiz/ — **другой чат**
+- CRUD URL прокси — O121-w4
+- TG join CRUD — O121-w3
+- O172-w (Green/Red runbook) — после O171
+
+---
+
+### Acceptance (DoD этого §)
+
+- [x] Wireframes @lead-designer: Сводка + TG · mobile 390
+- [ ] /status формат — **tail w2** (не в w1)
+- [ ] Push-триггеры согласованы — **tail w2**
+- [x] Coder § **O171-OPS-ADMIN-REBUILD** w1 on prod
+
+---
+
+### Handoff → @lead-designer
+
+```
+@lead-designer
+PM spec: LEAD_PRODUCT_PROMPT.md § O171-ADMIN-RESEARCH
+Scope wireframes: (1) Сводка — ступени правды 6 ламп per source (2) TG-блок acc + Bot API pool
+Mobile 390: обязательно — владелец чинит с телефона
+Не трогать: Прокси (O121-D ✅) · Управление · Лиды
+```
 
 ---
 
@@ -24,7 +612,7 @@
 ↓
 Промо-полоса: «Настрой ленту под себя — пройди тест (2 мин) →» [/quiz/]
 ↓
-/quiz/ — 12 карточек Тиндера (анонимно, без регистрации)
+/quiz/ — адаптивный тест (6–20 карточек, анонимно, без регистрации)
 ↓
 Экран результата: «Твой профиль: Дизайн + Видео · ~100 подходящих заказов в неделю»
 ↓
@@ -39,40 +627,143 @@ Premium: мгновенно + ИИ-отклики + push
 
 ---
 
-### /quiz/ — страница теста
+### /quiz/ — страница теста (Adaptive Pool · O197-w · 2026-06-13)
+
+> **Supersedes:** предыдущая версия «ровно 12 карточек (3×4)». Принято owner 2026-06-13 через § O197-w.
 
 **URL:** `/quiz/` (новая страница WP)
 
 **Механика:**
-- 12 карточек Тиндера — берутся из реальных лидов базы Neon (`is_visible=true`)
 - Кнопки: **«Взял бы» / «Не моё»** (или swipe)
-- Прогресс-бар: «3 из 12»
+- Прогресс-бар: «6 из ?» (верхняя граница не показывается — убирает давление «ещё N штук»)
 - Нет возврата к предыдущей карточке
 - Бюджет и источник скрыты — решение только по сути задачи
 
-**Состав 12 карточек (3 на нишу × 4 ниши):**
+---
 
-| # | Ниша | Теги-сигнал |
-|---|------|-------------|
-| 1–3 | Dev | python/bot, wordpress, api_integration |
-| 4–6 | Design | ui_ux, video_editing/motion, brand_identity |
-| 7–9 | Marketing | smm, yandex_direct/target_ads, seo |
-| 10–12 | Text | copywriting, article_writing, editing_proofreading |
+#### Адаптивный пул (O197-w)
 
-**Карточки берутся из живых лидов** — не выдуманные примеры. Критерии выборки для Coder: `is_visible=true, category=X, ai_score >= 60, ORDER BY created_at DESC LIMIT 3 per category`. Бюджет и source убираем из отображения.
+**Размер:**
 
-**Экран результата:**
+| Параметр | Значение | Обоснование |
+|----------|----------|-------------|
+| **Min (early stop)** | **6 карточек** | ниже — данных не хватает даже при явном профиле |
+| **Default (normal stop)** | **10–12 карточек** | типичный случай |
+| **Max (forced stop)** | **20 карточек** | при очень неясном стеке; больше — усталость |
 
+**Выборка из Neon:**
+- `is_visible=true, ai_score >= 60, created_at > NOW() - 30 days`
+- По каждой нише — отдельный pool: Dev / Design / Marketing / Text
+- Pool обновляется при каждой сессии (живые лиды, не кешированные ID)
+- Бюджет и source — не отображаем
+
+---
+
+#### Алгоритм ветвления
+
+**Confidence per ниша:**
+
+| Событие | Δ confidence ниши карточки |
+|---------|---------------------------|
+| «Взял бы» | **+2** |
+| «Не моё» | **-1** |
+
+Начало = 0 для каждой ниши (Dev, Design, Marketing, Text).
+
+**Фаза 1 — Intro (карточки 1–4):** по одной из каждой ниши, порядок перемешан — разведка всех четырёх направлений. Не пропускаем нишу, даже если пользователь не «зажигается».
+
+**Фаза 2 — Exploit + cross-check (карточки 5+):**
+- Если **только один** профиль ≥ 2, остальные ≤ 0 → чистый exploit: следующие карточки из лидера
+- Если **два или более** профиля ≥ 1 → **чередуем 2:1**: 2 карточки из лидера, 1 из второго. Цель: честно проверить, не «случайный лайк» ли второй профиль. Так выявляем комбинированные стеки (Text + Dev, Design + Marketing).
+
+**Фаза 3 — Probe (при неопределённости):** если после 10 карточек ни одна ниша не достигла порога — продолжаем, пробуем карточки с другими signal-тегами внутри топ-2 ниш (уточнение стека внутри ниши).
+
+> **Принцип:** алгоритм не форсирует выбор «одной правильной» ниши — комбинированный стек (копирайтер+питон, дизайнер+таргет) — валидный результат, не ошибка.
+
+---
+
+#### Stop rules
+
+| Условие | Порог | Действие |
+|---------|-------|----------|
+| **Early stop** | ≥ 6 показано · одна ниша ≥ 4 · все остальные ≤ 0 | → стоп (чёткий одиночный профиль) |
+| **Normal stop** | ≥ 10 показано · Σ(ниши с confidence ≥ 2) стабилизировался последние 2 карточки | → стоп |
+| **Forced stop** | 20 показано | → стоп всегда |
+| **Null stop** | ≥ 10 показано · все ниши ≤ 0 | → «не нашли профиль» экран |
+
+**«Стабилизировался»** = множество ниш с confidence ≥ 2 не изменилось за последние 2 ответа. Это универсальный критерий: работает для 1, 2, 3 и 4 активных ниш одинаково.
+
+> **Ключевое:** алгоритм не знает заранее, сколько профилей у пользователя. Он просто останавливается, когда картина перестаёт меняться — будь то 1 ниша или все 4.
+
+---
+
+#### API (stateless — no Redis session)
+
+Сервер не хранит state сессии. Вся история передаётся клиентом в каждом запросе.
+
+| Эндпоинт | Запрос | Ответ |
+|----------|--------|-------|
+| `POST /v1/quiz/next` | `{history: [{card_id, liked, tags: [...]}]}` | `{card: {...}, done: false}` или `{done: true, profile: {...}}` |
+| `GET /v1/quiz/start` | — | первая карточка (история пуста) |
+
+**Deterministic algorithm на сервере:** confidence считается из переданной истории; нет хранимого state на сервере.
+
+**localStorage schema:**
+```json
+{
+  "rawlead_quiz_session": {
+    "history": [{"card_id": "...", "liked": true, "tags": ["ui_ux", "figma"]}],
+    "started_at": "ISO"
+  }
+}
 ```
-Твой профиль:
-🎨 Дизайн (лайков: 3)
-📹 Видео (лайков: 2)
+После TG login: JS POST `/v1/me/tags/import` → импорт в `user_tags` → localStorage чистится.
 
-~100 подходящих заказов в неделю
+---
 
-[Войти через Telegram и открыть ленту →]
-[Посмотреть ленту без настройки →] (мелко)
-```
+#### Экран результата
+
+Алгоритм универсальный — работает для любого числа ниш (0, 1, 2, 3, 4) без хардкода кейсов.
+
+**Правило отображения:**
+
+Берём все ниши с confidence ≥ 2 → показываем их в порядке убывания. Называем «профиль». Нет хардкода «только 1» или «только 2».
+
+| Ситуация | Copy | CTA |
+|----------|------|-----|
+| **1 ниша ≥ 2** | «Твой профиль: 🎨 Дизайн (~N заказов/нед)» | «Войти → открой свою ленту» |
+| **2 ниши ≥ 2** | «Твой профиль: ✍️ Тексты + 💻 Разработка (~N заказов/нед)» | то же |
+| **3+ ниши ≥ 2** | «Широкий профиль: [Ниша1], [Ниша2], [Ниша3] — лента покажет заказы из нескольких направлений (~N заказов/нед)» | то же |
+| **Все ниши ≤ 0** (ничего не понравилось) | «Пока не нашли конкретного профиля — посмотри весь поток» | «Смотреть ленту →» + «Пройти снова» |
+
+**Важно:** «Широкий профиль» и «ничего не понравилось» — принципиально разные вещи. Широкий → теги импортируются из всех ниш, лента богатая. Null → профиля нет, лента без персонализации.
+
+**N заказов в неделю** — сумма `is_visible=true` за 7 дней по всем нишам с confidence ≥ 2. Для text отображаем честно (~30/нед).
+
+**Вторая кнопка** (мелко): «Посмотреть ленту без настройки →»
+
+---
+
+#### Import в user_tags — универсальный
+
+При POST `/v1/me/tags/import` → в `user_tags` попадают **теги всех карточек с `liked=true`**, вне зависимости от ниши. Алгоритм выбора «одного профиля» не нужен — лента сама ранжирует по весам.
+
+Примеры:
+- Маркетинг + Тексты → `smm`, `copywriting`, `yandex_direct`, `article_writing` — все с весом
+- Питон + Дизайн → `python_bot`, `api_integration`, `ui_ux`, `figma`
+- Питон + Маркетинг + Тексты → все три пула тегов
+- Универсал (все 4 ниши) → все теги лайкнутых карточек из всех ниш
+
+Лента после логина автоматически показывает заказы из всех «понравившихся» направлений — не нужно выбирать «главный» профиль.
+
+---
+
+#### Прогресс-бар UX
+
+Вместо «3 из 12» — индикатор без верхней границы:
+- **«Ещё пара карточек»** — если до early stop осталось ≤ 2
+- **«Почти готово»** — после 10 карточек
+- Без цифры max — пользователь не видит «конец»
 
 ---
 
@@ -103,8 +794,9 @@ ALTER TABLE user_tags
 | Тиндер: «Взял бы» | все теги карточки: `weight += 2.0`, `interaction_count += 1` |
 | Тиндер: «Не моё» | все теги карточки: `weight -= 1.0` |
 | Отклик «Написать отклик» | все теги: `weight += 3.0`, `interaction_count += 2` |
-| Expanded card без отклика | все теги: `weight += 0.1` |
-| Карточка показана 20+ раз без действия | теги: `weight -= 0.05` |
+| Раскрыл карточку (warm/expand) | все теги: `weight += 0.1` (интерес) |
+| Раскрыл, **не** откликнулся (свернул / ушёл) | теги лида: `weight −0.05` · `expand_no_reply` · **не** за scroll collapsed |
+| ~~Карточка 20+ показов~~ | superseded → только expand без отклика (owner 2026-06-15) |
 | Удалил отклик из inbox | теги: `weight -= 0.5` |
 
 **Scoring обновлённый (`final_rank`):**
@@ -172,15 +864,17 @@ effective_weight = weight * decay_factor
 
 ---
 
-### Acceptance (DoD этого §)
+### Acceptance (DoD этого §) — обновлено O197-w 2026-06-13
 
-- [ ] `/quiz/` — страница с 12 карточками (реальные лиды), swipe/кнопки, прогресс, результат
+- [ ] `/quiz/` — adaptive quiz (6–20 карточек), pool из Neon по нишам, ветвление по confidence, early/normal/forced stop
+- [ ] `/v1/quiz/start` + `POST /v1/quiz/next` (stateless, history в body) — deterministic algorithm
+- [ ] Прогресс-бар без верхней границы (без «из N»)
+- [ ] Экран результата: один лидер / два лидера / null — показывает нишу + объём лидов из Neon за 7 дней
 - [ ] Анон `/lenta/` — фильтры disabled до теста, промпт «Настроить ленту →»
 - [ ] `user_tags` — добавлены `last_active_at`, `interaction_count`
 - [ ] `/v1/me/tags/import` — endpoint для импорта localStorage-профиля
 - [ ] `/v1/feed` — keyword_match считается с весами (не бинарно)
 - [ ] Decay — реализован в Python, не в SQL
-- [ ] Экран результата теста — показывает нишу + примерный объём лидов
 
 ---
 
@@ -188,11 +882,12 @@ effective_weight = weight * decay_factor
 
 ```
 @lead-architect
-Новая продуктовая концепция: LEAD_PRODUCT_PROMPT.md § TINDER-ONBOARD
+Продуктовая концепция обновлена (O197-w 2026-06-13): LEAD_PRODUCT_PROMPT.md § TINDER-ONBOARD
 Нужно:
-1. CODER_PROMPT § для новой страницы /quiz/ + изменений /lenta/ фильтров + схемы user_tags
-2. Оценка по стеку: новая страница WP + Python API endpoint /v1/me/tags/import
-3. Приоритет по ROADMAP относительно текущих задач
+1. CODER_PROMPT § для /quiz/ adaptive (stateless API /v1/quiz/start + /v1/quiz/next, pool из Neon, confidence algorithm)
+2. Изменения /lenta/ фильтров (disabled до теста) + схема user_tags (last_active_at, interaction_count)
+3. O195-w1b ⏸ hold — НЕ деплоить 12-карточечный вариант; ждём adaptive
+4. Приоритет по ROADMAP: O195-w1b → заменить на O197-adaptive
 ```
 
 ---
@@ -881,12 +1576,13 @@ TON:
 
 ### O96-Z4 — Skill Tree sheet (⚙, cabinet + lenta)
 
-| Элемент | Канон O96 |
+> **⚠️ Superseded owner 2026-06-15** — manual picker снят · quiz-first · **нет** лимита 12 · канон → `feed-cabinet-mvp` §0.1 · `PRODUCT_CANON` §4.
+
+| Элемент | Канон O96 (archive) |
 |---------|-----------|
-| Заголовок | **«Навыки»** |
-| Счётчик (0–6) | **«Выбрано N / 12»** |
-| Hint (7–11) | **«Слишком широко — match упадёт. Оставь 6–8 ключевых.»** |
-| Лимит (12) | **«Максимум 12 — сними лишние.»** |
+| Заголовок | ~~«Навыки»~~ → квиз / read-only профиль |
+| Счётчик | ~~«Выбрано N / 12»~~ — **removed** |
+| Hint / лимит 12 | **removed** |
 | Subhead Разработка гр. 1 | **«ПО ЗАДАЧЕ»** |
 | Subhead Разработка гр. 2 | **«ПО ТЕХНОЛОГИИ»** |
 | L3 tray label | **«Уточнение (необязательно)»** |

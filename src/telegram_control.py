@@ -14,7 +14,11 @@ from config import Config, _PROJECT_ROOT
 from tg_proxy_pool import tg_http_request
 from radar_status import format_status_message
 from storage import ProjectStorage
-from match_push import handle_tg_draft_callback, upsert_subscriber_chat_id
+from match_push import (
+    handle_tg_draft_callback,
+    handle_tg_nope_callback,
+    upsert_subscriber_chat_id,
+)
 from premium_pay import (
     handle_owner_pay_callback,
     handle_user_pay_callback,
@@ -865,6 +869,10 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
 
         callback_query = upd.get("callback_query")
         if isinstance(callback_query, dict):
+            if handle_tg_nope_callback(cfg, callback_query, errors):
+                if isinstance(update_id, int):
+                    next_offset = max(next_offset, update_id + 1)
+                continue
             if handle_tg_draft_callback(cfg, callback_query, errors):
                 if isinstance(update_id, int):
                     next_offset = max(next_offset, update_id + 1)

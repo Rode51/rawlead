@@ -25,7 +25,7 @@
 | `main.py` | Цикл FL/Kwork + secondary (O63) |
 | `fl_parser.py`, `kwork_parser.py` | Биржи primary |
 | `youdo_parser.py`, `freelance_ru_parser.py`, `freelancejob_parser.py`, `pchyol_parser.py` | Secondary ingest (O63) |
-| `exchange_browser_fetch.py` | Playwright persistent per proxy slot (O99) |
+| `exchange_browser_fetch.py` | Browser fetch: FL/Kwork Playwright Chromium · **YouDo Camoufox** (subprocess worker) |
 | `exchange_proxy.py` | HTTP proxy pool, per-source bans v2 |
 | `tg_client.py` | Telethon connect |
 | `proxy_probe.py` | TCP probe прокси (fail-closed) |

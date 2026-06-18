@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from config import (
 from radar_status import (
     _pending_join_by_account,
     record_tg_acc_ready,
+    record_tg_listen_stats,
     record_tg_message,
     record_tg_monitor_start,
     record_tg_skip,
@@ -35,7 +37,13 @@ from budget import extract_budget_text_from_post
 from filters import default_listing_filter
 from lead_pipeline import process_new_listing_from_tg, short_err
 from listing import ListingProject, telegram_source
-from public_feed import filter_listen_chat_ids
+from public_feed import (
+    TG_TEST_GROUP_RAW_ID,
+    _chat_id_keys,
+    chat_in_tg_interest_set,
+    filter_listen_chat_ids,
+    tg_test_group_chat_keys,
+)
 from pg_storage import pg_storage_from_config
 from storage import storage_from_config
 from tg_bot_start import ensure_bot_started
@@ -43,11 +51,204 @@ from tg_client import connect_client
 from tg_join_lib import load_chat_registry_from_queue
 
 
+_ACC_PULSE_SEC = 120
+_ACC_DEAF_RECONNECT_SEC = 600
+_TEST_GROUP_INVITE = "https://t.me/+Z7HcnIAdSw9kY2U6"
+
+
 @dataclass
 class _MonitorSession:
     account: str
     client: object
     chat_ids: set[int]
+    file_listen_ids: list[int] = field(default_factory=list)
+    chats_in_file: int = 0
+    chats_filter: int = 0
+    started_at: float = field(default_factory=time.monotonic)
+    last_event_at: float = 0.0
+    handler_registered: bool = False
+
+
+def _test_group_peer_ok(chat_ids: set[int]) -> bool:
+    """True if listen peer set covers owner test group keys (O206-t3b)."""
+    target = tg_test_group_chat_keys()
+    for cid in chat_ids:
+        if _chat_id_keys(cid) & target:
+            return True
+    return False
+
+
+async def _in_test_group_dialogs(client, chat_id: int = TG_TEST_GROUP_RAW_ID) -> bool:
+    """True if test group appears in acc session dialogs (live membership)."""
+    target_keys = _chat_id_keys(chat_id) | tg_test_group_chat_keys()
+    try:
+        async for dialog in client.iter_dialogs(limit=500):
+            if _chat_id_keys(dialog.id) & target_keys:
+                return True
+    except Exception:
+        return False
+    return False
+
+
+async def _ensure_test_group_membership(
+    client,
+    account: str,
+    listen_ids: list[int],
+    chat_ids: set[int],
+    log_path: Path,
+    storage: object,
+) -> None:
+    """Re-join owner test group when listed in file but absent from dialogs (O206-t3b)."""
+    file_has_test = any(
+        _chat_id_keys(cid) & tg_test_group_chat_keys() for cid in listen_ids
+    )
+    if not file_has_test:
+        return
+    if await _in_test_group_dialogs(client):
+        return
+    from tg_join_lib import join_one
+
+    _append_log(
+        log_path,
+        f"{radar_timestamp()} тг:монитор:{account}: test_group re-join",
+    )
+    result = await join_one(client, _TEST_GROUP_INVITE)
+    if not result.ok:
+        detail = f"test_group join_fail: {result.error or 'unknown'}"
+        record_tg_skip(storage, account, detail)
+        _append_log(
+            log_path,
+            f"{radar_timestamp()} тг:монитор:{account}: {detail}",
+        )
+        return
+    already = int(bool(result.already))
+    _append_log(
+        log_path,
+        f"{radar_timestamp()} тг:монитор:{account}: test_group join_ok "
+        f"already={already} chat_id={result.chat_id or '-'}",
+    )
+    test_raw = [
+        TG_TEST_GROUP_RAW_ID,
+        -TG_TEST_GROUP_RAW_ID,
+        int(f"-100{TG_TEST_GROUP_RAW_ID}"),
+    ]
+    if result.chat_id is not None:
+        test_raw.insert(0, int(result.chat_id))
+    _added, skipped = await _add_monitor_peers(
+        client,
+        chat_ids,
+        test_raw,
+        log_path,
+        storage,
+        account=account,
+    )
+    if skipped:
+        _append_log(
+            log_path,
+            f"{radar_timestamp()} тг:монитор:{account}: skip_entity={skipped}",
+        )
+
+
+def _deaf_seconds(sess: _MonitorSession, *, now: float | None = None) -> float:
+    now = time.monotonic() if now is None else now
+    anchor = sess.last_event_at or sess.started_at
+    return max(0.0, now - anchor)
+
+
+def _client_connected(client) -> bool:
+    """Telethon is_connected() is sync — must not await (O206-t3c)."""
+    try:
+        fn = getattr(client, "is_connected", None)
+        if callable(fn):
+            return bool(fn())
+        return False
+    except Exception:
+        return False
+
+
+async def _wake_client_updates(
+    sess: _MonitorSession,
+    log_path: Path,
+    storage: object,
+) -> None:
+    """Reconnect + catch_up so updates flow after restart (O206-t3b)."""
+    account = sess.account
+    client = sess.client
+    try:
+        if not _client_connected(client):
+            await client.connect()
+        catch_up = getattr(client, "catch_up", None)
+        if callable(catch_up):
+            await catch_up()
+        await client.get_me()
+        _append_log(
+            log_path,
+            f"{radar_timestamp()} тг:монитор:{account}:sync ok",
+        )
+    except Exception as exc:
+        detail = f"sync: {short_err(exc)}"
+        record_tg_skip(storage, account, detail)
+        _append_log(
+            log_path,
+            f"{radar_timestamp()} тг:монитор:{account}: {detail}",
+        )
+
+
+async def _reconnect_session(
+    sess: _MonitorSession,
+    log_path: Path,
+    storage: object,
+    *,
+    reason: str,
+    detail: str = "",
+) -> None:
+    """Per-acc reconnect via wake — does not disconnect other accounts (O206-t3c)."""
+    account = sess.account
+    extra = f" {detail}" if detail else ""
+    _append_log(
+        log_path,
+        f"{radar_timestamp()} тг:монитор:{account}:reconnect "
+        f"причина={reason}{extra}",
+    )
+    if reason == "deaf":
+        record_tg_skip(storage, account, f"deaf:{detail}".strip(":"))
+    await _wake_client_updates(sess, log_path, storage)
+
+
+async def _acc_watchdog_loop(
+    sessions: list[_MonitorSession],
+    log_path: Path,
+    storage: object,
+) -> None:
+    """Per-acc pulse + wake when disconnected or deaf (O206-t3c)."""
+    while True:
+        await asyncio.sleep(_ACC_PULSE_SEC)
+        now = time.monotonic()
+        for sess in sessions:
+            account = sess.account
+            connected = _client_connected(sess.client)
+            deaf_sec = int(_deaf_seconds(sess, now=now))
+            _append_log(
+                log_path,
+                f"{radar_timestamp()} тг:пульс:{account} "
+                f"connected={int(connected)} peers={len(sess.chat_ids)} "
+                f"deaf_sec={deaf_sec} handler={int(sess.handler_registered)}",
+            )
+            if not connected:
+                await _reconnect_session(
+                    sess,
+                    log_path,
+                    storage,
+                    reason="disconnect",
+                )
+            elif deaf_sec >= _ACC_DEAF_RECONNECT_SEC:
+                await _reconnect_session(
+                    sess,
+                    log_path,
+                    storage,
+                    reason="deaf",
+                    detail=f"deaf_sec={deaf_sec}",
+                )
 
 
 def _needs_join_bootstrap(
@@ -82,6 +283,31 @@ def _append_join_bootstrap(
     )
 
 
+def _message_chat_listened(message_chat_id: int | None, listen_chat_ids: set[int]) -> bool:
+    """Match Telegram peer ids across -100… / short negative forms (O205-t6)."""
+    if message_chat_id is None:
+        return False
+    msg_keys = _chat_id_keys(message_chat_id)
+    for cid in listen_chat_ids:
+        if msg_keys & _chat_id_keys(cid):
+            return True
+    return False
+
+
+def _resolve_message_chat_id(message: Message, event: events.NewMessage.Event) -> int | None:
+    """Prefer message.chat_id; fall back to event.chat_id (O206-t3)."""
+    cid = message.chat_id
+    if cid is not None:
+        return int(cid)
+    raw = getattr(event, "chat_id", None)
+    if raw is not None:
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def _append_log(log_path: Path, line: str) -> None:
     log_path = Path(log_path)
     parent = log_path.parent
@@ -94,6 +320,38 @@ def _append_log(log_path: Path, line: str) -> None:
 
 def _message_text(message: Message) -> str:
     return (message.text or message.message or "").strip()
+
+
+def _listing_skip_reason(message: Message) -> str | None:
+    """Skip reason for тг:пропуск, or None if message may become a listing."""
+    if not _message_text(message):
+        return "нет_текста"
+    if message.out:
+        return "исходящее"
+    if message.action is not None:
+        return "нет_текста"
+    if message.chat_id is None:
+        return "нет_текста"
+    return None
+
+
+def _log_tg_skip(
+    log_path: Path,
+    *,
+    account: str,
+    chat_id: int | None,
+    msg_id: int | None,
+    reason: str,
+    storage: object,
+) -> None:
+    ts = radar_timestamp()
+    chat_part = chat_id if chat_id is not None else "-"
+    msg_part = msg_id if msg_id is not None else "-"
+    _append_log(
+        log_path,
+        f"{ts} тг:пропуск acc={account} chat={chat_part} msg={msg_part} reason={reason}",
+    )
+    record_tg_skip(storage, account, f"пропуск:{reason}")
 
 
 async def _message_from_bot(event: events.NewMessage.Event) -> bool:
@@ -118,14 +376,14 @@ def _channel_id_for_link(chat_id: int) -> int | None:
     return cid
 
 
-def _message_url(message: Message, *, username: str = "") -> str:
+def _message_url(message: Message, *, username: str = "", chat_id: int | None = None) -> str:
     uname = (username or "").strip().lstrip("@")
     if uname:
         return f"https://t.me/{uname}/{message.id}"
-    chat_id = message.chat_id
-    if chat_id is None:
+    resolved = chat_id if chat_id is not None else message.chat_id
+    if resolved is None:
         return ""
-    channel = _channel_id_for_link(int(chat_id))
+    channel = _channel_id_for_link(int(resolved))
     if not channel:
         return ""
     return f"https://t.me/c/{channel}/{message.id}"
@@ -137,26 +395,28 @@ def _listing_from_message(
     chat_registry: dict[int, dict[str, str]],
     chat_title: str = "",
     chat_username: str = "",
+    resolved_chat_id: int | None = None,
 ) -> ListingProject | None:
-    text = _message_text(message)
-    if not text:
-        return None
-    if message.out:
-        return None
-    if message.action is not None:
+    if _listing_skip_reason(message) is not None:
         return None
 
-    chat_id = message.chat_id
+    chat_id = resolved_chat_id if resolved_chat_id is not None else message.chat_id
     if chat_id is None:
         return None
 
+    text = _message_text(message)
     title = text.split("\n", 1)[0].strip()[:200] or "Telegram"
     snippet = text[:2000]
     meta = chat_registry.get(int(chat_id), {})
+    if not meta:
+        for key in _chat_id_keys(int(chat_id)):
+            meta = chat_registry.get(key, {})
+            if meta:
+                break
     invite = str(meta.get("invite") or "").strip()
     display_title = str(meta.get("name") or chat_title or "").strip()
     username = (chat_username or meta.get("username") or "").strip().lstrip("@")
-    url = _message_url(message, username=username)
+    url = _message_url(message, username=username, chat_id=int(chat_id))
     published = ""
     if message.date:
         published = message.date.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -182,9 +442,10 @@ async def _add_monitor_peers(
     storage,
     *,
     account: str,
-) -> list[int]:
-    """Добавляет peer_id из списка raw chat id. Возвращает новые peer_id."""
+) -> tuple[list[int], int]:
+    """Добавляет peer_id из списка raw chat id. Возвращает (новые peer_id, skip count)."""
     added: list[int] = []
+    skipped = 0
     for raw_id in raw_ids:
         peer: int | None = None
         candidates = [raw_id]
@@ -198,17 +459,13 @@ async def _add_monitor_peers(
             except Exception:
                 continue
         if peer is None:
-            detail = f"пропуск чата {raw_id}"
-            _append_log(
-                log_path,
-                f"{radar_timestamp()} тг:монитор:{account}: {detail}",
-            )
-            record_tg_skip(storage, account, detail)
+            skipped += 1
+            record_tg_skip(storage, account, f"пропуск чата {raw_id}")
             continue
         if peer not in chat_ids:
             chat_ids.add(peer)
             added.append(peer)
-    return added
+    return added, skipped
 
 
 async def _reload_listen_chats(
@@ -217,7 +474,7 @@ async def _reload_listen_chats(
     log_path: Path,
     storage,
     account: str,
-) -> list[int]:
+) -> tuple[list[int], int, int]:
     ids_path = telethon_chat_ids_path_for_account(account)
     try:
         raw_ids = parse_telethon_chat_ids(str(ids_path))
@@ -226,11 +483,17 @@ async def _reload_listen_chats(
             log_path,
             f"{radar_timestamp()} тг:монитор:{account}:reload ids: {short_err(exc)}",
         )
-        return []
+        return [], 0, 0
     listen_ids = filter_listen_chat_ids(raw_ids)
-    return await _add_monitor_peers(
+    added, skipped = await _add_monitor_peers(
         client, chat_ids, listen_ids, log_path, storage, account=account
     )
+    if skipped:
+        _append_log(
+            log_path,
+            f"{radar_timestamp()} тг:монитор:{account}:reload skip_entity={skipped}",
+        )
+    return added, len(raw_ids), len(listen_ids)
 
 
 async def _join_loop(
@@ -257,14 +520,38 @@ async def _join_loop(
                     storage=storage,
                 )
                 if tick.new_listen_chat_ids:
-                    added = await _reload_listen_chats(
+                    added, n_file, n_filter = await _reload_listen_chats(
                         client, chat_ids, log_path, storage, account
                     )
+                    n_peers = len(chat_ids)
+                    record_tg_listen_stats(
+                        storage,
+                        account,
+                        peers=n_peers,
+                        in_file=n_file,
+                        after_filter=n_filter,
+                    )
+                    for item in tick.new_listen_entries:
+                        if not item["passed_filter"]:
+                            _append_log(
+                                log_path,
+                                f"{radar_timestamp()} join:listen:filtered_out "
+                                f"account={account} link={item['link']} "
+                                f"chat_id={item['chat_id']} reason=not_in_allowlist",
+                            )
+                    for cid in tick.new_listen_chat_ids:
+                        if cid in added:
+                            _append_log(
+                                log_path,
+                                f"{radar_timestamp()} тг:цепочка:{account} join=ok "
+                                f"chat_id={cid} · file={n_file} filter={n_filter} "
+                                f"peers={n_peers}",
+                            )
                     if added:
                         _append_log(
                             log_path,
                             f"{radar_timestamp()} тг:монитор:{account}:listen+ "
-                            f"peers={added} всего={len(chat_ids)}",
+                            f"peers={added} всего={n_peers}",
                         )
             except Exception as exc:
                 _append_log(
@@ -292,20 +579,44 @@ def _register_message_handler(
 
     @client.on(events.NewMessage())
     async def on_new_message(event: events.NewMessage.Event) -> None:
+        session.last_event_at = time.monotonic()
         message = event.message
         if not isinstance(message, Message):
             return
-        if message.chat_id not in chat_ids:
+        chat_id = _resolve_message_chat_id(message, event)
+        if chat_id is None:
+            raw_event_cid = getattr(event, "chat_id", None)
+            if raw_event_cid is not None and chat_in_tg_interest_set(int(raw_event_cid)):
+                _log_tg_skip(
+                    log_path,
+                    account=account,
+                    chat_id=int(raw_event_cid),
+                    msg_id=message.id,
+                    reason="нет_chat_id",
+                    storage=storage,
+                )
+            return
+        if not _message_chat_listened(chat_id, chat_ids):
+            if chat_in_tg_interest_set(chat_id):
+                _log_tg_skip(
+                    log_path,
+                    account=account,
+                    chat_id=chat_id,
+                    msg_id=message.id,
+                    reason="не_слушаем",
+                    storage=storage,
+                )
             return
 
         if await _message_from_bot(event):
-            ts = radar_timestamp()
-            _append_log(
+            _log_tg_skip(
                 log_path,
-                f"{ts} тг:сообщ acc={account} chat={message.chat_id} msg={message.id} "
-                f"новый=0 увед=0 ош=пропуск:бот",
+                account=account,
+                chat_id=chat_id,
+                msg_id=message.id,
+                reason="бот",
+                storage=storage,
             )
-            record_tg_skip(storage, account, "пропуск:бот")
             return
 
         chat_title = ""
@@ -323,15 +634,25 @@ def _register_message_handler(
             chat_registry=chat_registry,
             chat_title=chat_title,
             chat_username=chat_username,
+            resolved_chat_id=chat_id,
         )
         if project is None:
+            reason = _listing_skip_reason(message) or "нет_текста"
+            _log_tg_skip(
+                log_path,
+                account=account,
+                chat_id=chat_id,
+                msg_id=message.id,
+                reason=reason,
+                storage=storage,
+            )
             return
 
         if storage.is_radar_paused():
             ts = radar_timestamp()
             _append_log(
                 log_path,
-                f"{ts} тг:сообщ acc={account} chat={message.chat_id} msg={message.id} "
+                f"{ts} тг:сообщ acc={account} chat={chat_id} msg={message.id} "
                 f"новый=0 увед=0 ош=пропуск:пауза",
             )
             return
@@ -361,9 +682,80 @@ def _register_message_handler(
         )
         _append_log(
             log_path,
-            f"{ts} тг:сообщ acc={account} chat={message.chat_id} msg={message.id} "
+            f"{ts} тг:сообщ acc={account} chat={chat_id} msg={message.id} "
             f"новый={int(was_new)} увед={int(notified)} ош={err_part}",
         )
+
+
+def _log_handler_registered(
+    session: _MonitorSession,
+    log_path: Path,
+) -> None:
+    account = session.account
+    session.handler_registered = True
+    listen_ids = session.file_listen_ids
+    test_ok = _test_group_peer_ok(session.chat_ids)
+    file_has_test = any(
+        _chat_id_keys(cid) & tg_test_group_chat_keys()
+        for cid in listen_ids
+    )
+    _append_log(
+        log_path,
+        f"{radar_timestamp()} тг:монитор:{account}:handler_ok "
+        f"peers={len(session.chat_ids)} test_group_peer={int(test_ok)} "
+        f"test_group_file={int(file_has_test)}",
+    )
+    if file_has_test and not test_ok:
+        _append_log(
+            log_path,
+            f"{radar_timestamp()} тг:монитор:{account}: "
+            f"test_group peer missing — retry entity {TG_TEST_GROUP_RAW_ID}",
+        )
+
+
+async def _hourly_summary_loop(
+    sessions: list[_MonitorSession],
+    log_path: Path,
+    storage,
+    cfg,
+) -> None:
+    """O190 t4: hourly TG listen ladder in radar log."""
+    from ops_funnel import _join_queue_counts, _lead_counts_by_source
+    from radar_status import _int_setting, _tg_key
+
+    while True:
+        await asyncio.sleep(3600)
+        try:
+            queue = _join_queue_counts()
+            neon_tg = (_lead_counts_by_source((cfg.database_url or "").strip()).get("tg") or {})
+            neon24h = int(neon_tg.get("visible_24h") or 0)
+            q_line = (
+                f"{queue.get('pending', 0)}/{queue.get('done', 0)}/"
+                f"{queue.get('fail', 0)}"
+            )
+            for sess in sessions:
+                acc = sess.account
+                ids_path = telethon_chat_ids_path_for_account(acc)
+                try:
+                    raw_ids = parse_telethon_chat_ids(str(ids_path))
+                except (OSError, ValueError):
+                    raw_ids = []
+                n_file = len(raw_ids)
+                n_filter = len(filter_listen_chat_ids(raw_ids))
+                n_peers = len(sess.chat_ids)
+                msgs = _int_setting(storage, _tg_key(acc, "msgs"))
+                new = _int_setting(storage, _tg_key(acc, "new"))
+                _append_log(
+                    log_path,
+                    f"{radar_timestamp()} тг:сводка:{acc} queue={q_line} "
+                    f"file={n_file} filter={n_filter} peers={n_peers} "
+                    f"msgs={msgs} new={new} neon24h={neon24h}",
+                )
+        except Exception as exc:
+            _append_log(
+                log_path,
+                f"{radar_timestamp()} тг:сводка:ошибка {short_err(exc)}",
+            )
 
 
 async def run_monitor() -> None:
@@ -444,7 +836,15 @@ async def run_monitor() -> None:
             )
             continue
         chat_ids: set[int] = set()
-        await _add_monitor_peers(
+        await _ensure_test_group_membership(
+            client,
+            acfg.account,
+            listen_ids,
+            chat_ids,
+            log_path,
+            storage,
+        )
+        _, skip_peers = await _add_monitor_peers(
             client,
             chat_ids,
             listen_ids,
@@ -452,6 +852,29 @@ async def run_monitor() -> None:
             storage,
             account=acfg.account,
         )
+        file_has_test = any(
+            _chat_id_keys(cid) & tg_test_group_chat_keys() for cid in listen_ids
+        )
+        if file_has_test and not _test_group_peer_ok(chat_ids):
+            test_raw = [
+                TG_TEST_GROUP_RAW_ID,
+                -TG_TEST_GROUP_RAW_ID,
+                int(f"-100{TG_TEST_GROUP_RAW_ID}"),
+            ]
+            _, skip_test = await _add_monitor_peers(
+                client,
+                chat_ids,
+                test_raw,
+                log_path,
+                storage,
+                account=acfg.account,
+            )
+            skip_peers += skip_test
+        if skip_peers:
+            _append_log(
+                log_path,
+                f"{radar_timestamp()} тг:монитор:{acfg.account}: skip_entity={skip_peers}",
+            )
         if not chat_ids:
             _append_log(
                 log_path,
@@ -460,12 +883,22 @@ async def run_monitor() -> None:
             )
             await client.disconnect()
             continue
-        sessions.append(_MonitorSession(acfg.account, client, chat_ids))
+        sessions.append(
+            _MonitorSession(
+                acfg.account,
+                client,
+                chat_ids,
+                file_listen_ids=list(listen_ids),
+                chats_in_file=len(acfg.chat_ids),
+                chats_filter=len(listen_ids),
+            )
+        )
         record_tg_monitor_start(
             storage,
             acfg.account,
             chats_listen=len(chat_ids),
             chats_in_file=len(acfg.chat_ids),
+            chats_filter=len(listen_ids),
         )
 
     if not sessions and not join_bootstrap:
@@ -477,7 +910,8 @@ async def run_monitor() -> None:
         _append_log(
             log_path,
             f"{radar_timestamp()} тг:монитор:старт account={sess.account} "
-            f"чатов={len(sess.chat_ids)} ids={sorted(sess.chat_ids)} "
+            f"чатов={len(sess.chat_ids)} file={sess.chats_in_file} "
+            f"filter={sess.chats_filter} "
             f"ночь={night} join_auto={'да' if join_in_main else 'нет'}",
         )
 
@@ -506,6 +940,7 @@ async def run_monitor() -> None:
             pg=pg,
             log_path=log_path,
         )
+        _log_handler_registered(sess, log_path)
 
     for sess in sessions:
         try:
@@ -515,6 +950,7 @@ async def run_monitor() -> None:
                 log_path,
                 f"{radar_timestamp()} тг:монитор:{sess.account}: ready",
             )
+            await _wake_client_updates(sess, log_path, storage)
         except Exception as exc:
             detail = f"get_me: {short_err(exc)}"
             record_tg_skip(storage, sess.account, detail)
@@ -528,6 +964,17 @@ async def run_monitor() -> None:
         for sess in sessions + join_bootstrap
     ]
     run_tasks.extend(join_tasks)
+    if sessions:
+        run_tasks.append(
+            asyncio.create_task(
+                _hourly_summary_loop(sessions, log_path, storage, cfg)
+            )
+        )
+        run_tasks.append(
+            asyncio.create_task(
+                _acc_watchdog_loop(sessions, log_path, storage)
+            )
+        )
 
     try:
         await asyncio.gather(*run_tasks)

@@ -597,6 +597,18 @@
 
   }
 
+  function applyRotatedAccessToken(res) {
+    if (!res || !res.headers || typeof res.headers.get !== "function") {
+      return;
+    }
+    var rotated = res.headers.get("X-RawLead-Access-Token");
+    if (rotated && String(rotated).trim()) {
+      setToken(String(rotated).trim());
+    }
+  }
+
+  window.rawleadApplyRotatedAccessToken = applyRotatedAccessToken;
+
   function readUserMeta() {
 
     try {
@@ -772,6 +784,8 @@
     })
 
       .then(function (res) {
+
+        applyRotatedAccessToken(res);
 
         if (!res.ok) {
 
@@ -1381,6 +1395,9 @@
 
     updateInboxEmptyStates();
     loadNotificationSettings(data);
+    if (window.rawleadMetrikaTrialLoginOnce) {
+      window.rawleadMetrikaTrialLoginOnce(data);
+    }
   }
 
   function fetchSubscriptionPayload() {
@@ -1389,6 +1406,7 @@
       headers: authHeaders(),
     })
       .then(function (res) {
+        applyRotatedAccessToken(res);
         if (!res.ok) {
           throw new Error("subscription " + res.status);
         }
@@ -1462,6 +1480,9 @@
       })
       .then(function (data) {
         if (data && data.confirmation_url) {
+          if (window.rawleadMetrikaGoal) {
+            window.rawleadMetrikaGoal("rl_checkout_start");
+          }
           window.location.href = data.confirmation_url;
         }
         return data;
@@ -4008,9 +4029,6 @@
   }
 
   function renderPerfectBadge(perfect) {
-    if (perfect) {
-      return '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>';
-    }
     return "";
   }
 
@@ -5460,6 +5478,12 @@
         resetAndLoad();
 
       }
+
+    });
+
+    window.addEventListener("rawlead-tags-imported", function () {
+
+      reloadTagsFromSync();
 
     });
 

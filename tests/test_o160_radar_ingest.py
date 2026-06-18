@@ -35,21 +35,18 @@ class TestO160PerSourceLocks(unittest.TestCase):
     def test_fl_and_kwork_use_different_locks(self) -> None:
         self.assertIsNot(_fetch_lock("fl"), _fetch_lock("kwork"))
 
-    @patch("exchange_browser_fetch.fetch_listing_html_browser")
-    def test_wall_clock_raises_before_hang_completes(self, mock_fetch: MagicMock) -> None:
-        def slow(*_args: object, **_kwargs: object) -> str:
+    def test_wall_clock_raises_before_hang_completes(self) -> None:
+        from concurrent.futures import TimeoutError as FuturesTimeout
+
+        from exchange_browser_fetch import _playwright_sync_timed
+
+        def slow() -> str:
             time.sleep(3.0)
             return "x" * 600
 
-        mock_fetch.side_effect = slow
         started = time.monotonic()
-        with self.assertRaises(HtmlFetchError):
-            fetch_listing_html_browser_wall_clock(
-                "fl",
-                "https://www.fl.ru/projects/",
-                user_agent="test",
-                wall_clock_sec=0.5,
-            )
+        with self.assertRaises(FuturesTimeout):
+            _playwright_sync_timed(slow, 0.5)
         self.assertLess(time.monotonic() - started, 2.5)
 
 
@@ -99,7 +96,7 @@ class TestO160SourceFetchWallClock(unittest.TestCase):
         from main import _radar_source_fetch_wall_sec
 
         youdo_wall = _radar_source_fetch_wall_sec("youdo")
-        self.assertGreaterEqual(youdo_wall, 330.0)
+        self.assertGreaterEqual(youdo_wall, 480.0)
         self.assertEqual(_radar_source_fetch_wall_sec("kwork"), 180.0)
 
 

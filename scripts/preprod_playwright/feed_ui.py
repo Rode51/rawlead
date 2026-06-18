@@ -375,8 +375,10 @@ def assert_match_for_tier(card: Any, tier: str) -> None:
             raise RuntimeError(f"forbidden copy «{bad}»")
 
     if tier == "anon":
-        if card.locator(".rl-match").count():
-            raise RuntimeError("anon: unexpected .rl-match block")
+        if card.locator(".rl-match-bar").count():
+            raise RuntimeError("anon: unexpected real match bar")
+        if not card.locator(".rl-match--free-locked").count():
+            raise RuntimeError("anon: missing locked match bar")
         if not card.locator("a.rl-card-cta--anon, .rl-card-upsell").count():
             raise RuntimeError("anon: missing login upsell on card")
         return

@@ -23,14 +23,14 @@ $rl_quiz_skip_class = $rl_quiz_overlay ? ' rl-quiz__skip-close js-quiz-overlay-c
 			<p class="rl-quiz__intro-sub">
 				<?php esc_html_e('Отвечай на заказы — ИИ собирает твой профиль на ходу', 'rawlead-kadence-child'); ?>
 			</p>
-			<button type="button" class="rl-btn rl-btn--primary rl-quiz__intro-start" id="rl-quiz-intro-start">
-				<?php esc_html_e('Начать  →', 'rawlead-kadence-child'); ?>
-			</button>
-			<p class="rl-quiz__skip rl-quiz__skip--intro">
-				<a class="rl-link-muted rl-quiz__skip-link<?php echo esc_attr($rl_quiz_skip_class); ?>" href="<?php echo esc_url($rl_quiz_skip_href); ?>">
-					<?php esc_html_e('Смотреть ленту без настройки →', 'rawlead-kadence-child'); ?>
+			<div class="rl-quiz__intro-cta">
+				<button type="button" class="rl-btn rl-btn--primary rl-quiz__intro-start" id="rl-quiz-intro-start">
+					<?php esc_html_e('Настроить ленту →', 'rawlead-kadence-child'); ?>
+				</button>
+				<a class="rl-btn rl-btn--secondary rl-quiz__intro-lenta<?php echo esc_attr($rl_quiz_skip_class); ?>" href="<?php echo esc_url($rl_quiz_skip_href); ?>">
+					<?php esc_html_e('Смотреть ленту →', 'rawlead-kadence-child'); ?>
 				</a>
-			</p>
+			</div>
 		</div>
 		<div class="rl-quiz__loading" id="rl-quiz-loading" hidden>
 			<span class="rl-quiz__spinner" aria-hidden="true"></span>
@@ -110,19 +110,11 @@ $rl_quiz_skip_class = $rl_quiz_overlay ? ' rl-quiz__skip-close js-quiz-overlay-c
 			<div id="rl-quiz-telegram-widget"></div>
 			<p class="rl-quiz__login-state" id="rl-quiz-login-state" aria-live="polite" hidden></p>
 		</div>
-		<p class="rl-quiz__open-lenta" id="rl-quiz-open-lenta" hidden>
-			<?php if ($rl_quiz_overlay) : ?>
-				<button type="button" class="rl-btn rl-btn--primary js-quiz-overlay-close">
-					<?php esc_html_e('Открыть ленту →', 'rawlead-kadence-child'); ?>
-				</button>
-			<?php else : ?>
-				<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($rl_quiz_lenta); ?>">
-					<?php esc_html_e('Открыть ленту →', 'rawlead-kadence-child'); ?>
-				</a>
-			<?php endif; ?>
-		</p>
 		<p class="rl-quiz__retry" id="rl-quiz-retry" hidden>
 			<button type="button" class="rl-btn rl-btn--ghost"><?php esc_html_e('Начать заново', 'rawlead-kadence-child'); ?></button>
+		</p>
+		<p class="rl-quiz__retake-completed" id="rl-quiz-retake-completed" hidden>
+			<button type="button" class="rl-btn rl-btn--ghost"><?php esc_html_e('Пройти ещё раз', 'rawlead-kadence-child'); ?></button>
 		</p>
 		<p class="rl-quiz__skip" id="rl-quiz-skip-result">
 			<a class="rl-link-muted<?php echo esc_attr($rl_quiz_skip_class); ?>" href="<?php echo esc_url($rl_quiz_skip_href); ?>">

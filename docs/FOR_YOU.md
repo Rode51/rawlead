@@ -1,5 +1,26 @@
 # Для тебя
 
+## Сейчас (2026-06-16)
+
+| Что | Статус |
+|-----|--------|
+| **Push TG** | ✅ prod (O250d + O253) |
+| **Лента / кабинет** | ✅ theme **1.19.20** в repo · prod `ver=` проверить |
+| **YouDo ingest** | 🟡 deploy ✅ · crash ушёл · antibot-заглушка · жди 10–15 мин |
+| **Ops кнопка restart** | **O254b deploy ✅** → `/ops/` **Ctrl+Shift+R** → toast |
+| **TG join v4** | ✅ ~304 pending · фон |
+| **→ deploy** | O252 · quiz CTA (локально) |
+| **Metrika** | ✅ счётчик на prod · **→ цели в UI** (см. FOR_YOU § Метрика) |
+| **Portfolio** | **P0** mood+refs с нуля · `@lead-portfolio` · Claude Code = код: [`team/portfolio/README.md`](team/portfolio/README.md) · промпт skills: [`CLAUDE_CODE_HANDOFF.md`](team/portfolio/CLAUDE_CODE_HANDOFF.md) |
+
+**Prod snapshot для AI:** [`team/common/PROD_FACTS.md`](team/common/PROD_FACTS.md)
+
+**Кнопка restart:** `https://rawlead.ru/ops/` в **Chrome/YaBrowser** (не Cursor) → **Ctrl+Shift+R** → Биржи → YouDo → «Перезапустить источник» → toast «YouDo: сброс…». Тишина — напиши Lead.
+
+**YouDo ingest отдельно:** даже ручной restart радара даёт `Connection closed` — это camoufox, не кнопка. Работает **@mechanic**.
+
+---
+
 ## Cursor — прокси на ПК (2026-06-09)
 
 **Зачем:** из РФ без прокси Cursor/модели часто дают region error. Прокси **только для Cursor на твоём ПК** — VPS и сайт работают сами.
@@ -73,14 +94,87 @@
 
 ---
 
-## Сейчас — stability ingest (2026-06-13)
+## Claude Code — прокси + установка (2026-06-17)
+
+**Тот же relay**, что Cursor: `127.0.0.1:18777` → пул из `.env`.
+
+| Что | Команда |
+|-----|---------|
+| **Установить Claude Code через прокси** | Двойной клик `scripts\install-claude-code-via-proxy.bat` |
+| **Прописать proxy навсегда** (Claude + npm) | `scripts\sync-claude-code-proxy.bat` |
+| **Recovery** (probe + sync) | `scripts\claude-code-proxy-recovery.bat` |
+| **Relay** (если не запущен) | `scripts\start-cursor-proxy-relay.bat` |
+| **Ярлык на рабочем столе** | **`Claude START.lnk`** — relay + login с нуля · **`Claude Relay.lnk`** · **`Claude Code.lnk`** · **`Claude — вставить код.lnk`** |
+| **Выключить proxy Claude Code** | `.venv\Scripts\python.exe scripts\sync_claude_code_proxy.py --off --npm` |
+| **OAuth не проходит (403)** | **`scripts\claude-import-subscription.bat`** (подписка) · или `claude-auth-api-key.bat` (API key) |
+| **Подписка, VPN только Dolphin** | § **Claude Code — подписка без VPN на ПК** ниже |
+| **Диагностика tunnel** | `.venv\Scripts\python.exe scripts\probe_anthropic_relay.py` |
+
+**Постоянный конфиг:** `%USERPROFILE%\.claude\settings.json` → `env.HTTP_PROXY` / `HTTPS_PROXY`.
+
+**Ошибки (коротко):**
+
+| Симптом | Что значит | Действие |
+|---------|------------|----------|
+| `CONNECT … 502` | relay жив, upstream proxy мёртв | `claude-code-proxy-recovery.bat` · пополни pool в `.env` |
+| `HTTP 403` на probe | **норма** — api отвечает без ключа | продолжай login |
+| `Login failed … 403` | OAuth exchange блокируется прокси | **`claude-import-subscription.bat`** — токен с другой сети |
+| `Invalid code` | код одноразовый / другая сессия login | новый `claude auth login`, не перезапускай окно |
+| `ECONNREFUSED` | relay не слушает 18777 | `start-cursor-proxy-relay.bat`, окно не закрывать |
+
+**Порядок работы (OAuth):**
+1. `start-cursor-proxy-relay.bat` — окно не закрывать
+2. `install-claude-code-via-proxy.bat` — один раз
+3. `claude auth login` — если ещё не залогинен
+4. `claude` из нужной папки проекта
+
+**Порядок работы (API key — если OAuth 403):**
+1. relay как выше
+2. `scripts\claude-auth-api-key.bat`
+3. `claude` → approve key при первом запуске
+
+### Claude Code — подписка без VPN на ПК (2026-06-17)
+
+**Cursor не поможет:** логин Cursor ≠ логин Claude Code CLI. Через консоль Cursor авторизовать Claude Code нельзя.
+
+**Почему Dolphin + login на этом ПК часто 403:** браузер в Dolphin ходит через прокси профиля, а CLI меняет код на токен через relay — Anthropic режет этот обмен с datacenter IP.
+
+**Рабочий план для подписки Pro/Max:**
+
+| Шаг | Где | Действие |
+|-----|-----|----------|
+| 1 | **Другая сеть** (мобильный интернет с телефона, друг, кафе) | `npm i -g @anthropic-ai/claude-code` → `claude setup-token` → логин в обычном браузере → **скопировать токен** |
+| 2 | **Этот ПК** | `start-cursor-proxy-relay.bat` (окно не закрывать) |
+| 3 | **Этот ПК** | `scripts\claude-import-subscription.bat` — вставить токен |
+| 4 | **Этот ПК** | `claude` |
+
+Токен живёт ~1 год · биллинг по **подписке**, не по API key.
+
+---
+
+## O220 — на prod ✅ (deploy 2026-06-14)
+
+**Theme 1.19.00** · match + лента UX · API перезапущен.
+
+| Шаг | Действие |
+|-----|----------|
+| **Smoke** | Ctrl+F5 `/lenta/` · Monica wipe → квиз → % на «своих» заказах |
+| **L1 pilot** | Coder ✅ · **ты:** `--dry-run` → `--apply` → judge (см. ниже) |
+
+---
+
+## Сейчас — ingest (2026-06-15)
 
 | Шаг | Что |
 |-----|-----|
-| **YouDo ✅** | O190+O191+**O194** · listing `parsed=50` · ingest+L1 в Neon · detail через subprocess |
-| **FL ✅** | **O193** subprocess · `parsed=30` · без asyncio-crash |
-| **TG ⏳** | O188 **~28/127** |
-| **Дальше** | O186 security · **реклама ⏸** |
+| **FL 🔴** | Нестабильно: `parsed=0` ↔ 30 · `pool_exhausted` · **O222** в `@coder` · Lead сбросил баны прокси |
+| **Kwork 🟡** | `parsed=36 fresh=0` — парсер жив, **новых нет** (не «упал») |
+| **YouDo 🟢** | `parsed=50` · но L1 путает перевозки с WordPress → **O223** |
+| **TG 🟢** | acc1–3 connected |
+| **Если FL снова 🔴** | `python scripts\clear-vps-proxy-bans.py` → подожди 5 мин → `/ops/` или `/status` в @FLPARSINGBOT |
+| **Дальше** | **O222** deploy → **O223** → tier smoke → O218 → ads ⏸ |
+
+Тикет: [`2026-06-15-parsers-fl-unstable.md`](problems/2026-06-15-parsers-fl-unstable.md)
 
 **Нюанс:** цикл с полным YouDo-fetch (50 карточек + detail + L1) занимает **~6–10 мин** — это нормально, не «завис».
 
@@ -113,7 +207,21 @@
 
 ---
 
-## TG acc2 и join
+## TG join — волна 5 (2026-06-15)
+
+| Что | Действие |
+|-----|----------|
+| **База** | ✅ `docs/ops/import/TG_FREELANCE_*.xlsx` (Lead copied 2026-06-15) |
+| **Стратегия** | **> 5000 участников** (col B) · **305** net-new · ~**2 дня** join |
+| **Фильтр** | Строго `Участники > 5000` · чаты **150** + каналы **179** = **329** проходят |
+| **Импорт** | `@coder` § **O248-TG-WAVE5-IMPORT** |
+| **Радар** | VPS: `TG_JOIN_IN_TG_MAIN=1` · лог `data/tg_join.log` |
+| **Срок** | ~**2 дня** на **305** чатов/каналов (>5k участников) |
+| **O247 toolbar** | § **O247b** — «осталось N откликов» (API deploy) |
+
+Старый блок v2/v3 — ниже.
+
+## TG acc2 и join (legacy note)
 
 - **Слушает** только чаты из `data/telethon_chat_ids_acc2.txt` (после join).
 - **Волна 4 (2026-06-12):** 127 чатов подготовлены Lead → [`TG_JOIN_QUEUE_v3.csv`](docs/ops/TG_JOIN_QUEUE_v3.csv) · **@coder ещё не давали** · сейчас идёт **v2 backlog** acc3 (~4 join/час) · логи: `data/tg_join.log` на VPS
@@ -169,23 +277,25 @@ Deploy: `scripts/deploy-youdo-browser-vps.py` · диагностика: `script
 
 **FL tier-2 (2026-06-14):** в `/opt/rawlead/.env.site` — `FL_PROXY_URLS` (4 DC) + **`FL_PROXY_URLS_RESIDENTIAL`** (25 RU слотов из хвоста YouDo) ✅ Lead 2026-06-14. Патч повторно: `scripts/patch-vps-fl-residential-env.py`.
 
-**Smoke O215 (сайт):** theme **1.18.95** · см. **чеклист tier smoke** ниже.
+**Smoke O215 (сайт):** theme **1.19.12** · см. **чеклист tier smoke** ниже · **Canvas:** [tier-smoke-checklist](file:///C:/Users/hramo/.cursor/projects/c-Users-hramo-uisness/canvases/tier-smoke-checklist.canvas.tsx) (OK/FAIL + комментарии, сохраняется).
 
 ---
 
 ## Tier smoke — полный чеклист (все уровни доступа)
 
-**Зачем:** после O215 убедиться, что UI/copy/гейты работают на **anon · trial · expired · premium · paused · owner**.
+**Зачем:** после O215 убедиться, что UI/copy/гейты работают на **anon · trial · expired · premium · owner** (пауза подписки **снята с prod**).
+
+**Prod billing (2026-06-15):** **обычная оплата** ЮKassa на `/pricing/` ✅ · **автооплата / auto-renew** убрана — в smoke **не** проверять.
 
 **Тестовые аккаунты**
 
 | Роль | Как |
 |------|-----|
 | **Anon** | Incognito · `https://rawlead.ru/lenta/` без входа |
-| **First login / Trial** | **Monica Bates** (TG) — сброшена 2026-06-14: `plan=free`, `trial_used=null`, tags=0 → первый вход должен дать **auto trial 3 дня** |
+| **First login / Trial** | **Monica Bates** (TG **8688264540**) — полный wipe в Neon (см. ниже) → auto trial 3 дня (**O219 ✅ prod**) · match/квиз — **O220 после deploy** |
 | **Expired trial** | После Monica trial: `@lead-architect` или скрипт — `trial_used_at=now()`, `plan=free`, `active_until=null` |
-| **Premium** | Твой owner TG **или** оплата ЮKassa на `/pricing/` |
-| **Paused premium** | ЛК → пауза подписки (14 д) |
+| **Premium** | Твой owner TG **или** разовая оплата ЮKassa на `/pricing/` |
+| ~~Paused premium~~ | **SKIP** — пауза подписки снята с prod |
 | **Owner/beta** | Owner TG (`TELEGRAM_CHAT_ID`) |
 
 **Перед каждым сценарием:** hard refresh или incognito · смотреть **desktop + mobile 390px**.
@@ -226,16 +336,14 @@ Deploy: `scripts/deploy-youdo-browser-vps.py` · диагностика: `script
 |---|-----------|
 | P1 | Instant лента · match rank · filter bar (если включён) |
 | P2 | Черновики 5/ч · generate OK |
-| P3 | `/cabinet/` inbox · оплата / auto-renew UI |
-| P4 | Pause → см. сценарий 5 |
+| P3 | `/cabinet/` inbox · **разовая оплата** через `/pricing/` OK · **без** auto-renew UI |
+| P4 | **SKIP** — пауза подписки снята |
 
-### 5. Paused premium
+### 5. Paused premium — **SKIP** (фича снята)
 
 | # | Проверить |
 |---|-----------|
-| S1 | `status=paused` · effective_access=false |
-| S2 | Лента как free (delay) · баннер «на паузе» |
-| S3 | Resume → instant снова |
+| S1–S3 | Не актуально · owner 2026-06-15 |
 
 ### 6. Owner
 
@@ -249,13 +357,79 @@ Deploy: `scripts/deploy-youdo-browser-vps.py` · диагностика: `script
 | # | Проверить |
 |---|-----------|
 | X1 | Лексикон: **совпадение** · нет Tinder/«добавь навыки» |
-| X2 | Theme **1.18.95** в view-source (query `ver=`) |
+| X2 | Theme **1.19.12** в view-source (query `ver=`) |
 | X3 | API `/v1/quiz/start` 200 · `/v1/feed` delay по tier |
 | X4 | TG bot `/status` · `/ops/` cycle_age зелёный |
 
-**Сброс Monica (повтор):** напиши `@lead-architect` — сброс `plan=free`, tags=0, `trial_used=null` (tg **8688264540**).
+**Monica — полный wipe (перед тестом auto-trial):** tg **8688264540** · `@lead-architect` / `@mechanic` — удалить из Neon (users, user_tags, subscriptions, auth_bot_sessions). **✅ wipe 2026-06-15** (user_id пересоздаётся при входе — не кэшировать старый id). После wipe — выйти из TG на сайте, incognito, войти снова как Monica → `plan=trial` · badge «Trial · 3 дн.».
+
+**Удобнее:** открой Canvas [tier-smoke-checklist](file:///C:/Users/hramo/.cursor/projects/c-Users-hramo-uisness/canvases/tier-smoke-checklist.canvas.tsx) рядом с чатом — все 7 секций · галочки · FAIL-комментарии сохраняются.
 
 **Симуляция expired trial (Monica):** после прохода trial — `@lead-architect` выставит `trial_used_at` + `plan=free`.
+
+---
+
+## Яндекс.Метрика — пошагово (2026-06-16)
+
+**Counter ID:** `109860210` · **на prod уже стоит** (theme **1.19.20**, `/lenta/` → view-source → `ym(109860210)`).
+
+**Тебе в интерфейсе Метрики** — создать цели и проверить воронку. Код сайта `reachGoal` уже шлёт события; без целей в UI отчёты пустые.
+
+### Шаг 0 — браузер
+
+- **YaBrowser или Chrome**, **AdBlock выключен** на rawlead.ru (иначе счётчик не грузится).
+- **Не** проверяй в Cursor-browser — там часто режутся трекеры.
+- `/ops/` и localhost — счётчик **намеренно выключен**.
+
+**YaBrowser и нет `mc.yandex` в Network:**  
+1. В Network фильтр **All** (не только Fetch/XHR) — `tag.js` идёт как **JS**.  
+2. Если есть только `tag.js`, но **нет** `watch/` / `webvisor` — часто **заблокированы cookie** → визит не пишется, «онлайн» = 0.  
+   Проверка в Console: `ym(109860210,'getClientID',id=>console.log(id))` — если пусто/timeout, это оно.  
+   **Лечение:** Настройки → **Сайты → Cookie** → разрешить **сторонние cookie** (или исключение для rawlead.ru) → Ctrl+F5.  
+3. Нейропротект «нет заблокированных трекеров» ≠ cookie разрешены — смотри п.2.
+
+**Debug YaBrowser для Cursor MCP:** `scripts\start-yandex-debug.bat` → порт **9222** → см. `MCP_POOL.md` § Chrome DevTools MCP.
+
+### Шаг 1 — счётчик жив?
+
+1. [metrika.yandex.ru](https://metrika.yandex.ru/) → счётчик **109860210**.
+2. Вкладка **«Посетители онлайн»** (или «Сейчас на сайте»).
+3. В **другой вкладке** открой [rawlead.ru/lenta/](https://rawlead.ru/lenta/) → Ctrl+F5.
+4. Через 10–30 сек в онлайне должен появиться **1 посетитель**. Нет — повтори без блокировщиков; проверь view-source: строка `ym(109860210`.
+
+### Шаг 2 — три цели (обязательно)
+
+**Настройки → Цели → Добавить цель** — тип **«JavaScript-событие»**, идентификатор **точно** как в таблице (регистр важен):
+
+| Цель в UI (название любое) | Идентификатор | Когда срабатывает на сайте |
+|----------------------------|---------------|----------------------------|
+| Quiz complete | `rl_quiz_complete` | Дошёл до конца квиза (overlay на `/lenta/` или `/quiz/`) |
+| Trial login | `rl_trial_login` | Первый вход в сессии с планом **trial** (TG-логин в кабинет) |
+| Checkout start | `rl_checkout_start` | Клик «Оплатить» / старт checkout (тарифы или кабинет) |
+
+Для каждой: условие — **совпадение идентификатора** (не URL, не клик по кнопке).
+
+### Шаг 3 — smoke целей (15 мин)
+
+| # | Действие | Ожидание |
+|---|----------|----------|
+| 1 | `/lenta/` → «Настроить ленту» → пройди квиз до финала | В Метрике → **Отчёты → Цели** → `rl_quiz_complete` (задержка до ~5 мин) |
+| 2 | Incognito → TG-вход **новым** trial-пользователем (не Monica после wipe без trial) | `rl_trial_login` **1 раз за сессию** |
+| 3 | Тарифы или кабинет → кнопка оплаты / checkout | `rl_checkout_start` |
+
+**Быстрая проверка в DevTools (F12 → Console):** после загрузки `/lenta/` набери `typeof ym` → должно быть `"function"`. После квиза — без ошибок в консоли.
+
+### Шаг 4 — что уже включено в коде (трогать не нужно)
+
+webvisor · clickmap · trackLinks · accurateTrackBounce · ecommerce `dataLayer` (покупки в dataLayer — **позже**, когда подключим ecommerce-события).
+
+### Шаг 5 — перед рекламой (позже)
+
+- **O73:** карта кликов / heatmap — уже есть clickmap + webvisor.
+- **Фильтр своих визитов:** в Метрике → **Настройки → Фильтры** → исключить свой IP **или** ждать O237b (opt-out owner/Monica в коде — в бэклоге).
+- **Ads ⏸** до стабильных целей + L2 smoke (см. `TASKS.md`).
+
+**Snippet в WP вручную не вставлять** — всё в теме `inc/yandex-metrika.php`.
 
 ---
 

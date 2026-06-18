@@ -17,6 +17,16 @@ from src.storage import ProjectStorage
 
 logger = logging.getLogger(__name__)
 
+_OPS_PULT_JS = Path(__file__).resolve().parent / "static" / "ops-pult.js"
+
+
+def _ops_pult_js_version() -> str:
+    try:
+        return str(int(_OPS_PULT_JS.stat().st_mtime))
+    except OSError:
+        return "0"
+
+
 _LOG_TS = re.compile(
     r"^(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?)"
 )
@@ -105,6 +115,48 @@ th{background:#121820} .err{color:var(--bad)} .btn{font-size:.75rem;padding:.2re
   .ops-proxy-table-wrap{display:none}
   .ops-proxy-cards{display:grid}
 }
+.ops-lamp-bar{display:flex;flex-wrap:nowrap;gap:.5rem;overflow-x:auto;padding:.5rem 0;margin-bottom:.75rem;align-items:center}
+.ops-lamp{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .55rem;border-radius:6px;border:1px solid var(--line);font-size:.78rem;white-space:nowrap;flex-shrink:0;cursor:pointer;background:#121820}
+.ops-lamp--ok{border-color:var(--ok)} .ops-lamp--warn{border-color:var(--warn)} .ops-lamp--bad{border-color:var(--bad)}
+.ops-lamp__l1{margin-left:auto;flex-shrink:0;font-size:.78rem;color:var(--muted)}
+.ops-diagnosis{padding:.65rem .85rem;border-radius:8px;border-left:3px solid var(--bad);background:#2a1a1a;margin-bottom:.75rem}
+.ops-diagnosis--warn{border-left-color:var(--warn);background:#2a2418}
+.ops-diagnosis__action{margin-top:.5rem}
+.ops-diagnosis__action .btn{min-height:44px}
+.ops-funnel-grid{display:grid;gap:.65rem;grid-template-columns:repeat(2,1fr)}
+.ops-funnel-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.85rem}
+.ops-funnel-card__head{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;font-weight:600;font-size:.88rem}
+.ops-truth-ladder{display:flex;gap:.2rem;margin:.45rem 0}
+.ops-truth-step{flex:1;text-align:center;min-width:0}
+.ops-truth-step__label{font-size:.62rem;color:var(--muted);text-transform:uppercase}
+.ops-truth-step__dot{width:.6rem;height:.6rem;border-radius:50%;margin:.2rem auto 0;display:inline-block}
+.ops-truth-step__dot--ok{background:var(--ok)} .ops-truth-step__dot--warn{background:var(--warn)}
+.ops-truth-step__dot--bad{background:var(--bad)} .ops-truth-step__dot--na{background:var(--line)}
+.ops-truth-step.is-break .ops-truth-step__dot{box-shadow:0 0 0 2px var(--bad)}
+.ops-funnel-meta{font-size:.78rem;color:var(--muted)}
+.ops-tg-botapi{padding:.75rem;border:1px solid var(--line);border-radius:10px;margin-bottom:1rem;background:#151d28}
+.ops-tg-table{width:100%;font-size:.82rem}
+.ops-tg-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.85rem;margin-bottom:.5rem}
+.ops-tg-card__title{font-weight:600;margin-bottom:.35rem}
+.ops-tg-card__row{font-size:.82rem;color:var(--muted);margin:.15rem 0}
+.ops-tg-table-wrap{display:block}
+.ops-tg-cards{display:none;gap:.5rem}
+.btn-ghost{background:transparent;border:1px dashed var(--line)}
+@media (max-width:767px){
+  .ops-funnel-grid{grid-template-columns:1fr}
+  .ops-truth-ladder{flex-direction:column;gap:.25rem}
+  .ops-truth-step{display:flex;justify-content:space-between;align-items:center;text-align:left}
+  .ops-truth-step__label{text-transform:none;font-size:.8rem}
+  .ops-truth-step__dot{margin:0}
+  .ops-lamp__l1{margin-left:0}
+  .ops-tg-table-wrap{display:none}
+  .ops-tg-cards{display:grid}
+  .ops-tg-card .btn{width:100%;min-height:44px}
+  .ops-diagnosis__action .btn{width:100%}
+}
+@media (min-width:768px){
+  .ops-tg-cards{display:none}
+}
 </style>
 </head>
 <body>
@@ -118,14 +170,19 @@ __LOGIN_BLOCK__
 <button type="button" class="chip is-active" data-target="ops-summary">Сводка</button>
 <button type="button" class="chip" data-target="ops-bots">Боты</button>
 <button type="button" class="chip" data-target="ops-exchanges">Биржи</button>
+<button type="button" class="chip" data-target="ops-tg">TG</button>
 <button type="button" class="chip" data-target="ops-proxies">Прокси</button>
 <button type="button" class="chip" data-target="ops-controls">Управление</button>
 <button type="button" class="chip" data-target="ops-logs">Логи</button>
 <button type="button" class="chip" data-target="ops-leads">Лента</button>
 </nav>
 <section id="ops-summary">
-<p class="sub" id="rl-ops-status">__STATUS__</p>
-<div class="grid" id="rl-ops-cards">__CARDS__</div>
+<h3>Сводка</h3>
+<p class="sub">Жив ли радар · где обрыв воронки · что делать</p>
+<div class="ops-lamp-bar" id="rl-ops-lamp-bar">__FUNNEL_LAMPS__</div>
+<div id="rl-ops-diagnosis-wrap">__FUNNEL_DIAGNOSIS__</div>
+<div class="ops-funnel-grid" id="rl-ops-funnels">__FUNNEL_CARDS__</div>
+<p class="sub ctl-hint" id="rl-ops-funnel-hint">__FUNNEL_HINT__</p>
 </section>
 <section id="ops-bots"><h3>Боты</h3>
 <div class="grid" id="rl-ops-bots">__BOTS__</div>
@@ -134,6 +191,10 @@ __LOGIN_BLOCK__
 <section id="ops-exchanges"><h3>Биржи и скорость</h3>
 <div class="grid" id="rl-ops-ingest-sla">__INGEST_SLA__</div>
 <div class="grid" id="rl-ops-exchanges">__EXCHANGES__</div>
+</section>
+<section id="ops-tg"><h3>Telegram</h3>
+<p class="sub">Аккаунты парсинга · Bot API · без SSH</p>
+__TG_SECTION__
 </section>
 <section id="ops-proxies"><h3>Прокси</h3>
 __PROXIES__
@@ -201,6 +262,39 @@ def ops_login_html(*, show_error: bool = False) -> str:
     return _OPS_LOGIN_PAGE.replace("__ERROR__", err)
 
 
+_OPS_SETUP_PAGE = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>RawLead — пульт не настроен</title>
+<style>
+:root{--bg:#0f1419;--card:#1a2332;--line:#2a3544;--txt:#e8eaed;--muted:#94a3b8}
+*{box-sizing:border-box} body{font-family:system-ui,sans-serif;margin:0;padding:1.25rem;background:var(--bg);color:var(--txt)}
+.login-page{max-width:480px;margin:2rem auto}
+.login-logo{font-size:1.5rem;font-weight:700;margin:0 0 1rem;text-align:center}
+.login-box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem}
+.login-box p{margin:.35rem 0;line-height:1.45}
+.login-box code{font-size:.9rem;color:#cbd5e1}
+</style>
+</head>
+<body>
+<div class="login-page">
+<p class="login-logo">RawLead</p>
+<div class="login-box">
+<p><strong>Пульт не настроен</strong></p>
+<p>Задай <code>RAWLEAD_OPS_KEY=…</code> в <code>/opt/rawlead/.env.site</code> на VPS и перезапусти <code>rawlead-api</code>.</p>
+<p class="sub" style="color:var(--muted);font-size:.85rem">После этого открой <code>/ops/</code> снова — появится форма пароля.</p>
+</div>
+</div>
+</body>
+</html>"""
+
+
+def ops_setup_html() -> str:
+    return _OPS_SETUP_PAGE
+
+
 def _human_ago(ts: float | None) -> str:
     if ts is None:
         return "нет данных"
@@ -241,6 +335,27 @@ def _exchange_status_from_ok_at(ok_epoch: float | None) -> tuple[str, str, str]:
     return "bad", "🔴", "Не отвечает — нужна проверка"
 
 
+def _tg_exchange_status_from_pult(lamp: str, reason: str) -> tuple[str, str, str]:
+    reason = (reason or "").strip()
+    if lamp == "ok":
+        return "ok", "🟢", reason or "Работает"
+    if lamp == "warn":
+        return "warn", "🟡", reason or "Задержка — ждём следующего цикла"
+    if lamp == "error":
+        return "bad", "🔴", reason or "Не отвечает — нужна проверка"
+    return "bad", "🔴", reason or "Не отвечает — нужна проверка"
+
+
+_TG_LOG_LINE_EXCLUDE = re.compile(r"бот_start:.*skip", re.I)
+_TG_LOG_LINE_PREFER = (
+    "handler_ok",
+    "тг:пульс",
+    "listing:tg",
+    "health:tg",
+    "тг:сообщ",
+)
+
+
 def _last_log_line_for_source(source_id: str) -> str:
     path = _resolve_log_path()
     if path is None:
@@ -256,10 +371,18 @@ def _last_log_line_for_source(source_id: str) -> str:
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return ""
+    fallback = ""
     for line in reversed(lines[-800:]):
-        if any(n in line for n in keys):
-            return line.strip()[:160]
-    return ""
+        if not any(n in line for n in keys):
+            continue
+        if source_id == "tg" and _TG_LOG_LINE_EXCLUDE.search(line):
+            continue
+        stripped = line.strip()[:160]
+        if source_id == "tg" and any(p in line for p in _TG_LOG_LINE_PREFER):
+            return stripped
+        if not fallback:
+            fallback = stripped
+    return fallback
 
 
 def _parse_health_ok_epoch(health: dict[str, Any]) -> float | None:
@@ -281,368 +404,15 @@ _OPS_LOGIN_BLOCK = """<div class="login-box">
 </ol>
 </div>"""
 
-_OPS_SCRIPT_SSR = """<script>
-(function () {
-  var API = "__API_BASE__";
-  function ctlFetchErr(r, body) {
-    if (body && typeof body.detail === "string" && body.detail) return body.detail;
-    if (body && typeof body.message === "string" && body.message) return body.message;
-    return "HTTP " + r.status;
-  }
-  function showToast(msg, isErr) {
-    var el = document.getElementById("rl-toast");
-    if (!el) return;
-    el.textContent = msg || "";
-    el.style.borderColor = isErr ? "#7f1d1d" : "#334155";
-    el.classList.add("is-visible");
-    clearTimeout(showToast._t);
-    showToast._t = setTimeout(function () { el.classList.remove("is-visible"); }, 3000);
-  }
-  function postControl(body, btn, statusEl) {
-    if (statusEl) {
-      statusEl.className = "ctl-status is-working";
-      statusEl.innerHTML = '<span class="dot"></span><span>Выполняем…</span>';
-    }
-    if (btn) btn.disabled = true;
-    var old = btn ? btn.textContent : "";
-    if (btn) btn.textContent = "…";
-    return fetch(API + "/control", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    }).then(function (r) {
-      return r.json().catch(function () { return null; }).then(function (data) {
-        if (!r.ok) throw new Error(ctlFetchErr(r, data));
-        return data;
-      });
-    }).then(function (data) {
-      var msg = (data && data.message) ? data.message : "Команда отправлена";
-      if (statusEl) {
-        statusEl.className = "ctl-status is-ok";
-        statusEl.innerHTML = '<span class="dot"></span><span>' + msg + "</span>";
-      }
-      showToast(msg, false);
-      return data;
-    }).catch(function (e) {
-      var msg = (e && e.message) || "Команда не выполнена";
-      if (statusEl) {
-        statusEl.className = "ctl-status is-bad";
-        statusEl.innerHTML = '<span class="dot"></span><span>' + msg + "</span>";
-      }
-      showToast(msg, true);
-      throw e;
-    }).finally(function () {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = old;
-      }
-    });
-  }
-  document.querySelectorAll(".rl-ctl").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var action = btn.getAttribute("data-action") || "";
-      var target = btn.getAttribute("data-target") || "";
-      if (!action || !target) return;
-      var ctl = document.getElementById("rl-ops-control-status");
-      postControl({ action: action, target: target }, btn, ctl);
-    });
-  });
-  document.querySelectorAll(".rl-restart-source").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var target = btn.getAttribute("data-target") || "";
-      if (!target) return;
-      postControl({ action: "restart_source", target: target }, btn, null);
-    });
-  });
-  document.querySelectorAll(".rl-hide").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var id = btn.getAttribute("data-id");
-      btn.disabled = true;
-      fetch(API + "/leads/" + id + "/hide", {
-        method: "POST",
-        credentials: "same-origin"
-      }).then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        btn.textContent = "Скрыт";
-      }).catch(function () {
-        btn.disabled = false;
-        alert("Не удалось скрыть lead #" + id);
-      });
-    });
-  });
-  var supportEl = document.getElementById("rl-ops-support");
-  if (supportEl) {
-    fetch(API + "/support/tickets", {
-      credentials: "same-origin"
-    }).then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
-    }).then(function (data) {
-      var tickets = (data && data.tickets) || [];
-      if (!tickets.length) {
-        supportEl.innerHTML = "<p class=\\"sub\\">Тикетов пока нет.</p>";
-        return;
-      }
-      supportEl.innerHTML = tickets.map(function (t) {
-        var who = t.tg_username ? ("@" + t.tg_username) : (t.user_id || t.guest_token || "—");
-        return '<div class="card" style="margin-bottom:.75rem">'
-          + '<p><strong>#' + t.id + '</strong> · ' + who + ' · ' + (t.last_preview || "") + '</p>'
-          + '<textarea class="rl-ops-reply" data-id="' + t.id + '" rows="2" style="width:100%;margin:.35rem 0"></textarea>'
-          + '<button type="button" class="btn rl-ops-reply-btn" data-id="' + t.id + '">Ответить</button>'
-          + '</div>';
-      }).join("");
-      supportEl.querySelectorAll(".rl-ops-reply-btn").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          var id = btn.getAttribute("data-id");
-          var area = supportEl.querySelector('.rl-ops-reply[data-id="' + id + '"]');
-          var text = area ? area.value.trim() : "";
-          if (!text) return;
-          btn.disabled = true;
-          fetch(API + "/support/tickets/" + id + "/reply", {
-            method: "POST",
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text })
-          }).then(function (r) {
-            if (!r.ok) throw new Error("HTTP " + r.status);
-            btn.textContent = "Отправлено";
-            if (area) area.value = "";
-          }).catch(function () {
-            btn.disabled = false;
-            alert("Не удалось ответить в тикет #" + id);
-          });
-        });
-      });
-    }).catch(function () {
-      supportEl.innerHTML = "<p class=\\"err\\">Поддержка: ошибка загрузки.</p>";
-    });
-  }
-  function logClass(line) {
-    var s = line || "";
-    if (s.indexOf("── Цикл ──") >= 0) return "log-cycle";
-    if (/fetch:(fl|kwork|youdo)/.test(s)) return "log-fetch";
-    if (/listing:(fl|kwork|youdo).*parsed=/.test(s)) return "log-listing";
-    if (/wall-clock|watchdog|timeout/i.test(s)) return "log-warn";
-    if (/ошибка|error|err=|HTTP [45]/i.test(s)) return "log-err";
-    if (/тг:|tg:/i.test(s)) return "log-tg";
-    if (/neon_insert/.test(s)) return "log-neon";
-    return "";
-  }
-  function appendLogLine(pre, line, stick) {
-    if (!pre || !line) return;
-    var span = document.createElement("span");
-    var cls = logClass(line);
-    if (cls) span.className = cls;
-    span.textContent = line + "\\n";
-    pre.appendChild(span);
-    while (pre.childNodes.length > 800) pre.removeChild(pre.firstChild);
-    if (stick !== false) pre.scrollTop = pre.scrollHeight;
-  }
-  function bindLogStream() {
-    var pre = document.getElementById("rl-ops-log");
-    var pauseBtn = document.getElementById("rl-ops-log-pause");
-    var statusEl = document.getElementById("rl-ops-log-status");
-    if (!pre) return;
-    var paused = false;
-    var userScrolled = false;
-    pre.addEventListener("scroll", function () {
-      userScrolled = pre.scrollTop + pre.clientHeight < pre.scrollHeight - 40;
-    });
-    if (pauseBtn) {
-      pauseBtn.addEventListener("click", function () {
-        paused = !paused;
-        pauseBtn.textContent = paused ? "▶ Live" : "⏸ Пауза";
-        if (statusEl) statusEl.textContent = paused ? "Пауза" : "Live";
-        if (!paused) connect();
-      });
-    }
-    var es = null;
-    function connect() {
-      if (paused || typeof EventSource === "undefined") return;
-      if (es) { try { es.close(); } catch (e) {} es = null; }
-      es = new EventSource("/ops/log/stream");
-      es.onmessage = function (ev) {
-        if (paused) return;
-        var stick = !userScrolled;
-        appendLogLine(pre, ev.data || "", stick);
-      };
-      es.onerror = function () {
-        if (es) { try { es.close(); } catch (e) {} es = null; }
-        if (!paused) setTimeout(connect, 2000);
-      };
-    }
-    connect();
-  }
-  function refreshSummary() {
-    fetch(API + "/dashboard", { credentials: "same-origin" })
-      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-      .then(function (data) {
-        var cards = document.getElementById("rl-ops-cards");
-        if (!cards || !data) return;
-        var t = data.today || {};
-        var radar = data.radar || {};
-        var feed = data.feed || {};
-        var bot = data.bot || {};
-        var prob = data.problems || {};
-        function setCard(idx, val, hint) {
-          var card = cards.children[idx];
-          if (!card) return;
-          var valEl = card.querySelector(".val");
-          var hintEl = card.querySelector(".hint");
-          if (valEl) valEl.textContent = val;
-          if (hintEl && hint) hintEl.textContent = hint;
-        }
-        setCard(0, (t.visits || 0) + " просмотров",
-          "Уникальных: " + (t.unique_visits || 0) + " · Новых: " + (t.new_users || 0));
-        setCard(1, radar.status_label || "—", radar.hint || "");
-        setCard(2, (feed.visible_count || 0) + " заказов", "Видимых на /lenta/");
-        setCard(3, (bot.push_subscribers || 0) + " с push", "@rawlead_bot / @FLPARSINGBOT");
-        setCard(4, (prob.auth_errors_24h || 0) + " вход · " + (prob.fetch_errors_24h || 0) + " парсер",
-          "Детали — radar.log");
-        var updated = document.getElementById("rl-ops-updated");
-        if (updated) updated.textContent = "Обновлено " + new Date().toLocaleString("ru-RU");
-      }).catch(function () {});
-  }
-  bindLogStream();
-  setInterval(refreshSummary, 30000);
-  __NAV_PROXY_JS__
-})();
-</script>"""
+def _ops_script_block(api_base: str) -> str:
+    """External ops JS (CSP-safe) — see src/static/ops-pult.js."""
+    base = html.escape((api_base or "").strip().rstrip("/") or "/ops", quote=True)
+    v = _ops_pult_js_version()
+    return (
+        f'<meta name="rl-ops-api-base" content="{base}"/>'
+        f'<script src="/ops/static/ops-pult.js?v={v}"></script>'
+    )
 
-_OPS_NAV_PROXY_JS = r"""
-  function bindMiniNav() {
-    var nav = document.getElementById("rl-ops-mini-nav");
-    if (!nav) return;
-    var chips = nav.querySelectorAll(".chip");
-    var sections = ["ops-summary","ops-bots","ops-exchanges","ops-proxies","ops-controls","ops-logs","ops-leads"];
-    function setActive(id) {
-      chips.forEach(function (c) {
-        c.classList.toggle("is-active", c.getAttribute("data-target") === id);
-      });
-    }
-    chips.forEach(function (chip) {
-      chip.addEventListener("click", function () {
-        var id = chip.getAttribute("data-target") || "";
-        var el = document.getElementById(id);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-        setActive(id);
-      });
-    });
-    if (typeof IntersectionObserver !== "undefined") {
-      var io = new IntersectionObserver(function (entries) {
-        var best = null;
-        entries.forEach(function (e) {
-          if (e.isIntersecting) {
-            if (!best || e.intersectionRatio > best.ratio) {
-              best = { id: e.target.id, ratio: e.intersectionRatio };
-            }
-          }
-        });
-        if (best && best.id) setActive(best.id);
-      }, { rootMargin: "-20% 0px -55% 0px", threshold: [0.1, 0.35, 0.6] });
-      sections.forEach(function (sid) {
-        var el = document.getElementById(sid);
-        if (el) io.observe(el);
-      });
-    }
-  }
-  function setProxyStatus(kind, text) {
-    var el = document.getElementById("rl-ops-proxy-status");
-    if (!el) return;
-    el.className = "ctl-status" + (kind ? " is-" + kind : "");
-    el.innerHTML = '<span class="dot"></span><span>' + text + "</span>";
-  }
-  function showProbeResult(group, slot, probe) {
-    var box = document.getElementById("ops-probe-" + group + "-" + slot);
-    if (!box || !probe) return;
-    var tcp = probe.tcp || {};
-    var https = probe.https || {};
-    box.className = "ops-proxy-probe is-open";
-    box.innerHTML = "TCP: " + (tcp.ok ? "OK" : "FAIL") + " — " + (tcp.message || "")
-      + "<br>HTTPS: " + (https.ok ? "OK" : "FAIL") + " — " + (https.message || "")
-      + (https.target ? " → " + https.target : "");
-  }
-  function postProxyControl(body, btn) {
-    setProxyStatus("working", "Выполняем…");
-    if (btn) btn.disabled = true;
-    return fetch(API + "/control", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    }).then(function (r) {
-      return r.json().catch(function () { return null; }).then(function (data) {
-        if (!r.ok) throw new Error(ctlFetchErr(r, data));
-        return data;
-      });
-    }).then(function (data) {
-      if (data && data.ok === false) {
-        setProxyStatus("bad", (data && data.message) ? data.message : "Ошибка");
-        return data;
-      }
-      setProxyStatus("ok", (data && data.message) ? data.message : "Готово");
-      showToast((data && data.message) ? data.message : "Готово", false);
-      if (data && data.probe && body.group && body.slot) {
-        showProbeResult(body.group, body.slot, data.probe);
-      }
-      if (data && data.results) {
-        data.results.forEach(function (item) {
-          showProbeResult(item.group, item.slot, item.probe);
-        });
-      }
-      if (data && data.proxies && window.rlOpsRenderProxies) {
-        window.rlOpsRenderProxies(data.proxies);
-      }
-      return data;
-    }).catch(function (e) {
-      setProxyStatus("bad", (e && e.message) || "Ошибка");
-      showToast((e && e.message) || "Ошибка", true);
-      throw e;
-    }).finally(function () {
-      if (btn) btn.disabled = false;
-    });
-  }
-  function bindProxyControls() {
-    document.querySelectorAll(".rl-proxy-probe:not([data-bound])").forEach(function (btn) {
-      btn.setAttribute("data-bound", "1");
-      btn.addEventListener("click", function () {
-        postProxyControl({
-          target: "proxy",
-          action: "probe",
-          group: btn.getAttribute("data-group") || "",
-          slot: parseInt(btn.getAttribute("data-slot") || "0", 10)
-        }, btn);
-      });
-    });
-    document.querySelectorAll(".rl-proxy-switch:not([data-bound])").forEach(function (btn) {
-      btn.setAttribute("data-bound", "1");
-      btn.addEventListener("click", function () {
-        if (btn.disabled) return;
-        postProxyControl({
-          target: "proxy",
-          action: "switch",
-          group: btn.getAttribute("data-group") || "",
-          slot: parseInt(btn.getAttribute("data-slot") || "0", 10)
-        }, btn);
-      });
-    });
-    document.querySelectorAll(".rl-proxy-probe-all:not([data-bound])").forEach(function (allBtn) {
-      allBtn.setAttribute("data-bound", "1");
-      allBtn.addEventListener("click", function () {
-        postProxyControl({ target: "proxy", action: "probe-all" }, allBtn);
-      });
-    });
-    document.querySelectorAll(".rl-proxy-clear-bans:not([data-bound])").forEach(function (clearBtn) {
-      clearBtn.setAttribute("data-bound", "1");
-      clearBtn.addEventListener("click", function () {
-        postProxyControl({ target: "proxy", action: "clear-bans" }, clearBtn);
-      });
-    });
-  }
-  bindMiniNav();
-  bindProxyControls();
-"""
 
 _OPS_SCRIPT_CLIENT = """<script>
 (function () {
@@ -745,8 +515,14 @@ _OPS_SCRIPT_CLIENT = """<script>
     return r.json();
   }).then(function (data) {
     if (timer) clearTimeout(timer);
-    statusEl.textContent = "Обновлено " + new Date().toLocaleString("ru-RU");
-    statusEl.className = "sub";
+    if (statusEl) {
+      statusEl.textContent = "Обновлено " + new Date().toLocaleString("ru-RU");
+      statusEl.className = "sub";
+    }
+    if (!cardsEl) {
+      location.reload();
+      return;
+    }
     var t = data.today || {};
     var radar = data.radar || {};
     var feed = data.feed || {};
@@ -898,7 +674,14 @@ _OPS_SCRIPT_CLIENT = """<script>
           + '</p>' + actions + probe + '</div>';
       });
       var helpHtml = help ? '<p class="ops-proxy-group__help">' + help + '</p>' : "";
-      return '<div class="ops-proxy-group" data-group="' + gid + '"><h4>' + title + '</h4>' + helpHtml
+      var resNote = "";
+      if (group.residential_active) {
+        var ra = group.res_alive || 0;
+        var rt = group.res_total || 0;
+        resNote = '<p class="ops-proxy-group__help ops-proxy-residential">FL сейчас работает через residential ('
+          + ra + "/" + rt + " слотов)</p>";
+      }
+      return '<div class="ops-proxy-group" data-group="' + gid + '"><h4>' + title + '</h4>' + helpHtml + resNote
         + '<div class="ops-proxy-table-wrap"><table><thead><tr><th>#</th><th>Прокси</th><th>Что значит</th><th></th></tr></thead><tbody>'
         + rows + '</tbody></table></div><div class="ops-proxy-cards">' + cards + '</div></div>';
     }
@@ -1402,7 +1185,10 @@ def _format_ingest_hint(metrics: dict[str, dict[str, int | float | str]]) -> str
     return " | ".join(parts)
 
 
-def _exchange_ops_rows() -> list[dict[str, Any]]:
+def _exchange_ops_rows(
+    *,
+    _ingest: dict[str, dict[str, int | float | str]] | None = None,
+) -> list[dict[str, Any]]:
     sqlite = _resolve_sqlite_path()
     if sqlite is None:
         return []
@@ -1414,11 +1200,30 @@ def _exchange_ops_rows() -> list[dict[str, Any]]:
         storage = ProjectStorage(sqlite)
         summary = load_cycle_summary(storage)
         all_health = load_all_health(storage)
-        ingest = _ingest_metrics_snapshot()
+        ingest = _ingest if _ingest is not None else _ingest_metrics_snapshot()
     except Exception:
         return []
 
     rows: list[dict[str, Any]] = []
+    lead_counts: dict[str, dict[str, int]] = {}
+    try:
+        from config import load_config
+        from ops_funnel import _lead_counts_by_source
+
+        db_url = (load_config().database_url or os.environ.get("DATABASE_URL", "")).strip()
+        if db_url:
+            lead_counts = _lead_counts_by_source(db_url)
+    except Exception:
+        lead_counts = {}
+
+    tg_process_alive = False
+    try:
+        from health_check import is_tg_monitor_active
+
+        tg_process_alive = is_tg_monitor_active()
+    except Exception:
+        tg_process_alive = False
+
     for sid in health_source_ids():
         health = all_health.get(sid) or {}
         st = summary.sources.get(sid) if summary else None
@@ -1431,14 +1236,49 @@ def _exchange_ops_rows() -> list[dict[str, Any]]:
         )
         ok_epoch = _parse_health_ok_epoch(health)
         row["last_ok_ago"] = _human_ago(ok_epoch)
-        row["today_new_ids"] = int(health.get("last_new_ids", 0) or 0)
+        neon_today = int((lead_counts.get(sid) or {}).get("new_today", 0) or 0)
+        row["today_new_ids"] = neon_today
+        parsed = row.get("last_parsed_cards")
+        fresh = int(row.get("last_fresh_cards") or 0)
+        if parsed is not None and int(parsed) >= 0:
+            row["cycle_hint"] = f"за цикл: parsed={int(parsed)} fresh={fresh}"
+        else:
+            row["cycle_hint"] = ""
         row["last_log_line"] = _last_log_line_for_source(sid)
         row["error_kind"] = str(health.get("last_error_kind") or "ok")
         row["error_short"] = str(health.get("last_error_short") or "")
-        lvl, icon, status_ru = _exchange_status_from_ok_at(ok_epoch)
+        if sid == "tg":
+            try:
+                from radar_status import tg_pult_lamp_state
+
+                lamp, reason = tg_pult_lamp_state(
+                    storage,
+                    process_alive=tg_process_alive,
+                )
+                lvl, icon, status_ru = _tg_exchange_status_from_pult(lamp, reason)
+            except Exception:
+                lvl, icon, status_ru = _exchange_status_from_ok_at(ok_epoch)
+        else:
+            lvl, icon, status_ru = _exchange_status_from_ok_at(ok_epoch)
         row["exchange_level"] = lvl
         row["exchange_icon"] = icon
         row["exchange_status_ru"] = status_ru
+        if sid == "fl":
+            try:
+                from exchange_proxy import FL_DC_PARSED_INGEST_OK, fl_on_residential_tier, fl_residential_counts
+
+                if fl_on_residential_tier():
+                    alive, total = fl_residential_counts()
+                    row["fl_tier"] = "residential"
+                    row["fl_res_alive"] = alive
+                    row["fl_res_total"] = total
+                    row["residential_hint"] = f"резидентский fallback: {alive}/{total} alive"
+                    parsed_n = int(parsed or 0)
+                    if parsed_n >= FL_DC_PARSED_INGEST_OK and row["exchange_level"] == "bad":
+                        row["exchange_level"] = "warn"
+                        row["exchange_icon"] = "🟡"
+            except Exception:
+                pass
         err_human = _human_error_text(row["error_short"], row["error_kind"])
         if err_human and lvl != "ok":
             row["error_human"] = err_human
@@ -1448,24 +1288,49 @@ def _exchange_ops_rows() -> list[dict[str, Any]]:
     return rows
 
 
-def hide_lead(database_url: str, lead_id: int) -> bool:
+def hide_lead(
+    database_url: str,
+    lead_id: int,
+    *,
+    delist_reason: str = "owner_hide",
+) -> bool:
     url = database_url.strip()
     if not url:
         return False
+    reason = (delist_reason or "owner_hide").strip()[:64] or "owner_hide"
     with psycopg.connect(url) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 UPDATE leads
                 SET is_visible = FALSE,
-                    delist_reason = 'owner_hide'
+                    delist_reason = %s
                 WHERE id = %s AND is_visible = TRUE
                 """,
-                (int(lead_id),),
+                (reason, int(lead_id)),
             )
             ok = cur.rowcount > 0
         conn.commit()
     return ok
+
+
+def _degraded_funnel_payload(reason: str) -> dict[str, Any]:
+    text = (reason or "ошибка загрузки воронки").strip()[:240]
+    return {
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "sources": [],
+        "lamps": {},
+        "l1": {"status": "warn", "queue": 0, "label": "ошибка"},
+        "diagnosis": {"level": "warn", "text": text, "action": None},
+    }
+
+
+def _degraded_tg_payload(reason: str) -> dict[str, Any]:
+    return {
+        "accounts": [],
+        "botapi": {"level": "warn", "label": (reason or "ошибка TG")[:120]},
+        "queue": {},
+    }
 
 
 def fetch_dashboard(database_url: str) -> dict[str, Any]:
@@ -1591,6 +1456,10 @@ def fetch_dashboard(database_url: str) -> dict[str, Any]:
                     }
                 )
 
+    # Compute ingest once and share with _exchange_ops_rows to avoid a second Neon connection.
+    # funnel and tg are fetched separately by ops-pult.js (/ops/funnel + /ops/tg in parallel)
+    # so there is no need to duplicate that work here — removing them drops ~6s from this call.
+    ingest = _ingest_metrics_snapshot()
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "today": {
@@ -1610,11 +1479,27 @@ def fetch_dashboard(database_url: str) -> dict[str, Any]:
         "problems": count_log_errors(),
         "users": users,
         "pageviews": pageviews,
-        "exchanges": _exchange_ops_rows(),
-        "ingest": _ingest_metrics_snapshot(),
+        "exchanges": _exchange_ops_rows(_ingest=ingest),
+        "ingest": ingest,
         "delist": _delist_snapshot(),
         "proxies": _proxies_snapshot(),
     }
+
+
+def _safe_ops_funnel(database_url: str) -> dict[str, Any]:
+    try:
+        return fetch_ops_funnel(database_url)
+    except Exception as exc:
+        logger.exception("ops funnel: %s", exc)
+        return _degraded_funnel_payload(str(exc))
+
+
+def _safe_ops_tg() -> dict[str, Any]:
+    try:
+        return fetch_ops_tg()
+    except Exception as exc:
+        logger.exception("ops tg: %s", exc)
+        return _degraded_tg_payload(str(exc))
 
 
 def _proxies_snapshot() -> dict[str, Any]:
@@ -1629,6 +1514,249 @@ def _proxies_snapshot() -> dict[str, Any]:
 def _dot_html(level: str) -> str:
     lv = level if level in ("ok", "warn", "bad") else "ok"
     return f'<span class="dot dot--{lv}"></span>'
+
+
+def _lamp_icon(status: str) -> str:
+    return {"ok": "🟢", "warn": "🟡", "bad": "🔴"}.get(status, "🟡")
+
+
+def fetch_ops_funnel(database_url: str) -> dict[str, Any]:
+    sqlite = _resolve_sqlite_path()
+    if sqlite is None:
+        return {
+            "sources": [],
+            "lamps": {},
+            "l1": {"status": "warn", "queue": 0, "label": "нет SQLite"},
+            "diagnosis": None,
+        }
+    from ops_funnel import build_funnel_payload
+
+    try:
+        return build_funnel_payload(sqlite, database_url=database_url)
+    except Exception as exc:
+        logger.exception("build_funnel_payload: %s", exc)
+        return _degraded_funnel_payload(str(exc))
+
+
+def fetch_ops_tg() -> dict[str, Any]:
+    sqlite = _resolve_sqlite_path()
+    if sqlite is None:
+        return {"accounts": [], "botapi": {}, "queue": {}}
+    from ops_funnel import build_tg_payload
+
+    try:
+        return build_tg_payload(sqlite)
+    except Exception as exc:
+        logger.exception("build_tg_payload: %s", exc)
+        return _degraded_tg_payload(str(exc))
+
+
+def _render_funnel_lamps(funnel: dict[str, Any]) -> str:
+    lamps = funnel.get("lamps") or {}
+    l1 = funnel.get("l1") or {}
+    parts: list[str] = []
+    for key in ("radar", "fl", "kwork", "youdo", "tg"):
+        item = lamps.get(key) or {}
+        st = str(item.get("status") or "warn")
+        label = html.escape(str(item.get("label") or key))
+        parts.append(
+            f'<span class="ops-lamp ops-lamp--{html.escape(st)}">'
+            f"{_lamp_icon(st)} {label}</span>"
+        )
+    l1_st = str(l1.get("status") or "warn")
+    l1_label = html.escape(str(l1.get("label") or ""))
+    parts.append(
+        f'<span class="ops-lamp__l1">L1 {_lamp_icon(l1_st)} {l1_label}</span>'
+    )
+    return "".join(parts)
+
+
+def _render_funnel_diagnosis(funnel: dict[str, Any]) -> str:
+    diag = funnel.get("diagnosis")
+    if not diag or not diag.get("text"):
+        return '<div class="ops-diagnosis" id="rl-ops-diagnosis" hidden></div>'
+    level = str(diag.get("level") or "bad")
+    text = html.escape(str(diag.get("text") or ""))
+    action = diag.get("action") or {}
+    act_html = ""
+    if action.get("label"):
+        tgt = str(action.get("target") or "").strip()
+        act = str(action.get("action") or "").strip()
+        if tgt and act:
+            act_html = (
+                f'<div class="ops-diagnosis__action">'
+                f'<button type="button" class="btn rl-funnel-action" '
+                f'data-target="{html.escape(tgt)}" data-action="{html.escape(act)}">'
+                f'{html.escape(str(action.get("label") or ""))}</button></div>'
+            )
+        else:
+            act_html = (
+                f'<div class="ops-diagnosis__action">'
+                f'<button type="button" class="btn rl-funnel-action" '
+                f'data-scroll="{html.escape(str(action.get("scroll_to") or ""))}" '
+                f'data-group="{html.escape(str(action.get("group") or ""))}">'
+                f'{html.escape(str(action.get("label") or ""))}</button></div>'
+            )
+    icon = "🔴" if level == "bad" else "🟡"
+    cls = "ops-diagnosis" if level == "bad" else "ops-diagnosis ops-diagnosis--warn"
+    return f'<div class="{cls}" id="rl-ops-diagnosis">{icon} {text}{act_html}</div>'
+
+
+def _render_funnel_cards(funnel: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for src in funnel.get("sources") or []:
+        sid = html.escape(str(src.get("source_id") or ""))
+        name = html.escape(str(src.get("name") or sid))
+        headline = html.escape(str(src.get("headline") or ""))
+        steps_html: list[str] = []
+        for st in src.get("steps") or []:
+            step_id = html.escape(str(st.get("id") or ""))
+            status = html.escape(str(st.get("status") or "na"))
+            label = html.escape(str(st.get("label") or step_id))
+            tip = html.escape(str(st.get("tooltip") or ""))
+            brk = " is-break" if st.get("is_break") else ""
+            steps_html.append(
+                f'<div class="ops-truth-step{brk}" title="{tip}">'
+                f'<span class="ops-truth-step__label">{label}</span>'
+                f'<span class="ops-truth-step__dot ops-truth-step__dot--{status}"></span>'
+                f"</div>"
+            )
+        meta = src.get("meta") or {}
+        meta_line = (
+            f"parsed {meta.get('parsed', '—')} · new {meta.get('new', '—')}"
+            + (f" · lag {meta.get('lag_min')} мин" if meta.get("lag_min") is not None else "")
+        )
+        muted = src.get("muted_note")
+        muted_html = (
+            f'<p class="ops-funnel-meta">{html.escape(str(muted))}</p>' if muted else ""
+        )
+        tg_link = (
+            ' · <button type="button" class="btn btn-ghost rl-scroll-tg">Подробнее → TG</button>'
+            if str(src.get("source_id") or "") == "tg"
+            else ""
+        )
+        parts.append(
+            f'<div class="ops-funnel-card" id="ops-funnels-{sid}">'
+            f'<div class="ops-funnel-card__head"><span>{name}</span><span>{headline}</span></div>'
+            f'<div class="ops-truth-ladder">{"".join(steps_html)}</div>'
+            f'<p class="ops-funnel-meta">{html.escape(meta_line)}{tg_link}</p>{muted_html}'
+            f"</div>"
+        )
+    return "".join(parts) if parts else '<p class="sub">Нет данных воронки</p>'
+
+
+def _render_funnel_hint(funnel: dict[str, Any]) -> str:
+    age = funnel.get("cycle_age_min")
+    if age is None:
+        return "Обновлено при загрузке"
+    return f"Обновлено при загрузке · цикл радара {int(age)} мин назад"
+
+
+def _render_tg_section(tg: dict[str, Any]) -> str:
+    bot = tg.get("botapi") or {}
+    q = tg.get("queue") or {}
+    slot = int(bot.get("active_slot") or 0)
+    free = int(bot.get("free") or 0)
+    total = int(bot.get("total") or 0)
+    auto = "вкл" if bot.get("auto_failover") else "выкл"
+    last_sw = bot.get("last_switch_at")
+    last_html = (
+        f'<p class="sub">Последнее переключение: {html.escape(str(last_sw))}</p>'
+        if last_sw
+        else ""
+    )
+    botapi = (
+        f'<div class="ops-tg-botapi" id="rl-ops-tg-botapi">'
+        f"<p><strong>Bot API:</strong> слот {slot} ● активен · Авто: {auto} · "
+        f"свободно {free} из {total}</p>{last_html}"
+        f'<button type="button" class="btn btn-ghost rl-scroll-proxy-tg">'
+        f"Открыть прокси TG →</button></div>"
+    )
+    from ops_funnel import TG_LISTEN_TOOLTIP, TG_MSGS_TOOLTIP, tg_listen_line_ru, tg_queue_hint_ru
+
+    rows: list[str] = []
+    cards: list[str] = []
+    for acc in tg.get("accounts") or []:
+        aid = html.escape(str(acc.get("id") or ""))
+        lamp = str(acc.get("lamp") or "warn")
+        state_label = html.escape(str(acc.get("state_label") or ""))
+        lamp_reason = html.escape(str(acc.get("lamp_reason_ru") or ""))
+        listen_title = html.escape(str(acc.get("listen_title") or TG_LISTEN_TOOLTIP))
+        listen_line = html.escape(
+            str(
+                acc.get("listen_line")
+                or tg_listen_line_ru(
+                    int(acc.get("peers_count") or acc.get("listen_count") or 0),
+                    int(acc.get("file_count") or 0),
+                    int(acc.get("filter_count") or 0),
+                )
+            )
+        )
+        msg_bits: list[str] = []
+        msgs_line = html.escape(
+            str(acc.get("msgs_line") or "—")
+        )
+        msgs_title = html.escape(str(acc.get("msgs_title") or TG_MSGS_TOOLTIP))
+        join_label = html.escape(str(acc.get("join_label") or "—"))
+        strikes = html.escape(str(acc.get("strikes") or "0/3"))
+        if acc.get("join_status") == "pending":
+            actions = (
+                f'<button type="button" class="btn rl-tg-ctl" data-action="tg-join-tick" '
+                f'data-target="tg">Докрутить join</button>'
+            )
+        else:
+            actions = (
+                f'<button type="button" class="btn rl-tg-ctl" data-action="tg-join-restart" '
+                f'data-target="tg">Перезапустить join</button>'
+            )
+        actions += ' <button type="button" class="btn" disabled title="Скоро">CRUD</button>'
+        rows.append(
+            f'<tr><td title="Номер TG на VPS: acc1/acc2/acc3">{aid}</td>'
+            f'<td title="{lamp_reason}">{_lamp_icon(lamp)} {state_label}</td>'
+            f'<td title="{listen_title}">{listen_line}</td>'
+            f'<td title="{msgs_title}">{msgs_line}</td>'
+            f'<td title="Статус очереди join для этого acc">{join_label}</td>'
+            f'<td title="3 подряд fail → пауза вступлений">{strikes}</td>'
+            f"<td>{actions}</td></tr>"
+        )
+        cards.append(
+            f'<div class="ops-tg-card"><p class="ops-tg-card__title" title="{lamp_reason}">{aid.upper()} · '
+            f"{_lamp_icon(lamp)} {state_label}</p>"
+            f'<p class="ops-tg-card__row" title="{listen_title}">{listen_line}</p>'
+            f'<p class="ops-tg-card__row" title="{msgs_title}">{msgs_line} · вступления {join_label}</p>'
+            f'<p class="ops-tg-card__row">Ошибки join {strikes}</p>{actions}</div>'
+        )
+    table = (
+        '<div class="ops-tg-table-wrap"><table class="ops-tg-table">'
+        '<thead><tr><th title="Номер TG на VPS: acc1/acc2/acc3">Аккаунт</th>'
+        "<th>Состояние</th>"
+        '<th title="Сейчас в эфире / Вступили / После фильтра — три числа">Слушают</th>'
+        '<th title="Сессия = с последнего рестарта радара · Всего = накопительно">Сообщения</th>'
+        '<th title="Статус очереди join для этого acc">Вступления</th>'
+        '<th title="3 подряд fail → пауза вступлений">Ошибки join</th>'
+        "<th>Действия</th></tr></thead>"
+        f'<tbody id="rl-ops-tg-tbody">{"".join(rows)}</tbody></table></div>'
+    )
+    cards_html = f'<div class="ops-tg-cards" id="rl-ops-tg-cards">{"".join(cards)}</div>'
+    hint = html.escape(
+        str(
+            q.get("hint_ru")
+            or tg_queue_hint_ru(
+                int(q.get("done") or 0),
+                int(q.get("pending") or 0),
+                int(q.get("fail") or 0),
+                int(q.get("max_per_hour") or 0),
+            )
+        )
+    )
+    status = (
+        '<div id="rl-ops-tg-status" class="ctl-status"><span class="dot"></span>'
+        "<span>Ожидание</span></div>"
+    )
+    return botapi + table + cards_html + (
+        f'<p class="sub ctl-hint" id="rl-ops-tg-queue-hint" '
+        f'title="Статус CSV-очереди join по всем аккаунтам">{hint}</p>'
+    ) + status
 
 
 def _card_html(title: str, value: str, hint: str, level: str) -> str:
@@ -1731,6 +1859,14 @@ def _render_exchanges(data: dict[str, Any]) -> str:
         level = str(row.get("exchange_level") or row.get("level") or "warn")
         ago = html.escape(str(row.get("last_ok_ago") or "нет данных"))
         today_new = int(row.get("today_new_ids") or 0)
+        cycle_hint = html.escape(str(row.get("cycle_hint") or ""))
+        cycle_block = (
+            f'<p class="exchange-meta">{cycle_hint}</p>' if cycle_hint else ""
+        )
+        tier_hint = html.escape(str(row.get("residential_hint") or ""))
+        tier_block = (
+            f'<p class="exchange-meta">{tier_hint}</p>' if tier_hint else ""
+        )
         last_line = html.escape(str(row.get("last_log_line") or row.get("listing_line") or "—"))
         err_human = html.escape(str(row.get("error_human") or ""))
         err_block = f'<p class="exchange-meta err">{err_human}</p>' if err_human else ""
@@ -1746,6 +1882,8 @@ def _render_exchanges(data: dict[str, Any]) -> str:
             f'<p class="exchange-title">{icon} {name} — {status_ru}</p>'
             f'<p class="exchange-meta">Последний цикл: {ago}</p>'
             f'<p class="exchange-meta">Сегодня найдено новых заказов: {today_new}</p>'
+            f"{cycle_block}"
+            f"{tier_block}"
             f'<p class="exchange-meta">Последнее: {last_line}</p>'
             f"{err_block}"
             f'<div class="exchange-actions">{restart_btn}</div>'
@@ -2072,7 +2210,7 @@ def run_ops_control(
         from proxy_ops import run_proxy_control, strip_internal_urls
 
         result = run_proxy_control(action=a, group=group, slot=slot)
-        if result.get("ok") and a == "clear-bans":
+        if result.get("ok") and a in {"clear-bans", "clear-youdo-bans"}:
             import threading
 
             def _restart_after_clear_bans() -> None:
@@ -2123,8 +2261,15 @@ def run_ops_control(
         ok, msg = _restart_bot_poll()
         return {"ok": ok, "message": msg}
     if t == "delist" and a == "run":
-        ok, msg = _run_delist_batch_ops()
-        return {"ok": ok, "message": msg}
+        import threading
+
+        def _run_delist_bg() -> None:
+            ok, msg = _run_delist_batch_ops()
+            if not ok:
+                logger.warning("ops delist background: %s", msg)
+
+        threading.Thread(target=_run_delist_bg, daemon=True).start()
+        return {"ok": True, "message": "Проверка ссылок запущена в фоне (~2 мин)."}
     if a == "restart_source" and t in {"fl", "kwork", "youdo", "tg"}:
         sqlite = _resolve_sqlite_path()
         if sqlite is None:
@@ -2137,10 +2282,65 @@ def run_ops_control(
             "youdo": "YouDo",
             "tg": "Telegram",
         }
+        if t == "youdo":
+            from youdo_parser import youdo_hard_reset
+
+            youdo_hard_reset(reason="ops_restart_source", storage=storage)
+
+            import threading
+
+            def _restart_youdo_radar_bg() -> None:
+                ok_radar, msg_radar = _run_systemctl("restart", "rawlead-radar")
+                if not ok_radar:
+                    logger.warning("ops restart_source youdo: radar restart failed: %s", msg_radar)
+
+            threading.Thread(target=_restart_youdo_radar_bg, daemon=True).start()
+            return {
+                "ok": True,
+                "message": (
+                    "YouDo: сброс cooldown/guard, радар перезапускается (~30 с)"
+                ),
+            }
         return {
             "ok": True,
             "message": f"{labels[t]} перезапустится на следующем цикле (~2 мин)",
         }
+    if t == "tg" and a == "tg-join-tick":
+        try:
+            from health_check import is_tg_monitor_active
+        except Exception:
+            def is_tg_monitor_active() -> bool:
+                return False
+
+        if is_tg_monitor_active():
+            return {
+                "ok": True,
+                "message": "TG монитор активен — join идёт автоматически в tg_main",
+            }
+        return {
+            "ok": True,
+            "message": "Join tick: запустите tg_main / радар для автоматического join",
+        }
+    if t == "tg" and a == "tg-join-restart":
+        try:
+            from config import load_tg_join_config
+
+            cfg = load_tg_join_config()
+            if cfg.state_path.is_file():
+                import json
+
+                state = json.loads(cfg.state_path.read_text(encoding="utf-8"))
+                if isinstance(state, dict):
+                    for acc in state.values():
+                        if isinstance(acc, dict):
+                            acc["joins_this_hour"] = 0
+                    cfg.state_path.write_text(
+                        json.dumps(state, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8",
+                    )
+        except Exception as exc:
+            return {"ok": False, "message": f"join restart failed: {exc}"}
+        return {"ok": True, "message": "Join лимиты сброшены — следующий тик продолжит очередь"}
     return {"ok": False, "message": "Unsupported control target/action"}
 
 
@@ -2199,6 +2399,14 @@ def _render_proxy_group(group: dict[str, Any]) -> str:
     help_html = (
         f'<p class="ops-proxy-group__help">{html.escape(help_text)}</p>' if help_text else ""
     )
+    res_note = ""
+    if group.get("residential_active"):
+        alive = int(group.get("res_alive") or 0)
+        total = int(group.get("res_total") or 0)
+        res_note = (
+            f'<p class="ops-proxy-group__help ops-proxy-residential">'
+            f"FL сейчас работает через residential ({alive}/{total} слотов)</p>"
+        )
     slots = group.get("slots") or []
     if not slots:
         return f'<div class="ops-proxy-group"><h4>{title}</h4><p class="sub">Слотов нет</p></div>'
@@ -2234,7 +2442,7 @@ def _render_proxy_group(group: dict[str, Any]) -> str:
     rows_html = "".join(table_rows)
     return (
         f'<div class="ops-proxy-group" data-group="{html.escape(gid)}">'
-        f"<h4>{title}</h4>{help_html}"
+        f"<h4>{title}</h4>{help_html}{res_note}"
         f'<div class="ops-proxy-table-wrap"><table><thead><tr>'
         f"<th>#</th><th>Прокси</th><th>Что значит</th><th></th></tr></thead><tbody>"
         f"{rows_html}</tbody></table></div>"
@@ -2260,7 +2468,12 @@ def _render_proxies(data: dict[str, Any] | None) -> str:
     toolbar = (
         f'<div class="ops-proxy-toolbar">{badge}{last_hint}'
         f'<button type="button" class="btn rl-proxy-probe-all">Проверить все</button>'
-        f'<button type="button" class="btn rl-proxy-clear-bans">Сбросить баны</button>'
+        f'<button type="button" class="btn rl-proxy-clear-bans" '
+        f'title="Все биржи + TG — полный сброс банов">'
+        f"Сбросить баны</button>"
+        f'<button type="button" class="btn rl-proxy-clear-youdo-bans" '
+        f'title="Только YouDo DC + node — FL/Kwork не трогаем">'
+        f"Сбросить баны YouDo</button>"
         f"</div>"
         f'<div id="rl-ops-proxy-status" class="ctl-status"><span class="dot"></span>'
         f"<span>Ожидание команд прокси</span></div>"
@@ -2302,7 +2515,12 @@ def _proxy_shell_html() -> str:
         '<span class="ops-proxy-badge" title="Если прокси падает, система сама пробует следующий">'
         "Авто-переключение: вкл</span>"
         '<button type="button" class="btn rl-proxy-probe-all">Проверить все</button>'
-        '<button type="button" class="btn rl-proxy-clear-bans">Сбросить баны</button>'
+        '<button type="button" class="btn rl-proxy-clear-bans" '
+        'title="Все биржи + TG — полный сброс банов">'
+        "Сбросить баны</button>"
+        '<button type="button" class="btn rl-proxy-clear-youdo-bans" '
+        'title="Только YouDo DC + node — FL/Kwork не трогаем">'
+        "Сбросить баны YouDo</button>"
         "</div>"
         '<div id="rl-ops-proxy-status" class="ctl-status"><span class="dot"></span>'
         "<span>Ожидание команд прокси</span></div>"
@@ -2315,29 +2533,32 @@ def ops_html(
     api_base: str,
     data: dict[str, Any] | None = None,
     ops_authenticated: bool = False,
+    database_url: str = "",
 ) -> str:
     base = (api_base or "").strip().rstrip("/") or "/ops"
-    base_esc = html.escape(base, quote=True)
-    nav_js = _OPS_NAV_PROXY_JS
     logout_btn = (
         '<a href="/ops/logout" class="btn btn-logout">Выйти</a>' if ops_authenticated else ""
     )
     if data is not None:
         updated = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
         header_meta = f'<p class="sub" id="rl-ops-updated">Обновлено {updated}</p>'
-        script = (
-            _OPS_SCRIPT_SSR.replace("__API_BASE__", base_esc).replace("__NAV_PROXY_JS__", nav_js)
-        )
+        db_url = database_url.strip() or os.environ.get("DATABASE_URL", "").strip()
+        funnel = data.get("funnel") or fetch_ops_funnel(db_url)
+        tg = data.get("tg") or fetch_ops_tg()
+        script = _ops_script_block(base)
         return (
             _OPS_HTML.replace("__LOGIN_BLOCK__", "")
             .replace("__HEADER_META__", header_meta)
             .replace("__LOGOUT_BTN__", logout_btn)
-            .replace("__STATUS__", f"Обновлено {updated}")
-            .replace("__CARDS__", _render_cards(data))
+            .replace("__FUNNEL_LAMPS__", _render_funnel_lamps(funnel))
+            .replace("__FUNNEL_DIAGNOSIS__", _render_funnel_diagnosis(funnel))
+            .replace("__FUNNEL_CARDS__", _render_funnel_cards(funnel))
+            .replace("__FUNNEL_HINT__", _render_funnel_hint(funnel))
             .replace("__BOTS__", _render_bots(data))
             .replace("__BOTS_CTL__", _render_bots_ctl())
             .replace("__INGEST_SLA__", _render_ingest_sla(data))
             .replace("__EXCHANGES__", _render_exchanges(data))
+            .replace("__TG_SECTION__", _render_tg_section(tg))
             .replace("__PROXIES__", _render_proxies(data))
             .replace("__CONTROLS__", _render_controls())
             .replace("__DELIST_STATS__", _render_delist_stats(data))
@@ -2345,25 +2566,54 @@ def ops_html(
             .replace("__VIEWS__", _render_views_rows(data))
             .replace("__SCRIPT__", script)
         )
-    script = (
-        _OPS_SCRIPT_CLIENT.replace("__API_BASE__", base_esc)
-        .replace("__SSR__", "false")
-        .replace("__NAV_PROXY_JS__", nav_js)
-    )
+    if ops_authenticated:
+        script = _ops_script_block(base)
+        return (
+            _OPS_HTML.replace("__LOGIN_BLOCK__", "")
+            .replace("__HEADER_META__", '<p class="sub" id="rl-ops-updated">Загрузка…</p>')
+            .replace("__LOGOUT_BTN__", logout_btn)
+            .replace("__FUNNEL_LAMPS__", "")
+            .replace(
+                "__FUNNEL_DIAGNOSIS__",
+                '<div class="ops-diagnosis" id="rl-ops-diagnosis" hidden></div>',
+            )
+            .replace("__FUNNEL_CARDS__", '<p class="sub">Загрузка воронки…</p>')
+            .replace("__FUNNEL_HINT__", "Загрузка…")
+            .replace("__BOTS__", "")
+            .replace("__BOTS_CTL__", "")
+            .replace("__INGEST_SLA__", "")
+            .replace("__EXCHANGES__", "")
+            .replace(
+                "__TG_SECTION__",
+                '<div id="rl-ops-tg-botapi"></div>'
+                '<div class="ops-tg-table-wrap"><table><tbody id="rl-ops-tg-tbody"></tbody></table></div>'
+                '<div class="ops-tg-cards" id="rl-ops-tg-cards"></div>'
+                '<p class="sub" id="rl-ops-tg-queue-hint">Загрузка TG…</p>',
+            )
+            .replace("__PROXIES__", _proxy_shell_html())
+            .replace("__CONTROLS__", _render_controls())
+            .replace("__DELIST_STATS__", "")
+            .replace("__LEADS__", "")
+            .replace("__VIEWS__", "")
+            .replace("__SCRIPT__", script)
+        )
     return (
-        _OPS_HTML.replace("__LOGIN_BLOCK__", _OPS_LOGIN_BLOCK)
+        _OPS_HTML.replace("__LOGIN_BLOCK__", "")
         .replace("__HEADER_META__", '<p class="sub" id="rl-ops-updated">Нужен вход</p>')
         .replace("__LOGOUT_BTN__", "")
-        .replace("__STATUS__", "Нужен вход в кабинет (см. шаги ниже)")
-        .replace("__CARDS__", "")
+        .replace("__FUNNEL_LAMPS__", "")
+        .replace("__FUNNEL_DIAGNOSIS__", '<div class="ops-diagnosis" id="rl-ops-diagnosis" hidden></div>')
+        .replace("__FUNNEL_CARDS__", "")
+        .replace("__FUNNEL_HINT__", "Нужен вход")
         .replace("__BOTS__", "")
         .replace("__BOTS_CTL__", "")
         .replace("__INGEST_SLA__", "")
         .replace("__EXCHANGES__", "")
+        .replace("__TG_SECTION__", '<p class="sub">Нужен вход</p>')
         .replace("__PROXIES__", _proxy_shell_html())
         .replace("__CONTROLS__", "")
         .replace("__DELIST_STATS__", "")
         .replace("__LEADS__", "")
         .replace("__VIEWS__", "")
-        .replace("__SCRIPT__", script)
+        .replace("__SCRIPT__", "")
     )

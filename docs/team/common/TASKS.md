@@ -6,9 +6,7 @@
 
 ## Где мы (2026-06-18)
 
-**→ Now:** **O271** Neon → VPS Postgres · O200 ⏸ · O268 фон
-
-**Инцидент:** Neon compute quota exceeded · **миграция на local PG** (owner go) · autocleanup timer ✅ (03:15 −699 rows)
+**→ Now:** **O280** WP→Next до ads · O200 ⏸ · O271 ✅
 
 ---
 
@@ -16,9 +14,8 @@
 
 | # | Что | Кто | Статус |
 |---|-----|-----|--------|
-| **0** | **O271** Neon → VPS Postgres (full dump) | @coder + Lead ops | 🔴 P0 **2026-06-18** · ветка `o271/pre-vps-postgres-migration` |
-| **0b** | **O270** Neon quota probe + circuit breaker | @coder | ⏸ после O271 cutover |
-| **1** | **O200** L2 regen judge ≥70%×4 | @coder | ⏸ **blocked Neon** |
+| **0** | **O280** WP → Next UI `web/` | Claude Code + @coder | 🔴 **P0 owner** · [`WP_TO_NEXT_HANDOFF.md`](../architect/WP_TO_NEXT_HANDOFF.md) |
+| **1** | **O200** L2 regen judge ≥70%×4 | @coder | ⏸ |
 | **3** | **O237** Metrika goals UI | owner | ⏸ smoke отложен · код **1.19.20** ✅ prod |
 | **4** | **M1** TG test ads (≤5k ₽) | @lead-marketing + owner | ⏳ после O218 + L2 |
 | **5** | **Portfolio P0** skills + refs с нуля | @lead-portfolio + owner + Claude Code | ⏳ |

@@ -22,12 +22,21 @@ from config import (
 from radar_cycle_log import log_pipeline_line
 from tg_client import connect_client
 from tg_join_lib import (
+    first_pending_row,
+    has_pending_for_account,
     join_one,
-    pending_for_account,
-    read_queue_csv,
+    ordered_join_queue_paths,
     update_queue_row,
     write_queue_csv,
 )
+
+try:
+    from public_feed import append_link_to_allowlist, filter_listen_chat_ids
+except ModuleNotFoundError:
+    from src.public_feed import (  # type: ignore[no-redef]
+        append_link_to_allowlist,
+        filter_listen_chat_ids,
+    )
 
 
 @dataclass
@@ -35,6 +44,7 @@ class JoinTickResult:
     """Итог одного тика join."""
 
     new_listen_chat_ids: list[int] = field(default_factory=list)
+    new_listen_entries: list[dict[str, object]] = field(default_factory=list)
 
 
 def _radar_site_log_path():
@@ -137,32 +147,42 @@ async def run_join_tick(
         _save_state(cfg.state_path, state)
         return result
 
-    fieldnames, rows = read_queue_csv(cfg.queue_csv)
-    if not fieldnames:
-        log_join(cfg, f"join:fail account={account} reason=empty_queue_csv")
-        return result
+    fieldnames: list[str] = []
+    rows: list[dict[str, str]] = []
+    queue_paths = ordered_join_queue_paths()
+    queue_csv = cfg.queue_csv
 
-    pending = pending_for_account(account, rows)
-    if not pending:
+    if not has_pending_for_account(account, queue_paths):
         log_join(cfg, f"join:skip account={account} reason=no_pending")
         _save_state(cfg.state_path, state)
         return result
 
-    budget = min(remaining_hour, remaining_day, len(pending))
+    first = first_pending_row(account, queue_paths)
+    assert first is not None
+    queue_csv, fieldnames, rows, _ = first
+    if not fieldnames:
+        log_join(cfg, f"join:fail account={account} reason=empty_queue_csv")
+        return result
+
+    budget = min(remaining_hour, remaining_day)
     own_client = client is None
     if own_client:
         client = await connect_client(account)
     try:
-        for row in pending:
-            if budget <= 0:
+        while budget > 0:
+            found = first_pending_row(account, queue_paths)
+            if not found:
                 break
+            queue_csv, fieldnames, rows, row = found
 
             link = row.get("link", "").strip()
             name = row.get("name", "").strip() or link
             if not link:
+                row["status"] = "skip"
+                write_queue_csv(fieldnames, rows, queue_csv)
                 continue
 
-            log_join(cfg, f"join:wait account={account} link={link} name={name!r}")
+            log_join(cfg, f"join:wait account={account} link={link} name={name!r} queue={queue_csv.name}")
             if storage is not None:
                 from radar_status import record_tg_phase
 
@@ -177,7 +197,7 @@ async def run_join_tick(
                     status="done",
                     chat_id=join_result.chat_id,
                 )
-                write_queue_csv(fieldnames, rows, cfg.queue_csv)
+                write_queue_csv(fieldnames, rows, queue_csv)
                 acc_state["joins_this_hour"] = int(acc_state["joins_this_hour"]) + 1
                 acc_state["joins_today"] = int(acc_state["joins_today"]) + 1
                 acc_state["last_join_at"] = ts
@@ -214,10 +234,17 @@ async def run_join_tick(
                     record_tg_phase(
                         storage, account, "join ok", f"chat_id={cid}{already}"
                     )
+                if link:
+                    if append_link_to_allowlist(link):
+                        log_join(cfg, f"join:allowlist:add link={link}")
+                    else:
+                        log_join(cfg, f"join:allowlist:exists link={link}")
                 if join_result.chat_id is not None:
                     monitor_accounts = telethon_monitor_accounts()
                     if account in monitor_accounts:
                         ids_path = telethon_chat_ids_path_for_account(account)
+                        cid_int = int(join_result.chat_id)
+                        passed_filter = bool(filter_listen_chat_ids([cid_int]))
                         if append_telethon_chat_id(
                             join_result.chat_id,
                             ids_path,
@@ -228,7 +255,21 @@ async def run_join_tick(
                                 f"join:listen:add account={account} "
                                 f"chat_id={join_result.chat_id} path={ids_path}",
                             )
-                            result.new_listen_chat_ids.append(int(join_result.chat_id))
+                            result.new_listen_chat_ids.append(cid_int)
+                            result.new_listen_entries.append(
+                                {
+                                    "link": link,
+                                    "chat_id": cid_int,
+                                    "passed_filter": passed_filter,
+                                }
+                            )
+                            if not passed_filter:
+                                log_join(
+                                    cfg,
+                                    f"join:listen:filtered_out account={account} "
+                                    f"link={link} chat_id={cid_int} "
+                                    f"reason=not_in_allowlist",
+                                )
                         else:
                             log_join(
                                 cfg,
@@ -255,7 +296,7 @@ async def run_join_tick(
                     break
             else:
                 update_queue_row(rows, link, status="fail")
-                write_queue_csv(fieldnames, rows, cfg.queue_csv)
+                write_queue_csv(fieldnames, rows, queue_csv)
                 history = acc_state.setdefault("history", [])
                 history.append(
                     {

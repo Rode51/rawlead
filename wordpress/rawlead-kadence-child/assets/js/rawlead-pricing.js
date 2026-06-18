@@ -35,7 +35,14 @@
       "rl-price-card__checkout-note" + (isErr ? " rl-price-card__checkout-note--err" : "");
   }
 
+  function fireCheckoutGoal() {
+    if (window.rawleadMetrikaGoal) {
+      window.rawleadMetrikaGoal("rl_checkout_start");
+    }
+  }
+
   function redirectToLogin(kind) {
+    fireCheckoutGoal();
     var cabinet = cfg.cabinetUrl || "/cabinet/";
     var sep = cabinet.indexOf("?") >= 0 ? "&" : "?";
     window.location.href = cabinet + sep + "checkout=" + encodeURIComponent(kind || "subscription");
@@ -77,6 +84,7 @@
       })
       .then(function (data) {
         if (data && data.confirmation_url) {
+          fireCheckoutGoal();
           window.location.href = data.confirmation_url;
         }
         return data;

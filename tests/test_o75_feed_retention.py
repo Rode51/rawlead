@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from public_feed import FEED_VISIBILITY_DAYS, feed_visibility_where_sql
+from public_feed import FEED_ANON_DELAY_MINUTES, FEED_VISIBILITY_DAYS, feed_visibility_where_sql
 from api_server import _feed_where_sql
 
 
@@ -25,6 +25,7 @@ def test_feed_visibility_where_includes_age_and_visible() -> None:
 def test_feed_where_delay_param() -> None:
     sql, params = _feed_where_sql(apply_delay=True)
     assert "make_interval(mins => %s)" in sql
+    assert FEED_ANON_DELAY_MINUTES in params
     assert len(params) >= 3
 
 

@@ -280,6 +280,7 @@ class TestO168L2Gates(unittest.TestCase):
         self.assertIn("photoshop", user.casefold())
         self.assertIn("illustrator", user.casefold())
         self.assertIn("каждый", user.casefold())
+        self.assertIn("primary_category: design", user)
 
     def test_forbidden_word_fails_auto_audit(self) -> None:
         fails = validate_stored_l2_draft(

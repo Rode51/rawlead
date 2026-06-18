@@ -4,9 +4,9 @@
 
 from __future__ import annotations
 
-
-
 from datetime import datetime, timezone
+
+from public_feed import FEED_ANON_DELAY_MINUTES
 
 
 
@@ -180,7 +180,7 @@ def display_views(
 
 
 
-    if feed_delayed and age_min >= 15:
+    if feed_delayed and age_min >= FEED_ANON_DELAY_MINUTES:
 
         views += 6 + (lead_id % 5) + int(min(age_min, 120) * 0.08)
 

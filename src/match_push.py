@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import threading
 import time
@@ -24,13 +25,21 @@ from ai_analyze import (
     note_draft_request,
 )
 from config import Config, telegram_requests_proxies
+from lead_category import CATEGORIES, resolve_lead_category
 from public_feed import feed_visibility_where_sql
-from radar_cycle_log import SOURCE_LABELS
-from rank import keyword_match, parse_lead_tags, tags_as_weights
+from radar_cycle_log import SOURCE_LABELS, log_pipeline_line
+from rank import (
+    compatibility_match,
+    effective_user_tag_weights,
+    keyword_match,
+    parse_lead_tags,
+    user_quiz_niches_from_tags,
+)
 from reply_draft_strip import strip_reply_draft_price_deadline, strip_tg_draft_price_deadline
 from draft_limits import draft_hourly_limit, draft_warm_hourly_cap
-from skills_catalog import lead_tags_for_feed, normalize_user_tags
+from skills_catalog import lead_tags_for_feed
 from tools_catalog import normalize_tools_required, tools_from_tz_text
+from tg_proxy_pool import tg_http_request
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +48,44 @@ _LENTA_BASE = "https://rawlead.ru/lenta/"
 
 def _lenta_lead_url(lead_id: int) -> str:
     return f"{_LENTA_BASE}?lead={int(lead_id)}"
+
+
+def _uid8(user_id: Any) -> str:
+    """Log-safe first 8 chars (psycopg may return uuid.UUID)."""
+    return str(user_id)[:8]
+
+
+def _match_push_debug() -> bool:
+    raw = os.environ.get("MATCH_PUSH_DEBUG", "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
+def _log_push_line(log_path: Any, line: str, err: list[str]) -> None:
+    err.append(line)
+    log_pipeline_line(log_path, line)
+
+
+def _tg_api_fail_detail(resp: requests.Response) -> str:
+    if resp.status_code != 200:
+        return f"HTTP {resp.status_code}"
+    try:
+        body = resp.json()
+    except ValueError:
+        return f"HTTP {resp.status_code} non-json"
+    if body.get("ok"):
+        return ""
+    desc = str(body.get("description") or "not_ok")[:120]
+    return f"HTTP {resp.status_code} {desc}"
 _CABINET_URL = "https://rawlead.ru/cabinet/"
 _PUSH_MIN_MATCH_DEFAULT = 60
 _DRAFT_CALLBACK_RE = re.compile(r"^draft:(\d+)$")
+_NOPE_CALLBACK_RE = re.compile(r"^nope:(\d+)$")
 _DRAFT_WINDOW_SEC = 3600
 _ONDEMAND_L2_SEM = threading.Semaphore(2)
 _ONDEMAND_L2_BACKOFF_SEC = (0.5, 1)
 _draft_attempts: dict[str, deque[float]] = defaultdict(deque)
 _warm_attempts: dict[str, deque[float]] = defaultdict(deque)
+_draft_lock = threading.Lock()
 
 _LEAD_SELECT_COLS = """
     id, source, title, body, url, budget_text,
@@ -71,20 +110,52 @@ class DraftResult:
     keyword_match: int
 
 
+def _prune_draft_window(q: deque[float], now: float) -> None:
+    cutoff = now - _DRAFT_WINDOW_SEC
+    while q and q[0] < cutoff:
+        q.popleft()
+
+
+def draft_quota_for_user(user_id: str) -> dict[str, int]:
+    """O247: rolling 1h draft quota snapshot (read-only)."""
+    limit = draft_hourly_limit()
+    if limit <= 0:
+        return {
+            "draft_hourly_limit": 0,
+            "draft_used": 0,
+            "draft_remaining": 0,
+            "draft_retry_after_sec": 0,
+        }
+    with _draft_lock:
+        now = time.time()
+        q = _draft_attempts[user_id]
+        _prune_draft_window(q, now)
+        used = len(q)
+        remaining = max(0, limit - used)
+        retry = 0
+        if remaining <= 0 and q:
+            retry = max(1, int(_DRAFT_WINDOW_SEC - (now - q[0])))
+        return {
+            "draft_hourly_limit": limit,
+            "draft_used": used,
+            "draft_remaining": remaining,
+            "draft_retry_after_sec": retry,
+        }
+
+
 def draft_rate_limit_retry_after(user_id: str) -> int | None:
     """O48/O60b: DRAFT_HOURLY_LIMIT per user; 0 = без лимита."""
     limit = draft_hourly_limit()
     if limit <= 0:
         return None
-    now = time.time()
-    q = _draft_attempts[user_id]
-    cutoff = now - _DRAFT_WINDOW_SEC
-    while q and q[0] < cutoff:
-        q.popleft()
-    if len(q) >= limit:
-        return max(1, int(_DRAFT_WINDOW_SEC - (now - q[0])))
-    q.append(now)
-    return None
+    with _draft_lock:
+        now = time.time()
+        q = _draft_attempts[user_id]
+        _prune_draft_window(q, now)
+        if len(q) >= limit:
+            return max(1, int(_DRAFT_WINDOW_SEC - (now - q[0])))
+        q.append(now)
+        return None
 
 
 def warm_rate_limit_retry_after(user_id: str, *, consume: bool = True) -> int | None:
@@ -221,12 +292,23 @@ def _feed_where_sql() -> tuple[str, list[Any]]:
 
 
 def _load_user_tags(cur: Any, user_id: str) -> dict[str, float]:
+    """O250d: same loader as api_server._load_user_tags (weights + decay)."""
+    from config import load_config
+    from pg_storage import _ensure_user_tags_columns
+
+    url = (load_config().database_url or "").strip()
+    if url:
+        _ensure_user_tags_columns(url)
     cur.execute(
-        "SELECT tag FROM user_tags WHERE user_id = %s::uuid ORDER BY tag",
+        """
+        SELECT tag, COALESCE(weight, 1.0), last_active_at
+        FROM user_tags
+        WHERE user_id = %s::uuid
+        ORDER BY tag
+        """,
         (user_id,),
     )
-    tags = normalize_user_tags([row[0] for row in cur.fetchall()])
-    return tags_as_weights(tags)
+    return effective_user_tag_weights(cur.fetchall())
 
 
 def _canonical_lead_tags(raw: Any) -> list[str]:
@@ -277,11 +359,14 @@ def _lite_from_lead_row(row: tuple[Any, ...]) -> AiLiteAnalysis:
     tags = _canonical_lead_tags(row[8])
     v = (row[7] or "OK").strip().casefold()
     hidden = v in ("мимо", "пропустить", "skip")
+    cat_raw = (row[11] or "").strip()
+    primary_category = cat_raw if cat_raw in CATEGORIES else ""
     return AiLiteAnalysis(
         feed_visible=not hidden,
         task_summary=(row[12] or "").strip() or (row[3] or "")[:400],
         lead_tags=tuple(tags),
         ai_reasons=tuple(_parse_ai_reasons(row[9])),
+        primary_category=primary_category,
     )
 
 
@@ -379,18 +464,18 @@ def _format_push_text(
 
 
 def _push_keyboard(*, show_generate: bool, lead_id: int, order_url: str = "") -> str:
+    del show_generate  # O265: premium gate in draft callback, not keyboard layout
     order = (order_url or "").strip() or _LENTA_BASE
-    rows: list[list[dict[str, str]]] = []
-    if show_generate:
-        rows.append(
-            [{"text": "Сгенерировать отклик", "callback_data": f"draft:{lead_id}"}]
-        )
-    rows.append(
+    rows: list[list[dict[str, str]]] = [
         [
-            {"text": "Открыть заказ", "url": order},
-            {"text": "Лента", "url": _lenta_lead_url(lead_id)},
-        ]
-    )
+            {"text": "Не моё", "callback_data": f"nope:{lead_id}"},
+            {"text": "Отклик", "callback_data": f"draft:{lead_id}"},
+        ],
+        [
+            {"text": "Смотреть в ленте", "url": _lenta_lead_url(lead_id)},
+            {"text": "Смотреть на бирже", "url": order},
+        ],
+    ]
     return json.dumps({"inline_keyboard": rows}, ensure_ascii=False)
 
 
@@ -402,8 +487,7 @@ def _send_push_message(
     lead_id: int,
     show_generate: bool,
     order_url: str = "",
-) -> bool:
-    proxies = telegram_requests_proxies(cfg)
+) -> tuple[bool, str]:
     api_url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/sendMessage"
     markup = _push_keyboard(
         show_generate=show_generate, lead_id=lead_id, order_url=order_url
@@ -411,8 +495,10 @@ def _send_push_message(
     try:
         session = requests.Session()
         session.trust_env = False
-        resp = session.post(
+        resp = tg_http_request(
+            "POST",
             api_url,
+            session=session,
             data={
                 "chat_id": str(chat_id),
                 "text": text,
@@ -420,14 +506,15 @@ def _send_push_message(
                 "disable_web_page_preview": True,
             },
             timeout=20.0,
-            proxies=proxies,
         )
         if resp.status_code != 200:
-            return False
+            return False, _tg_api_fail_detail(resp)
         body = resp.json()
-        return bool(body.get("ok"))
-    except requests.RequestException:
-        return False
+        if not body.get("ok"):
+            return False, _tg_api_fail_detail(resp)
+        return True, ""
+    except requests.RequestException as exc:
+        return False, type(exc).__name__
 
 
 def _normalize_order_url(url: str) -> str:
@@ -638,7 +725,7 @@ def materialize_shared_draft_for_user(
             _insert_user_draft(cur, user_id, lead_id, reply)
             conn.commit()
             mode = "fallback_shared" if fallback_shared else "personalized"
-            logger.info("%s%s lead=%s user=%s", prefix, mode, lead_id, user_id[:8])
+            logger.info("%s%s lead=%s user=%s", prefix, mode, lead_id, _uid8(user_id))
             if tools:
                 row = _fetch_lead_row(cur, lead_id) or row
             return _draft_result_from_row(cur, user_id, row, reply)
@@ -676,14 +763,14 @@ def generate_and_store_lead_draft(
         retry_after = draft_rate_limit_retry_after(user_id)
         if retry_after is not None:
             lim = draft_hourly_limit()
-            raise DraftError("rate_limit", f"max {lim}/hour")
+            raise DraftError("rate_limit", f"Лимит — {lim} черновиков в час")
 
     prefix = log_prefix or f"draft:{lead_id}:"
     ai_errors: list[str] = []
     from draft_trace import DraftTimer, log_draft_stage
 
     trace = DraftTimer()
-    log_draft_stage(prefix, stage="start", timer=trace, lead_id=lead_id, user_id=user_id[:8])
+    log_draft_stage(prefix, stage="start", timer=trace, lead_id=lead_id, user_id=_uid8(user_id))
     with psycopg.connect(cfg.database_url) as conn:
         with conn.cursor() as cur:
             if not _user_effective_access(cur, user_id):
@@ -707,7 +794,7 @@ def generate_and_store_lead_draft(
                     timer=trace,
                     lead_id=lead_id,
                     path="cache_hit",
-                    user_id=user_id[:8],
+                    user_id=_uid8(user_id),
                 )
                 return _draft_result_from_row(cur, user_id, row, saved)
 
@@ -749,9 +836,9 @@ def generate_and_store_lead_draft(
                 )
                 _insert_user_draft(cur, user_id, lead_id, reply)
                 conn.commit()
-                logger.info("%sfast_shared lead=%s user=%s", prefix, lead_id, user_id[:8])
+                logger.info("%sfast_shared lead=%s user=%s", prefix, lead_id, _uid8(user_id))
                 if fallback_shared:
-                    logger.warning("%sfallback_shared lead=%s user=%s", prefix, lead_id, user_id[:8])
+                    logger.warning("%sfallback_shared lead=%s user=%s", prefix, lead_id, _uid8(user_id))
                 note_draft_request(True)
                 log_draft_stage(
                     prefix,
@@ -759,7 +846,7 @@ def generate_and_store_lead_draft(
                     timer=trace,
                     lead_id=lead_id,
                     path="fast_shared",
-                    user_id=user_id[:8],
+                    user_id=_uid8(user_id),
                 )
                 if tools:
                     row = _fetch_lead_row(cur, lead_id) or row
@@ -825,7 +912,7 @@ def generate_and_store_lead_draft(
                 "%sfirst_user_l2_only lead=%s user=%s",
                 prefix,
                 lead_id,
-                user_id[:8],
+                _uid8(user_id),
             )
             log_draft_stage(
                 prefix,
@@ -833,7 +920,7 @@ def generate_and_store_lead_draft(
                 timer=trace,
                 lead_id=lead_id,
                 path="cold_l2",
-                user_id=user_id[:8],
+                user_id=_uid8(user_id),
             )
 
     note_draft_request(True)
@@ -942,7 +1029,61 @@ def _send_tg_draft_result(
         f"→ Inbox: {_CABINET_URL}"
     )
     _send_draft_reply(cfg, chat_id, body, errors)
-    errors.append(f"tg:draft:ok user={user_id[:8]} lead={lead_id}")
+    errors.append(f"tg:draft:ok user={_uid8(user_id)} lead={lead_id}")
+    from api_server import _apply_tag_weight_event_for_lead
+
+    _apply_tag_weight_event_for_lead(user_id, lead_id, "draft")
+
+
+def handle_tg_nope_callback(
+    cfg: Config,
+    callback_query: dict[str, Any],
+    errors: list[str],
+) -> bool:
+    """O265: callback nope:{lead_id} → push_nope weight on lead tags."""
+    data = str(callback_query.get("data") or "").strip()
+    m = _NOPE_CALLBACK_RE.match(data)
+    if not m:
+        return False
+
+    lead_id = int(m.group(1))
+    from_user = callback_query.get("from") or {}
+    tg_user_id = from_user.get("id")
+    callback_id = callback_query.get("id")
+
+    if tg_user_id is None:
+        errors.append(f"tg:push:nope:skip lead={lead_id} missing from")
+        return True
+
+    _answer_callback_query(cfg, str(callback_id), "Учтём в профиле", errors)
+
+    if not cfg.database_url.strip():
+        errors.append(f"tg:push:nope:skip lead={lead_id} no_db")
+        return True
+
+    try:
+        with psycopg.connect(cfg.database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id FROM users WHERE tg_user_id = %s",
+                    (int(tg_user_id),),
+                )
+                row = cur.fetchone()
+                if not row:
+                    errors.append(f"tg:push:nope:skip lead={lead_id} no_user")
+                    return True
+                user_id = str(row[0])
+    except Exception as exc:
+        logger.warning("tg:push:nope lead=%s: %s", lead_id, exc)
+        errors.append(f"tg:push:nope:err lead={lead_id}")
+        return True
+
+    from api_server import _apply_tag_weight_event_for_lead
+
+    _apply_tag_weight_event_for_lead(user_id, lead_id, "push_nope")
+    logger.info("tg:push:nope lead=%s user=%s", lead_id, _uid8(user_id))
+    errors.append(f"tg:push:nope lead={lead_id} user={_uid8(user_id)}")
+    return True
 
 
 def handle_tg_draft_callback(
@@ -976,8 +1117,6 @@ def handle_tg_draft_callback(
         errors.append(f"tg:draft:skip lead={lead_id} missing from/chat")
         return True
 
-    _answer_callback_query(cfg, str(callback_id), "Генерирую отклик…", errors)
-
     if not cfg.database_url.strip():
         _log_draft_mute(errors, chat_id=int(chat_id), code="no_db")
         return True
@@ -998,6 +1137,37 @@ def handle_tg_draft_callback(
                     )
                     return True
                 user_id = str(row[0])
+                if not _user_effective_access(cur, user_id):
+                    _answer_callback_query(
+                        cfg,
+                        str(callback_id),
+                        f"Нужна подписка — {_CABINET_URL}",
+                        errors,
+                    )
+                    _log_draft_mute(
+                        errors,
+                        chat_id=int(chat_id),
+                        code="forbidden",
+                    )
+                    return True
+
+                retry_after = draft_rate_limit_retry_after(user_id)
+                if retry_after is not None:
+                    lim = draft_hourly_limit()
+                    _answer_callback_query(
+                        cfg,
+                        str(callback_id),
+                        f"Лимит — {lim} черновиков в час",
+                        errors,
+                    )
+                    _log_draft_mute(
+                        errors,
+                        chat_id=int(chat_id),
+                        code="rate_limit",
+                    )
+                    return True
+
+        _answer_callback_query(cfg, str(callback_id), "Генерирую отклик…", errors)
 
         from draft_async import poll_draft, submit_draft
 
@@ -1128,6 +1298,23 @@ def _send_draft_reply(
         err.append(f"tg:draft:send:err {type(exc).__name__}")
 
 
+def _push_km_for_lead_row(
+    row: tuple[Any, ...],
+    user_tags: dict[str, float],
+) -> int | None:
+    """O250b: same km as feed (`api_server._km_for_lead_row`)."""
+    tags = _canonical_lead_tags(row[8])
+    category = resolve_lead_category(row[11], row[2] or "", row[3] or "", tags)
+    if not user_tags:
+        return 0
+    return compatibility_match(
+        tags,
+        user_tags,
+        lead_category=category,
+        user_quiz_niches=user_quiz_niches_from_tags(user_tags),
+    )
+
+
 def push_match_for_lead(
     cfg: Config,
     lead_id: int,
@@ -1136,6 +1323,7 @@ def push_match_for_lead(
     task_summary: str,
     lead_tags: list[str],
     errors: list[str] | None = None,
+    log_path: Any = None,
 ) -> int:
     """
     После L1 visible lead: каждому paid/beta с tg_chat_id + push_enabled
@@ -1147,13 +1335,19 @@ def push_match_for_lead(
     err = errors if errors is not None else []
     now = datetime.now(timezone.utc)
     sent = 0
+    debug = _match_push_debug()
+    radar_log = log_path if log_path is not None else cfg.radar_log_path
 
     try:
         with psycopg.connect(cfg.database_url) as conn:
             with conn.cursor() as cur:
                 row = _fetch_lead_row(cur, lead_id)
                 if row is None:
-                    err.append(f"push:match:lead_missing id={lead_id}")
+                    _log_push_line(
+                        radar_log,
+                        f"push:match:lead_missing id={lead_id}",
+                        err,
+                    )
                     return 0
 
                 lead_title = (row[2] or title or "").strip()
@@ -1193,8 +1387,20 @@ def push_match_for_lead(
                     push_enabled,
                 ) in cur.fetchall():
                     if chat_id is None:
+                        if debug:
+                            _log_push_line(
+                                radar_log,
+                                f"push:match:skip user={_uid8(user_id)} lead={lead_id} reason=no_chat",
+                                err,
+                            )
                         continue
                     if not bool(push_enabled):
+                        if debug:
+                            _log_push_line(
+                                radar_log,
+                                f"push:match:skip user={_uid8(user_id)} lead={lead_id} reason=push_off",
+                                err,
+                            )
                         continue
                     plan_str = str(plan or "free")
                     is_act = bool(is_active)
@@ -1205,12 +1411,33 @@ def push_match_for_lead(
                         now,
                         active_until=active_until,
                     ):
+                        if debug:
+                            _log_push_line(
+                                radar_log,
+                                f"push:match:skip user={_uid8(user_id)} lead={lead_id} reason=plan",
+                                err,
+                            )
                         continue
                     user_tags = _load_user_tags(cur, str(user_id))
                     if not user_tags:
+                        if debug:
+                            _log_push_line(
+                                radar_log,
+                                f"push:match:skip user={_uid8(user_id)} lead={lead_id} reason=tags",
+                                err,
+                            )
                         continue
-                    km = keyword_match(card_tags, user_tags)
-                    if km < int(push_min_match):
+                    km = _push_km_for_lead_row(row, user_tags)
+                    if km is None or km < int(push_min_match):
+                        if debug:
+                            feed_km = km
+                            skip_line = (
+                                f"push:match:skip user={_uid8(user_id)} lead={lead_id} "
+                                f"reason=km km={km} thr={push_min_match}"
+                            )
+                            if feed_km is not None:
+                                skip_line += f" feed_km={feed_km} push_km={km}"
+                            _log_push_line(radar_log, skip_line, err)
                         continue
                     cur.execute(
                         """
@@ -1220,6 +1447,12 @@ def push_match_for_lead(
                         (user_id, lead_id),
                     )
                     if cur.fetchone():
+                        if debug:
+                            _log_push_line(
+                                radar_log,
+                                f"push:match:skip user={_uid8(user_id)} lead={lead_id} reason=dedup",
+                                err,
+                            )
                         continue
                     if _user_already_pushed_for_order(
                         cur,
@@ -1228,6 +1461,12 @@ def push_match_for_lead(
                         external_id=lead_external_id,
                         order_url=lead_order_url,
                     ):
+                        if debug:
+                            _log_push_line(
+                                radar_log,
+                                f"push:match:skip user={_uid8(user_id)} lead={lead_id} reason=dedup_order",
+                                err,
+                            )
                         continue
                     show_generate = _user_effective_access(cur, str(user_id))
                     text = _format_push_text(
@@ -1240,15 +1479,21 @@ def push_match_for_lead(
                         tools_required=tools,
                         order_url=lead_order_url,
                     )
-                    if not _send_push_message(
+                    sent_ok, fail_detail = _send_push_message(
                         cfg,
                         chat_id,
                         text,
                         lead_id=lead_id,
                         show_generate=show_generate,
                         order_url=lead_order_url,
-                    ):
-                        err.append(f"push:match:fail user={user_id[:8]} lead={lead_id}")
+                    )
+                    if not sent_ok:
+                        fail_line = (
+                            f"push:match:fail user={_uid8(user_id)} lead={lead_id}"
+                        )
+                        if fail_detail:
+                            fail_line += f" {fail_detail}"
+                        _log_push_line(radar_log, fail_line, err)
                         continue
                     cur.execute(
                         """
@@ -1258,14 +1503,15 @@ def push_match_for_lead(
                         """,
                         (user_id, lead_id),
                     )
-                    err.append(
-                        f"push:match:user={user_id[:8]} lead={lead_id} km={km} thr={push_min_match}"
+                    ok_line = (
+                        f"push:match:user={_uid8(user_id)} lead={lead_id} km={km} thr={push_min_match}"
                     )
+                    _log_push_line(radar_log, ok_line, err)
                     sent += 1
                 conn.commit()
     except Exception as exc:
         logger.warning("push_match_for_lead %d: %s", lead_id, exc)
-        err.append(f"push:match:err lead={lead_id}:{exc}")
+        _log_push_line(radar_log, f"push:match:err lead={lead_id}:{exc}", err)
 
     return sent
 

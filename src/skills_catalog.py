@@ -297,8 +297,6 @@ _V02_MERGE_ALIASES: dict[str, str] = {
     "resume_cv_writing": "technical_writing",
 }
 
-_USER_MAX_TAGS = 12
-
 # O94 v0.5 — 4-niche tree picker (SKILLS_TOOLS_CATALOG v0.5)
 DEV_USE_CASE_L1: tuple[str, ...] = (
     "telegram_bot_dev",
@@ -468,7 +466,7 @@ def category_for_canonical_tag(canonical: str) -> str | None:
 
 
 def user_tags_input_count(raw_tags: list[str]) -> int:
-    """Число уникальных canonical после merge (до обрезки max 12)."""
+    """Число уникальных canonical после merge."""
     seen: set[str] = set()
     for raw in normalize_tags(raw_tags):
         canonical = resolve_canonical_tag(raw)
@@ -478,7 +476,7 @@ def user_tags_input_count(raw_tags: list[str]) -> int:
 
 
 def normalize_user_tags(raw_tags: list[str]) -> list[str]:
-    """user_tags: v0.2→v0.3 merge, canonical only, max 12."""
+    """user_tags: v0.2→v0.3 merge, canonical only (quiz-first — no cap)."""
     out: list[str] = []
     seen: set[str] = set()
     for raw in normalize_tags(raw_tags):
@@ -486,8 +484,6 @@ def normalize_user_tags(raw_tags: list[str]) -> list[str]:
         if canonical and canonical in CANONICAL_TAGS and canonical not in seen:
             seen.add(canonical)
             out.append(canonical)
-        if len(out) >= _USER_MAX_TAGS:
-            break
     return out
 
 
@@ -590,7 +586,8 @@ def allowed_tags_prompt_block() -> str:
     lines = [
         "",
         "lead_tags — только canonical_tag из списка ниже (EN slug, без #, без русских слов).",
-        f"Максимум {_L1_MAX_TAGS} тегов. Каждый тег должен быть из словаря **primary_category**.",
+        "**2–5 тегов на заказ** (не меньше 2 при feed_visible=true); максимум "
+        f"{_L1_MAX_TAGS} тегов. Каждый тег должен быть из словаря **primary_category**.",
         "Синонимы из заказа → canonical (яндекс.директ → yandex_direct; gpt/openai → llm_integration).",
         "ЗАПРЕЩЕНО как теги: ai, automation, #ai — только canonical из пула.",
         l1_gate_anti_rules_block().strip(),

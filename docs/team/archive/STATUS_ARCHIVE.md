@@ -8,7 +8,38 @@
 
 ---
 
-## § 2026-06-12 — перенос из hot STATUS (Lead slim O190)
+## § 2026-06-15 — O221 quiz v2 + deploy
+
+| Ticket | Сводка |
+|--------|--------|
+| **O221-QUIZ-ADAPTIVE** | 186 cards v1+v2 · QUIZ_SIGNALS 45 · `test_quiz_coverage.py` · VPS DEPLOY OK |
+| **O221 r7 PM** | `quiz_cards_v2.json` 130 · owner pilot ✅ |
+| **O220-DEDUP** | bundled in quiz_adaptive deploy |
+
+---
+
+## § 2026-06-14 — O209 match-first + FL proxy tier-2
+
+| Ticket | Сводка |
+|--------|--------|
+| **O209** | theme **1.18.84** · P0 `/quiz/` rebuild · P1 lenta/cabinet/marketing match-first · spec `wave-o209-match-brief.md` |
+| **FL-PROXY** | tier-2 DC→res · browser slots · httpx cap · ops 🟡 · VPS deploy ✅ · owner tail: `FL_PROXY_URLS_RESIDENTIAL` |
+
+---
+
+---
+
+## § 2026-06-13 — deploy batch (O198 + O171 + O118)
+
+| Ticket | Сводка |
+|--------|--------|
+| O198+O195-w2-tail | `deploy-o198-vps.py` · theme **1.18.76** · cx rank · weight_delta |
+| O171-w1 | `ops_funnel.py` · `/ops/` summary+TG · pytest 19/19 |
+| O118 | local `/quiz/` WP-CLI id=59 |
+
+---
+
+# Перенесено из hot **2026-06-12** — Lead slim O190
 
 _O175b–O190 footnotes moved from hot STATUS **2026-06-12**._
 

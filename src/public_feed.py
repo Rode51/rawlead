@@ -13,6 +13,7 @@ _DEFAULT_SOURCES = ("fl", "kwork")
 _PUBLIC_FEED_SOURCES_ENV = "PUBLIC_FEED_SOURCES"
 FEED_VISIBILITY_DAYS = 7
 INBOX_VISIBILITY_DAYS = 7
+FEED_ANON_DELAY_MINUTES = 30
 FEED_SOURCE_KEYS = frozenset(
     {"fl", "kwork", "tg", "youdo", "freelance_ru", "freelancejob", "pchyol"}
 )
@@ -130,7 +131,7 @@ def feed_visibility_where_sql(
     *,
     alias: str = "",
     apply_delay_minutes: int | None = None,
-    delay_minutes: int = 15,
+    delay_minutes: int = FEED_ANON_DELAY_MINUTES,
 ) -> tuple[str, list[Any]]:
     """O75: is_visible + public sources + created_at within FEED_VISIBILITY_DAYS."""
     prefix = f"{alias}." if alias else ""
@@ -233,21 +234,170 @@ def _chat_id_keys(chat_id: int) -> set[int]:
 
 
 def filter_listen_chat_ids(raw_ids: list[int]) -> list[int]:
-    """Оставить только id из allowlist (done в join queue); пустой allowlist → []."""
-    allowed = tg_listen_allowed_chat_ids()
-    if not allowed:
-        return []
-    allowed_keys: set[int] = set()
-    for aid in allowed:
-        allowed_keys |= _chat_id_keys(aid)
+    """O190-auto: trust telethon file — return all ids (dedupe by peer)."""
     out: list[int] = []
     seen: set[int] = set()
     for cid in raw_ids:
-        keys = _chat_id_keys(cid)
-        if not keys & allowed_keys:
-            continue
         peer = int(cid)
         if peer not in seen:
             seen.add(peer)
             out.append(peer)
     return out
+
+
+def append_link_to_allowlist(
+    link: str,
+    *,
+    allowlist_path: Path | None = None,
+) -> bool:
+    """Append one link to TG allowlist if missing. Returns True if newly added."""
+    s = (link or "").strip()
+    if not s:
+        return False
+    key = _tg_link_key(s)
+    if not key or key in _tg_allowlist_link_keys():
+        return False
+    target = allowlist_path or _ALLOWLIST_PATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("a", encoding="utf-8") as fh:
+        if target.is_file() and target.stat().st_size > 0:
+            fh.write("\n")
+        fh.write(s + "\n")
+    clear_tg_listen_caches()
+    return True
+
+
+def clear_tg_listen_caches() -> None:
+    _tg_allowlist_link_keys.cache_clear()
+    tg_listen_allowed_chat_ids.cache_clear()
+    tg_join_queue_done_chat_ids.cache_clear()
+    tg_test_group_chat_keys.cache_clear()
+
+
+# Owner smoke / prompt-test (O206-t3)
+TG_TEST_GROUP_RAW_ID = 5177575757
+
+
+@lru_cache(maxsize=1)
+def tg_test_group_chat_keys() -> frozenset[int]:
+    return frozenset(_chat_id_keys(TG_TEST_GROUP_RAW_ID))
+
+
+@lru_cache(maxsize=1)
+def tg_join_queue_done_chat_ids() -> frozenset[int]:
+    """chat_id from done rows across TG_JOIN_QUEUE*.csv (all ops copies)."""
+    try:
+        from tg_join_lib import read_queue_csv
+    except ModuleNotFoundError:
+        from src.tg_join_lib import read_queue_csv  # type: ignore[no-redef]
+
+    ids: set[int] = set()
+    for path in default_join_queue_paths():
+        if not path.is_file():
+            continue
+        _, rows = read_queue_csv(path)
+        for row in rows:
+            if row.get("status", "").strip().lower() != "done":
+                continue
+            raw_cid = row.get("chat_id", "").strip()
+            if not raw_cid:
+                continue
+            try:
+                ids.add(int(raw_cid))
+            except ValueError:
+                continue
+    return frozenset(ids)
+
+
+def chat_in_tg_interest_set(chat_id: int | None) -> bool:
+    """Log-worthy unlistened chat: allowlist, test group, or join queue done (O206-t1)."""
+    if chat_id is None:
+        return False
+    keys = _chat_id_keys(int(chat_id))
+    if keys & tg_test_group_chat_keys():
+        return True
+    for cid in tg_listen_allowed_chat_ids():
+        if keys & _chat_id_keys(cid):
+            return True
+    for cid in tg_join_queue_done_chat_ids():
+        if keys & _chat_id_keys(cid):
+            return True
+    return False
+
+
+def default_join_queue_paths() -> tuple[Path, ...]:
+    ops = _PROJECT_ROOT / "docs" / "ops"
+    names = (
+        "TG_JOIN_QUEUE.csv",
+        "TG_JOIN_QUEUE_v2.csv",
+        "TG_JOIN_QUEUE_v3.csv",
+        "TG_JOIN_QUEUE_v4.csv",
+    )
+    return tuple(ops / name for name in names if (ops / name).is_file())
+
+
+def collect_done_links_from_queues(
+    queue_paths: tuple[Path, ...] | list[Path] | None = None,
+) -> list[str]:
+    """Уникальные link из done-строк активной очереди (v2+v3 merge)."""
+    try:
+        from tg_join_lib import read_queue_csv
+    except ModuleNotFoundError:
+        from src.tg_join_lib import read_queue_csv  # type: ignore[no-redef]
+
+    paths = tuple(queue_paths) if queue_paths else default_join_queue_paths()
+    seen: set[str] = set()
+    out: list[str] = []
+    for path in paths:
+        if not path.is_file():
+            continue
+        _, rows = read_queue_csv(path)
+        for row in rows:
+            if row.get("status", "").strip().lower() != "done":
+                continue
+            link = row.get("link", "").strip()
+            if not link or link in seen:
+                continue
+            seen.add(link)
+            out.append(link)
+    return out
+
+
+def link_in_allowlist(link: str) -> bool:
+    key = _tg_link_key(link)
+    return bool(key and key in _tg_allowlist_link_keys())
+
+
+def expand_allowlist_from_done_queues(
+    *,
+    allowlist_path: Path | None = None,
+    queue_paths: tuple[Path, ...] | list[Path] | None = None,
+    dry_run: bool = False,
+) -> int:
+    """Append done queue links missing from allowlist (Option A). Returns count added."""
+    target = allowlist_path or _ALLOWLIST_PATH
+    existing_keys = set(_tg_allowlist_link_keys())
+    if target != _ALLOWLIST_PATH:
+        existing_keys = set()
+        for line in _read_nonempty_lines(target):
+            key = _tg_link_key(line)
+            if key:
+                existing_keys.add(key)
+
+    to_add: list[str] = []
+    for link in collect_done_links_from_queues(queue_paths):
+        key = _tg_link_key(link)
+        if not key or key in existing_keys:
+            continue
+        existing_keys.add(key)
+        to_add.append(link)
+
+    if not to_add or dry_run:
+        return len(to_add)
+
+    block = ["", "# --- O190 done queue (auto-expanded) ---"]
+    block.extend(to_add)
+    with target.open("a", encoding="utf-8") as fh:
+        fh.write("\n".join(block) + "\n")
+    clear_tg_listen_caches()
+    return len(to_add)

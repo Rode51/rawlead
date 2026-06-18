@@ -182,6 +182,20 @@ def write_queue_csv(
         writer.writerows(rows)
 
 
+def ordered_join_queue_paths() -> list[Path]:
+    """Join tick order: v2 backlog → v3 → v4 (O248)."""
+    ops = _PROJECT_ROOT / "docs" / "ops"
+    names = (
+        "TG_JOIN_QUEUE_v2.csv",
+        "TG_JOIN_QUEUE_v3.csv",
+        "TG_JOIN_QUEUE_v4.csv",
+    )
+    paths = [ops / name for name in names if (ops / name).is_file()]
+    if paths:
+        return paths
+    return [join_queue_csv_path()]
+
+
 def pending_for_account(
     account: str,
     rows: list[dict[str, str]],
@@ -193,6 +207,31 @@ def pending_for_account(
         if row.get("account", "").strip().lower() == key
         and row.get("status", "").strip().lower() == "pending"
     ]
+
+
+def first_pending_row(
+    account: str,
+    queue_paths: list[Path] | None = None,
+) -> tuple[Path, list[str], list[dict[str, str]], dict[str, str]] | None:
+    """First pending row for account across ordered queue CSVs."""
+    paths = queue_paths or ordered_join_queue_paths()
+    key = account.strip().lower()
+    for path in paths:
+        fieldnames, rows = read_queue_csv(path)
+        for row in rows:
+            if (
+                row.get("account", "").strip().lower() == key
+                and row.get("status", "").strip().lower() == "pending"
+            ):
+                return path, fieldnames, rows, row
+    return None
+
+
+def has_pending_for_account(
+    account: str,
+    queue_paths: list[Path] | None = None,
+) -> bool:
+    return first_pending_row(account, queue_paths) is not None
 
 
 def update_queue_row(

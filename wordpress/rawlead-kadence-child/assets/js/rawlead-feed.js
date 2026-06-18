@@ -163,7 +163,10 @@
     focusLeadHandled: false,
     draftInflight: {},
     draftWarmSession: {},
+    draftQuota: { limit: 0, remaining: 0, retryAfterSec: 0, pending: 0 },
   };
+
+  var draftQuotaTimer = null;
 
   var subscriptionState = null;
   var meState = null;
@@ -522,6 +525,7 @@
           if (data.reply_slots_remaining != null) {
             baseItem.reply_slots_remaining = data.reply_slots_remaining;
           }
+          applyDraftQuota(data);
           state.itemsById[leadId] = baseItem;
         }
         removePendingDraft(leadId);
@@ -720,6 +724,23 @@
       h.Authorization = "Bearer " + t;
     }
     return h;
+  }
+
+  function applyRotatedAccessToken(res) {
+    if (!res || !res.headers || typeof res.headers.get !== "function") {
+      return;
+    }
+    var rotated = res.headers.get("X-RawLead-Access-Token");
+    if (!rotated || !String(rotated).trim()) {
+      return;
+    }
+    var token = String(rotated).trim();
+    try {
+      localStorage.setItem(TOKEN_KEY, token);
+    } catch (e) {
+      return;
+    }
+    syncAuthCookie(token);
   }
 
   function isExpiredTrial() {
@@ -1029,6 +1050,7 @@
       headers: authHeaders(),
     })
       .then(function (res) {
+        applyRotatedAccessToken(res);
         if (!res.ok) {
           throw new Error("subscription " + res.status);
         }
@@ -1054,6 +1076,7 @@
       headers: authHeaders(),
     })
       .then(function (res) {
+        applyRotatedAccessToken(res);
         if (!res.ok) {
           throw new Error("me " + res.status);
         }
@@ -1856,9 +1879,6 @@
   }
 
   function renderPerfectBadge(perfect) {
-    if (perfect) {
-      return '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>';
-    }
     return "";
   }
 
@@ -2168,7 +2188,16 @@
     if (replySlotsRemaining(item) <= 0) {
       return (
         '<div class="rl-card-cta-zone">' +
-        '<button type="button" class="rl-card-cta rl-card-cta--primary rl-card-cta--exhausted rl-feed-card__reply-btn" disabled>Написать отклик →</button>' +
+        '<button type="button" class="rl-card-cta rl-card-cta--primary rl-card-cta--exhausted rl-feed-card__reply-btn" data-slot-exhausted disabled>Написать отклик →</button>' +
+        "</div>"
+      );
+    }
+    if (isDraftHourlyBlocked()) {
+      return (
+        '<div class="rl-card-cta-zone">' +
+        '<button type="button" class="rl-card-cta rl-card-cta--primary rl-card-cta--exhausted rl-feed-card__reply-btn" data-hourly-exhausted disabled title="' +
+        escapeHtml(draftLimitTooltip()) +
+        '">Написать отклик →</button>' +
         "</div>"
       );
     }
@@ -2331,7 +2360,9 @@
       return "Ошибка, попробуй снова";
     }
     if (err.status === 429) {
-      return err.detail || "Лимит черновиков в час. Попробуй позже.";
+      var retrySec = err.retryAfterSec || err.draft_retry_after_sec || state.draftQuota.retryAfterSec;
+      var mins = retrySec ? Math.max(1, Math.ceil(retrySec / 60)) : draftLimitRetryMinutes();
+      return err.detail || "Лимит черновиков в час · обновится через " + mins + " мин";
     }
     return err.detail || err.message || "Ошибка, попробуй снова";
   }
@@ -2347,6 +2378,18 @@
       } else if (data.detail && typeof data.detail === "object") {
         detail = String(data.detail.error || data.detail.detail || "");
         retryAfter = data.detail.retry_after_sec;
+        if (data.detail.draft_retry_after_sec != null) {
+          err.draft_retry_after_sec = data.detail.draft_retry_after_sec;
+        }
+        if (data.detail.draft_hourly_limit != null) {
+          err.draft_hourly_limit = data.detail.draft_hourly_limit;
+        }
+        if (data.detail.draft_remaining != null) {
+          err.draft_remaining = data.detail.draft_remaining;
+        }
+        if (data.detail.draft_used != null) {
+          err.draft_used = data.detail.draft_used;
+        }
       }
       if (!detail && data.error) {
         detail = String(data.error);
@@ -2354,16 +2397,216 @@
       if (!detail && data.message) {
         detail = String(data.message);
       }
-      if (data.data && data.data.retry_after_sec != null) {
-        retryAfter = data.data.retry_after_sec;
+      if (data.data && typeof data.data === "object") {
+        if (data.data.retry_after_sec != null) {
+          retryAfter = data.data.retry_after_sec;
+        }
+        if (data.data.draft_retry_after_sec != null) {
+          err.draft_retry_after_sec = data.data.draft_retry_after_sec;
+        }
+        if (data.data.draft_hourly_limit != null) {
+          err.draft_hourly_limit = data.data.draft_hourly_limit;
+        }
+        if (data.data.draft_remaining != null) {
+          err.draft_remaining = data.data.draft_remaining;
+        }
+        if (data.data.draft_used != null) {
+          err.draft_used = data.data.draft_used;
+        }
       }
       if (data.retry_after_sec != null) {
         retryAfter = data.retry_after_sec;
       }
+      if (data.draft_retry_after_sec != null) {
+        err.draft_retry_after_sec = data.draft_retry_after_sec;
+      }
+      if (data.draft_hourly_limit != null) {
+        err.draft_hourly_limit = data.draft_hourly_limit;
+      }
+      if (data.draft_remaining != null) {
+        err.draft_remaining = data.draft_remaining;
+      }
+      if (data.draft_used != null) {
+        err.draft_used = data.draft_used;
+      }
     }
     err.detail = detail;
     err.retryAfterSec = retryAfter;
+    if (draftQuotaPayload(err)) {
+      applyDraftQuota(err);
+    }
     return err;
+  }
+
+  function draftQuotaPayload(data) {
+    if (!data || typeof data !== "object") {
+      return null;
+    }
+    var src = data;
+    if (data.data && typeof data.data === "object") {
+      src = data.data;
+    }
+    if (src.draft_hourly_limit == null && src.draft_remaining == null) {
+      return null;
+    }
+    return {
+      limit: parseInt(src.draft_hourly_limit, 10) || 0,
+      remaining: parseInt(src.draft_remaining, 10) || 0,
+      retryAfterSec: parseInt(src.draft_retry_after_sec, 10) || 0,
+    };
+  }
+
+  function applyDraftQuota(data) {
+    var q = draftQuotaPayload(data);
+    if (!q || q.limit <= 0) {
+      state.draftQuota.limit = 0;
+      state.draftQuota.remaining = 0;
+      state.draftQuota.retryAfterSec = 0;
+      stopDraftQuotaTimer();
+      syncDraftHourlyLimitUi();
+      renderFeedToolbar();
+      return;
+    }
+    state.draftQuota.limit = q.limit;
+    state.draftQuota.remaining = q.remaining;
+    state.draftQuota.retryAfterSec = q.retryAfterSec;
+    scheduleDraftQuotaTimer();
+    syncDraftHourlyLimitUi();
+    renderFeedToolbar();
+  }
+
+  function effectiveDraftRemaining() {
+    if (state.draftQuota.limit <= 0) {
+      return Infinity;
+    }
+    return Math.max(0, state.draftQuota.remaining - (state.draftQuota.pending || 0));
+  }
+
+  function isDraftHourlyBlocked() {
+    if (!hasPaidAccess() || state.draftQuota.limit <= 0) {
+      return false;
+    }
+    return effectiveDraftRemaining() <= 0;
+  }
+
+  function draftLimitRetryMinutes() {
+    var sec = state.draftQuota.retryAfterSec || 0;
+    return Math.max(1, Math.ceil(sec / 60));
+  }
+
+  function draftLimitTooltip() {
+    var lim = state.draftQuota.limit || 10;
+    return (
+      "Лимит " +
+      lim +
+      " откликов/час исчерпан · обновится через " +
+      draftLimitRetryMinutes() +
+      " мин"
+    );
+  }
+
+  function draftToolbarMetaHtml() {
+    if (!isLoggedIn() || !hasPaidAccess() || state.draftQuota.limit <= 0) {
+      if (state.todayCount != null) {
+        return " · " + state.todayCount + " новых сегодня";
+      }
+      return "";
+    }
+    if (isDraftHourlyBlocked()) {
+      return " · обновится через " + draftLimitRetryMinutes() + " мин";
+    }
+    return " · осталось " + effectiveDraftRemaining() + " откликов";
+  }
+
+  function stopDraftQuotaTimer() {
+    if (draftQuotaTimer) {
+      window.clearInterval(draftQuotaTimer);
+      draftQuotaTimer = null;
+    }
+  }
+
+  function scheduleDraftQuotaTimer() {
+    stopDraftQuotaTimer();
+    if (state.draftQuota.limit <= 0) {
+      return;
+    }
+    draftQuotaTimer = window.setInterval(function () {
+      if (state.draftQuota.retryAfterSec > 0) {
+        state.draftQuota.retryAfterSec = Math.max(0, state.draftQuota.retryAfterSec - 30);
+        if (state.draftQuota.retryAfterSec <= 0) {
+          loadDraftQuota().catch(function () {});
+        }
+      }
+      renderFeedToolbar();
+      syncDraftHourlyLimitUi();
+    }, 30000);
+  }
+
+  function loadDraftQuota() {
+    if (!isLoggedIn() || !hasPaidAccess()) {
+      applyDraftQuota({ draft_hourly_limit: 0 });
+      return Promise.resolve();
+    }
+    var url = cfg.restDraftQuota || "";
+    if (!url) {
+      return Promise.resolve();
+    }
+    return fetch(url, {
+      method: "GET",
+      credentials: "same-origin",
+      headers: authHeaders(),
+    }).then(function (res) {
+      return res
+        .json()
+        .catch(function () {
+          return {};
+        })
+        .then(function (data) {
+          if (res.ok) {
+            applyDraftQuota(data);
+          }
+          return data;
+        });
+    });
+  }
+
+  function syncDraftHourlyLimitUi() {
+    if (!listEl || !hasPaidAccess() || state.draftQuota.limit <= 0) {
+      return;
+    }
+    var blocked = isDraftHourlyBlocked();
+    var title = blocked ? draftLimitTooltip() : "";
+    listEl.querySelectorAll(".rl-feed-card__reply-btn").forEach(function (btn) {
+      if (btn.hasAttribute("data-slot-exhausted")) {
+        return;
+      }
+      var card = btn.closest(".rl-lead-card");
+      if (!card) {
+        return;
+      }
+      var id = parseInt(card.getAttribute("data-id"), 10);
+      var item = state.itemsById[id];
+      if (item && prepForDisplay(item.reply_draft || "", false).trim()) {
+        return;
+      }
+      if (item && replySlotsRemaining(item) <= 0) {
+        btn.disabled = true;
+        btn.classList.add("rl-card-cta--exhausted");
+        btn.setAttribute("data-slot-exhausted", "1");
+        return;
+      }
+      if (blocked) {
+        btn.disabled = true;
+        btn.classList.add("rl-card-cta--exhausted");
+        btn.setAttribute("data-hourly-exhausted", "1");
+        btn.title = title;
+      } else {
+        btn.disabled = false;
+        btn.classList.remove("rl-card-cta--exhausted");
+        btn.removeAttribute("data-hourly-exhausted");
+        btn.removeAttribute("title");
+      }
+    });
   }
 
   function renderFeedToolbar() {
@@ -2376,9 +2619,7 @@
       html +=
         '<p class="rl-feed-toolbar__meta">' +
         escapeHtml(state.totalShown + " заказов") +
-        (state.todayCount != null
-          ? " · " + state.todayCount + " новых сегодня"
-          : "") +
+        draftToolbarMetaHtml() +
         "</p>";
     }
     toolbarEl.innerHTML = html;
@@ -2640,7 +2881,7 @@
     var filterCount =
       state.appliedTags.length + (state.appliedCategories.length ? 1 : 0);
     var labelEl = btn.querySelector(".rl-filter-mobile-trigger__label");
-    var labelText = filterCount > 0 ? "Фильтр · " + filterCount : "Фильтр";
+    var labelText = "Фильтр";
     if (labelEl) {
       labelEl.textContent = labelText;
     } else {
@@ -4012,6 +4253,10 @@
     if (baseItem && replySlotsRemaining(baseItem) <= 0) {
       return;
     }
+    if (isDraftHourlyBlocked()) {
+      showDraftToast(draftLimitTooltip());
+      return;
+    }
     var replyEl = card.querySelector("[data-reply-text]");
     if (replyEl && replyEl.textContent.trim()) {
       expandCard(card);
@@ -4040,6 +4285,8 @@
     }
     addPendingDraft(id, baseItem);
     notifyInboxRefresh();
+    state.draftQuota.pending = (state.draftQuota.pending || 0) + 1;
+    syncDraftHourlyLimitUi();
     fetchDraft(id)
       .then(function (data) {
         delete state.draftInflight[id];
@@ -4051,6 +4298,7 @@
           if (data.reply_slots_remaining != null) {
             item.reply_slots_remaining = data.reply_slots_remaining;
           }
+          applyDraftQuota(data);
           state.itemsById[id] = item;
         }
         onDraftReady(card, item);
@@ -4060,7 +4308,14 @@
         removePendingDraft(id);
         resetCardDraftUi(card);
         setReplyBtnGenerating(replyBtn, false, prevLabel);
+        if (err && err.status === 429) {
+          loadDraftQuota().catch(function () {});
+        }
         showDraftToast(draftErrorUserMessage(err));
+      })
+      .finally(function () {
+        state.draftQuota.pending = Math.max(0, (state.draftQuota.pending || 0) - 1);
+        syncDraftHourlyLimitUi();
       });
   }
 
@@ -4392,6 +4647,9 @@
     if (e.key === TAGS_SYNC_KEY) {
       reloadTagsFromSync();
     }
+  });
+  window.addEventListener("rawlead-tags-imported", function () {
+    reloadTagsFromSync();
   });
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") {
@@ -4876,6 +5134,9 @@
     loadCatalog().catch(function () {}),
   ])
     .then(function () {
+    return loadDraftQuota().catch(function () {});
+  })
+    .then(function () {
     applyFeedShellMode();
     if (!isLoggedIn()) {
       state.draftCategories = readCategoriesFrom();
@@ -4945,7 +5206,9 @@
     window.addEventListener("rawlead-quiz-complete", function () {
       applyFeedTierUi();
       syncFeedCabinetLink();
-      resetAndLoad();
+      if (readTagsSyncRev() === state.tagsSyncRev) {
+        resetAndLoad();
+      }
     });
   }
 

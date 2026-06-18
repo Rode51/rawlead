@@ -350,6 +350,40 @@ cd C:\Users\hramo\uisness
 
 ---
 
+## O218 — Quiz E2E (Playwright j1–j7)
+
+**Gate pre-ads** · prod URL · изолированный browser context на persona.
+
+```powershell
+cd C:\Users\hramo\uisness
+
+# Mint tokens (once)
+.venv\Scripts\python.exe scripts\preprod_mint_token.py --account acc1 --write-env-site
+.venv\Scripts\python.exe scripts\grant_premium_local.py --username RawLead --plan agent --days 30
+# → RAWLEAD_MONICA_TOKEN in .env.site (see PREPROD_ACCOUNTS.md)
+
+# Desktop j1–j7
+.venv\Scripts\python.exe scripts\preprod_playwright\quiz_e2e.py --base-url https://rawlead.ru
+
+# Mobile j1,j2,j5,j7 @ 390×844
+.venv\Scripts\python.exe scripts\preprod_playwright\quiz_e2e.py --base-url https://rawlead.ru --viewport mobile
+
+# Subset / debug
+.venv\Scripts\python.exe scripts\preprod_playwright\quiz_e2e.py --ids j1,j2,j5 --headed --slow-mo 100
+
+# pytest import smoke (full prod E2E: RAWLEAD_O218_E2E=1)
+.venv\Scripts\python.exe -m pytest tests/test_o218_quiz_e2e.py -q
+```
+
+| Artifact | Path |
+|----------|------|
+| JSON | `data/preprod_quiz_e2e.json` |
+| Screenshots (fail) | `data/preprod_quiz_e2e/` |
+
+**Env:** `RAWLEAD_PREPROD_ACCESS_TOKEN` · `RAWLEAD_MONICA_TOKEN` · opt. `DATABASE_URL` (Neon j3)
+
+---
+
 ## Parser: «сломан» vs «заказов нет»
 
 **Где смотреть:** @FLPARSINGBOT `/status` · `/ops/` биржи · строка `health:fl` в `radar_site.log`.

@@ -135,7 +135,8 @@ def resolve_backfill_body(
 ) -> tuple[str, dict | None]:
     if lead.source not in BACKFILL_SOURCES:
         raise ValueError(f"unsupported source: {lead.source}")
-    return _resolve_ingest_body(build_listing_project(lead), cfg, errors)
+    body, tz, _ = _resolve_ingest_body(build_listing_project(lead), cfg, errors)
+    return body, tz
 
 
 def apply_lead_update(

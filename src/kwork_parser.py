@@ -1,4 +1,4 @@
-"""Парсинг листинга Kwork: один GET на URL ленты, JSON «wants» в HTML страницы."""
+"""Парсинг листинга Kwork: до KWORK_MAX_PAGES GET, JSON «wants» в HTML страницы."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import re
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
 
@@ -31,6 +31,28 @@ class KworkListingError(RuntimeError):
 
 
 _WANTS_MARKER = '"wants":['
+
+
+def _kwork_listing_max_pages() -> int:
+    raw = os.environ.get("KWORK_MAX_PAGES", "3").strip()
+    try:
+        n = int(raw)
+    except ValueError:
+        n = 3
+    return max(1, min(5, n))
+
+
+def _kwork_listing_page_url(base_url: str, page: int) -> str:
+    """Страница 1 — URL из конфига; далее query `page=N` (SSR wants в HTML)."""
+    if page <= 1:
+        return base_url
+    parsed = urlparse(base_url)
+    qs = parse_qs(parsed.query, keep_blank_values=True)
+    qs["page"] = [str(page)]
+    query = urlencode({k: v[-1] for k, v in qs.items()})
+    return urlunparse(
+        (parsed.scheme, parsed.netloc, parsed.path, parsed.params, query, parsed.fragment)
+    )
 
 
 def _extract_wants_array(html: str) -> list[dict]:
@@ -161,89 +183,134 @@ def _kwork_listing_wall_clock_sec() -> float:
         return 120.0
 
 
+def _fetch_listing_html(
+    page_url: str,
+    cfg: Config,
+    *,
+    timeout_sec: float = 30.0,
+) -> str | None:
+    html: str | None = None
+    if listing_browser_enabled():
+        wall = _kwork_listing_wall_clock_sec()
+        try:
+            html = fetch_listing_html_browser_wall_clock(
+                "kwork",
+                page_url,
+                user_agent=cfg.http_user_agent,
+                timeout_sec=min(timeout_sec, wall),
+                wall_clock_sec=wall,
+            )
+        except HtmlFetchError as exc:
+            if "timeout" in str(exc).lower():
+                logger.warning(
+                    "kwork_listing: timeout after %ss — httpx fallback",
+                    int(wall),
+                )
+            else:
+                logger.warning(
+                    "kwork_listing: Playwright failed (%s) — httpx fallback",
+                    exc,
+                )
+    if html is None:
+        headers = {"User-Agent": cfg.http_user_agent}
+        try:
+            resp = exchange_get("kwork", page_url, headers=headers, timeout_sec=timeout_sec)
+        except requests.RequestException as exc:
+            raise KworkListingError(f"Сетевой сбой при запросе ленты: {exc}") from exc
+        if resp.status_code != 200:
+            raise KworkListingError(f"HTTP {resp.status_code} для ленты Kwork.")
+        encoding = resp.encoding or "utf-8"
+        html = resp.content.decode(encoding, errors="replace")
+    return html
+
+
+def _apply_feed_category(
+    projects: list[ListingProject], feed_url: str
+) -> list[ListingProject]:
+    feed_cat = category_from_kwork_listing_url(feed_url) or ""
+    if not feed_cat:
+        return projects
+    return [
+        ListingProject(
+            project_id=p.project_id,
+            title=p.title,
+            budget_text=p.budget_text,
+            url=p.url,
+            published_at=p.published_at,
+            listing_snippet=p.listing_snippet,
+            source=p.source,
+            listing_category=p.listing_category or feed_cat,
+            chat_invite_url=p.chat_invite_url,
+            chat_title=p.chat_title,
+        )
+        for p in projects
+    ]
+
+
 def fetch_listing_projects(
     cfg: Config,
     *,
     timeout_sec: float = 30.0,
     storage: object | None = None,
 ) -> list[ListingProject]:
-    """GET `cfg.kwork_projects_url`, первая страница (без пагинации в MVP)."""
-    url = cfg.kwork_projects_url
+    """GET до `KWORK_MAX_PAGES` страниц `cfg.kwork_projects_url`, дедуп id внутри цикла."""
+    base_url = cfg.kwork_projects_url
+    max_pages = _kwork_listing_max_pages()
+    merged: list[ListingProject] = []
+    seen: set[int] = set()
+    pages_fetched = 0
+
     exchange_fetch_begin("kwork")
     log_pipeline_line(cfg.radar_log_path, f"fetch:kwork proxy={proxy_log_hint('kwork')}")
     try:
-        html: str | None = None
-        if listing_browser_enabled():
-            wall = _kwork_listing_wall_clock_sec()
+        for page in range(1, max_pages + 1):
+            page_url = _kwork_listing_page_url(base_url, page)
             try:
-                html = fetch_listing_html_browser_wall_clock(
-                    "kwork",
-                    url,
-                    user_agent=cfg.http_user_agent,
-                    timeout_sec=min(timeout_sec, wall),
-                    wall_clock_sec=wall,
-                )
-            except HtmlFetchError as exc:
-                if "timeout" in str(exc).lower():
-                    logger.warning(
-                        "kwork_listing: timeout after %ss — httpx fallback",
-                        int(wall),
-                    )
-                else:
-                    logger.warning(
-                        "kwork_listing: Playwright failed (%s) — httpx fallback",
-                        exc,
-                    )
-        if html is None:
-            headers = {"User-Agent": cfg.http_user_agent}
+                html = _fetch_listing_html(page_url, cfg, timeout_sec=timeout_sec)
+            except KworkListingError:
+                if page == 1:
+                    raise
+                break
+            if html is None:
+                break
             try:
-                resp = exchange_get("kwork", url, headers=headers, timeout_sec=timeout_sec)
-            except requests.RequestException as exc:
-                raise KworkListingError(f"Сетевой сбой при запросе ленты: {exc}") from exc
-            if resp.status_code != 200:
-                raise KworkListingError(f"HTTP {resp.status_code} для ленты Kwork.")
-            encoding = resp.encoding or "utf-8"
-            html = resp.content.decode(encoding, errors="replace")
+                batch = parse_listing_html(html, page_url)
+            except KworkListingError:
+                if page == 1:
+                    hint = _guess_blocked_or_changed(html)
+                    if hint:
+                        raise KworkListingError(
+                            f"Не удалось разобрать ленту Kwork; похоже на {hint}."
+                        ) from None
+                    raise
+                break
+            pages_fetched += 1
+            for project in batch:
+                if project.project_id in seen:
+                    continue
+                seen.add(project.project_id)
+                merged.append(project)
+
+        projects = _apply_feed_category(merged, base_url)
+        parsed_cards = len(projects)
+        trimmed = trim_listing_at_known(projects, storage, SOURCE_KWORK)  # type: ignore[arg-type]
+        fresh = len(trimmed)
+        log_pipeline_line(
+            cfg.radar_log_path,
+            f"listing:kwork parsed={parsed_cards} fresh={fresh} pages={pages_fetched}",
+        )
+        # O257: structured outcome line for grep-based triage.
+        hint = proxy_log_hint("kwork")
+        outcome_reason = "ok" if parsed_cards > 0 else "browser_empty"
+        log_pipeline_line(
+            cfg.radar_log_path,
+            f"fetch:kwork outcome={'ok' if parsed_cards > 0 else 'fail'}"
+            f" reason={outcome_reason} tier=dc parsed={parsed_cards} proxy_hint={hint}",
+        )
+        stash_listing_metrics("kwork", parsed_cards, fresh)
+        return trimmed
     finally:
         exchange_fetch_end("kwork")
-
-    try:
-        projects = parse_listing_html(html, url)
-    except KworkListingError:
-        hint = _guess_blocked_or_changed(html)
-        if hint:
-            raise KworkListingError(
-                f"Не удалось разобрать ленту Kwork; похоже на {hint}."
-            ) from None
-        raise
-    feed_cat = category_from_kwork_listing_url(url) or ""
-    if not feed_cat:
-        batch = projects
-    else:
-        batch = [
-            ListingProject(
-                project_id=p.project_id,
-                title=p.title,
-                budget_text=p.budget_text,
-                url=p.url,
-                published_at=p.published_at,
-                listing_snippet=p.listing_snippet,
-                source=p.source,
-                listing_category=p.listing_category or feed_cat,
-                chat_invite_url=p.chat_invite_url,
-                chat_title=p.chat_title,
-            )
-            for p in projects
-        ]
-    parsed_cards = len(batch)
-    trimmed = trim_listing_at_known(batch, storage, SOURCE_KWORK)  # type: ignore[arg-type]
-    fresh = len(trimmed)
-    log_pipeline_line(
-        cfg.radar_log_path,
-        f"listing:kwork parsed={parsed_cards} fresh={fresh}",
-    )
-    stash_listing_metrics("kwork", parsed_cards, fresh)
-    return trimmed
 
 
 _KWORK_GONE_MARKERS = (

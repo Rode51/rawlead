@@ -12,6 +12,16 @@ _DECAY_BASE = float(os.getenv("RANK_DECAY_BASE", "0.95"))
 _DECAY_DAYS = float(os.getenv("RANK_DECAY_DAYS", "3"))
 _DECAY_MIN_WEIGHT = float(os.getenv("RANK_DECAY_MIN_WEIGHT", "0.5"))
 CX_PREF_TAG = "__cx_pref"
+QUIZ_NICHE_TAG_PREFIX = "__quiz_niche:"
+QUIZ_NICHES: tuple[str, ...] = ("dev", "design", "marketing", "text")
+CATEGORY_FLOOR_MATCH = 20
+CATEGORY_FLOOR_PRIMARY = 20
+CATEGORY_FLOOR_SECONDARY = 10
+QUIZ_NICHE_PRIMARY_WEIGHT = 2.0
+QUIZ_NICHE_SECONDARY_WEIGHT = 1.0
+CATEGORY_FLOOR_VALUES: frozenset[int] = frozenset(
+    {CATEGORY_FLOOR_PRIMARY, CATEGORY_FLOOR_SECONDARY}
+)
 CX_MULTIPLIER_FLOOR = 0.80
 CX_MULTIPLIER_STEP = 0.10  # per 1.0 distance in complexity units
 EMPTY_PROFILE_KEYWORD_MATCH = 50
@@ -254,6 +264,96 @@ def lead_coverage_match(lead_tags: list[str], user_tags: dict[str, float]) -> in
     if numerator <= 0:
         return 0
     return min(100, round(100.0 * numerator / denominator))
+
+
+def quiz_niche_meta_tag(niche: str) -> str:
+    return f"{QUIZ_NICHE_TAG_PREFIX}{niche}"
+
+
+def normalize_quiz_niches(niches: list[str] | None) -> list[str]:
+    """Valid quiz finale niches (conf ≥ 2), deduped, stable order."""
+    if not niches:
+        return []
+    valid = set(QUIZ_NICHES)
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in niches:
+        n = str(raw).strip().lower()
+        if n in valid and n not in seen:
+            seen.add(n)
+            out.append(n)
+    return out
+
+
+def user_quiz_niches_from_tags(user_tags: dict[str, float]) -> set[str]:
+    out: set[str] = set()
+    for raw in user_tags:
+        s = str(raw)
+        if s.startswith(QUIZ_NICHE_TAG_PREFIX):
+            niche = s[len(QUIZ_NICHE_TAG_PREFIX) :]
+            if niche in QUIZ_NICHES:
+                out.add(niche)
+    return out
+
+
+def user_quiz_primary_niche(user_tags: dict[str, float]) -> str | None:
+    """Primary quiz niche — highest __quiz_niche weight (import: 2.0 vs 1.0)."""
+    best_niche: str | None = None
+    best_w = -1.0
+    for raw, w in user_tags.items():
+        s = str(raw)
+        if not s.startswith(QUIZ_NICHE_TAG_PREFIX):
+            continue
+        niche = s[len(QUIZ_NICHE_TAG_PREFIX) :]
+        if niche not in QUIZ_NICHES:
+            continue
+        try:
+            fw = float(w)
+        except (TypeError, ValueError):
+            fw = QUIZ_NICHE_SECONDARY_WEIGHT
+        if fw > best_w:
+            best_w = fw
+            best_niche = niche
+    return best_niche
+
+
+def category_floor_match(
+    lead_category: str | None,
+    user_tags: dict[str, float],
+    *,
+    user_quiz_niches: set[str] | frozenset[str] | None = None,
+) -> int:
+    """O225: primary niche → 20%, secondary quiz niches → 10%; other → 0."""
+    cat = str(lead_category or "").strip().lower()
+    if not cat or cat not in QUIZ_NICHES:
+        return 0
+    niches = user_quiz_niches or user_quiz_niches_from_tags(user_tags)
+    if cat not in niches:
+        return 0
+    primary = user_quiz_primary_niche(user_tags)
+    if cat == primary:
+        return CATEGORY_FLOOR_PRIMARY
+    return CATEGORY_FLOOR_SECONDARY
+
+
+def compatibility_match(
+    lead_tags: list[str],
+    user_tags: dict[str, float],
+    *,
+    lead_category: str | None = None,
+    user_quiz_niches: set[str] | frozenset[str] | None = None,
+) -> int | None:
+    """O224/O225: lead-coverage first; category floor 20/10 from __quiz_niche* only."""
+    coverage = lead_coverage_match(lead_tags, user_tags)
+    if coverage is None:
+        return None
+    if coverage > 0:
+        return coverage
+    return category_floor_match(
+        lead_category,
+        user_tags,
+        user_quiz_niches=user_quiz_niches,
+    )
 
 
 def keyword_match_breakdown(lead_tags: list[str], user_tags: dict[str, float]) -> dict[str, int]:

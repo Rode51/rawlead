@@ -6,31 +6,29 @@
 
 ---
 
-## Сейчас (2026-06-14)
+## Сейчас (2026-06-15)
 
-**Стадия:** prod live · **→ O215 design polish (BrowserSync)** · Perf ⏸ · **ads ⏸**
+**Стадия:** prod **1.19.18** · лента OK · **→ O247b + O248** (Coder) · **→ O237** Metrika · ads ⏸
 
-### ✅ Сделано (не возвращать в hot)
+### ✅ Недавно закрыто
 
-| Блок | § / факт |
-|------|----------|
-| **YouDo+FL ingest** | **O190+O191+O193** subprocess · stable cycles |
-| **Pay + pre-launch** | O174 ЮKassa smoke · O185 w1–w3/t5b/t6 |
-| **Feed + delist** | O175–O178 · O180–O182b |
-| **Ingest + VPS** | O99 · O160 locks · VPS **4 GB** |
-| **ИИ quality** | O72e aggregate · O164 L2 grounding |
-| **TG handlers** | **O206 t3c** ✅ owner · мгновенно |
+O236–O246 UX/Perf · O247 hotfix · tier smoke PASS · TG xlsx owner base copied.
 
-### ⏳ До soft ads (порядок owner 2026-06-13)
+### ⏳ До soft ads (порядок) — **owner 2026-06-18: O280 перед GTM**
 
 | Волна | Что | Кто |
 |-------|-----|-----|
+| **2.5 · UI** | **O280** WP → Next `web/` на rawlead.ru (до ads) | Claude Code + @coder deploy/CORS · handoff [`WP_TO_NEXT_HANDOFF.md`](WP_TO_NEXT_HANDOFF.md) |
 | **1 · TG** | t2b sync · **O207** funnel proof · O188 join ~127 | @coder |
-| **2 · Концепция** | **O208** quiz-first UI/UX · тексты · воронка · убрать ручные навыки | @lead-product → @lead-designer → @coder |
-| **3 · Perf** | Оптимизация загрузки `/lenta/` · home · quiz | **после O215 design OK** · @lead-designer scope → @coder |
-| **4 · L2** | **O200** full regen · **≥70% × 4 категории** | @coder после «да» owner |
-| **5 · Pre-ads** | Финальный stress @50 VU · O186 security | owner + @coder |
-| **6 · GTM** | ads + portfolio | **последним** ⏸ |
+| **2 · Концепция** | **O208** quiz-first · **O217** synthetic quiz pack | @lead-product → @coder |
+| **4 · L2** | **O200** full regen · **≥70% × 4 категории** | @coder |
+| **5 · SEO + analytics** | **O113-seo** · **Метрика** 109860210 | @coder · owner |
+| **6 · Pre-ads QA** | **O218** Playwright · stress · security | @coder · на **Next** URL после O280 |
+| **7 · GTM** | ads + rode51.ru | **последним** ⏸ |
+
+**Снято с блокера «WP perf»:** волна 3 Perf WP — заменена O280 Next.
+
+**Гейт GTM:** O280 cutover ✅ · O218 green · L2 **70%×4** · Metrika · stress green.
 
 **Не в hot:** join wave можно идти **параллельно** волне 2–3 на VPS.
 
@@ -39,7 +37,7 @@
 | # | Что |
 |---|-----|
 | **ingest SLA** | Биржи: lag p50 в ops · укоротить цикл где безопасно (FL/Kwork = poll, не push как TG) |
-| **O113-seo** | органика |
+| **O73** | heatmap Metrika/Clarity (после базового счётчика) |
 | **O105-w2** | crypto auto-check |
 | **O110** | FL 403 отдельный пул — по триггеру |
 | **O92b** | pending_tags review |
@@ -120,7 +118,7 @@
 |------|-----|----------|
 | **Product** | Tier/лимиты **✅ freeze** · vision bump после O209 | `LEAD_PRODUCT_PROMPT` § O208-MONETIZATION |
 | **Design** | **O209** — полный UX+copy match-first (quiz · lenta · home · pricing · FAQ) | `LEAD_DESIGN_PROMPT` § **O209-MATCH-EXPERIENCE** |
-| **Coder** | Убрать manual skills picker · quiz-first only · `DRAFT_HOURLY_LIMIT=5` · card strip · L3 judge→K | § после PM+Design freeze |
+| **Coder** | ~~Убрать manual skills picker~~ ✅ · quiz-first only · **O230** снять cap 12 в API/JS · `DRAFT_HOURLY_LIMIT=5` · card strip · L3 judge→K | § после PM+Design freeze |
 | **Не смешивать** | Ingest filter/L1 (O207) ≠ UI «навыки» — разные слои |
 
 **Perf (волна 3):** scope в Design § O199 «Site optimization» → Coder: `/lenta/` P0.
@@ -133,4 +131,4 @@ Coder ТЗ: [`CODER_PROMPT.md`](CODER_PROMPT.md) · решения: [`OWNER_INTE
 
 ---
 
-_Lead Architect · 2026-06-13 · волны до ads · O208 concept · L2 70%_
+_Lead Architect · 2026-06-14 · O218 Playwright pre-ads gate · O217 synthetic live_

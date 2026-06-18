@@ -360,6 +360,113 @@ class TestL3HumanStyle(unittest.TestCase):
         self.assertIn("[TZ attachment — извлечено", body)
         self.assertIn("Файлы и вложения", body)
 
+    # --- O200-L2-CATEGORY-WAVE ---
+
+    def test_o200_category_playbooks_all_four(self) -> None:
+        """O200: Category playbooks block exists for all 4 categories."""
+        body = build_shared_l2_system()
+        self.assertIn("Category playbooks", body)
+        # dev: stack by name, steps, no fake PageSpeed
+        self.assertIn("### dev", body)
+        self.assertIn("PageSpeed", body)  # anti-hallucination rule referenced
+        # design: Figma/Illustrator/Reels, deliverables, no PHP
+        self.assertIn("### design", body)
+        self.assertIn("deliverables", body)
+        # marketing: channel + KPI
+        self.assertIn("### marketing", body)
+        self.assertIn("KPI", body)
+        # text: volume (знаки/слова), tone, format
+        self.assertIn("### text", body)
+        self.assertIn("знаки", body)
+
+    def test_o200_category_playbooks_bad_good_each(self) -> None:
+        """O200: BAD+GOOD pair present for each category playbook."""
+        body = build_shared_l2_system()
+        # find playbooks block and check BAD/GOOD exist after it
+        idx = body.find("Category playbooks")
+        self.assertGreater(idx, 0)
+        block = body[idx: idx + 6000]
+        self.assertIn("BAD:", block)
+        self.assertIn("GOOD:", block)
+        # at least 4 BAD lines (one per category)
+        self.assertGreaterEqual(block.count("BAD:"), 4)
+        self.assertGreaterEqual(block.count("GOOD:"), 4)
+
+    def test_o200_category_playbooks_no_dev_tools_in_design(self) -> None:
+        """O200: design playbook BAD example must not suggest PHP/WP tools."""
+        body = build_shared_l2_system()
+        idx = body.find("### design")
+        self.assertGreater(idx, 0)
+        design_block = body[idx: idx + 1200]
+        # playbook says not to add dev tools in design reply
+        self.assertIn("PHP", design_block)  # mentioned as forbidden
+        # BAD example in design does NOT call for PHP usage
+        bad_idx = design_block.find("BAD:")
+        if bad_idx >= 0:
+            bad_line = design_block[bad_idx: bad_idx + 200]
+            self.assertNotIn("PHP", bad_line)
+
+    def test_o200_anti_hallucination_still_intact(self) -> None:
+        """O200: anti-hallucination rules not removed (O164 guard)."""
+        body = build_shared_l2_system()
+        self.assertIn("Anti-hallucination", body)
+        self.assertIn("Файлы и вложения", body)
+        self.assertIn("[TZ attachment — извлечено", body)
+
+
+    # --- O200-L2-CAT-80 (r2 playbook micro-fixes) ---
+
+    def test_o200_l2_cat80_marketing_no_invented_budget(self) -> None:
+        """O200-L2-CAT-80: marketing — no invented budget/price rule; KPI from TZ only."""
+        body = build_shared_l2_system()
+        idx = body.find("### marketing")
+        self.assertGreater(idx, 0)
+        block = body[idx: idx + 1400]
+        # tightened KPI rule
+        self.assertIn("явно", block)
+        self.assertNotIn("логичны из ТЗ", block)
+        # no invented budget
+        self.assertIn("бюджет", block.casefold())
+        self.assertIn("изобретай", block.casefold())
+        # price-when-requested guidance
+        self.assertIn("цену/стоимость", block)
+        # BAD with invented budget
+        self.assertIn("BAD (#19933", block)
+        # GOOD example with concrete channel
+        self.assertIn("GOOD (#19231", block)
+
+    def test_o200_l2_cat80_dev_pipeline_coverage(self) -> None:
+        """O200-L2-CAT-80: dev — multi-component pipeline coverage rule present."""
+        body = build_shared_l2_system()
+        idx = body.find("### dev")
+        self.assertGreater(idx, 0)
+        block = body[idx: idx + 1050]
+        # multi-component pipeline rule
+        self.assertIn("Многокомпонентный", block)
+        self.assertIn("все слои пайплайна", block)
+        # pure AI/ML guard
+        self.assertIn("web_scraping", block)
+        self.assertIn("pure AI/ML/RAG", block)
+        # BAD/GOOD for #19954
+        self.assertIn("#19954", block)
+
+    def test_o200_l2_cat80_design_no_ready_when_tz(self) -> None:
+        """O200-L2-CAT-80: design — reject «готов когда пришлёте ТЗ»; tool from TZ rule."""
+        body = build_shared_l2_system()
+        idx = body.find("### design")
+        self.assertGreater(idx, 0)
+        block = body[idx: idx + 1800]
+        # specific tool from TZ rule
+        self.assertIn("конкретную программу", block)
+        self.assertIn("Видеомонтаж", block)
+        # BAD: «Готов начать, когда пришлёте ТЗ»
+        self.assertIn("Готов начать, когда пришлёте ТЗ", block)
+        # price/portfolio when requested
+        self.assertIn("цену/сроки/примеры работ", block)
+        # BAD/GOOD for #21614 and #19234
+        self.assertIn("#21614", block)
+        self.assertIn("#19234", block)
+
 
 if __name__ == "__main__":
     unittest.main()

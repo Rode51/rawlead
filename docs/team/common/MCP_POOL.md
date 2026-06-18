@@ -33,6 +33,7 @@
 | 4 | **Glif** | Картинки/видео через workflow glif.app (много моделей) | [glifxyz/glif-mcp-server](https://github.com/glifxyz/glif-mcp-server) | Токен [glif.app/settings/api-tokens](https://glif.app/settings/api-tokens) |
 | 5 | **Chrome (Claude in Chrome)** | Текущие вкладки, логин, консоль — из Claude Code | Встроено в Claude Code (не отдельный npm) | План Anthropic + расширение Chrome |
 | 6 | **Recraft** | Raster + **vector (SVG)** — hero, иконки, иллюстрации для `docs/design/assets/` | [recraft-ai/mcp-recraft-server](https://github.com/recraft-ai/mcp-recraft-server) · [remote docs](https://www.recraft.ai/docs/mcp-reference/remote-server) | **Кредиты Recraft** (OAuth remote) или API units (local) |
+| 7 | **Chrome DevTools MCP** | F12 в **вашем** Chrome/Yandex: Network, Console, CDP | [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) | Бесплатно · нужен `--remote-debugging-port=9222` |
 
 > «Все бесплатные» в постах — **серверы** часто open source, но Perplexity / Firecrawl / Glif **съедают квоты API**. Playwright и Chrome MCP — без отдельного SaaS за скрап (кроме плана Claude для Chrome).
 
@@ -45,6 +46,7 @@
 | Актуальные новости, цены, «что сейчас в сети» | Perplexity | — |
 | Скачать **структурированно** страницу / сайт в markdown | Firecrawl | Playwright `get_page_content` |
 | E2E-тест пульта, клики, регресс UI | Playwright | Chrome MCP |
+| **F12 / Network / Console** на **вашем** YaBrowser/Chrome | **Chrome DevTools MCP** | Playwright (отдельный профиль) |
 | Сайт уже открыт, нужен **ваш** логин / cookies | Chrome MCP | Playwright (чистый профиль) |
 | Иконка, мокап, картинка для `docs/design/` | **Recraft** (vector/SVG) | Glif · владелец вручную |
 | Данные **только** из этого репо | — (без MCP) | — |
@@ -104,6 +106,40 @@ claude mcp add --transport http recraft https://mcp.recraft.ai/mcp
 ```
 
 Первый вызов → OAuth в браузере. Док: [recraft.ai/docs/mcp-reference/remote-server](https://www.recraft.ai/docs/mcp-reference/remote-server)
+
+### Chrome DevTools MCP (F12 в **вашем** YaBrowser)
+
+**Зачем:** Playwright открывает **свой** браузер; DevTools MCP — Network/Console **вашей** сессии (логины, расширения, блокировщики как у владельца).
+
+**1. Закрой все окна YaBrowser.**
+
+**2. Запусти с отладкой** (cmd или ярлык):
+
+```text
+"C:\Users\hramo\AppData\Local\Yandex\YandexBrowser\Application\browser.exe" --remote-debugging-port=9222 --remote-allow-origins=*
+```
+
+Проверка: открой `http://127.0.0.1:9222` — должны быть вкладки.
+
+**3. В `%USERPROFILE%\.cursor\mcp.json` добавь:**
+
+```json
+"chrome-devtools": {
+  "command": "npx",
+  "args": [
+    "-y",
+    "chrome-devtools-mcp@latest",
+    "--browser-url=http://127.0.0.1:9222",
+    "--no-usage-statistics"
+  ]
+}
+```
+
+**4. Cursor → Reload MCP** → в чате: «открой rawlead.ru/lenta/, покажи Network на mc.yandex».
+
+Альтернатива только под Yandex: [T1Trit/yandex-browser-mcp](https://github.com/T1Trit/yandex-browser-mcp) (нужен `npm install` + тот же `--remote-debugging-port=9222`).
+
+**Playwright** у вас уже включён (`user-playwright`) — для smoke без вашего профиля.
 
 Chrome: `claude --chrome` или в сессии `/chrome` → Enabled.  
 Док: [Use Claude Code with Chrome](https://code.claude.com/docs/en/chrome) · расширение [Claude in Chrome](https://chromewebstore.google.com) · CC ≥ 2.0.73, ext ≥ 1.0.36.

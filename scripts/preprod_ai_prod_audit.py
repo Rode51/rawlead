@@ -618,6 +618,33 @@ def _judge_model(cfg) -> str:
     return (cfg.ai_model_judge or "").strip() or "anthropic/claude-sonnet-4"
 
 
+def _l2_judge_targets(leads: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+    """O200: stratified L2 judge — ~limit/4 per dev/design/marketing/text when possible."""
+    with_draft = [r for r in leads if (r.get("reply_draft") or "").strip()]
+    per_cat = max(1, limit // len(CATEGORIES))
+    buckets: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for lead in with_draft:
+        cat = (lead.get("category") or "other").strip() or "other"
+        if cat in CATEGORIES:
+            buckets[cat].append(lead)
+    picked: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for cat in CATEGORIES:
+        for lead in buckets.get(cat, [])[:per_cat]:
+            lid = int(lead["lead_id"])
+            if lid not in seen:
+                seen.add(lid)
+                picked.append(lead)
+    for lead in with_draft:
+        if len(picked) >= limit:
+            break
+        lid = int(lead["lead_id"])
+        if lid not in seen:
+            seen.add(lid)
+            picked.append(lead)
+    return picked[:limit]
+
+
 def _l1_judge_targets(leads: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
     seen: set[int] = set()
     out: list[dict[str, Any]] = []
@@ -645,16 +672,18 @@ def _run_judge_l2(cfg, leads: list[dict[str, Any]], *, limit: int) -> list[dict[
         return []
     model = _judge_model(cfg)
     judged: list[dict[str, Any]] = []
-    targets = [r for r in leads if (r.get("reply_draft") or "").strip()][:limit]
+    targets = _l2_judge_targets(leads, limit=limit)
     for lead in targets:
+        cat = (lead.get("category") or "other").strip() or "other"
         user = (
             f"Заголовок: {lead['title']}\n"
             f"Описание:\n{lead['body'][:3000]}\n\n"
+            f"primary_category: {cat}\n"
             f"task_summary: {lead['task_summary']}\n"
             f"tools_required: {', '.join(lead['tools_required']) or '—'}\n\n"
             f"reply_draft:\n{lead['reply_draft']}\n"
         )
-        entry: dict[str, Any] = {"lead_id": lead["lead_id"], "model": model}
+        entry: dict[str, Any] = {"lead_id": lead["lead_id"], "model": model, "category": cat}
         try:
             raw = _openrouter_chat(
                 cfg,
@@ -973,6 +1002,11 @@ def _judge_l3_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+_JUDGE_L2_SEND_MIN_PER_CAT = 0.70  # O200 owner gate (was 0.80 CAT-80 pilot)
+_JUDGE_L2_SEND_FLOOR_PER_CAT = 0.50
+_JUDGE_L2_CAT_MIN_N = 10
+
+
 def _judge_l2_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
     ok = [
         j
@@ -989,6 +1023,10 @@ def _judge_l2_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
             "avg_combined_3": 0,
             "send_as_is_pct": 0,
             "accept_l2": False,
+            "accept_l2_balanced": False,
+            "gate_owner_send_min_pct": round(_JUDGE_L2_SEND_MIN_PER_CAT * 100, 0),
+            "by_category": {},
+            "worst_by_category": {},
             "top_worst": [],
             "prompt_recommendations": [],
         }
@@ -1008,6 +1046,60 @@ def _judge_l2_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
     for j in worst:
         if j.get("prompt_fix"):
             patterns.append(j["prompt_fix"])
+
+    # --- per-category breakdown ---
+    by_cat: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"count": 0, "send_ok": 0, "rel_sum": 0, "spec_sum": 0, "univ_sum": 0}
+    )
+    for j in ok:
+        cat = (j.get("category") or "other").strip() or "other"
+        by_cat[cat]["count"] += 1
+        by_cat[cat]["send_ok"] += 1 if j.get("send_as_is") else 0
+        by_cat[cat]["rel_sum"] += j.get("relevance", 0)
+        by_cat[cat]["spec_sum"] += j.get("specificity", 0)
+        by_cat[cat]["univ_sum"] += j.get("universal_helpful", 0)
+
+    by_category: dict[str, dict[str, Any]] = {}
+    for cat, d in by_cat.items():
+        n = d["count"]
+        s_pct = round(d["send_ok"] / n * 100, 1) if n else 0.0
+        comb = round(
+            (d["rel_sum"] + d["spec_sum"] + d["univ_sum"]) / (3 * n), 2
+        ) if n else 0.0
+        by_category[cat] = {
+            "count": n,
+            "send_as_is_pct": s_pct,
+            "combined": comb,
+        }
+
+    # balanced gate: overall pass AND each measured category (n≥10) ≥70%, none <50%
+    accept_l2 = combined >= _JUDGE_L2_COMBINED_MIN and send_ok >= _JUDGE_L2_SEND_MIN
+    balanced_fail = False
+    for cat, d in by_category.items():
+        if d["count"] < _JUDGE_L2_CAT_MIN_N:
+            continue
+        pct = d["send_as_is_pct"]
+        if pct < _JUDGE_L2_SEND_FLOOR_PER_CAT * 100:
+            balanced_fail = True
+            break
+        if pct < _JUDGE_L2_SEND_MIN_PER_CAT * 100:
+            balanced_fail = True
+            break
+    accept_l2_balanced = accept_l2 and not balanced_fail
+
+    worst_by_category: dict[str, list[dict[str, Any]]] = {}
+    for cat in ("dev", "design", "marketing", "text", "other"):
+        cat_rows = [j for j in ok if (j.get("category") or "other").strip() == cat]
+        if not cat_rows:
+            continue
+        worst_by_category[cat] = sorted(
+            cat_rows,
+            key=lambda x: (
+                x["relevance"] + x["specificity"] + x.get("universal_helpful", 0),
+                x["relevance"],
+            ),
+        )[:3]
+
     return {
         "count": len(judged),
         "scored": len(ok),
@@ -1016,7 +1108,11 @@ def _judge_l2_summary(judged: list[dict[str, Any]]) -> dict[str, Any]:
         "avg_universal_helpful": round(univ, 2),
         "avg_combined_3": round(combined, 2),
         "send_as_is_pct": round(send_ok * 100, 1),
-        "accept_l2": combined >= _JUDGE_L2_COMBINED_MIN and send_ok >= _JUDGE_L2_SEND_MIN,
+        "accept_l2": accept_l2,
+        "accept_l2_balanced": accept_l2_balanced,
+        "gate_owner_send_min_pct": round(_JUDGE_L2_SEND_MIN_PER_CAT * 100, 0),
+        "by_category": by_category,
+        "worst_by_category": worst_by_category,
         "top_worst": worst,
         "prompt_recommendations": patterns[:10],
     }
@@ -1125,7 +1221,69 @@ def _render_judge_md(
                 f"- send_as_is: **{js.get('send_as_is_pct', 0)}%** "
                 f"({'✅ ≥70%' if js.get('send_as_is_pct', 0) >= _JUDGE_L2_SEND_MIN * 100 else '❌ <70%'})",
                 f"- **Accept L2:** {'✅ PASS' if js.get('accept_l2') else '❌ FAIL'}",
+                f"- **Accept L2 balanced (O200 owner — each cat n≥{_JUDGE_L2_CAT_MIN_N} "
+                f"→ send ≥{int(_JUDGE_L2_SEND_MIN_PER_CAT * 100)}%):** "
+                f"{'✅ PASS' if js.get('accept_l2_balanced') else '❌ FAIL'}",
                 "",
+            ]
+        )
+        by_cat = js.get("by_category") or {}
+        if by_cat:
+            lines.extend(
+                [
+                    "### By category (send_as_is%)",
+                    "",
+                    "| Category | n | send_as_is% | combined | gate |",
+                    "|----------|---|-------------|----------|------|",
+                ]
+            )
+            for cat in ("dev", "design", "marketing", "text", "other"):
+                d = by_cat.get(cat)
+                if not d:
+                    continue
+                n = d["count"]
+                s = d["send_as_is_pct"]
+                comb = d["combined"]
+                if n < _JUDGE_L2_CAT_MIN_N:
+                    gate = f"⏳ n<{_JUDGE_L2_CAT_MIN_N}"
+                elif s < _JUDGE_L2_SEND_FLOOR_PER_CAT * 100:
+                    gate = "❌ <50% floor"
+                elif s < _JUDGE_L2_SEND_MIN_PER_CAT * 100:
+                    gate = f"❌ <{int(_JUDGE_L2_SEND_MIN_PER_CAT * 100)}%"
+                else:
+                    gate = f"✅ ≥{int(_JUDGE_L2_SEND_MIN_PER_CAT * 100)}%"
+                lines.append(f"| {cat} | {n} | {s}% | {comb}/5 | {gate} |")
+            lines.append("")
+        worst_by_cat = js.get("worst_by_category") or {}
+        if worst_by_cat:
+            lines.extend(["### Worst 3 per category (L2)", ""])
+            for cat in ("dev", "design", "marketing", "text", "other"):
+                rows = worst_by_cat.get(cat) or []
+                if not rows:
+                    continue
+                lines.append(f"#### {cat}")
+                for j in rows:
+                    lead = by_id.get(j["lead_id"], {})
+                    title = (lead.get("title") or "")[:80]
+                    draft = (lead.get("reply_draft") or "")[:300]
+                    lines.append(
+                        f"- **#{j['lead_id']}** {title!r} — "
+                        f"rel={j.get('relevance')} spec={j.get('specificity')} "
+                        f"univ={j.get('universal_helpful')} send={j.get('send_as_is')}"
+                    )
+                    if j.get("reason"):
+                        lines.append(f"  - reason: {j.get('reason', '')}")
+                    if draft:
+                        lines.append(
+                            f"  - draft: «{draft}…»"
+                            if len(draft) >= 300
+                            else f"  - draft: «{draft}»"
+                        )
+                    if j.get("prompt_fix"):
+                        lines.append(f"  - fix: {j['prompt_fix']}")
+                lines.append("")
+        lines.extend(
+            [
                 "### Top prompt-fix patterns (L2)",
                 "",
             ]
@@ -1537,7 +1695,8 @@ def main() -> int:
             f"Judge L2: combined={judge_l2_summary['avg_combined_3']} "
             f"univ={judge_l2_summary['avg_universal_helpful']} "
             f"send={judge_l2_summary['send_as_is_pct']}% "
-            f"({'PASS' if judge_l2_summary['accept_l2'] else 'FAIL'})"
+            f"({'PASS' if judge_l2_summary['accept_l2'] else 'FAIL'}) · "
+            f"balanced O200={('PASS' if judge_l2_summary.get('accept_l2_balanced') else 'FAIL')}"
         )
     if judge_l1_summary is not None:
         print(

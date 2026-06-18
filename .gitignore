@@ -37,6 +37,10 @@ __pycache__/
 # --- data/ — local runtime; whitelist only safe reports ---
 data/*
 !data/.gitkeep
+!data/quiz_pool_allowlist.json
+!data/quiz_cards_v1.json
+!data/quiz_cards_v2-pilot.json
+!data/quiz_cards_v2.json
 !data/sessions/
 data/sessions/*
 !data/sessions/README.txt
@@ -79,3 +83,10 @@ desktop/src-tauri/target/
 
 # O118 WP live dev
 wordpress/rawlead-kadence-child/node_modules/
+
+# O251 local-only artifacts (probes, MCP dumps, audit PNGs)
+.playwright-mcp/
+audit_*.png
+o105_*.png
+rawlead_*.png
+scripts/_tmp_*.py

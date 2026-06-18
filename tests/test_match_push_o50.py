@@ -45,18 +45,23 @@ class TestMatchPushO50(TestCase):
         )
         data = json.loads(raw)
         rows = data["inline_keyboard"]
-        self.assertEqual(rows[0][0]["callback_data"], "draft:7019")
-        self.assertEqual(rows[1][0]["text"], "Открыть заказ")
-        self.assertEqual(rows[1][0]["url"], "https://fl.ru/projects/123/")
-        self.assertEqual(rows[1][1]["text"], "Лента")
-        self.assertEqual(rows[1][1]["url"], "https://rawlead.ru/lenta/?lead=7019")
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0][0]["text"], "Не моё")
+        self.assertEqual(rows[0][0]["callback_data"], "nope:7019")
+        self.assertEqual(rows[0][1]["text"], "Отклик")
+        self.assertEqual(rows[0][1]["callback_data"], "draft:7019")
+        self.assertEqual(rows[1][0]["text"], "Смотреть в ленте")
+        self.assertEqual(rows[1][0]["url"], "https://rawlead.ru/lenta/?lead=7019")
+        self.assertEqual(rows[1][1]["text"], "Смотреть на бирже")
+        self.assertEqual(rows[1][1]["url"], "https://fl.ru/projects/123/")
 
-    def test_push_keyboard_free_no_generate(self) -> None:
+    def test_push_keyboard_free_still_four_buttons(self) -> None:
         raw = _push_keyboard(show_generate=False, lead_id=42, order_url="https://kwork.ru/project/1")
         data = json.loads(raw)
-        row = data["inline_keyboard"][0]
-        self.assertEqual(len(row), 2)
-        self.assertEqual(row[0]["url"], "https://kwork.ru/project/1")
+        rows = data["inline_keyboard"]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0][1]["callback_data"], "draft:42")
+        self.assertEqual(rows[1][1]["url"], "https://kwork.ru/project/1")
 
     def test_format_push_uses_order_url(self) -> None:
         text = _format_push_text(

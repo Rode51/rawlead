@@ -1150,6 +1150,8 @@ add_action('rest_api_init', static function (): void {
 
             $retry_after = null;
 
+            $quota_fields = [];
+
             if (is_array($data)) {
 
                 if (isset($data['detail'])) {
@@ -1163,6 +1165,16 @@ add_action('rest_api_init', static function (): void {
                         $detail = (string) ($data['detail']['detail'] ?? 'API error');
 
                         $retry_after = $data['detail']['retry_after_sec'] ?? null;
+
+                        foreach (['draft_hourly_limit', 'draft_used', 'draft_remaining', 'draft_retry_after_sec'] as $quota_key) {
+
+                            if (isset($data['detail'][$quota_key])) {
+
+                                $quota_fields[$quota_key] = (int) $data['detail'][$quota_key];
+
+                            }
+
+                        }
 
                     }
 
@@ -1187,6 +1199,12 @@ add_action('rest_api_init', static function (): void {
             if ($retry_after !== null) {
 
                 $err_data['retry_after_sec'] = (int) $retry_after;
+
+            }
+
+            foreach ($quota_fields as $quota_key => $quota_val) {
+
+                $err_data[$quota_key] = $quota_val;
 
             }
 
@@ -1233,6 +1251,54 @@ add_action('rest_api_init', static function (): void {
             },
 
         ],
+
+    ]);
+
+
+
+    register_rest_route('rawlead/v1', '/me/draft/quota', [
+
+        'methods'             => 'GET',
+
+        'permission_callback' => '__return_true',
+
+        'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+
+            if (rawlead_api_bearer_from_request($request) === '') {
+
+                return new WP_Error('rawlead_auth', 'Login required', ['status' => 401]);
+
+            }
+
+            $url = rawlead_api_base_url() . '/v1/me/draft/quota';
+
+            $response = wp_remote_get($url, [
+
+                'timeout' => 15,
+
+                'headers' => rawlead_api_user_headers($request, false),
+
+            ]);
+
+            if (is_wp_error($response)) {
+
+                return $response;
+
+            }
+
+            $code = (int) wp_remote_retrieve_response_code($response);
+
+            $data = json_decode(wp_remote_retrieve_body($response), true);
+
+            if ($code < 200 || $code >= 300) {
+
+                return new WP_Error('rawlead_api_http', 'API error', ['status' => $code]);
+
+            }
+
+            return new WP_REST_Response(is_array($data) ? $data : [], 200);
+
+        },
 
     ]);
 
@@ -1602,6 +1668,7 @@ add_action('rest_api_init', static function (): void {
                 'body'    => wp_json_encode(array_filter([
                     'tags'    => $body['tags'],
                     'cx_pref' => isset($body['cx_pref']) ? $body['cx_pref'] : null,
+                    'niches'  => isset($body['niches']) && is_array($body['niches']) ? $body['niches'] : null,
                 ], static fn ($value) => $value !== null)),
             ]);
             if (is_wp_error($response)) {

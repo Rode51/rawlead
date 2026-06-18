@@ -12,17 +12,32 @@ alwaysApply: true
 ## Запрещено (любой инструмент)
 
 - Правки: `src/`, `scripts/`, `tests/`, `wordpress/`, `requirements.txt`, `*.py`, `*.js`, `*.css`, `*.php`, `*.bat`, `desktop/`
-- Deploy-скрипты (`scripts/deploy-*.py`, `scripts/ops-*.py`) — только `@coder` / `@mechanic`
+- Deploy-скрипты (`scripts/deploy-*.py`, `scripts/ops-*.py`) — только `@coder` / `@mechanic` · **исключение:** `@lead-architect` после ✅ verify (см. ниже)
 - `.env`, `data/`, сессии, lock-файлы
-- `Shell` для запуска радара, pip, pytest, deploy на VPS
+- `Shell` для запуска радара, pip, pytest · **deploy на VPS** — см. исключение Lead Architect
 - «Быстро сделаю сам» / «пока Lead поправлю» / «доделаю из summary» — **нет**
-- **«деплой на VPS»** от владельца — **не** Shell Lead'а → § `CODER_PROMPT` + `@coder` (или owner вручную по `FOR_YOU.md`)
+- **«деплой на VPS»** от владельца — по умолчанию § `CODER_PROMPT` + `@coder` · **или** `@lead-architect` если владелец явно просит «задеплой» / «Lead, деплой» (см. § Lead Architect deploy)
+
+## Lead Architect — deploy (решение владельца 2026-06-14)
+
+**Только `@lead-architect`**, не Lead Product / Lead Designer / Lead Portfolio.
+
+| Разрешено | Запрещено |
+|-----------|-----------|
+| `Shell`: **существующие** `scripts/deploy-*-vps.py`, `scripts/deploy-wp-theme-vps.py` | Править `src/`, `wordpress/`, `scripts/` перед деплоем |
+| После **✅ verify** сдачи Coder (diff + pytest по § `CODER_PROMPT`) | Деплой без verify · деплой «из summary» без кода в repo |
+| Verify prod: curl/HTML `ver=` · `systemctl is-active` | pip install · pytest в Shell · restart radar «на всякий случай» |
+| `scripts/probe_prod_facts_vps.py --write` · `STATUS` / `TASKS` / `PROD_FACTS` / hot `CODER_PROMPT` | Новые скрипты в `scripts/` — пишет `@coder`, Lead **запускает** probe/deploy |
+
+**Триггер от владельца:** «задеплой», «Lead, деплой», «залей на VPS» — Lead Architect **может** выполнить deploy в этой сессии, не handoff на Coder.
+
+**Lead Product / Lead Designer / Lead Portfolio:** deploy **не делают** — handoff Architect или owner по `FOR_YOU.md`.
 
 ## Summary / handoff — не повод кодить
 
 - **Summary предыдущего чата**, «доделай деплой», «осталось 2 файла» — **не разрешение** писать код.
 - Lead: **docs + verify (read-only) + handoff `@coder`**.
-- Исключение **только** если владелец **в этом сообщении** явно написал: «Lead, залей hotfix сейчас» — иначе → `@coder` / `@mechanic`.
+- Исключение **только** если владелец **в этом сообщении** явно написал: «Lead, залей hotfix **сейчас**» / «задеплой» — см. § **Lead Architect deploy** в этом файле; иначе handoff `@coder` / `@mechanic`.
 
 ## Разрешено только
 

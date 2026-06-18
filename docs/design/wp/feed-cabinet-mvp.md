@@ -1,6 +1,7 @@
 # WP /lenta/ и /cabinet/ — дизайн-спека v5
 
-**Статус:** NEO-BRUTALIST · **принято владельцем 2026-05-29** (prod as-is, theme **v1.10.9**)  
+**Статус:** NEO-BRUTALIST · **quiz-first profile (owner 2026-06-15)** · theme **1.19.x+**  
+**Supersedes:** §4.5–4.7 manual Skill Tree + **max 12** — **снято** (см. §0.1).  
 **Канон UI:** `wordpress/.../assets/css/rawlead.css` · токены — [`REFERENCE.md`](REFERENCE.md) §2  
 **Токены:** [`../../team/design/DESIGN_SYSTEM.md`](../../team/design/DESIGN_SYSTEM.md) § WP NEO-BRUTALIST  
 **Анимации:** [`REFERENCE.md`](REFERENCE.md) § 6  
@@ -14,12 +15,30 @@
 |--|-----------|------------|
 | **Доступ** | анон, без входа | TG Login; anon → редирект |
 | **Лента** | все `is_visible=true` лиды | **inbox откликов** (O23) — не match-лента |
-| **Навыки** | выбор → **сортировка** (лента не пустеет) | collapsed strip → sheet; редактируемые |
+| **Навыки** | **квиз → Neon** · retake · поведение (draft/expand) | **нет** ручного picker · read-only отображение профиля (если есть) |
 | **Карточка** | закрытая → раскрытие с L1-саммари | заголовок → аккордеон (черновик + [Скопировать] [Удалить]) |
 | **Ощущение** | «открытый рынок» | «мои отклики» — личный inbox |
 | **Первый принцип** | **Mobile-first** — thumb-zone ≥ 44px, viewport 390px | то же |
 
 Обе страницы продуктовые. Стиль: NEO-BRUTALIST (токены из `DESIGNER_PROMPT.md`).
+
+---
+
+## 0.1 Quiz-first profile (**owner 2026-06-15 · канон**)
+
+**Решение владельца:** ручной ввод навыков **убран** (нет Skill Tree sheet, нет «Выбрано N / 12», нет чекбоксов L1/L3 на `/lenta/` и `/cabinet/`).
+
+| Источник профиля | Что пишется в Neon |
+|------------------|-------------------|
+| **Квиз** (first + retake) | `__quiz_niche:*` (primary/secondary) · liked tags с карточек · `cx_pref` |
+| **Поведение** | `weight_delta`: draft, expand, expand_no_reply, inbox_delete |
+| ~~Ручной picker~~ | **deprecated** — не проектировать, не возвращать без отдельного решения |
+
+**Лимит 12:** **не нужен** — был guardrail для ручного picker («не выбери всё»). При quiz-first **обрезка до 12 — баг** (теряем сигнал). Код: снять `_USER_MAX_TAGS` / `MAX_USER_TAGS` → § **O230** в `CODER_PROMPT`.
+
+**UX сейчас:** профиль меняется через **квиз** (`/lenta/#quiz`, retake) и **отклики в ленте**; match/sort по `user_tags` + niches.
+
+**§4.5–4.7 ниже** — **архив** O92–O94 (manual tree); только для истории wireframes, **не** acceptance для новых задач.
 
 ---
 
@@ -441,6 +460,8 @@ Filter bar — sticky под header, всегда видна. Высота 52px 
 ---
 
 ### 4.5 O92 — Skill Tree (v1): acceptance
+
+> **⚠️ ARCHIVE · superseded §0.1** — manual picker снят owner 2026-06-15. AC ниже **не применяются** к prod.
 
 **Guardrail v1:** только UI/UX. API payload (массив slug), L1, Neon schema — **не трогать**.  
 **Каталог тегов:** [`SKILLS_TOOLS_CATALOG.md`](../../team/product/SKILLS_TOOLS_CATALOG.md) v0.3 · 51 тег · 4 ниши.
@@ -1695,3 +1716,24 @@ _Lead Designer · O127 UI Unify · 2026-06-07_
 ---
 
 _Lead Designer · NEO-BRUTALIST + O23 + C1 · 2026-05-29_ · _Lead Product · O92 Skill Tree AC · 2026-06-02_
+
+---
+
+## § O209 supplement — quiz + tier states (2026-06-14)
+
+**Канон:** [`wave-o209-match-brief.md`](wave-o209-match-brief.md) · theme **1.18.84** · **baseline §0–§9 structure не менялся**
+
+| Surface | Tier / state | UX (delta) |
+|---------|--------------|------------|
+| **`/quiz/`** | all | P0 full rebuild: intro → swipe cards → finale (category bars, TG, trial chip) |
+| **`/lenta/`** | anon | strip «30 мин» · filter bar hidden · quiz promo banner |
+| **`/lenta/`** | trial/premium | match % label · filter bar · slots row только premium |
+| **`/lenta/`** | expired trial | mandatory banner → pricing |
+| **`/cabinet/`** | trial | badge «Trial» · skills UI hidden |
+| **`/cabinet/`** | expired | banner как на ленте |
+| **Marketing** | — | hero/pricing/FAQ/how — match-first copy · tier table 30м/5h/trial |
+
+**Не в scope O209:** смена filter bar layout · cabinet inbox grid · perf (волна 3).
+
+_Lead Architect doc sync · O209 delivered 2026-06-14_
+

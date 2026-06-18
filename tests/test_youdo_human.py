@@ -27,6 +27,15 @@ from youdo_parser import (  # noqa: E402
     youdo_cooldown_active,
 )
 
+_SLOT_PROXIES = [
+    "http://u:p@1.2.3.4:8000",
+    "http://u:p@5.6.7.8:8000",
+]
+
+
+def _youdo_tier_plan() -> list[tuple[str, str]]:
+    return [(url, "dc") for url in _SLOT_PROXIES]
+
 
 class TestYoudoHuman(unittest.TestCase):
     def setUp(self) -> None:
@@ -34,6 +43,14 @@ class TestYoudoHuman(unittest.TestCase):
         os.environ["EXCHANGE_LISTING_BROWSER"] = "1"
         os.environ["YOUDO_BROWSER_ONLY"] = "1"
         os.environ["YOUDO_ONE_SLOT_PER_CYCLE"] = "1"
+        os.environ["YOUDO_STICKY_SESSION"] = "0"
+        os.environ["YOUDO_PERSISTENT_PROFILE"] = "0"
+        os.environ["YOUDO_BROWSER"] = "patchright"
+        os.environ["YOUDO_RU_RETRY_MAX"] = "0"
+        os.environ["YOUDO_SERVICEPIPE_EARLY_RU"] = "0"
+        os.environ["YOUDO_MAX_DC_BANS_PER_FETCH"] = "2"
+        os.environ["YOUDO_SLOT_RETRY_ON_TIMEOUT"] = "3"
+        os.environ["YOUDO_DC_RETRY_MAX"] = "4"
         reset_cascade_state_for_tests()
 
     def tearDown(self) -> None:
@@ -80,6 +97,7 @@ class TestYoudoHuman(unittest.TestCase):
         self.assertTrue(ok)
         self.assertGreater(len(html), 500)
 
+    @patch("exchange_browser_fetch._youdo_fetch_tier_plan", return_value=_youdo_tier_plan())
     @patch("exchange_browser_fetch.fetch_youdo_html_browser")
     @patch("exchange_browser_fetch.exchange_primary_proxy_url", return_value="http://u:p@1.2.3.4:8000")
     @patch("exchange_browser_fetch.exchange_alive_proxy_urls")
@@ -88,6 +106,7 @@ class TestYoudoHuman(unittest.TestCase):
         mock_alive: MagicMock,
         _mock_primary: MagicMock,
         mock_human: MagicMock,
+        _mock_plan: MagicMock,
     ) -> None:
         mock_alive.return_value = [
             "http://u:p@1.2.3.4:8000",
@@ -105,6 +124,8 @@ class TestYoudoHuman(unittest.TestCase):
             "http://u:p@1.2.3.4:8000",
         )
 
+    @patch("youdo_parser.youdo_hard_reset")
+    @patch("exchange_browser_fetch._youdo_fetch_tier_plan", return_value=_youdo_tier_plan())
     @patch("exchange_browser_fetch._abort_playwright_worker")
     @patch("exchange_browser_fetch._fetch_youdo_ephemeral")
     @patch("exchange_browser_fetch.fetch_youdo_html_browser")
@@ -119,6 +140,8 @@ class TestYoudoHuman(unittest.TestCase):
         mock_human: MagicMock,
         mock_ephemeral: MagicMock,
         mock_abort: MagicMock,
+        _mock_hard_reset: MagicMock,
+        _mock_plan: MagicMock,
     ) -> None:
         from html_fetch import HtmlFetchError
 
@@ -142,6 +165,8 @@ class TestYoudoHuman(unittest.TestCase):
         )
         mock_abort.assert_called_once()
 
+    @patch("youdo_parser.youdo_hard_reset")
+    @patch("exchange_browser_fetch._youdo_fetch_tier_plan", return_value=_youdo_tier_plan())
     @patch("exchange_browser_fetch._abort_playwright_worker")
     @patch("exchange_browser_fetch._fetch_youdo_ephemeral")
     @patch("exchange_browser_fetch.fetch_youdo_html_browser")
@@ -156,6 +181,8 @@ class TestYoudoHuman(unittest.TestCase):
         mock_human: MagicMock,
         mock_ephemeral: MagicMock,
         mock_abort: MagicMock,
+        _mock_hard_reset: MagicMock,
+        _mock_plan: MagicMock,
     ) -> None:
         from html_fetch import HtmlFetchError
 
@@ -179,6 +206,9 @@ class TestYoudoHuman(unittest.TestCase):
         )
         mock_abort.assert_called_once()
 
+    @patch("youdo_parser.youdo_hard_reset")
+    @patch("exchange_browser_fetch._youdo_fetch_tier_plan", return_value=_youdo_tier_plan())
+    @patch("exchange_browser_fetch._youdo_browser_slot_fail")
     @patch("exchange_browser_fetch._abort_playwright_worker")
     @patch("exchange_browser_fetch._fetch_youdo_ephemeral")
     @patch("exchange_browser_fetch.fetch_youdo_html_browser")
@@ -193,6 +223,9 @@ class TestYoudoHuman(unittest.TestCase):
         mock_human: MagicMock,
         mock_ephemeral: MagicMock,
         mock_abort: MagicMock,
+        mock_youdo_ban: MagicMock,
+        _mock_hard_reset: MagicMock,
+        _mock_plan: MagicMock,
     ) -> None:
         from html_fetch import HtmlFetchError
 
@@ -211,7 +244,10 @@ class TestYoudoHuman(unittest.TestCase):
         mock_human.assert_called_once()
         mock_ephemeral.assert_called_once()
         mock_abort.assert_called_once()
+        mock_youdo_ban.assert_called_once()
 
+    @patch("youdo_parser.youdo_hard_reset")
+    @patch("exchange_browser_fetch._youdo_fetch_tier_plan", return_value=_youdo_tier_plan())
     @patch("exchange_browser_fetch._abort_playwright_worker")
     @patch("exchange_browser_fetch._fetch_youdo_ephemeral")
     @patch("exchange_browser_fetch.fetch_youdo_html_browser")
@@ -226,6 +262,8 @@ class TestYoudoHuman(unittest.TestCase):
         mock_human: MagicMock,
         mock_ephemeral: MagicMock,
         mock_abort: MagicMock,
+        _mock_hard_reset: MagicMock,
+        _mock_plan: MagicMock,
     ) -> None:
         from html_fetch import HtmlFetchError
 

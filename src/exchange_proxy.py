@@ -44,6 +44,7 @@ _FAILOVER_COOLDOWN_MAX_SEC = float(os.getenv("EXCHANGE_PROXY_FAILOVER_COOLDOWN_M
 _BANS_STORAGE_KEY = "exchange_proxy_bans_v2"
 _BANS_STORAGE_KEY_LEGACY = "exchange_proxy_bans_v1"
 _ACTIVE_SLOT_KEY = "exchange_proxy_active_slot_v1"
+_YOUDO_DC_BANNED_SINCE_KEY = "youdo_dc_banned_since"
 _PRIMARY_SOURCES = frozenset({"fl", "kwork"})
 _TELETHON_POOL_ENV = (
     "TELETHON_PROXY_ACC2",
@@ -167,29 +168,304 @@ def _shared_exchange_pool() -> list[str]:
     return _primary_exchange_pool()
 
 
-def _urls_for_source(source: str) -> tuple[str, list[str]]:
+_FL_RES_BAN_SOURCE = "fl_res"
+FL_DC_PARSED_INGEST_OK = 25
+
+
+def _fl_dc_pool() -> list[str]:
+    return _parse_proxy_list("FL_PROXY_URLS", "FL_PROXY_URL") or _primary_exchange_pool()
+
+
+def _fl_residential_pool() -> list[str]:
+    return _parse_proxy_list("FL_PROXY_URLS_RESIDENTIAL", "FL_PROXY_URL_RESIDENTIAL")
+
+
+def _fl_pool_triple() -> tuple[str, str, list[str]]:
+    """pool_key, ban_source, urls — DC tier first; residential when DC alive==0 (O210)."""
+    _ensure_loaded()
+    dc = _fl_dc_pool()
+    if dc and _alive_urls(dc, "fl"):
+        return "fl", "fl", dc
+    res = _fl_residential_pool()
+    if res:
+        return "fl", _FL_RES_BAN_SOURCE, res
+    return "fl", "fl", dc
+
+
+def fl_dc_tier_exhausted() -> bool:
+    """True when all DC FL slots are banned (residential may still work)."""
+    _ensure_loaded()
+    dc = _fl_dc_pool()
+    if not dc:
+        return False
+    alive, total = _pool_counts(dc, "fl")
+    return total > 0 and alive == 0
+
+
+def fl_on_residential_tier() -> bool:
+    _ensure_loaded()
+    _, ban_source, urls = _fl_pool_triple()
+    return ban_source == _FL_RES_BAN_SOURCE and bool(urls)
+
+
+def fl_residential_counts() -> tuple[int, int]:
+    """Alive/total residential FL slots (0,0 if pool empty)."""
+    _ensure_loaded()
+    res = _fl_residential_pool()
+    return _pool_counts(res, _FL_RES_BAN_SOURCE)
+
+
+def fl_dc_alive_urls() -> list[str]:
+    _ensure_loaded()
+    return _alive_urls(_fl_dc_pool(), "fl")
+
+
+def fl_res_alive_urls() -> list[str]:
+    _ensure_loaded()
+    return _alive_urls(_fl_residential_pool(), _FL_RES_BAN_SOURCE)
+
+
+def fl_one_slot_res_per_cycle() -> bool:
+    """O215: on residential tier — one browser slot per cycle (do not burn 25 res)."""
+    return os.getenv("FL_ONE_SLOT_RES_PER_CYCLE", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _fl_slot_retry_max() -> int:
+    raw = os.getenv("FL_SLOT_RETRY_MAX", "1").strip()
+    try:
+        return max(1, min(int(raw), 8))
+    except ValueError:
+        return 1
+
+
+def _fl_hard_reset_on_ban_enabled() -> bool:
+    return os.getenv("FL_HARD_RESET_ON_BAN", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def fl_browser_slot_urls() -> list[str]:
+    """DC primary; residential only when DC exhausted; res = 1 slot/cycle (O191/O215)."""
+    dc_alive = fl_dc_alive_urls()
+    if dc_alive:
+        primary = exchange_primary_proxy_url("fl")
+        if primary and primary in dc_alive:
+            slots = [primary] + [u for u in dc_alive if u != primary]
+        else:
+            slots = list(dc_alive)
+        return slots[: _fl_slot_retry_max()]
+    res_alive = fl_res_alive_urls()
+    if not res_alive:
+        return []
+    primary = exchange_primary_proxy_url("fl")
+    if fl_one_slot_res_per_cycle():
+        if primary and primary in res_alive:
+            return [primary]
+        return [res_alive[0]]
+    if primary and primary in res_alive:
+        slots = [primary] + [u for u in res_alive if u != primary]
+    else:
+        slots = list(res_alive)
+    return slots[: min(_fl_slot_retry_max(), 2)]
+
+
+def _youdo_dc_slot_count() -> int:
+    raw = os.getenv("YOUDO_O191_DC_SLOTS", "1").strip()
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 1
+
+
+def _youdo_dc_pool() -> list[str]:
+    if _youdo_dc_slot_count() == 0:
+        return []
+    explicit = _parse_proxy_list("YOUDO_DC_PROXY_URLS", "YOUDO_DC_PROXY_URL")
+    if explicit:
+        return explicit
+    fl = _fl_dc_pool()
+    if fl:
+        return fl[: _youdo_dc_slot_count()]
+    all_urls = _parse_proxy_list("YOUDO_PROXY_URLS", "YOUDO_PROXY_URL")
+    if not all_urls:
+        return []
+    return all_urls[: _youdo_dc_slot_count()]
+
+
+def _youdo_ru_pool() -> list[str]:
+    all_urls = _parse_proxy_list("YOUDO_PROXY_URLS", "YOUDO_PROXY_URL") or _secondary_exchange_pool()
+    dc_hints = {_hint_from_url(u) for u in _youdo_dc_pool()}
+    return [u for u in all_urls if _hint_from_url(u) not in dc_hints]
+
+
+def youdo_dc_pool_size() -> int:
+    return len(_youdo_dc_pool())
+
+
+def youdo_dc_alive_urls() -> list[str]:
+    _ensure_loaded()
+    return _alive_urls(_youdo_dc_pool(), "youdo")
+
+
+def youdo_ru_alive_urls() -> list[str]:
+    _ensure_loaded()
+    return _alive_urls(_youdo_ru_pool(), "youdo")
+
+
+_YOUDO_POOL_KEY = "youdo"
+
+
+def _youdo_dc_retry_max() -> int:
+    raw = os.getenv("YOUDO_DC_RETRY_MAX", "").strip()
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    raw = os.getenv("YOUDO_SLOT_RETRY_ON_TIMEOUT", "3").strip()
+    try:
+        cap = max(1, int(raw))
+    except ValueError:
+        cap = 3
+    dc_n = youdo_dc_pool_size()
+    return min(cap, dc_n) if dc_n else cap
+
+
+def _youdo_ru_retry_max() -> int:
+    raw = os.getenv("YOUDO_RU_RETRY_MAX", "5").strip()
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 5
+
+
+def _youdo_dc_slot_index_raw() -> int:
+    dc_urls = _youdo_dc_pool()
+    if not dc_urls:
+        return 0
+    _ensure_loaded()
+    return _active_slot.get(_YOUDO_POOL_KEY, 0) % len(dc_urls)
+
+
+def _resolve_youdo_dc_slot_index() -> int:
+    """Active slot index within DC pool only (O260)."""
+    dc_urls = _youdo_dc_pool()
+    if not dc_urls:
+        return 0
+    _ensure_loaded()
+    idx = _youdo_dc_slot_index_raw()
+    if not _is_banned(dc_urls[idx], "youdo"):
+        return idx
+    for off in range(len(dc_urls)):
+        j = (idx + off) % len(dc_urls)
+        if not _is_banned(dc_urls[j], "youdo"):
+            if j != idx:
+                _active_slot[_YOUDO_POOL_KEY] = j
+                _persist_bans()
+            return j
+    return idx
+
+
+def _youdo_primary_dc_url() -> str:
+    dc_urls = _youdo_dc_pool()
+    dc_alive = youdo_dc_alive_urls()
+    if not dc_alive or not dc_urls:
+        return ""
+    idx = _resolve_youdo_dc_slot_index()
+    preferred = dc_urls[idx]
+    if not _is_banned(preferred, "youdo"):
+        return preferred
+    return dc_alive[0]
+
+
+def youdo_realign_to_dc_tier() -> bool:
+    """O260: after ban TTL — active slot back to first alive DC."""
+    _ensure_loaded()
+    dc_urls = _youdo_dc_pool()
+    dc_alive = youdo_dc_alive_urls()
+    if not dc_urls or not dc_alive:
+        return False
+    first_idx = _index_of_url(dc_alive[0], dc_urls)
+    old_idx = _youdo_dc_slot_index_raw()
+    if old_idx == first_idx and not _is_banned(dc_urls[first_idx], "youdo"):
+        return False
+    _active_slot[_YOUDO_POOL_KEY] = first_idx
+    _persist_bans()
+    logger.info(
+        "fetch:youdo tier=dc_restored dc_alive=%d/%d slot=%d",
+        len(dc_alive),
+        len(dc_urls),
+        first_idx + 1,
+    )
+    return True
+
+
+def _normalize_youdo_active_slot() -> None:
+    """O260: persisted slot may index full YOUDO_PROXY_URLS (RU) — realign to DC pool."""
+    dc_urls = _youdo_dc_pool()
+    if not dc_urls:
+        return
+    _ensure_loaded()
+    raw = _active_slot.get(_YOUDO_POOL_KEY, 0)
+    if raw >= len(dc_urls):
+        youdo_realign_to_dc_tier()
+
+
+def youdo_listing_slot_urls(*, include_ru: bool = False) -> list[str]:
+    """O260: ordered DC slots; RU (max 1) only when include_ru and all DC banned."""
+    dc_alive = youdo_dc_alive_urls()
+    if dc_alive:
+        primary = _youdo_primary_dc_url()
+        if primary:
+            slots = [primary]
+            slots.extend(u for u in dc_alive if u != primary)
+            return _dedupe_urls(slots)
+        return list(dc_alive)
+    if include_ru:
+        ru_alive = youdo_ru_alive_urls()
+        return ru_alive[: _youdo_ru_retry_max()]
+    return []
+
+
+def youdo_browser_slot_urls() -> list[str]:
+    """O260: DC carousel; RU only when all DC banned."""
+    dc_alive = youdo_dc_alive_urls()
+    if dc_alive:
+        return youdo_listing_slot_urls(include_ru=False)
+    return youdo_listing_slot_urls(include_ru=True)
+
+
+def _urls_for_source(source: str) -> tuple[str, str, list[str]]:
+    """pool_key, ban_source, urls."""
     src = (source or "").strip() or "exchange"
     if src == "fl":
-        urls = _parse_proxy_list("FL_PROXY_URLS", "FL_PROXY_URL")
-        return src, urls or _primary_exchange_pool()
+        return _fl_pool_triple()
     if src == "kwork":
         urls = _parse_proxy_list("KWORK_PROXY_URLS", "KWORK_PROXY_URL")
-        return src, urls or _primary_exchange_pool()
+        return src, src, urls or _primary_exchange_pool()
     if src == "youdo":
         urls = _parse_proxy_list("YOUDO_PROXY_URLS", "YOUDO_PROXY_URL")
-        return src, urls or _secondary_exchange_pool()
+        return src, src, urls or _secondary_exchange_pool()
     if src == "freelance_ru":
         urls = _parse_proxy_list("FREELANCE_RU_PROXY_URLS", "FREELANCE_RU_PROXY_URL")
-        return src, urls or _secondary_exchange_pool()
+        return src, src, urls or _secondary_exchange_pool()
     if src == "freelancejob":
         urls = _parse_proxy_list("FREELANCEJOB_PROXY_URLS", "FREELANCEJOB_PROXY_URL")
-        return src, urls or _secondary_exchange_pool()
+        return src, src, urls or _secondary_exchange_pool()
     if src == "pchyol":
         urls = _parse_proxy_list("PCHYOL_PROXY_URLS", "PCHYOL_PROXY_URL")
-        return src, urls or _secondary_exchange_pool()
+        return src, src, urls or _secondary_exchange_pool()
     if src in _PRIMARY_SOURCES:
-        return src, _primary_exchange_pool()
-    return src, _secondary_exchange_pool()
+        urls = _primary_exchange_pool()
+        return src, src, urls
+    urls = _secondary_exchange_pool()
+    return src, src, urls
 
 
 def _hint_from_url(url: str | None) -> str:
@@ -227,10 +503,18 @@ def _storage():
 
 def _prune_expired_bans() -> None:
     now = time.time()
+    _ensure_loaded()
+    dc_before = len(youdo_dc_alive_urls())
     expired = [k for k, until in _banned_until.items() if until <= now]
+    youdo_expired = [k for k in expired if k.startswith("youdo:")]
     for k in expired:
         _banned_until.pop(k, None)
         _ban_meta.pop(k, None)
+    if youdo_expired and dc_before == 0:
+        dc_after = len(youdo_dc_alive_urls())
+        if dc_after > 0:
+            youdo_realign_to_dc_tier()
+    _youdo_update_dc_banned_since()
 
 
 def _load_persistence() -> None:
@@ -264,6 +548,315 @@ def _load_persistence() -> None:
                         pass
     except Exception as exc:
         logger.warning("fetch:proxy load persistence failed: %s", exc)
+    _prune_fl_res_bans()
+    _normalize_youdo_active_slot()
+
+
+def _prune_fl_res_bans() -> None:
+    """Residential FL slots are never auto-banned — drop stale persisted bans (O215)."""
+    prefix = f"{_FL_RES_BAN_SOURCE}:"
+    stale = [k for k in list(_banned_until) if k.startswith(prefix)]
+    if not stale:
+        return
+    for k in stale:
+        _banned_until.pop(k, None)
+        _ban_meta.pop(k, None)
+    logger.info("fetch:proxy cleared %d stale residential FL ban(s)", len(stale))
+
+
+def clear_fl_source_bans(*, persist: bool = True) -> int:
+    """Drop fl:* keys from ban table — full FL refresh without waiting TTL (O233)."""
+    _ensure_loaded()
+    prefix = "fl:"
+    stale = [k for k in list(_banned_until) if k.startswith(prefix)]
+    if not stale:
+        return 0
+    for k in stale:
+        _banned_until.pop(k, None)
+        _ban_meta.pop(k, None)
+    if persist:
+        _persist_bans()
+    logger.info("fetch:proxy cleared %d FL ban(s)", len(stale))
+    return len(stale)
+
+
+def clear_youdo_source_bans(*, persist: bool = True, dc_only: bool = False) -> int:
+    """Drop youdo:* keys from ban table — manual recovery / hard reset (O254/O261)."""
+    _ensure_loaded()
+    prefix = "youdo:"
+    dc_hints: frozenset[str] | None = None
+    if dc_only:
+        dc_hints = frozenset(_hint_from_url(u) for u in _youdo_dc_pool())
+    stale = [k for k in list(_banned_until) if k.startswith(prefix)]
+    cleared = 0
+    for k in stale:
+        if dc_only:
+            host = k.split(":", 1)[-1] if ":" in k else ""
+            if host not in dc_hints:
+                continue
+        _banned_until.pop(k, None)
+        _ban_meta.pop(k, None)
+        cleared += 1
+    if cleared and persist:
+        _persist_bans()
+    if cleared:
+        logger.info(
+            "fetch:proxy cleared %d YouDo ban(s)%s",
+            cleared,
+            " (DC only)" if dc_only else "",
+        )
+    _youdo_update_dc_banned_since()
+    return cleared
+
+
+def _youdo_max_dc_bans_per_fetch() -> int:
+    raw = os.getenv("YOUDO_MAX_DC_BANS_PER_FETCH", "2").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 2
+
+
+def _youdo_auto_unban_min_sec() -> float:
+    raw = os.getenv("YOUDO_AUTO_UNBAN_MIN", "20").strip()
+    try:
+        return max(1.0, float(raw)) * 60.0
+    except ValueError:
+        return 20.0 * 60.0
+
+
+def _fl_dead_proxy_ban_ttl_sec() -> float:
+    raw = os.getenv("FL_DEAD_PROXY_BAN_TTL_SEC", "300").strip()
+    try:
+        return max(30.0, float(raw))
+    except ValueError:
+        return 300.0
+
+
+def is_proxy_connection_error(exc: BaseException) -> bool:
+    """True for dead/unreachable proxy (O261 FL httpx + browser rotate)."""
+    msg = f"{type(exc).__name__} {exc}".casefold()
+    markers = (
+        "err_proxy_connection_failed",
+        "net::err_proxy",
+        "proxyerror",
+        "proxy connection",
+        "tunnel connection failed",
+        "connect tunnel failed",
+        "407 proxy",
+        "unable to connect to proxy",
+    )
+    return any(m in msg for m in markers)
+
+
+def youdo_proxy_in_dc_pool(proxy_url: str) -> bool:
+    if not proxy_url:
+        return False
+    hint = _hint_from_url(proxy_url)
+    return any(_hint_from_url(u) == hint for u in _youdo_dc_pool())
+
+
+def _youdo_update_dc_banned_since() -> None:
+    """Track when all YouDo DC slots became banned (O261 auto-unban timer)."""
+    try:
+        st = _storage()
+    except Exception:
+        return
+    if youdo_dc_alive_urls():
+        try:
+            st.set_setting(_YOUDO_DC_BANNED_SINCE_KEY, "")
+        except Exception:
+            pass
+        return
+    try:
+        if not st.get_setting(_YOUDO_DC_BANNED_SINCE_KEY, "").strip():
+            st.set_setting(_YOUDO_DC_BANNED_SINCE_KEY, str(time.time()))
+    except Exception:
+        pass
+
+
+def youdo_maybe_auto_unban_dc() -> bool:
+    """Clear DC bans + hard reset when dc_alive=0 longer than YOUDO_AUTO_UNBAN_MIN."""
+    _ensure_loaded()
+    if youdo_dc_alive_urls():
+        return False
+    try:
+        st = _storage()
+    except Exception:
+        return False
+    raw = st.get_setting(_YOUDO_DC_BANNED_SINCE_KEY, "").strip()
+    if not raw:
+        _youdo_update_dc_banned_since()
+        return False
+    try:
+        since = float(raw)
+    except ValueError:
+        _youdo_update_dc_banned_since()
+        return False
+    if time.time() - since < _youdo_auto_unban_min_sec():
+        return False
+    cleared = clear_youdo_source_bans(dc_only=True)
+    try:
+        st.set_setting(_YOUDO_DC_BANNED_SINCE_KEY, "")
+    except Exception:
+        pass
+    youdo_realign_to_dc_tier()
+    try:
+        from youdo_parser import youdo_hard_reset
+
+        youdo_hard_reset(reason="dc_auto_unban", storage=st)
+    except Exception as exc:
+        logger.warning("fetch:youdo dc_auto_unban hard_reset failed: %s", exc)
+    logger.info("fetch:youdo tier=dc_auto_unban cleared=%d", cleared)
+    return True
+
+
+def fl_browser_dead_proxy_fail(
+    proxy_url: str,
+    *,
+    reason: str = "dead_proxy",
+) -> bool:
+    """Ban dead FL DC proxy (short TTL) and advance to next alive DC (O261)."""
+    _ensure_loaded()
+    dc_urls = _fl_dc_pool()
+    if not proxy_url or not dc_urls:
+        return False
+    failed_hint = _hint_from_url(proxy_url)
+    if not any(_hint_from_url(u) == failed_hint for u in dc_urls):
+        return False
+    slot_idx = _index_of_url(proxy_url, dc_urls)
+    _ban_url(
+        proxy_url,
+        source="fl",
+        reason=reason,
+        slot_idx=slot_idx,
+        ttl_sec=_fl_dead_proxy_ban_ttl_sec(),
+    )
+    _invalidate_browser_slot_for_ban("fl", proxy_url)
+    dc_alive = _alive_urls(dc_urls, "fl")
+    if not dc_alive:
+        return False
+    cur = _active_slot.get("fl", 0) % len(dc_urls)
+    start = 0
+    for i, u in enumerate(dc_urls):
+        if _hint_from_url(u) == failed_hint:
+            start = i
+            break
+    for off in range(1, len(dc_urls) + 1):
+        cand = dc_urls[(start + off) % len(dc_urls)]
+        if not _is_banned(cand, "fl"):
+            new_idx = _index_of_url(cand, dc_urls)
+            if new_idx != cur:
+                _apply_active_slot(
+                    "fl",
+                    dc_urls,
+                    new_idx,
+                    old_idx=cur,
+                    reason=reason,
+                    notify=True,
+                )
+            return True
+    return False
+
+
+def _index_of_url(url: str, urls: list[str]) -> int:
+    hint = _hint_from_url(url)
+    for i, u in enumerate(urls):
+        if u == url or _hint_from_url(u) == hint:
+            return i
+    return 0
+
+
+def youdo_browser_slot_fail(
+    proxy_url: str,
+    *,
+    reason: str,
+) -> bool:
+    """Ban failed YouDo browser proxy and advance active slot within DC pool (O260)."""
+    _ensure_loaded()
+    source = "youdo"
+    dc_urls = _youdo_dc_pool()
+    ru_urls = _youdo_ru_pool()
+    if not proxy_url:
+        return False
+    failed_hint = _hint_from_url(proxy_url)
+    in_dc = any(_hint_from_url(u) == failed_hint for u in dc_urls)
+    in_ru = any(_hint_from_url(u) == failed_hint for u in ru_urls)
+    slot_idx = _index_of_url(proxy_url, dc_urls if in_dc else ru_urls or dc_urls)
+    _ban_url(
+        proxy_url,
+        source=source,
+        reason=reason,
+        slot_idx=slot_idx,
+    )
+    _invalidate_browser_slot_for_ban("youdo", proxy_url)
+    if in_dc and dc_urls:
+        dc_alive = _alive_urls(dc_urls, source)
+        if not dc_alive:
+            ru_alive = _alive_urls(ru_urls, source)
+            return bool(ru_alive)
+        cur = _youdo_dc_slot_index_raw()
+        start = 0
+        for i, u in enumerate(dc_urls):
+            if _hint_from_url(u) == failed_hint:
+                start = i
+                break
+        for off in range(1, len(dc_urls) + 1):
+            cand = dc_urls[(start + off) % len(dc_urls)]
+            if not _is_banned(cand, source):
+                new_idx = _index_of_url(cand, dc_urls)
+                if new_idx != cur:
+                    _apply_youdo_dc_slot(
+                        new_idx,
+                        old_idx=cur,
+                        reason=reason,
+                        notify=True,
+                    )
+                return True
+    elif in_ru:
+        return not _alive_urls(ru_urls, source)
+    alive_dc, total_dc = _pool_counts(dc_urls, source)
+    alive_ru, total_ru = _pool_counts(ru_urls, source)
+    _send_owner_proxy_alert(
+        f"{_PROXY_ALERT_PREFIX}\n\n"
+        f"Источник: youdo\n"
+        f"Забанен: {_slot_label(slot_idx)} ({_hint_from_url(proxy_url)})\n"
+        f"Причина: {_reason_human(reason)}\n\n"
+        f"🛑 Нет свободных прокси для youdo (DC {alive_dc}/{total_dc}, RU {alive_ru}/{total_ru}).",
+        pool_exhausted=True,
+    )
+    return False
+
+
+def _apply_youdo_dc_slot(
+    new_idx: int,
+    *,
+    old_idx: int,
+    reason: str,
+    notify: bool,
+) -> None:
+    dc_urls = _youdo_dc_pool()
+    if not dc_urls:
+        return
+    new_idx = new_idx % len(dc_urls)
+    _active_slot[_YOUDO_POOL_KEY] = new_idx
+    _persist_bans()
+    logger.info(
+        "fetch:proxy cascade switch pool=youdo_dc %s→%s slot=%s/%s reason=%s",
+        _hint_from_url(dc_urls[old_idx % len(dc_urls)]),
+        _hint_from_url(dc_urls[new_idx]),
+        new_idx + 1,
+        len(dc_urls),
+        reason,
+    )
+    if notify and new_idx != old_idx:
+        _notify_proxy_switch(
+            dc_urls,
+            source="youdo",
+            old_idx=old_idx % len(dc_urls),
+            new_idx=new_idx,
+            reason=reason,
+        )
 
 
 def _persist_bans() -> None:
@@ -286,6 +879,8 @@ def _persist_bans() -> None:
 
 def _is_banned(url: str, source: str) -> bool:
     _ensure_loaded()
+    if source == _FL_RES_BAN_SOURCE:
+        return False
     key = _ban_key(url, source)
     until = _banned_until.get(key, 0.0)
     if until and time.time() >= until:
@@ -316,11 +911,20 @@ def _ban_url(
     source: str,
     reason: str,
     slot_idx: int | None = None,
+    ttl_sec: float | None = None,
 ) -> None:
     if not url:
         return
+    if source == _FL_RES_BAN_SOURCE:
+        logger.info(
+            "fetch:proxy skip residential ban %s reason=%s",
+            _hint_from_url(url),
+            reason,
+        )
+        return
     key = _ban_key(url, source)
-    until = time.time() + _BAN_TTL_SEC
+    ttl = float(ttl_sec) if ttl_sec is not None else _BAN_TTL_SEC
+    until = time.time() + ttl
     _banned_until[key] = until
     _ban_meta[key] = {
         "reason": reason,
@@ -336,8 +940,10 @@ def _ban_url(
         "fetch:proxy banned %s reason=%s ttl=%.0fs",
         key,
         reason,
-        _BAN_TTL_SEC,
+        ttl,
     )
+    if source == "youdo":
+        _youdo_update_dc_banned_since()
 
 
 def _http_strike_key(url: str, source: str, http_code: int) -> str:
@@ -549,17 +1155,21 @@ def _apply_active_slot(
 
 
 def exchange_pool_health(source: str) -> tuple[int, int]:
-    _key, urls = _urls_for_source(source)
-    return _pool_counts(urls, source)
+    _key, ban_source, urls = _urls_for_source(source)
+    return _pool_counts(urls, ban_source)
 
 
 def exchange_alive_proxy_urls(source: str) -> list[str]:
     """Живые слоты прокси для source (browser retry, O63 YouDo)."""
     _ensure_loaded()
-    _key, urls = _urls_for_source(source)
+    if source == "youdo":
+        return youdo_browser_slot_urls()
+    if source == "fl":
+        return fl_browser_slot_urls()
+    _key, ban_source, urls = _urls_for_source(source)
     if not urls:
         return []
-    alive = _alive_urls(urls, source)
+    alive = _alive_urls(urls, ban_source)
     return alive if alive else []
 
 
@@ -598,16 +1208,21 @@ def _pool_status_slice(urls: list[str], source: str, pool_key: str) -> dict[str,
 
 
 def cascade_status_summary() -> dict[str, Any]:
-    """Для /status и watchdog: primary (fl) + secondary (youdo)."""
-    primary_urls = _primary_exchange_pool()
-    secondary_urls = _secondary_exchange_pool()
+    """Для /status и watchdog: primary (fl) + youdo DC tier (O260)."""
+    primary_urls = _fl_dc_pool()
     fl = _pool_status_slice(primary_urls, "fl", "fl")
-    sec = _pool_status_slice(secondary_urls, "youdo", "youdo")
+    youdo_dc = _youdo_dc_pool()
+    youdo = _pool_status_slice(youdo_dc, "youdo", _YOUDO_POOL_KEY)
+    ru_alive = len(youdo_ru_alive_urls())
+    ru_total = len(_youdo_ru_pool())
+    youdo["ru_alive"] = ru_alive
+    youdo["ru_total"] = ru_total
+    youdo["tier"] = "dc" if youdo.get("alive", 0) else ("ru" if ru_alive else "exhausted")
     return {
         **fl,
         "primary": fl,
-        "secondary": sec,
-        "secondary_total": len(secondary_urls),
+        "secondary": youdo,
+        "secondary_total": len(youdo_dc) + ru_total,
     }
 
 
@@ -649,6 +1264,8 @@ class ExchangeFetchSession:
         host = _hint_from_url(self.current_url)
         if self.urls and not self.current_url:
             host = "pool_exhausted"
+        elif self.source == _FL_RES_BAN_SOURCE and host not in ("direct", "pool_exhausted"):
+            host = f"{host} res"
         return f"{host} slot={slot_n}/{total} alive={alive}/{total}"
 
     def advance_failover(self, *, reason: str, banned_url: str | None = None) -> bool:
@@ -663,6 +1280,14 @@ class ExchangeFetchSession:
                 slot_idx=old_idx,
             )
             _invalidate_browser_slot_for_ban(self.source, banned_url)
+            if self.source in ("fl", _FL_RES_BAN_SOURCE) and _fl_hard_reset_on_ban_enabled():
+                try:
+                    from exchange_browser_fetch import fl_hard_reset
+
+                    fl_hard_reset(reason=reason, storage=_storage())
+                except Exception as exc:
+                    logger.warning("fetch:fl hard_reset on failover failed: %s", exc)
+                return False
             _failover_cooldown_sleep(reason=reason, banned_url=banned_url)
         for off in range(1, len(self.urls) + 1):
             idx = (old_idx + off) % len(self.urls)
@@ -698,33 +1323,55 @@ class ExchangeFetchSession:
 
 def exchange_fetch_begin(source: str) -> ExchangeFetchSession:
     _ensure_loaded()
-    pool_key, urls = _urls_for_source(source)
+    _prune_expired_bans()
+    pool_key, ban_source, urls = _urls_for_source(source)
+    youdo_dc_urls: list[str] = []
+    if source == "youdo":
+        youdo_maybe_auto_unban_dc()
+        _prune_expired_bans()
+        youdo_dc_urls = _youdo_dc_pool()
+        if youdo_dc_urls:
+            urls = youdo_dc_urls
+            pool_key = _YOUDO_POOL_KEY
     if not urls:
-        session = ExchangeFetchSession(pool_key=pool_key, source=source, urls=[])
+        session = ExchangeFetchSession(pool_key=pool_key, source=ban_source, urls=[])
         _sessions[source] = session
         logger.info("fetch:%s proxy=direct", source)
         return session
-    slot = _slot_index(pool_key, urls, source)
-    session = ExchangeFetchSession(pool_key=pool_key, source=source, urls=urls, slot=slot)
-    alive, total = _pool_counts(urls, source)
+    slot = _slot_index(pool_key, urls, ban_source)
+    if source == "youdo" and youdo_dc_urls:
+        slot = _resolve_youdo_dc_slot_index()
+    session = ExchangeFetchSession(pool_key=pool_key, source=ban_source, urls=urls, slot=slot)
+    alive, total = _pool_counts(urls, ban_source)
+    dc_exhausted = source == "fl" and ban_source == "fl" and alive == 0 and bool(_fl_residential_pool())
     if alive == 0:
-        logger.error(
-            "fetch:%s proxy pool exhausted (0/%s alive) pool=%s",
-            source,
-            total,
-            pool_key,
-        )
-        _send_owner_proxy_alert(
-            f"{_PROXY_ALERT_PREFIX}\n\n"
-            f"🛑 Для {source}: 0/{total} прокси (баны только у этого источника).\n"
-            f"Ждём TTL {_BAN_TTL_SEC / 60:.0f} мин или clear-vps-proxy-bans.py",
-            pool_exhausted=True,
-        )
+        if dc_exhausted:
+            logger.warning(
+                "fetch:%s DC proxy tier exhausted (0/%s) — residential fallback next",
+                source,
+                total,
+            )
+        else:
+            logger.error(
+                "fetch:%s proxy pool exhausted (0/%s alive) pool=%s tier=%s",
+                source,
+                total,
+                pool_key,
+                ban_source,
+            )
+            _send_owner_proxy_alert(
+                f"{_PROXY_ALERT_PREFIX}\n\n"
+                f"🛑 Для {source}: 0/{total} прокси (tier={ban_source}).\n"
+                f"Ждём TTL {_BAN_TTL_SEC / 60:.0f} мин или clear-vps-proxy-bans.py",
+                pool_exhausted=True,
+            )
     else:
+        tier_note = " res" if ban_source == _FL_RES_BAN_SOURCE else ""
         logger.info(
-            "fetch:%s proxy=%s cascade slot=%s/%s alive=%s/%s",
+            "fetch:%s proxy=%s%s cascade slot=%s/%s alive=%s/%s",
             source,
             _hint_from_url(session.current_url),
+            tier_note,
             slot + 1,
             total,
             alive,
@@ -756,46 +1403,86 @@ def _active_session(source: str) -> ExchangeFetchSession | None:
 
 
 def exchange_primary_proxy_url(source: str) -> str:
-    pool_key, urls = _urls_for_source(source)
+    if source == "youdo":
+        dc_url = _youdo_primary_dc_url()
+        if dc_url:
+            return dc_url
+        ru_alive = youdo_ru_alive_urls()
+        return ru_alive[0] if ru_alive else ""
+    pool_key, ban_source, urls = _urls_for_source(source)
     if not urls:
         return ""
-    slot = _slot_index(pool_key, urls, source)
+    slot = _slot_index(pool_key, urls, ban_source)
     u = urls[slot % len(urls)]
-    alive = _alive_urls(urls, source)
-    return u if not _is_banned(u, source) else (alive[0] if alive else "")
+    alive = _alive_urls(urls, ban_source)
+    return u if not _is_banned(u, ban_source) else (alive[0] if alive else "")
 
 
 def requests_proxies_for(source: str) -> dict[str, str | None]:
     session = _active_session(source)
     if session:
         return session.current_proxies()
-    pool_key, urls = _urls_for_source(source)
+    pool_key, ban_source, urls = _urls_for_source(source)
     if not urls:
         return DIRECT_REQUESTS_PROXIES
-    alive = _alive_urls(urls, source)
+    alive = _alive_urls(urls, ban_source)
     if not alive:
         return DIRECT_REQUESTS_PROXIES
-    slot = _slot_index(pool_key, urls, source)
+    slot = _slot_index(pool_key, urls, ban_source)
     u = urls[slot % len(urls)]
-    if _is_banned(u, source):
+    if _is_banned(u, ban_source):
         u = alive[0]
     return _proxies_dict(u)
 
 
 def proxy_log_hint(source: str) -> str:
     session = _active_session(source)
-    if session:
+    if session and source != "youdo":
         return session.log_hint()
-    pool_key, urls = _urls_for_source(source)
+    if source == "youdo":
+        dc_urls = _youdo_dc_pool()
+        dc_alive = youdo_dc_alive_urls()
+        dc_total = len(dc_urls)
+        dc_alive_n = len(dc_alive)
+        ru_alive_n = len(youdo_ru_alive_urls())
+        if dc_alive and dc_urls:
+            idx = _resolve_youdo_dc_slot_index()
+            u = dc_urls[idx]
+            if _is_banned(u, "youdo"):
+                u = dc_alive[0]
+            hint = _hint_from_url(u)
+            base = (
+                f"{hint} tier=dc slot={idx + 1}/{dc_total} "
+                f"alive={dc_alive_n}/{dc_total}"
+            )
+            if ru_alive_n:
+                base += f" ru_alive={ru_alive_n}"
+            return base
+        if ru_alive_n:
+            ru_urls = youdo_ru_alive_urls()
+            u = ru_urls[0]
+            return (
+                f"{_hint_from_url(u)} tier=ru slot=1/1 "
+                f"alive={ru_alive_n}/{len(_youdo_ru_pool())} dc_alive=0/{dc_total}"
+            )
+        if dc_urls:
+            return f"pool_exhausted tier=dc slot=0/{dc_total} alive=0/{dc_total}"
+        return "direct"
+    pool_key, ban_source, urls = _urls_for_source(source)
     if not urls:
         return "direct"
-    slot = _slot_index(pool_key, urls, source)
-    alive, total = _pool_counts(urls, source)
+    slot = _slot_index(pool_key, urls, ban_source)
+    alive, total = _pool_counts(urls, ban_source)
     u = urls[slot % len(urls)]
-    alive_list = _alive_urls(urls, source)
-    if _is_banned(u, source) and alive_list:
+    alive_list = _alive_urls(urls, ban_source)
+    if _is_banned(u, ban_source) and alive_list:
         u = alive_list[0]
-    return f"{_hint_from_url(u)} slot={slot + 1}/{total} alive={alive}/{total}"
+    hint = _hint_from_url(u)
+    if ban_source == _FL_RES_BAN_SOURCE and hint != "direct":
+        hint = f"{hint} res"
+    if urls and not alive_list:
+        hint = "pool_exhausted"
+    return f"{hint} slot={slot + 1}/{total} alive={alive}/{total}"
 
 
 def exchange_get(
@@ -804,6 +1491,7 @@ def exchange_get(
     *,
     headers: dict[str, str],
     timeout_sec: float | tuple[float, float] | None = None,
+    max_bans: int | None = None,
 ) -> requests.Response:
     if timeout_sec is None:
         timeout = request_timeout_tuple()
@@ -823,7 +1511,11 @@ def exchange_get(
         )
 
     max_attempts = max(4, len(session.urls) * (_STRIKES_TO_BAN + 1))
+    if max_bans is not None:
+        max_attempts = min(max_attempts, max(1, max_bans + 1))
     attempts = 0
+    bans_used = 0
+    ban_source = session.source
     try:
         while attempts < max_attempts:
             attempts += 1
@@ -852,11 +1544,36 @@ def exchange_get(
                     )
                 except Exception:
                     pass
-                if _record_failure(proxy_url, source=source, http_code=None):
+                if ban_source == "fl" and is_proxy_connection_error(exc):
+                    if fl_browser_dead_proxy_fail(
+                        proxy_url,
+                        reason=f"dead_proxy:{type(exc).__name__}",
+                    ):
+                        bans_used += 1
+                        if session.urls:
+                            session.slot = _active_slot.get("fl", session.slot) % len(
+                                session.urls
+                            )
+                        logger.warning(
+                            "fetch:fl stage=dead_proxy_rotate httpx proxy=%s err=%s",
+                            _hint_from_url(proxy_url),
+                            type(exc).__name__,
+                        )
+                        if max_bans is not None and bans_used >= max_bans:
+                            raise requests.RequestException(
+                                f"exchange_get:{source}: max_bans={max_bans} reached"
+                            ) from exc
+                        continue
+                if _record_failure(proxy_url, source=ban_source, http_code=None):
                     if session.advance_failover(
                         reason=f"timeout:{type(exc).__name__}",
                         banned_url=proxy_url,
                     ):
+                        bans_used += 1
+                        if max_bans is not None and bans_used >= max_bans:
+                            raise requests.RequestException(
+                                f"exchange_get:{source}: max_bans={max_bans} reached"
+                            ) from exc
                         logger.warning(
                             "fetch:%s proxy=%s failover after error: %s",
                             source,
@@ -878,7 +1595,7 @@ def exchange_get(
             ms = int((time.monotonic() - t0) * 1000)
             if resp.status_code in _FAILOVER_HTTP:
                 ban_slot = _record_failure(
-                    proxy_url, source=source, http_code=resp.status_code
+                    proxy_url, source=ban_source, http_code=resp.status_code
                 )
                 try:
                     from exchange_trace import log_exchange_trace
@@ -898,6 +1615,10 @@ def exchange_get(
                     reason=f"http_{resp.status_code}",
                     banned_url=proxy_url if ban_slot else None,
                 ):
+                    if ban_slot:
+                        bans_used += 1
+                        if max_bans is not None and bans_used >= max_bans:
+                            return resp
                     logger.warning(
                         "fetch:%s proxy=%s failover after HTTP %s ban=%s",
                         source,
@@ -907,7 +1628,7 @@ def exchange_get(
                     )
                     continue
                 return resp
-            _record_success(proxy_url, source)
+            _record_success(proxy_url, ban_source)
             try:
                 from exchange_trace import log_exchange_trace
 
@@ -994,17 +1715,33 @@ def _exchange_ui_group(
 
 def list_ui_groups() -> list[dict[str, Any]]:
     """Exchange proxy groups for /ops/."""
-    fl_urls = _parse_proxy_list("FL_PROXY_URLS", "FL_PROXY_URL") or _primary_exchange_pool()
+    fl_urls = _fl_dc_pool()
     kw_urls = _parse_proxy_list("KWORK_PROXY_URLS", "KWORK_PROXY_URL") or _primary_exchange_pool()
-    pool_urls = _secondary_exchange_pool()
+    youdo_dc = _youdo_dc_pool()
+    youdo_group = _exchange_ui_group(
+        group_id="exchange-pool",
+        title="YouDo DC",
+        pool_key=_YOUDO_POOL_KEY,
+        source="youdo",
+        urls=youdo_dc,
+    )
+    ru_alive, ru_total = _pool_counts(_youdo_ru_pool(), "youdo")
+    youdo_group["ru_alive"] = ru_alive
+    youdo_group["ru_total"] = ru_total
+    fl_group = _exchange_ui_group(
+        group_id="exchange-fl",
+        title="FL",
+        pool_key="fl",
+        source="fl",
+        urls=fl_urls,
+    )
+    if fl_on_residential_tier():
+        alive, total = fl_residential_counts()
+        fl_group["residential_active"] = True
+        fl_group["res_alive"] = alive
+        fl_group["res_total"] = total
     return [
-        _exchange_ui_group(
-            group_id="exchange-fl",
-            title="FL",
-            pool_key="fl",
-            source="fl",
-            urls=fl_urls,
-        ),
+        fl_group,
         _exchange_ui_group(
             group_id="exchange-kwork",
             title="Kwork",
@@ -1012,26 +1749,20 @@ def list_ui_groups() -> list[dict[str, Any]]:
             source="kwork",
             urls=kw_urls,
         ),
-        _exchange_ui_group(
-            group_id="exchange-pool",
-            title="Общий pool",
-            pool_key="youdo",
-            source="youdo",
-            urls=pool_urls,
-        ),
+        youdo_group,
     ]
 
 
 def set_active_slot_manual(group_id: str, slot_1based: int) -> tuple[bool, str]:
     """Manual switch for exchange pools (1-based), без restart radar."""
     mapping = {
-        "exchange-fl": ("fl", "fl", _parse_proxy_list("FL_PROXY_URLS", "FL_PROXY_URL") or _primary_exchange_pool()),
+        "exchange-fl": ("fl", "fl", _fl_dc_pool()),
         "exchange-kwork": (
             "kwork",
             "kwork",
             _parse_proxy_list("KWORK_PROXY_URLS", "KWORK_PROXY_URL") or _primary_exchange_pool(),
         ),
-        "exchange-pool": ("youdo", "youdo", _secondary_exchange_pool()),
+        "exchange-pool": ("youdo", "youdo", _youdo_dc_pool()),
     }
     entry = mapping.get((group_id or "").strip().lower())
     if not entry:

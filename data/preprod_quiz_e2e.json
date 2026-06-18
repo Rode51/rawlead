@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-06-17T17:27:15.668694+00:00",
+  "base_url": "https://rawlead.ru",
+  "viewport": "mobile",
+  "scenarios_total": 5,
+  "scenarios_pass": 5,
+  "pass": true,
+  "has_preprod_token": true,
+  "has_monica_token": true,
+  "results": [
+    {
+      "id": "j1",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 12057,
+      "error": null,
+      "screenshot": null
+    },
+    {
+      "id": "j2",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 22321,
+      "error": null,
+      "screenshot": null
+    },
+    {
+      "id": "j5",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 15454,
+      "error": null,
+      "screenshot": null,
+      "persona": "monica"
+    },
+    {
+      "id": "j5",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 6114,
+      "error": null,
+      "screenshot": null,
+      "persona": "anon"
+    },
+    {
+      "id": "j7",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 2575,
+      "error": null,
+      "screenshot": null
+    }
+  ],
+  "artifacts_dir": "data\\preprod_quiz_e2e"
+}

@@ -48,13 +48,12 @@ from src.lead_category import (
     resolve_lead_category,
 )
 from src.skills_catalog import (
-    _USER_MAX_TAGS,
+    CANONICAL_TAGS,
     build_catalog_groups,
     build_dynamic_catalog_groups,
     lead_tags_for_feed,
     normalize_user_tags,
     resolve_canonical_tag,
-    user_tags_input_count,
 )
 from src.public_feed import (
     FEED_ANON_DELAY_MINUTES,
@@ -70,15 +69,22 @@ from src.telegram_login import login_bot_token, verify_telegram_login
 from src.feed_social import display_replies, display_views
 from src.rank import (
     CX_PREF_TAG,
+    CATEGORY_FLOOR_VALUES,
+    compatibility_match,
+    QUIZ_NICHE_PRIMARY_WEIGHT,
+    QUIZ_NICHE_SECONDARY_WEIGHT,
     cx_pref_from_user_tags,
     effective_user_tag_weights,
     final_rank,
     keyword_match,
     lead_coverage_match,
+    normalize_quiz_niches,
     normalize_tags,
     open_rank,
     parse_lead_tags,
+    quiz_niche_meta_tag,
     tags_as_weights,
+    user_quiz_niches_from_tags,
 )
 from src.ai_analyze import draft_stats_24h, ai_last_error, draft_fail_per_hour
 from src.stars_billing import stars_available
@@ -106,6 +112,7 @@ from src.bot_auth import (
 )
 from src.match_push import (
     DraftError,
+    draft_quota_for_user,
     draft_rate_limit_retry_after,
     merge_chat_id_on_login,
 )
@@ -439,10 +446,33 @@ def _keyword_match_for_user(
     user_tags: dict[str, float],
     *,
     has_profile: bool,
+    lead_category: str | None = None,
 ) -> int | None:
     if not has_profile:
         return 0
-    return lead_coverage_match(lead_tags, user_tags)
+    niches = user_quiz_niches_from_tags(user_tags)
+    return compatibility_match(
+        lead_tags,
+        user_tags,
+        lead_category=lead_category,
+        user_quiz_niches=niches,
+    )
+
+
+def _km_for_lead_row(
+    row: tuple[Any, ...],
+    user_tags: dict[str, float],
+) -> int | None:
+    tags = _canonical_lead_tags(row[8])
+    category = resolve_lead_category(row[11], row[2] or "", row[3] or "", tags)
+    if not user_tags:
+        return 0
+    return compatibility_match(
+        tags,
+        user_tags,
+        lead_category=category,
+        user_quiz_niches=user_quiz_niches_from_tags(user_tags),
+    )
 
 
 def _rewrite_user_tags(cur: Any, user_id: str, tags: list[str]) -> None:
@@ -459,6 +489,100 @@ def _rewrite_user_tags(cur: Any, user_id: str, tags: list[str]) -> None:
             """,
             (user_id, tag),
         )
+
+
+def _canonical_user_tag(raw: str) -> str | None:
+    canonical = resolve_canonical_tag(raw)
+    if not canonical:
+        t = str(raw).strip().lower().lstrip("#")
+        canonical = t or None
+    if not canonical or str(canonical).startswith("__"):
+        return None
+    return canonical
+
+
+def _merge_user_tag_rows(
+    rows: list[tuple[Any, ...]],
+) -> dict[str, tuple[float, Any | None, int]]:
+    """Merge duplicate/raw tags → canonical; keep max weight per canonical tag."""
+    merged: dict[str, tuple[float, Any | None, int]] = {}
+    for row in rows:
+        raw_tag = row[0]
+        try:
+            weight = float(row[1] if len(row) > 1 and row[1] is not None else 1.0)
+        except (TypeError, ValueError):
+            weight = 1.0
+        last_active = row[2] if len(row) > 2 else None
+        try:
+            interaction = int(row[3] if len(row) > 3 and row[3] is not None else 0)
+        except (TypeError, ValueError):
+            interaction = 0
+        canonical = _canonical_user_tag(str(raw_tag))
+        if not canonical:
+            continue
+        prev = merged.get(canonical)
+        if prev is None or weight > prev[0]:
+            merged[canonical] = (weight, last_active, interaction)
+        elif weight == prev[0]:
+            merged[canonical] = (
+                weight,
+                last_active or prev[1],
+                max(interaction, prev[2]),
+            )
+    return merged
+
+
+def _user_tags_need_canonical_rewrite(
+    rows: list[tuple[Any, ...]], merged: dict[str, tuple[float, Any | None, int]]
+) -> bool:
+    if len(rows) != len(merged):
+        return True
+    seen_raw: set[str] = set()
+    for row in rows:
+        raw = str(row[0])
+        if raw in seen_raw:
+            return True
+        seen_raw.add(raw)
+        canonical = _canonical_user_tag(raw)
+        if canonical != raw:
+            return True
+        if canonical not in merged:
+            return True
+    return False
+
+
+def _write_user_tags_merged(
+    cur: Any, user_id: str, merged: dict[str, tuple[float, Any | None, int]]
+) -> None:
+    cur.execute(
+        "DELETE FROM user_tags WHERE user_id = %s::uuid",
+        (user_id,),
+    )
+    for tag, (weight, last_active, interaction) in sorted(merged.items()):
+        cur.execute(
+            """
+            INSERT INTO user_tags (user_id, tag, weight, last_active_at, interaction_count)
+            VALUES (%s::uuid, %s, %s, %s, %s)
+            """,
+            (user_id, tag, weight, last_active, interaction),
+        )
+
+
+def _canonicalize_user_tags_preserve_weights(cur: Any, user_id: str) -> list[str]:
+    cur.execute(
+        """
+        SELECT tag, COALESCE(weight, 1.0), last_active_at, interaction_count
+        FROM user_tags
+        WHERE user_id = %s::uuid
+        ORDER BY tag
+        """,
+        (user_id,),
+    )
+    rows = cur.fetchall()
+    merged = _merge_user_tag_rows(rows)
+    if merged and _user_tags_need_canonical_rewrite(rows, merged):
+        _write_user_tags_merged(cur, user_id, merged)
+    return sorted(merged.keys())
 
 
 def _parse_skills_param(skills: str) -> list[str]:
@@ -539,7 +663,10 @@ def _passes_min_match(km: int | None, min_match: int) -> bool:
     if km is None or km <= 0:
         return False
     if min_match > 0:
-        return km >= min_match
+        if km >= min_match:
+            return True
+        # O225: keep category-floor cards (10/20) visible under match filter
+        return km in CATEGORY_FLOOR_VALUES
     return True
 
 
@@ -560,7 +687,7 @@ def _rank_feed_rows(
             continue
         tags = _canonical_lead_tags(row[8])
         category = resolve_lead_category(row[11], row[2] or "", row[3] or "", tags)
-        km = lead_coverage_match(tags, tag_weights) if tag_weights else 0
+        km = _km_for_lead_row(row, tag_weights) if tag_weights else 0
         fr = _final_rank_for_row(row, km, tag_weights)
         if min_match is not None:
             if not _passes_min_match(km, min_match):
@@ -1005,7 +1132,13 @@ def _personal_feed_page(
             if categories and not _passes_category_filter(row, categories):
                 continue
             tags = _canonical_lead_tags(row[8])
-            km = _keyword_match_for_user(tags, user_tags, has_profile=has_profile)
+            category = resolve_lead_category(row[11], row[2] or "", row[3] or "", tags)
+            km = _keyword_match_for_user(
+                tags,
+                user_tags,
+                has_profile=has_profile,
+                lead_category=category,
+            )
             fr = _final_rank_for_row(row, km, user_tags if has_profile else None)
             ranked.append(
                 _row_to_item(row, keyword_match_val=km, final_rank_val=fr, feed_delayed=False)
@@ -1161,6 +1294,7 @@ def _try_auto_start_trial_on_login(
 
 
 def _resolve_bearer_user_id(
+    request: Request,
     authorization: str = Header(default="", alias="Authorization"),
 ) -> str:
     """Только Bearer JWT — без fallback на MVP owner header."""
@@ -1174,10 +1308,53 @@ def _resolve_bearer_user_id(
         data = decode_access_token(token)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail="Unauthorized") from exc
-    return str(data["sub"])
+    return _canonical_user_id_from_jwt(data, request=request)
+
+
+_JWT_ROTATION_HEADER = "X-RawLead-Access-Token"
+
+
+def _canonical_user_id_from_jwt(
+    data: dict[str, Any],
+    *,
+    request: Request | None = None,
+) -> str:
+    """O253: heal stale JWT sub via tg_id claim when Neon row moved."""
+    sub = str(data.get("sub", "")).strip()
+    tg_raw = data.get("tg_id")
+    tg_id: int | None = None
+    if tg_raw is not None:
+        try:
+            tg_id = int(tg_raw)
+        except (TypeError, ValueError):
+            tg_id = None
+
+    with _db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id::text FROM users WHERE id = %s::uuid", (sub,))
+            row = cur.fetchone()
+            if row:
+                return str(row[0])
+            if tg_id is None:
+                raise HTTPException(status_code=401, detail="session_stale")
+            cur.execute(
+                "SELECT id::text FROM users WHERE tg_user_id = %s LIMIT 1",
+                (tg_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=401, detail="session_stale")
+            canonical = str(row[0])
+
+    if request is not None and canonical != sub and tg_id is not None:
+        request.state.jwt_rotation_token = issue_access_token(
+            canonical, tg_user_id=tg_id
+        )
+    return canonical
 
 
 def _resolve_user_id(
+    request: Request,
     authorization: str = Header(default="", alias="Authorization"),
     x_rawlead_user_id: str = Header(default="", alias="X-RawLead-User-Id"),
 ) -> str:
@@ -1191,7 +1368,7 @@ def _resolve_user_id(
             data = decode_access_token(token)
         except ValueError as exc:
             raise HTTPException(status_code=401, detail="Unauthorized") from exc
-        return str(data["sub"])
+        return _canonical_user_id_from_jwt(data, request=request)
 
     uid = (x_rawlead_user_id or "").strip() or _OWNER_USER_ID
     try:
@@ -1212,8 +1389,8 @@ def _try_user_from_bearer(authorization: str) -> str | None:
         return None
     try:
         data = decode_access_token(token)
-        return str(data["sub"])
-    except ValueError:
+        return _canonical_user_id_from_jwt(data)
+    except (ValueError, HTTPException):
         return None
 
 
@@ -1263,7 +1440,17 @@ if _cors:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=[_JWT_ROTATION_HEADER],
     )
+
+
+@app.middleware("http")
+async def _jwt_rotation_header_middleware(request: Request, call_next):
+    response = await call_next(request)
+    token = getattr(request.state, "jwt_rotation_token", None)
+    if token:
+        response.headers[_JWT_ROTATION_HEADER] = token
+    return response
 
 
 @app.on_event("startup")
@@ -1796,10 +1983,14 @@ def get_lead(
                 if user_id:
                     user_tags = _load_user_tags(cur, user_id)
                     tags, _ = lead_tags_for_feed(row[8])
+                    category = resolve_lead_category(
+                        row[11], row[2] or "", row[3] or "", tags
+                    )
                     km = _keyword_match_for_user(
                         tags,
                         user_tags,
                         has_profile=bool(user_tags),
+                        lead_category=category,
                     )
                 item = _row_to_item(row, keyword_match_val=km)
                 if user_id:
@@ -1900,18 +2091,30 @@ def me_tags(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT tag FROM user_tags WHERE user_id = %s::uuid ORDER BY tag",
+                    """
+                    SELECT tag, COALESCE(weight, 1.0), last_active_at, interaction_count
+                    FROM user_tags
+                    WHERE user_id = %s::uuid
+                    ORDER BY tag
+                    """,
                     (user_id,),
                 )
-                raw = [r[0] for r in cur.fetchall()]
-                tags = normalize_user_tags(raw)
-                if set(raw) != set(tags) or len(raw) != len(tags):
-                    _rewrite_user_tags(cur, user_id, tags)
+                rows = cur.fetchall()
+                merged = _merge_user_tag_rows(rows)
+                if merged and _user_tags_need_canonical_rewrite(rows, merged):
+                    _write_user_tags_merged(cur, user_id, merged)
+                skill_tags = sorted(
+                    tag for tag in merged if not str(tag).startswith("__")
+                )
+                weights = {
+                    tag: round(float(merged[tag][0]), 4)
+                    for tag in skill_tags
+                }
             conn.commit()
     except Exception as exc:
         logger.error("me_tags: %s", exc)
         raise HTTPException(status_code=500, detail="db error")
-    return {"tags": tags}
+    return {"tags": skill_tags, "weights": weights}
 
 
 _TAG_WEIGHT_MIN = -5.0
@@ -1920,7 +2123,10 @@ _TAG_WEIGHT_MAX = 10.0
 _WEIGHT_EVENT_SPECS: dict[str, tuple[float, int, bool]] = {
     "expand": (0.1, 0, True),
     "draft": (3.0, 2, True),
+    "push_nope": (-1.0, 1, True),
+    "reply_delete": (-3.0, -2, False),
     "inbox_delete": (-0.5, 0, False),
+    "expand_no_reply": (-0.05, 0, False),
 }
 
 
@@ -2056,9 +2262,12 @@ def quiz_next(payload: QuizNextPayload) -> dict[str, Any]:
 class TagsImportPayload(BaseModel):
     tags: dict[str, float] = {}
     cx_pref: float | None = None
+    niches: list[str] = []
 
 
-def _upsert_imported_user_tags(cur: Any, user_id: str, tags_map: dict[str, float]) -> int:
+def _upsert_imported_user_tags(
+    cur: Any, user_id: str, tags_map: dict[str, float]
+) -> int:
     written = 0
     for raw_tag, weight in tags_map.items():
         tag_str = str(raw_tag).strip()
@@ -2093,6 +2302,33 @@ def _upsert_imported_user_tags(cur: Any, user_id: str, tags_map: dict[str, float
     return written
 
 
+def _replace_quiz_import_user_tags(
+    cur: Any, user_id: str, tags_map: dict[str, float], niches: list[str] | None = None
+) -> int:
+    """Quiz import replaces the whole profile — retake must drop stale liked tags."""
+    cur.execute(
+        "DELETE FROM user_tags WHERE user_id = %s::uuid",
+        (user_id,),
+    )
+    imported = _upsert_imported_user_tags(cur, user_id, tags_map)
+    for i, niche in enumerate(normalize_quiz_niches(niches)):
+        niche_weight = (
+            QUIZ_NICHE_PRIMARY_WEIGHT if i == 0 else QUIZ_NICHE_SECONDARY_WEIGHT
+        )
+        cur.execute(
+            """
+            INSERT INTO user_tags (user_id, tag, weight, last_active_at, interaction_count)
+            VALUES (%s::uuid, %s, %s, NOW(), 0)
+            ON CONFLICT (user_id, tag) DO UPDATE SET
+                weight = EXCLUDED.weight,
+                last_active_at = NOW()
+            """,
+            (user_id, quiz_niche_meta_tag(niche), niche_weight),
+        )
+        imported += 1
+    return imported
+
+
 @app.post("/v1/me/tags/import")
 def me_tags_import(
     payload: TagsImportPayload,
@@ -2101,28 +2337,24 @@ def me_tags_import(
     """O195: import quiz localStorage weights into user_tags."""
     from pg_storage import _ensure_user_tags_columns
 
-    if not payload.tags and payload.cx_pref is None:
+    if not payload.tags and payload.cx_pref is None and not payload.niches:
         return {"ok": True, "imported": 0}
-    skill_keys = [k for k in payload.tags.keys() if not str(k).startswith("__")]
-    if user_tags_input_count(skill_keys) > _USER_MAX_TAGS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"max {_USER_MAX_TAGS} skills allowed",
-        )
     tags_map = dict(payload.tags)
     if payload.cx_pref is not None:
         try:
             tags_map[CX_PREF_TAG] = max(1.0, min(2.0, float(payload.cx_pref)))
         except (TypeError, ValueError):
             pass
-    if not tags_map:
+    if not tags_map and not payload.niches:
         return {"ok": True, "imported": 0}
     try:
         db_url = _db_url()
         _ensure_user_tags_columns(db_url)
         with psycopg.connect(db_url) as conn:
             with conn.cursor() as cur:
-                imported = _upsert_imported_user_tags(cur, user_id, tags_map)
+                imported = _replace_quiz_import_user_tags(
+                    cur, user_id, tags_map, payload.niches
+                )
             conn.commit()
     except Exception as exc:
         logger.error("me_tags_import: %s", exc)
@@ -2145,7 +2377,8 @@ def me_tags_weight_delta(
 
     event = str(payload.event or "").strip()
     if event not in _WEIGHT_EVENT_SPECS:
-        raise HTTPException(status_code=400, detail="event must be expand, draft, or inbox_delete")
+        allowed = ", ".join(sorted(_WEIGHT_EVENT_SPECS))
+        raise HTTPException(status_code=400, detail=f"event must be one of: {allowed}")
     if not payload.tags:
         return {"ok": True, "updated": 0}
     try:
@@ -2166,11 +2399,6 @@ def me_tags_put(
     payload: TagsPayload,
     user_id: str = Depends(_resolve_user_id),
 ) -> dict[str, Any]:
-    if user_tags_input_count(payload.tags) > _USER_MAX_TAGS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"max {_USER_MAX_TAGS} skills allowed",
-        )
     tags = normalize_user_tags(payload.tags)
     try:
         with psycopg.connect(_db_url()) as conn:
@@ -2393,14 +2621,20 @@ def _draft_http_error(exc: DraftError, *, lead_id: int) -> HTTPException:
     return HTTPException(status_code=500, detail="db error")
 
 
+def _merge_draft_quota(body: dict[str, Any], user_id: str) -> dict[str, Any]:
+    body.update(draft_quota_for_user(user_id))
+    return body
+
+
 def _me_lead_draft_response(
     resp: Any,
     *,
     lead_id: int,
+    user_id: str,
 ) -> Any:
     from fastapi.responses import JSONResponse
 
-    body = draft_response_body(resp)
+    body = _merge_draft_quota(draft_response_body(resp), user_id)
     if resp.status == "ready":
         reply = strip_reply_draft_price_deadline(body.get("reply_draft") or "")
         body["reply_draft"] = reply
@@ -2439,7 +2673,13 @@ def me_lead_draft_get(
         lead_id=lead_id,
         log_prefix=f"lenta:draft:{lead_id}:",
     )
-    return _me_lead_draft_response(resp, lead_id=lead_id)
+    return _me_lead_draft_response(resp, lead_id=lead_id, user_id=user_id)
+
+
+@app.get("/v1/me/draft/quota")
+def me_draft_quota(user_id: str = Depends(_resolve_user_id)) -> Any:
+    """O247: hourly draft quota for feed toolbar."""
+    return draft_quota_for_user(user_id)
 
 
 @app.post("/v1/me/leads/{lead_id}/draft")
@@ -2455,11 +2695,16 @@ def me_lead_draft(
     retry_after = draft_rate_limit_retry_after(user_id)
     if retry_after is not None:
         msg = draft_rate_limit_detail() or "draft rate limit"
+        quota = draft_quota_for_user(user_id)
         raise HTTPException(
             status_code=429,
             detail={
                 "detail": msg,
                 "retry_after_sec": retry_after,
+                "draft_retry_after_sec": quota["draft_retry_after_sec"],
+                "draft_hourly_limit": quota["draft_hourly_limit"],
+                "draft_used": quota["draft_used"],
+                "draft_remaining": quota["draft_remaining"],
             },
         )
 
@@ -2477,7 +2722,7 @@ def me_lead_draft(
         raise HTTPException(status_code=500, detail="db error") from exc
 
     _apply_tag_weight_event_for_lead(user_id, lead_id, "draft")
-    return _me_lead_draft_response(resp, lead_id=lead_id)
+    return _me_lead_draft_response(resp, lead_id=lead_id, user_id=user_id)
 
 
 @app.post("/v1/me/leads/{lead_id}/draft/warm")
@@ -2560,7 +2805,7 @@ def me_replies(
         lead_row = row[:15]
         replied_at = row[15]
         tags = _canonical_lead_tags(lead_row[8])
-        km = lead_coverage_match(tags, user_tags) if user_tags else None
+        km = _km_for_lead_row(lead_row, user_tags) if user_tags else None
         item = _row_to_item(lead_row, keyword_match_val=km, feed_delayed=False)
         item["replied_at"] = replied_at.isoformat() if replied_at else None
         items.append(item)
@@ -2599,6 +2844,7 @@ def me_reply_delete(
                     row = _fetch_visible_lead(cur, lead_id)
                     if row:
                         tags = _canonical_lead_tags(row[8])
+                        _apply_tag_weight_event(cur, user_id, "reply_delete", tags)
                         _apply_tag_weight_event(cur, user_id, "inbox_delete", tags)
                 conn.commit()
     except Exception as exc:
@@ -2624,6 +2870,9 @@ def _as_utc(dt: datetime | None) -> datetime | None:
 def _ensure_subscription(
     cur: Any, user_id: str
 ) -> tuple[str, bool, datetime | None, datetime | None, datetime | None]:
+    cur.execute("SELECT 1 FROM users WHERE id = %s::uuid", (user_id,))
+    if not cur.fetchone():
+        raise HTTPException(status_code=401, detail="session_stale")
     plan, is_active, active_until, paused_until, trial_used_at = fetch_subscription_row(
         cur, user_id
     )

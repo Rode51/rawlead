@@ -8,7 +8,7 @@
 declare(strict_types=1);
 
 $lenta = rawlead_page_url('lenta');
-$quiz = rawlead_page_url('quiz');
+$quiz = rawlead_quiz_url();
 $geo_svg = RAWLEAD_CHILD_DIR . '/assets/images/wave2-hero-geo-corner-v1.svg';
 ?>
 <section class="rl-hero rl-section rl-reveal" aria-labelledby="rl-hero-title">
@@ -30,7 +30,6 @@ $geo_svg = RAWLEAD_CHILD_DIR . '/assets/images/wave2-hero-geo-corner-v1.svg';
 			<span class="rl-hero__float-budget">3 500 ₽</span>
 		</div>
 		<div class="rl-hero__float rl-hero__float--3 rl-hero__float--perfect">
-			<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>
 			<span class="rl-hero__float-match"><?php esc_html_e('100% совпадение', 'rawlead-kadence-child'); ?></span>
 		</div>
 	</div>
@@ -40,8 +39,8 @@ $geo_svg = RAWLEAD_CHILD_DIR . '/assets/images/wave2-hero-geo-corner-v1.svg';
 			<?php echo wp_kses_post(__('ИИ находит. Пишет черновик — свой у каждого.<br>Учится на твоих откликах.', 'rawlead-kadence-child')); ?>
 		</p>
 		<div class="rl-hero__cta-group">
-			<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($quiz); ?>"><?php esc_html_e('Настроить ленту →', 'rawlead-kadence-child'); ?></a>
-			<a class="rl-btn rl-btn--secondary" href="<?php echo esc_url($lenta); ?>"><?php esc_html_e('Смотреть заказы →', 'rawlead-kadence-child'); ?></a>
+			<a class="rl-btn rl-btn--primary" href="<?php echo esc_url($lenta); ?>"><?php esc_html_e('Смотреть ленту →', 'rawlead-kadence-child'); ?></a>
+			<a class="rl-btn rl-btn--secondary" href="<?php echo esc_url($quiz); ?>"><?php esc_html_e('Настроить ленту →', 'rawlead-kadence-child'); ?></a>
 		</div>
 	</div>
 </section>

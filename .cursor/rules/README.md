@@ -6,12 +6,14 @@
 
 | Роль в чате | Правило `.mdc` | Файл задачи (шаг 3) |
 |-------------|----------------|----------------------|
-| `@lead-architect` | `lead-architect.mdc` | **онбординг A+B+C** · `STATUS` · `TASKS` · `CODER_PROMPT` |
+| `@lead-architect` | `lead-architect.mdc` | **онбординг A+B+C** · **`PROD_FACTS`** · `STATUS` · `TASKS` · `CODER_PROMPT` |
 | `@lead-product` | `lead-product.mdc` | `LEAD_PRODUCT_PROMPT` · **онбординг A+B+C** |
+| `@lead-marketing` | `lead-marketing.mdc` | `LEAD_MARKETING_PROMPT` · **онбординг A+B+C** |
 | `@lead-designer` | `lead-designer.mdc` | **`LEAD_DESIGN_PROMPT`** · регламент **`LEAD_DESIGN.md`** |
+| `@lead-portfolio` | `lead-portfolio.mdc` | **`LEAD_PORTFOLIO_PROMPT`** · регламент **`LEAD_PORTFOLIO.md`** |
 | `@coder` | `coder.mdc` | **`CODER_PROMPT.md`** только (без vision, без design) |
 | `@designer` | `designer.mdc` | **`DESIGNER_PROMPT.md` hot** (~80 строк) |
-| `@mechanic` | `mechanic.mdc` | **`docs/problems/<тикет>.md`** |
+| `@mechanic` | `mechanic.mdc` | **`PROD_FACTS`** · **`docs/problems/<тикет>.md`** |
 | `@owner` | `owner.mdc` | **`docs/FOR_YOU.md`** |
 
 **Always (в каждом чате):** `economy.mdc` · `lead-no-code.mdc` (Lead не кодят)
@@ -55,7 +57,9 @@
 |------|--------|
 | `lead-architect.mdc` | `@lead-architect` |
 | `lead-product.mdc` | `@lead-product` |
+| `lead-marketing.mdc` | `@lead-marketing` |
 | `lead-designer.mdc` | `@lead-designer` |
+| `lead-portfolio.mdc` | `@lead-portfolio` |
 
 ### Исполнители
 
@@ -79,9 +83,10 @@
 
 | Файл | Hot | Архив | Правило |
 |------|-----|-------|---------|
+| `PROD_FACTS.md` | snapshot + VPS auto-block | — | все AI перед triage |
 | `STATUS.md` | ~80 строк | `STATUS_ARCHIVE.md` | Lead: после ✅ → архив |
 | `CODER_PROMPT.md` | ~120 строк | `CODER_PROMPT_ARCHIVE.md` | одна § в шапке |
-| `TASKS.md` | активное | `TASKS_HISTORY.md` | одна строка на трек |
+| `TASKS.md` | активное (~50) | `TASKS_HISTORY.md` | одна строка на трек |
 
 **Coder** читает § шапки, не архив. **Lead** не читает архив без grep. Канон: `economy.mdc` § «Бюджет контекста».
 

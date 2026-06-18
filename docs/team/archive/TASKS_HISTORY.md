@@ -4,6 +4,80 @@
 
 ---
 
+## 2026-06-16 — TASKS hot slim
+
+**Перенесено из hot:** шаги **#43–#96** (O203–O251) · планы O207/O208 · чеклист smoke O204/O205 (deploy 1.18.82, filter TG, glow).
+
+**Новый hot:** [`TASKS.md`](../common/TASKS.md) — только #1–5 (O254 deploy · O252 · O237 · O200-L2 · smoke).
+
+**Закрытые треки (index):** O220 quiz/match batch · O221 adaptive 130 cards · O222 FL hard reset · O223 YouDo L1 · O224–O227 match UX · O230–O231 inbox · O236–O246 perf · O247–O248 TG · O249–O251 hygiene · O250 push chain ✅ prod.
+
+**Старый smoke O205** (filter TG, acc3, API 502) — устарел; актуальный local smoke → `TASKS.md` § Local smoke.
+
+---
+
+## 2026-06-15 — O221-QUIZ-ADAPTIVE + PM r7
+
+**Закрыто:** `quiz_cards_v2.json` 130 · loader 186 · `test_quiz_coverage.py` · VPS DEPLOY OK · pytest 64/64 ✅ Lead verify+deploy.
+
+---
+
+## 2026-06-14 — O206 t2b sync chat_ids
+
+**Закрыто:** merge 3 queue CSV → listen file · acc1 72/70 peers · audit ok:true ✅ Lead verify+deploy.
+
+---
+
+## 2026-06-14 — O211 ops truth metrics
+
+**Закрыто:** footer `сегодня/24ч` · YouDo soft lamp · pytest 15/15 ✅ Lead verify. Deploy API ⏳.
+
+---
+
+## 2026-06-14 — FL-PROXY-STABILITY deploy
+
+**Закрыто:** tier-2 proxy code on VPS · pytest 25/25 · smoke `alive=4/4` ✅ Lead.
+
+**Owner tail:** `FL_PROXY_URLS_RESIDENTIAL` in `.env.site`.
+
+---
+
+## 2026-06-14 — O209 match-first WP
+
+**Закрыто:** O209 P0 quiz rebuild + P1 copy/tier strips · theme **1.18.84** · Lead verify+deploy ✅.
+
+**Next:** волна 1 t2b/O207 · FL tier-2 (отдельный чат) · волна 3 perf.
+
+---
+
+## 2026-06-13 — O190-auto + O203 + O202-proxy + glow
+
+**Закрыто:** O190-auto · O203 ops RU · O202 spam WP proxy · draft glow · acc3 VPS diag ✅ Coder.
+
+**Deploy ⏳ owner:** o190 script + wp theme 1.18.80.
+
+**Next:** O199 logged-in lenta.
+
+---
+
+## 2026-06-13 — O202 spam corpus + O200 r2 код
+
+**Закрыто:** O202-TG-SPAM-CORPUS ✅ Lead verify · pytest 11/11 · deploy ⏳.
+
+**Параллель:** O200-L2 r2 playbooks ✅ код · judge re-pilot ⏳.
+
+**Не сдано:** O190-AUTO-ALLOWLIST-LISTEN — filter всё ещё allowlist∩CSV.
+
+---
+
+## 2026-06-13 — O201 ops500 + O190 TG chain
+
+**Закрыто:** O201-OPS-500 (`load_config`, degraded funnel) · O190-TG-JOIN-LISTEN-CHAIN (allowlist expand, peers ladder, chain logs) · pytest 24/24 · deploy ⏳ owner.
+
+**Hot:** CODER_PROMPT → O199 · L2 parallel untouched.
+
+---
+
 ## 2026-06-12 — O190 ingest DoD + hot slim
 
 **Закрыто:** O190-t0j YouDo ingest · Lead verify VPS · `fetch_end parsed=50`.

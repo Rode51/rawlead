@@ -51,7 +51,7 @@ class TestExchangeDetailParity(TestCase):
             "lead_pipeline.fetch_project_detail",
             return_value=(long_body, "<html></html>", True),
         ) as mock_fetch:
-            body, tz = _resolve_ingest_body(project, cfg, errors)
+            body, tz, _ = _resolve_ingest_body(project, cfg, errors)
         mock_fetch.assert_called_once()
         self.assertEqual(body, long_body)
         self.assertIsNone(tz)
@@ -138,13 +138,12 @@ class TestExchangeDetailParity(TestCase):
         mock_cur = MagicMock()
         mock_cur.fetchone.side_effect = [
             lead_row,
+            (None,),
+            None,
             None,
             ("beta", True, None, None),
         ]
-        mock_cur.fetchall.side_effect = [
-            [user_row],
-            [("telegram_bot_dev",), ("python",)],
-        ]
+        mock_cur.fetchall.return_value = [user_row]
 
         mock_conn = MagicMock()
         mock_conn.__enter__ = MagicMock(return_value=mock_conn)
@@ -155,7 +154,11 @@ class TestExchangeDetailParity(TestCase):
         errors: list[str] = []
         with (
             patch("match_push.psycopg.connect", return_value=mock_conn),
-            patch("match_push._send_push_message", return_value=True) as mock_send,
+            patch(
+                "match_push._load_user_tags",
+                return_value={"telegram_bot_dev": 4.0, "python": 4.0},
+            ),
+            patch("match_push._send_push_message", return_value=(True, "")) as mock_send,
         ):
             sent = push_match_for_lead(
                 cfg,

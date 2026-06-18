@@ -1,4 +1,4 @@
-"""O114: pre-L1 vacancy filter — 5 freelance / 5 vacancy."""
+"""O114/O245: pre-L1 vacancy filter — freelance vs staff + physical/onsite services."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-from vacancy_filter import is_staff_vacancy, vacancy_lite_analysis  # noqa: E402
+from vacancy_filter import is_physical_service_job, is_staff_vacancy, vacancy_lite_analysis  # noqa: E402
 
 _FREELANCE_OK = (
     (
@@ -76,3 +76,27 @@ def test_vacancy_lite_hidden() -> None:
     assert lite.feed_visible is False
     assert lite.is_skip_verdict()
     assert "вакансии" in lite.task_summary.casefold()
+
+
+_T14858651_TITLE = "Установить виндоус на iMac"
+_T14858651_BODY = (
+    "Нужна помощь с установкой Windows на iMac, с указанием адреса для выезда мастера."
+)
+
+
+def test_physical_repro_t14858651() -> None:
+    assert is_physical_service_job(_T14858651_TITLE, _T14858651_BODY)
+
+
+def test_physical_vyezd_marker() -> None:
+    assert is_physical_service_job("Мастер на выезд", "Ремонт техники у клиента")
+
+
+def test_physical_na_domu_marker() -> None:
+    assert is_physical_service_job("Уборка на дому", "Квартира в центре")
+
+
+def test_remote_dev_not_physical() -> None:
+    title = "Разработка REST API на Python"
+    body = "Удалённо: FastAPI, Neon, оплата по факту."
+    assert not is_physical_service_job(title, body)

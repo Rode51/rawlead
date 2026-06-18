@@ -12,13 +12,21 @@ REMOTE = r"""
 cd /opt/rawlead && sudo -u rawlead env PYTHONPATH=/opt/rawlead/src .venv/bin/python - <<'PY'
 from config import load_config
 from storage import storage_from_config
+from exchange_proxy import clear_youdo_source_bans
 from youdo_parser import _reset_youdo_fail_streak, YOUDO_COOLDOWN_KEY, YOUDO_FETCH_CYCLE_KEY
 
 st = storage_from_config(load_config())
 _reset_youdo_fail_streak(st)
 st.set_setting(YOUDO_COOLDOWN_KEY, "0")
 st.set_setting(YOUDO_FETCH_CYCLE_KEY, "0")
-print("reset_ok cycle=0 cooldown=0")
+cleared = clear_youdo_source_bans()
+print("reset_ok cycle=0 cooldown=0 bans_cleared=", cleared)
+try:
+    from exchange_browser_fetch import youdo_browser_teardown
+    killed = youdo_browser_teardown()
+    print("teardown_ok killed=", killed)
+except Exception as exc:
+    print("teardown_warn", exc)
 PY
 systemctl stop rawlead-radar 2>/dev/null || true
 sleep 2

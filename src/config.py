@@ -514,27 +514,49 @@ def telethon_chat_ids_path_for_account(account: str) -> Path:
     return default
 
 
-def _seed_chat_ids_from_queue_csv(queue_csv: Path, account: str) -> list[int]:
+def _join_queue_csv_paths() -> list[Path]:
+    """All TG_JOIN_QUEUE*.csv copies under docs/ops (same set as listen audit)."""
+    ops = _PROJECT_ROOT / "docs" / "ops"
+    names = (
+        "TG_JOIN_QUEUE.csv",
+        "TG_JOIN_QUEUE_v2.csv",
+        "TG_JOIN_QUEUE_v3.csv",
+        "TG_JOIN_QUEUE_v4.csv",
+    )
+    return [ops / name for name in names if (ops / name).is_file()]
+
+
+def _seed_chat_ids_from_queue_paths(queue_paths: list[Path], account: str) -> list[int]:
     import csv
 
-    if not queue_csv.is_file():
-        return []
     account = account.strip().lower()
+    seen: set[int] = set()
     out: list[int] = []
-    with queue_csv.open(encoding="utf-8", newline="") as fh:
-        for row in csv.DictReader(fh):
-            if row.get("account", "").strip().lower() != account:
-                continue
-            if row.get("status", "").strip().lower() != "done":
-                continue
-            raw_cid = row.get("chat_id", "").strip()
-            if not raw_cid:
-                continue
-            try:
-                out.append(int(raw_cid))
-            except ValueError:
-                continue
+    for queue_csv in queue_paths:
+        if not queue_csv.is_file():
+            continue
+        with queue_csv.open(encoding="utf-8", newline="") as fh:
+            for row in csv.DictReader(fh):
+                if row.get("account", "").strip().lower() != account:
+                    continue
+                if row.get("status", "").strip().lower() != "done":
+                    continue
+                raw_cid = row.get("chat_id", "").strip()
+                if not raw_cid:
+                    continue
+                try:
+                    cid = int(raw_cid)
+                except ValueError:
+                    continue
+                if cid in seen:
+                    continue
+                seen.add(cid)
+                out.append(cid)
     return out
+
+
+def _seed_chat_ids_from_queue_csv(queue_csv: Path, account: str) -> list[int]:
+    return _seed_chat_ids_from_queue_paths([queue_csv], account)
 
 
 def _seed_chat_ids_from_env_inline() -> list[int]:
@@ -572,11 +594,16 @@ def ensure_telethon_chat_ids_file(
         target.write_text(legacy_single.read_text(encoding="utf-8"), encoding="utf-8")
         return target
 
-    csv_path = queue_csv or (
-        _PROJECT_ROOT
-        / _path_from_env("TG_JOIN_QUEUE_CSV", "docs/ops/TG_JOIN_QUEUE.csv")
-    )
-    ids = _seed_chat_ids_from_queue_csv(csv_path, acc)
+    queue_paths = _join_queue_csv_paths()
+    if not queue_paths:
+        queue_paths = [
+            queue_csv
+            or (
+                _PROJECT_ROOT
+                / _path_from_env("TG_JOIN_QUEUE_CSV", "docs/ops/TG_JOIN_QUEUE.csv")
+            )
+        ]
+    ids = _seed_chat_ids_from_queue_paths(queue_paths, acc)
     if not ids and acc == telethon_monitor_account():
         ids = _seed_chat_ids_from_env_inline()
 

@@ -103,7 +103,7 @@ flowchart LR
 | Источник | Модуль | Прокси |
 |----------|--------|--------|
 | FL, Kwork | `fl_parser`, `kwork_parser` | VPS: `FL_PROXY_URLS` / `KWORK_PROXY_URLS`; часто direct ok |
-| YouDo, FR, job, Пчёл | `youdo_parser`, … | `YOUDO_PROXY_URLS` · browser Playwright (`exchange_browser_fetch`) |
+| YouDo, FR, job, Пчёл | `youdo_parser`, … | `YOUDO_PROXY_URLS` · **YouDo: Camoufox Firefox** (`YOUDO_BROWSER=camoufox`, worker subprocess) · FL/Kwork: Playwright Chromium |
 | TG | `tg_monitor` | SOCKS/HTTP **per acc** (≠ биржи) |
 | Bot API | `telegram_notify` | `TG_PROXY_URL` |
 

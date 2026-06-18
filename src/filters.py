@@ -10,14 +10,21 @@ __all__ = [
     "parse_filters_markdown",
     "ListingWordFilter",
     "default_listing_filter",
+    "TG_WIDE_SOFT_STOPS",
+    "EXCHANGE_SAFE_STOPS",
+    "tg_filter_soft_bypass",
+    "exchange_filter_soft_stops",
 ]
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
 from lead_category import category_for_listing
-from listing import ListingProject
+from listing import SOURCE_FL, SOURCE_KWORK, ListingProject
+
+logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -29,6 +36,42 @@ _GLOBAL_ALWAYS_STOP: tuple[str, ...] = (
     "озвучка",
     "голос за",
 )
+# O207b: FILTERS.md skill stops that block real TG vacancies in FILTER_WIDE mode.
+TG_WIDE_SOFT_STOPS: tuple[str, ...] = (
+    "figma",
+    "фигма",
+    "монтаж",
+    "монтаж рилс",
+    "логотип",
+    "баннер",
+    "вебинар",
+    "иллюстратор",
+    "va",
+)
+_TG_WIDE_SOFT_STOPS_CF: frozenset[str] = frozenset(
+    token.casefold() for token in TG_WIDE_SOFT_STOPS
+)
+# O213: FILTERS.md stops tuned for TG noise — allow on kwork/fl when matched.
+EXCHANGE_SAFE_STOPS: tuple[str, ...] = (
+    "вебинар",
+    "логотип",
+    "баннер",
+    "дизайн макета",
+    "figma",
+    "фигма",
+    "монтаж",
+    "монтаж рилс",
+    "иллюстратор",
+)
+_EXCHANGE_SAFE_STOPS_CF: frozenset[str] = frozenset(
+    token.casefold() for token in EXCHANGE_SAFE_STOPS
+)
+_TG_TEAM_HIRING_MARKERS: tuple[str, ...] = (
+    "в команду",
+    "в нашу команду",
+    "набор в команду",
+)
+
 _CATEGORY_STOP: dict[str, tuple[str, ...]] = {
     "dev": (
         "1с",
@@ -136,6 +179,49 @@ def parse_filters_markdown(text: str) -> tuple[tuple[str, ...], tuple[str, ...]]
     return _dedupe(take_raw), _dedupe(stop_raw)
 
 
+def tg_filter_soft_bypass(
+    title: str,
+    listing_snippet: str = "",
+    *,
+    wide: bool,
+    source: str = "",
+) -> bool:
+    """True when TG wide filter may ignore TG_WIDE_SOFT_STOPS (O207b)."""
+    if not wide or not str(source).startswith("tg:"):
+        return False
+    from tg_spam_filter import is_tg_order_post
+
+    if not is_tg_order_post(title, listing_snippet):
+        return False
+    hay = f"{title}\n{listing_snippet}".casefold()
+    for marker in _TG_TEAM_HIRING_MARKERS:
+        if marker in hay:
+            return False
+    return True
+
+
+def exchange_filter_soft_stops(source: str) -> frozenset[str]:
+    """O213: kwork/fl may ignore EXCHANGE_SAFE_STOPS (TG path unchanged)."""
+    if source in (SOURCE_KWORK, SOURCE_FL):
+        return _EXCHANGE_SAFE_STOPS_CF
+    return frozenset()
+
+
+def _log_exchange_filter_safe(project: ListingProject, stop: str) -> None:
+    line = (
+        f"pipeline:filter:exchange_safe {project.source}:id={project.project_id} "
+        f"stop={stop}"
+    )
+    try:
+        from config import load_config, load_radar_env
+        from radar_cycle_log import log_pipeline_line
+
+        load_radar_env()
+        log_pipeline_line(load_config().radar_log_path, line)
+    except Exception:
+        logger.info("%s", line)
+
+
 @dataclass(frozen=True)
 class ListingWordFilter:
     """Правило уровня 2: есть хотя бы одно «берём» (подстрока, без регистра) и ни одного «стоп»."""
@@ -152,10 +238,26 @@ class ListingWordFilter:
     def haystack(self, title: str, listing_snippet: str = "") -> str:
         return f"{title}\n{listing_snippet}".casefold()
 
-    def accepts(self, title: str, listing_snippet: str = "", *, wide: bool = False) -> bool:
+    def accepts(
+        self,
+        title: str,
+        listing_snippet: str = "",
+        *,
+        wide: bool = False,
+        soft_bypass: bool = False,
+        soft_stops: frozenset[str] | None = None,
+    ) -> bool:
         """Проходит ли текст: wide=только стоп; иначе нужно слово из «берём» и нет стопа."""
         hay = self.haystack(title, listing_snippet)
+        if soft_stops is not None:
+            skip = soft_stops
+        elif soft_bypass:
+            skip = _TG_WIDE_SOFT_STOPS_CF
+        else:
+            skip = frozenset()
         for s in self.stop:
+            if s.casefold() in skip:
+                continue
             if s.casefold() in hay:
                 return False
         if wide:
@@ -165,8 +267,22 @@ class ListingWordFilter:
                 return True
         return False
 
-    def rejects(self, title: str, listing_snippet: str = "", *, wide: bool = False) -> bool:
-        return not self.accepts(title, listing_snippet, wide=wide)
+    def rejects(
+        self,
+        title: str,
+        listing_snippet: str = "",
+        *,
+        wide: bool = False,
+        soft_bypass: bool = False,
+        soft_stops: frozenset[str] | None = None,
+    ) -> bool:
+        return not self.accepts(
+            title,
+            listing_snippet,
+            wide=wide,
+            soft_bypass=soft_bypass,
+            soft_stops=soft_stops,
+        )
 
     def rejects_category(
         self,
@@ -187,7 +303,34 @@ class ListingWordFilter:
         return False
 
     def accepts_listing(self, project: ListingProject, *, wide: bool = False) -> bool:
-        if not self.accepts(project.title, project.listing_snippet, wide=wide):
+        soft_stops: frozenset[str] = frozenset()
+        if tg_filter_soft_bypass(
+            project.title,
+            project.listing_snippet,
+            wide=wide,
+            source=project.source,
+        ):
+            soft_stops |= _TG_WIDE_SOFT_STOPS_CF
+        exchange_soft = exchange_filter_soft_stops(project.source)
+        if exchange_soft:
+            hay = self.haystack(project.title, project.listing_snippet)
+            matched = next(
+                (
+                    s
+                    for s in self.stop
+                    if s.casefold() in exchange_soft and s.casefold() in hay
+                ),
+                None,
+            )
+            if matched:
+                soft_stops |= exchange_soft
+                _log_exchange_filter_safe(project, matched)
+        if not self.accepts(
+            project.title,
+            project.listing_snippet,
+            wide=wide,
+            soft_stops=soft_stops or None,
+        ):
             return False
         cat = category_for_listing(
             project.source,

@@ -27,6 +27,7 @@ from preprod_ai_prod_audit import (  # noqa: E402
     _judge_l1_summary,
     _judge_l2_summary,
     _l1_judge_targets,
+    _l2_judge_targets,
     _parse_judge_since,
     audit_lead,
     build_sample_and_audit,
@@ -449,6 +450,40 @@ class TestPreprodAiProdAudit(TestCase):
         ] * 10
         s = _judge_l2_summary(judged)
         self.assertFalse(s["accept_l2"])
+
+    def test_l2_judge_targets_stratified_four_cats(self) -> None:
+        leads = []
+        lid = 1
+        for cat in ("dev", "design", "marketing", "text"):
+            for _ in range(12):
+                leads.append(_mock_lead(lead_id=lid, category=cat, reply_draft=f"draft {lid}"))
+                lid += 1
+        picked = _l2_judge_targets(leads, limit=40)
+        self.assertEqual(len(picked), 40)
+        counts: dict[str, int] = {}
+        for lead in picked:
+            counts[lead["category"]] = counts.get(lead["category"], 0) + 1
+        for cat in ("dev", "design", "marketing", "text"):
+            self.assertEqual(counts.get(cat), 10)
+
+    def test_judge_l2_balanced_gate_70_owner(self) -> None:
+        judged = []
+        for cat, send_ok in (("dev", 8), ("design", 7), ("marketing", 7), ("text", 7)):
+            for i in range(10):
+                judged.append(
+                    {
+                        "lead_id": f"{cat}-{i}",
+                        "category": cat,
+                        "relevance": 4,
+                        "specificity": 4,
+                        "universal_helpful": 4,
+                        "send_as_is": i < send_ok,
+                    }
+                )
+        s = _judge_l2_summary(judged)
+        self.assertTrue(s["accept_l2"])
+        self.assertTrue(s["accept_l2_balanced"])
+        self.assertEqual(s["gate_owner_send_min_pct"], 70.0)
 
     def test_normalize_tools_vendor_to_generic(self) -> None:
         out = normalize_tools_required(["neon", "telethon", "python"])

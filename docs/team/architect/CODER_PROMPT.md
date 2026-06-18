@@ -1,12 +1,33 @@
 # Coder — hot queue (active)
 
-**→ Now:** **O271** Neon → VPS Postgres migration · O200 ⏸ · O268 фон
+**→ Now:** **O280** WP→Next UI (до ads) · O200 ⏸ · O271 ✅
 
-Full closed specs → [`CODER_PROMPT_ARCHIVE`](../archive/CODER_PROMPT_ARCHIVE.md) · prod snapshot → [`PROD_FACTS.md`](../common/PROD_FACTS.md) · **migrate:** [`MIGRATE_NEON_TO_VPS_POSTGRES.md`](../../ops/MIGRATE_NEON_TO_VPS_POSTGRES.md)
+Full handoff Claude Code → [`WP_TO_NEXT_HANDOFF.md`](WP_TO_NEXT_HANDOFF.md)
 
 ---
 
-## § O271-NEON-TO-VPS-POSTGRES — **P0 owner go 2026-06-18**
+## § O280-WP-TO-NEXT-UI — **P0 owner go 2026-06-18** (до ads)
+
+**Owner:** заменить WordPress витрину на Next.js · API/radar **не трогать**.
+
+**Handoff (Claude Code):** [`WP_TO_NEXT_HANDOFF.md`](WP_TO_NEXT_HANDOFF.md) — read order · фазы 0–3 · bootstrap копипаст · gate ads.
+
+**Пакет:** `web/` (не `portfolio/` · не `wordpress/`).
+
+| Фаза | Deliverable | DoD |
+|------|-------------|-----|
+| 0 | scaffold + `lib/api.ts` + smoke feed | health/anon feed 200 |
+| 1 | `/lenta/` + auth + quiz + match | owner smoke · O272 event |
+| 2 | `/cabinet/` inbox + draft | copy отклик |
+| 3 | pricing · home · `deploy-web-rawlead-vps.py` · nginx cutover | O218 green · Metrika |
+
+**Coder hot (после UI):** `RADAR_CORS_ORIGINS` rawlead.ru · Playwright base URL · `scripts/deploy-web-rawlead-vps.py`.
+
+**Не в MVP:** `/ops/` · support UI · WP admin.
+
+---
+
+Full closed specs → [`CODER_PROMPT_ARCHIVE`](../archive/CODER_PROMPT_ARCHIVE.md) · prod snapshot → [`PROD_FACTS.md`](../common/PROD_FACTS.md) · **migrate:** [`MIGRATE_NEON_TO_VPS_POSTGRES.md`](../../ops/MIGRATE_NEON_TO_VPS_POSTGRES.md)
 
 **Owner:** миграция без оплаты Neon · полный dump если доступен · ветка `o271/pre-vps-postgres-migration` **перед** prod cutover.
 

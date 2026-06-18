@@ -201,9 +201,7 @@
     var perfect = idx === 1;
     var title = escapeHtml(prepForDisplay(item.title || "Без названия", true));
     var budget = escapeHtml(formatBudgetDisplay(item.budget_text || "—"));
-    var perfectBadge = perfect
-      ? '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>'
-      : "";
+    var perfectBadge = "";
     var heroCls = idx === 1 ? " rl-lead-card--demo-hero" : "";
     return (
       '<article class="rl-lead-card is-visible' +
@@ -227,14 +225,15 @@
       '<p class="rl-lead-card__budget">Бюджет: ' +
       budget +
       "</p>" +
-      '<div class="rl-match">' +
-      '<div class="rl-match__label"><span>Совместимость ' +
-      km +
-      "%</span></div>" +
+      '<div class="rl-match rl-match-bar">' +
       '<div class="rl-match__bar" role="progressbar" aria-valuenow="' +
       km +
-      '" aria-valuemin="0" aria-valuemax="100">' +
-      '<span class="rl-match__fill" style="--match-value:' +
+      '" aria-valuemin="0" aria-valuemax="100" aria-label="Совместимость ' +
+      km +
+      '%">' +
+      '<span class="rl-match__fill" data-match-pct="' +
+      km +
+      '" style="--match-value:' +
       km +
       '%"></span></div></div>' +
       '<div class="rl-chips">' +

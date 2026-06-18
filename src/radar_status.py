@@ -70,6 +70,7 @@ def reset_tg_session_stats(storage: ProjectStorage, accounts: tuple[str, ...]) -
             "last_err",
             "chats_listen",
             "chats_file",
+            "chats_filter",
             "started_at",
             "ready",
             "phase",
@@ -84,24 +85,46 @@ def record_tg_monitor_start(
     *,
     chats_listen: int,
     chats_in_file: int,
+    chats_filter: int | None = None,
 ) -> None:
     acc = account.strip().lower()
     storage.set_setting(_tg_key(acc, "ready"), "0")
-    storage.set_setting(_tg_key(acc, "chats_listen"), str(chats_listen))
-    storage.set_setting(_tg_key(acc, "chats_file"), str(chats_in_file))
+    record_tg_listen_stats(
+        storage,
+        acc,
+        peers=chats_listen,
+        in_file=chats_in_file,
+        after_filter=chats_filter if chats_filter is not None else chats_listen,
+    )
     storage.set_setting(_tg_key(acc, "started_at"), radar_timestamp())
     record_tg_phase(
         storage,
         acc,
         "старт",
-        f"слушаем {chats_listen}/{chats_in_file} чатов",
+        f"peers={chats_listen} file={chats_in_file} filter={chats_filter or chats_listen}",
     )
+
+
+def record_tg_listen_stats(
+    storage: ProjectStorage,
+    account: str,
+    *,
+    peers: int,
+    in_file: int,
+    after_filter: int,
+) -> None:
+    """Live listen ladder: file → filter → active peers (O190)."""
+    acc = account.strip().lower()
+    storage.set_setting(_tg_key(acc, "chats_listen"), str(peers))
+    storage.set_setting(_tg_key(acc, "chats_file"), str(in_file))
+    storage.set_setting(_tg_key(acc, "chats_filter"), str(after_filter))
 
 
 def record_tg_acc_ready(storage: ProjectStorage, account: str) -> None:
     """Acc готов слушать: handler зарегистрирован, get_me ok."""
     acc = account.strip().lower()
     storage.set_setting(_tg_key(acc, "ready"), "1")
+    storage.set_setting(_tg_key(acc, "last_err"), "")
     record_tg_phase(storage, acc, "слушает")
 
 
@@ -115,6 +138,7 @@ def record_tg_message(
 ) -> None:
     acc = account.strip().lower()
     storage.incr_setting(_tg_key(acc, "msgs"), 1)
+    storage.incr_setting(_tg_key(acc, "msgs_total"), 1)
     if was_new:
         storage.incr_setting(_tg_key(acc, "new"), 1)
     if notified:
@@ -465,6 +489,78 @@ def _source_row_label(source_id: str) -> str:
     return SOURCE_LABELS.get(source_id, source_id)
 
 
+def _fl_parsed_zero_streak(storage: ProjectStorage) -> int:
+    return _int_setting(storage, "fl_parsed_zero_streak")
+
+
+def _fl_proxy_ban_count() -> int:
+    try:
+        from exchange_proxy import cascade_status_summary
+
+        summary = cascade_status_summary()
+        fl_ps = summary.get("primary") or summary
+        return len(fl_ps.get("banned") or [])
+    except Exception:
+        return 0
+
+
+def _fl_recent_pool_exhausted(log_path: Path | None, *, tail: int = 400) -> bool:
+    if log_path is None or not log_path.is_file():
+        return False
+    try:
+        lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return False
+    for line in reversed(lines[-tail:]):
+        low = line.lower()
+        if "fetch:fl" not in low:
+            continue
+        return "pool_exhausted" in low or "alive=0/" in low
+    return False
+
+
+def fl_antibot_soft_active(
+    storage: ProjectStorage,
+    *,
+    log_path: Path | None = None,
+    parsed_cards: int | None = None,
+    streak_threshold: int = 10,
+) -> bool:
+    """O256: parsed=0 streak with alive pool and no proxy bans — soft antibot."""
+    streak = _fl_parsed_zero_streak(storage)
+    if streak <= streak_threshold:
+        return False
+    if _fl_proxy_ban_count() > 0:
+        return False
+    if _fl_recent_pool_exhausted(log_path):
+        return False
+    if parsed_cards is not None and parsed_cards > 0:
+        return False
+    return True
+
+
+def apply_fl_antibot_soft_ops_row(
+    row: dict,
+    storage: ProjectStorage,
+    log_path: Path | None,
+) -> None:
+    """Mark FL funnel row red with antibot_soft meta (O256 /ops/)."""
+    parsed = int(row.get("meta", {}).get("parsed") or 0)
+    if not fl_antibot_soft_active(
+        storage,
+        log_path=log_path,
+        parsed_cards=parsed,
+    ):
+        return
+    row["lamp"] = "bad"
+    row["meta"]["fl_antibot_soft"] = True
+    row["meta"]["antibot_soft"] = True
+    for step_row in row.get("steps") or []:
+        if step_row.get("id") in ("fetch", "parsed"):
+            step_row["status"] = "bad"
+        step_row["is_break"] = step_row.get("id") == "parsed"
+
+
 def _format_exchange_line(st: SourceCycleStats, *, neon_insert: int) -> str:
     """Legacy helper — предпочитайте format_exchange_status_line + health."""
     label = _source_row_label(st.source_id).ljust(7)
@@ -512,6 +608,19 @@ def _format_exchanges_block(
         health = all_health.get(sid) or load_health(storage, sid)
         st = summary.sources.get(sid) if summary and summary.sources else None
         fetch_failed = bool(st and st.fetch_error)
+        if (
+            sid == "fl"
+            and not fetch_failed
+            and st is not None
+            and st.parsed_cards >= 25
+        ):
+            try:
+                from exchange_proxy import fl_dc_tier_exhausted
+
+                if fl_dc_tier_exhausted():
+                    fetch_failed = False
+            except Exception:
+                pass
         if sid == "tg":
             tg_ok, tg_detail = _tg_monitor_state(storage)
             if not tg_ok:
@@ -521,6 +630,20 @@ def _format_exchanges_block(
                 fetch_failed = False
         elif fetch_failed and st:
             problems.append(f"{st.label}: {st.fetch_error[:80]}")
+        if sid == "fl" and st is not None and st.parsed_cards == 0:
+            try:
+                from config import load_config
+
+                log_path = Path(load_config().radar_log_path)
+            except Exception:
+                log_path = None
+            if fl_antibot_soft_active(
+                storage,
+                log_path=log_path,
+                parsed_cards=st.parsed_cards,
+            ):
+                fetch_failed = True
+                problems.append(f"{_source_row_label(sid)}: antibot_soft streak>{10}")
         level = status_level(health, fetch_failed=fetch_failed)
         if level == "red":
             maybe_send_red_alert(storage, sid, health, fetch_failed=fetch_failed)

@@ -14,7 +14,6 @@ from pg_storage import NeonLeadStorage, _is_visible_lite
 from public_feed import is_public_feed_source
 from radar_cycle_log import log_pipeline_line, note_site_rollup_after_lite
 
-
 class L1Pool:
     """Thread pool на один цикл main/tg; drain() в конце."""
 
@@ -115,7 +114,7 @@ def _l1_worker(
             stats.note_skip("skip:l1_failed")
         return
 
-    pg.update_after_lite(
+    lead_id = pg.update_after_lite(
         project,
         lite=lite,
         errors=errors,
@@ -160,8 +159,19 @@ def _l1_worker(
         and visible
         and is_public_feed_source(project.source)
     ):
-        lead_id = pg.fetch_lead_id(project.source, str(project.project_id), errors)
-        if lead_id is not None:
+        if lead_id is None:
+            lead_id = pg.fetch_lead_id(
+                project.source, str(project.project_id), errors
+            )
+        if lead_id is None:
+            line = (
+                f"push:match:lead_missing source={project.source} "
+                f"ext={project.project_id}"
+            )
+            with lock:
+                errors.append(line)
+            log_pipeline_line(cfg.radar_log_path, line)
+        else:
             push_match_for_lead(
                 cfg,
                 lead_id,
@@ -169,4 +179,5 @@ def _l1_worker(
                 task_summary=lite.task_summary,
                 lead_tags=lead_tags_from_lite(lite),
                 errors=errors,
+                log_path=cfg.radar_log_path,
             )

@@ -61,7 +61,7 @@
 | **O28** | **Push match** в @rawlead_bot подписчикам | § **3f-A4-MATCH-PUSH** · **→ Coder до Design** |
 | **O29** | **Stars** — живая оплата (не заглушка) | § **3f-C-STARS** P0 · **→ Coder до Design** |
 | **O30** | **Push match:** не top-3 глобально — **каждому paid** при `keyword_match ≥ порог`; порог **настраивает пользователь** (default **60%**, диапазон 30–100) | § **MATCH-PUSH-V2** · отменяет top-K=3 (O28 MVP) |
-| **O46** | **Match F2:** `km = matched/lead_tags×100` · «ИДЕАЛЬНО ✦» только при ≥2 тегах лида и полном покрытии · cap навыков **12** | § **PRE-STRESS-PACK O42** · 2026-05-29 |
+| **O46** | **Match F2:** `km = matched/lead_tags×100` · «ИДЕАЛЬНО ✦» только при ≥2 тегах лида и полном покрытии · ~~cap навыков **12**~~ → **снят** quiz-first **2026-06-15** | § **PRE-STRESS-PACK O42** · 2026-05-29 |
 | **O47** | **L1 tags strict:** Joomla/Bitrix ≠ wordpress_dev · post-validate · golden tests | § **PRE-STRESS-WAVE-2** · **P0 до stress** |
 | **O48** | **Draft reliability:** log 503 · retry · rate limit · UI «Повторить» · scale | § **PRE-STRESS-WAVE-2** · **P0** |
 | **O49** | **L2 premium v2:** без «Готов…» · шаги · 9/10 quality | § **PRE-STRESS-WAVE-2** |
@@ -445,10 +445,26 @@
 
 **План по шагам (legacy O92):**
 1. ~~UI-tree~~ interim принят
-2. ~~Ограничения max 12~~ ✅
+2. ~~Ограничения max 12~~ — **снято owner 2026-06-15** (quiz-first, manual picker убран)
 3. ~~Telemetry~~ ✅
 4. A/B — **отложено** до O93
 5. Веса/auto-priorities — после O93
+
+---
+
+## § QUIZ-FIRST-NO-CAP — **owner 2026-06-15**
+
+**Решение:** ручной ввод навыков **нет** (O208) · лимит **12 не держим** — обрезка при import **вредит** профилю.
+
+| Было | Стало |
+|------|--------|
+| Skill Tree sheet · «Выбрано N / 12» | **Квиз** + retake + behavior weights |
+| API/UI reject или trim >12 | **Без cap** на quiz import · `__quiz_niche:*` отдельно |
+| PRODUCT_CANON «макс 12» | **Снято** · канон → `PRODUCT_CANON` §4 · `feed-cabinet-mvp` §0.1 |
+
+**Код:** ✅ O230 prod **2026-06-15**.
+
+**Owner 2026-06-15 · inbox delete:** удалил отклик в ЛК → на карточке в ленте **нет** «Отклик ✓» и match без draft-boost → § **O231-INBOX-DELETE-MATCH**.
 
 ---
 
@@ -1705,6 +1721,16 @@ Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unse
 
 | Дата | Мысль / запрос | Kуда ушло |
 |------|----------------|-----------|
+| 2026-06-16 | **Soft launch M1** — TG ads test · РФ · все фрилансеры · budget **≤5k ₽** (старт 2–3k) · trial · параллельно инженерии · owner мониторит | **§ M1** `LEAD_MARKETING_PROMPT` · `@lead-marketing` |
+| 2026-06-16 | **Роль Lead Marketing** — кампании, UTM, KPI; понимает квиз-first + trial | `.cursor/rules/lead-marketing.mdc` · `docs/team/marketing/` |
+| 2026-06-16 | **YouDo O260 DC-first** — slot1=DC · node max 1 при dc_alive=0 · hard reset при банах на DC | **§ O260** ✅ prod |
+| 2026-06-15 | **O225 match floors v2** — primary niche **20%** · secondary **10%** · trial без замка · floor не ломается от draft на чужую нишу | **§ O225** `@coder` |
+| 2026-06-15 | **O224-B expand-no-reply** — штраф **только** «раскрыл и не откликнулся», не за просмотр в ленте · `expand_no_reply −0.05` | **§ O224-B** `@coder` ✅ |
+| 2026-06-15 | **O224 match UX** — chips · bar · 20% category · gold 100% | **§ O224** `@coder` |
+| 2026-06-15 | **YouDo t14857148** — перевозка → L1 WordPress | **§ O223** ✅ |
+| 2026-06-15 | **«Все парсеры упали»** — triage: FL 🔴 · Kwork fresh=0 · YouDo/TG OK | Lead clear bans ✅ · [`2026-06-15-parsers-fl-unstable.md`](../../problems/2026-06-15-parsers-fl-unstable.md) · **O222** P0 |
+| 2026-06-15 | **O221 deploy prod** — 186 cards · coverage CI · dedup on VPS | Lead `deploy-o217-quiz-vps.py` ✅ · owner quiz smoke |
+| 2026-06-15 | **O221 r6 pilot 40** — owner **«принимаю pilot»** + signals v2 approve | **→ @coder** § **O221-QUIZ-ADAPTIVE** · **→ @lead-product** r7 ~130 |
 | 2026-06-13 | **L2 Option B** — подкрутить playbooks до full regen · **все 4 cat send ≥80%** (не 60%) · pilot r1 mkt 60% — не проходит owner bar | **§ O200-L2-CAT-80** · parallel L2 chat |
 | 2026-06-13 | **L2 чат отдельно** | O200 ≠ O201/O199/concept · pilot 40 в L2-чате | § **O200** · `TASKS` две линии |
 | 2026-06-13 | **L2 pilot 40** — 10×4 cat сначала · judge balanced → full regen только после PASS + «да» | **§ O200-L2-CATEGORY-WAVE** · `CODER_PROMPT` |
@@ -1842,7 +1868,8 @@ Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unse
 | 2026-05-31 | **O77 views** | Hot-лиды: **медленный** набор просмотров · &gt;1ч быстрее · «я первый» | **📋 backlog** |
 | 2026-05-31 | **O78 admin** | Web admin-кабinet владельца (users, leads, radar) | **📋 backlog** |
 | 2026-05-31 | **GTM: нулевая сеть** | Нет знакомых · нет своего TG-канала · пост «друзьям» не применим | **FOR_YOU** § нулевая сеть · **→ @lead-product** GTM без аудитории (не срочно) |
-| 2026-05-31 | **P-PORTFOLIO** | Личное портфолио VPS · параллельно soft ads RawLead | **после** O72d+O76 · RawLead · Crystal Debt · **Михалыч** (= умный чат-бот, WIP) |
+| 2026-05-31 | **P-PORTFOLIO** | ~~brutalism labs~~ | **❌ superseded → P288** |
+| 2026-06-17 | **P288 v3 ✅ mood** | Owner sign-off Recraft · terracotta · spiral tiles · §3.1 freeze | Design → Coder · [`premium-scroll-brief.md`](../../design/portfolio/premium-scroll-brief.md) |
 | 2026-05-31 | **Фриланс + недоделки** | Владелец: проекты сырые · вопрос «есть ли шанс на FL» | честная оценка в `FOR_YOU` § портфолио · не блокер гейтов RawLead |
 | 2026-05-31 | **O72 старые лиды** | Старые в Neon **не важны** для запуска · можно **убить** перед полным launch · regen 80 — **не** цель | Учиться на выборке → **промпт** · гейт = **новые** лиды после deploy VPS |
 | 2026-05-31 | **O72 цикл владельца** | Ждём **новые** лиды → тест (глаза + опц. judge) → правим промпт если надо · **не** regen старых | План B combined **≥4** (жёстче автоматических 3.5/70%) |

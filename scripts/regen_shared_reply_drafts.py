@@ -59,12 +59,17 @@ _REGEN_VERDICTS = frozenset({"брать", "брат", "take", "сомнител
 
 
 def _lite_from_lead(lead: dict[str, Any]) -> AiLiteAnalysis:
+    from lead_category import CATEGORIES
+
     v_norm = _norm_verdict(lead.get("ai_verdict") or "")
+    cat_raw = (lead.get("category") or "").strip()
+    primary_category = cat_raw if cat_raw in CATEGORIES else ""
     return AiLiteAnalysis(
         feed_visible=v_norm not in _SKIP_VERDICTS,
         task_summary=(lead.get("task_summary") or "").strip(),
         lead_tags=tuple(lead.get("lead_tags") or ()),
         ai_reasons=tuple(lead.get("ai_reasons") or ()),
+        primary_category=primary_category,
     )
 
 

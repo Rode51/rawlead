@@ -103,13 +103,34 @@ def youdo_fail_kind(error_msg: str) -> str:
 def log_youdo_fetch_end(cfg: Config, stats, health: dict) -> None:
     kind = str(health.get("last_error_kind") or "ok")
     err = str(stats.fetch_error or health.get("last_error_short") or "").strip()
+    parsed = stats.parsed_cards if stats.parsed_cards >= 0 else 0
+    # O257: derive reason= when parsed=0 so owner can grep fetch_end reason=
+    reason = ""
+    if parsed == 0:
+        if "antibot" in err.lower() or "browser_fail" in err.lower():
+            reason = "antibot_html"
+        elif "cooldown" in err.lower():
+            reason = "cooldown"
+        elif "traffic_guard" in err.lower():
+            reason = "traffic_guard"
+        elif "ru_pool_dead" in err.lower():
+            reason = "ru_pool_dead"
+        elif "servicepipe" in err.lower():
+            reason = "servicepipe"
+        elif "ru_early" in err.lower() or "ru_fallback" in err.lower():
+            reason = "ru_tier_fail"
+        elif kind not in ("", "ok"):
+            reason = kind
+        else:
+            reason = "browser_empty"
     log_youdo_trace(
         cfg,
         "fetch_end",
-        parsed=stats.parsed_cards if stats.parsed_cards >= 0 else 0,
+        parsed=parsed,
         fresh=stats.downloaded,
         new=stats.new_ids,
         kind=kind,
+        reason=reason,
         error_class=kind if kind not in ("", "ok") else "",
         error_snip=err[:_TRACE_SNIP_MAX] if err else "",
     )
@@ -119,6 +140,9 @@ YOUDO_FETCH_CYCLE_KEY = "youdo_fetch_cycle_n"
 YOUDO_FAIL_STREAK_KEY = "youdo_fail_streak"
 YOUDO_TRAFFIC_GUARD_UNTIL_KEY = "youdo_traffic_guard_until"
 YOUDO_CYCLE_SKIP_KEY = "youdo_last_cycle_skip"
+YOUDO_LAST_HARD_RESET_AT_KEY = "youdo_last_hard_reset_at"
+YOUDO_HARD_RESET_HOUR_START_KEY = "youdo_hard_reset_hour_window_start"
+YOUDO_HARD_RESET_HOUR_COUNT_KEY = "youdo_hard_reset_hour_count"
 
 _DEFAULT_LISTING_URL = "https://youdo.com/tasks-all-opened-all"
 _TASK_ID_RE = re.compile(r"/t(\d+)")
@@ -137,8 +161,17 @@ def _youdo_slot_retry_max() -> int:
         return 3
 
 
+def _youdo_carousel_wall_extra_sec() -> float:
+    """Headroom beyond goto×slot_retry for DC carousel + RU + camoufox subprocess tail (O262h)."""
+    raw = os.getenv("YOUDO_CAROUSEL_WALL_EXTRA_SEC", "150").strip()
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 150.0
+
+
 def _youdo_listing_wall_clock_sec() -> float:
-    """Wall budget must cover goto × slot retries (O177b: 120s blocked retry after 90s goto)."""
+    """Wall budget: goto×slot retries + carousel headroom (O262h: prod 558s vs old 510s)."""
     raw = os.getenv("YOUDO_LISTING_TIMEOUT_SEC", "").strip()
     if raw:
         try:
@@ -147,12 +180,22 @@ def _youdo_listing_wall_clock_sec() -> float:
             pass
     goto = _youdo_goto_timeout_sec()
     retries = _youdo_slot_retry_max()
-    return max(goto * retries + 60.0, 120.0)
+    base = goto * retries + 60.0
+    return max(base + _youdo_carousel_wall_extra_sec(), 120.0)
+
+
+def _youdo_fetch_outer_grace_sec() -> float:
+    """Radar outer wall grace — inner browser may finish after inner wall subprocess work (O262h)."""
+    raw = os.getenv("YOUDO_FETCH_OUTER_GRACE_SEC", "90").strip()
+    try:
+        return max(30.0, float(raw))
+    except ValueError:
+        return 90.0
 
 
 def youdo_source_fetch_wall_sec() -> float:
-    """Radar outer wall for YouDo fetch — must match internal browser budget (O179)."""
-    return _youdo_listing_wall_clock_sec()
+    """Radar outer wall for YouDo — must exceed internal browser budget (O179, O262h)."""
+    return _youdo_listing_wall_clock_sec() + _youdo_fetch_outer_grace_sec()
 
 
 def _youdo_traffic_guard_fails() -> int:
@@ -191,6 +234,117 @@ def _bump_youdo_fail_streak(storage) -> int:
 def _reset_youdo_fail_streak(storage) -> None:
     storage.set_setting(YOUDO_FAIL_STREAK_KEY, "0")
     storage.set_setting(YOUDO_TRAFFIC_GUARD_UNTIL_KEY, "0")
+
+
+def youdo_hard_reset_on_fail_enabled() -> bool:
+    return os.getenv("YOUDO_HARD_RESET_ON_FAIL", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def _youdo_hard_reset_fail_threshold() -> int:
+    raw = os.getenv("YOUDO_HARD_RESET_FAILS", "1").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 1
+
+
+def _youdo_hard_reset_min_sec() -> float:
+    raw = os.getenv("YOUDO_HARD_RESET_MIN_SEC", "120").strip()
+    try:
+        return max(1.0, float(raw))
+    except ValueError:
+        return 120.0
+
+
+def _youdo_short_cooldown_min() -> int:
+    raw = os.getenv("YOUDO_SHORT_COOLDOWN_MIN", "5").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 5
+
+
+def _youdo_hard_reset_max_per_hour() -> int:
+    raw = os.getenv("YOUDO_HARD_RESET_MAX_PER_HOUR", "8").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 8
+
+
+def _get_youdo_last_hard_reset_at(storage) -> float:
+    raw = storage.get_setting(YOUDO_LAST_HARD_RESET_AT_KEY, "0") or "0"
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 0.0
+
+
+def _youdo_hard_reset_hour_window(storage) -> tuple[float, int]:
+    now = time.time()
+    raw_start = storage.get_setting(YOUDO_HARD_RESET_HOUR_START_KEY, "0") or "0"
+    raw_count = storage.get_setting(YOUDO_HARD_RESET_HOUR_COUNT_KEY, "0") or "0"
+    try:
+        start = float(raw_start)
+    except ValueError:
+        start = 0.0
+    try:
+        count = max(0, int(raw_count))
+    except ValueError:
+        count = 0
+    if start <= 0 or now - start >= 3600.0:
+        return now, 0
+    return start, count
+
+
+def _youdo_hard_reset_hourly_cap_reached(storage) -> bool:
+    _, count = _youdo_hard_reset_hour_window(storage)
+    return count >= _youdo_hard_reset_max_per_hour()
+
+
+def _youdo_hard_reset_rate_limited(storage) -> bool:
+    last = _get_youdo_last_hard_reset_at(storage)
+    if last <= 0:
+        return False
+    return time.time() - last < _youdo_hard_reset_min_sec()
+
+
+def _record_auto_hard_reset(storage) -> None:
+    now = time.time()
+    storage.set_setting(YOUDO_LAST_HARD_RESET_AT_KEY, str(now))
+    start, count = _youdo_hard_reset_hour_window(storage)
+    if now - start >= 3600.0:
+        start = now
+        count = 0
+    storage.set_setting(YOUDO_HARD_RESET_HOUR_START_KEY, str(start))
+    storage.set_setting(YOUDO_HARD_RESET_HOUR_COUNT_KEY, str(count + 1))
+
+
+def youdo_hard_reset(*, reason: str = "", storage=None) -> None:
+    """Reset YouDo cooldown/guard/cycle and tear down browser slots (O254)."""
+    st = storage
+    if st is not None:
+        _reset_youdo_fail_streak(st)
+        st.set_setting(YOUDO_COOLDOWN_KEY, "0")
+        st.set_setting(YOUDO_FETCH_CYCLE_KEY, "0")
+        st.set_setting("status_youdo_cooldown_msg", "")
+    killed = 0
+    try:
+        from exchange_browser_fetch import youdo_browser_teardown
+
+        killed = youdo_browser_teardown()
+    except Exception as exc:
+        logger.warning("fetch:youdo hard_reset browser teardown failed: %s", exc)
+    logger.info(
+        "fetch:youdo hard_reset reason=%s killed=%d",
+        (reason or "unknown")[:200],
+        killed,
+    )
 
 
 def youdo_traffic_guard_blocks_fetch(storage) -> tuple[bool, int, str]:
@@ -307,6 +461,11 @@ def set_youdo_cooldown(storage) -> None:
     storage.set_setting(YOUDO_COOLDOWN_KEY, str(until))
 
 
+def set_youdo_short_cooldown(storage) -> None:
+    until = time.time() + _youdo_short_cooldown_min() * 60
+    storage.set_setting(YOUDO_COOLDOWN_KEY, str(until))
+
+
 def _log_youdo_cooldown_skip(cfg: Config, mins: int, *, cooldown_until: str = "") -> None:
     log_pipeline_line(cfg.radar_log_path, f"youdo:skip cooldown {mins} min")
     log_youdo_trace(
@@ -324,21 +483,76 @@ def _log_youdo_cooldown_skip(cfg: Config, mins: int, *, cooldown_until: str = ""
         pass
 
 
+def _youdo_dc_carousel_has_alive() -> bool:
+    try:
+        from exchange_proxy import youdo_dc_alive_urls
+
+        return bool(youdo_dc_alive_urls())
+    except Exception:
+        return False
+
+
 def _on_youdo_fetch_fail(cfg: Config, storage) -> None:
     streak = _bump_youdo_fail_streak(storage)
-    set_youdo_cooldown(storage)
-    if streak >= _youdo_traffic_guard_fails():
-        until_raw = storage.get_setting(YOUDO_TRAFFIC_GUARD_UNTIL_KEY, "0").strip()
-        try:
-            until_hhmm = time.strftime("%H:%M", time.localtime(float(until_raw)))
-        except ValueError:
-            until_hhmm = until_raw
-        log_youdo_trace(
-            cfg,
-            "traffic_guard",
-            fail_streak=streak,
-            guard_until=until_hhmm,
+    sticky_warm = False
+    soft_sp_fail = False
+    try:
+        from exchange_browser_fetch import (
+            youdo_last_fetch_was_soft_servicepipe,
+            youdo_sticky_session_warm,
         )
+
+        sticky_warm = youdo_sticky_session_warm()
+        soft_sp_fail = youdo_last_fetch_was_soft_servicepipe()
+    except Exception:
+        pass
+    hard_reset_eligible = (
+        youdo_hard_reset_on_fail_enabled()
+        and streak >= _youdo_hard_reset_fail_threshold()
+        and not (sticky_warm and streak == 1)
+        and not (streak == 1 and soft_sp_fail)
+    )
+    if hard_reset_eligible:
+        if _youdo_hard_reset_hourly_cap_reached(storage):
+            until = time.time() + _youdo_traffic_guard_cooldown_sec()
+            storage.set_setting(YOUDO_TRAFFIC_GUARD_UNTIL_KEY, str(until))
+            log_youdo_trace(
+                cfg,
+                "hard_reset_hourly_cap",
+                fail_streak=streak,
+                guard_until=time.strftime("%H:%M", time.localtime(until)),
+            )
+        elif _youdo_hard_reset_rate_limited(storage):
+            set_youdo_short_cooldown(storage)
+            log_youdo_trace(
+                cfg,
+                "hard_reset_rate_limited",
+                fail_streak=streak,
+                cooldown_min=_youdo_short_cooldown_min(),
+            )
+        else:
+            youdo_hard_reset(reason=f"auto_fail_streak={streak}", storage=storage)
+            _record_auto_hard_reset(storage)
+            log_youdo_trace(
+                cfg,
+                "hard_reset",
+                fail_streak=streak,
+                guard_until="",
+            )
+    else:
+        set_youdo_cooldown(storage)
+        if streak >= _youdo_traffic_guard_fails():
+            until_raw = storage.get_setting(YOUDO_TRAFFIC_GUARD_UNTIL_KEY, "0").strip()
+            try:
+                until_hhmm = time.strftime("%H:%M", time.localtime(float(until_raw)))
+            except ValueError:
+                until_hhmm = until_raw
+            log_youdo_trace(
+                cfg,
+                "traffic_guard",
+                fail_streak=streak,
+                guard_until=until_hhmm,
+            )
     proxy = exchange_primary_proxy_url("youdo")
     if proxy:
         from exchange_browser_fetch import invalidate_browser_slot
@@ -359,7 +573,7 @@ def _looks_like_antibot(html: str) -> bool:
         'data-id' in low and 'href="/t' in low.replace("'", '"')
     ):
         return False
-    if any(m in low for m in ("exhkqyad", "just a moment", "checking your browser")):
+    if any(m in low for m in ("exhkqyad", "servicepipe", "just a moment", "checking your browser")):
         return True
     if "403 forbidden" in low[:2500] and len(html.strip()) < 5000:
         return True
@@ -746,22 +960,35 @@ def fetch_listing_projects(
         html = _fetch_listing_html(url, cfg, timeout_sec=timeout_sec, storage=st)
         projects = parse_listing_html(html, url)
         _reset_youdo_fail_streak(st)
+        parsed_n = len(projects)
         log_youdo_trace(
             cfg,
             "parse",
-            cards_found=len(projects),
+            cards_found=parsed_n,
             new_ids=0,
             skipped_reason="",
+        )
+        # O257: structured outcome line at fetch end.
+        log_pipeline_line(
+            cfg.radar_log_path,
+            f"fetch:youdo outcome=ok reason=ok tier=dc parsed={parsed_n}",
         )
         return projects
     except YoudoListingError as exc:
         msg = str(exc)
+        fail_kind = youdo_fail_kind(msg)
+        reason = "ru_pool_dead" if "ru_pool_dead" in msg.lower() else fail_kind or "browser_empty"
         log_youdo_trace(
             cfg,
             "parse",
             cards_found=0,
             new_ids=0,
-            skipped_reason=youdo_fail_kind(msg),
+            skipped_reason=fail_kind,
+        )
+        # O257: log outcome=fail to pipeline so it appears in radar_site.log.
+        log_pipeline_line(
+            cfg.radar_log_path,
+            f"fetch:youdo outcome=fail reason={reason} tier=dc parsed=0",
         )
         raise
     finally:

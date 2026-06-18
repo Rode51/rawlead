@@ -23,12 +23,15 @@
 | Фазы «сейчас» | [`architect/ROADMAP.md`](../architect/ROADMAP.md) | FOR_YOU, TASKS простынёй |
 | Мысли / решения владельца | [`architect/OWNER_INTENT.md`](../architect/OWNER_INTENT.md) | чат, дубли в FOR_YOU |
 | Активный план Product | [`product/LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) | новый `TZ_*.md` |
+| Активный план Marketing | [`marketing/LEAD_MARKETING_PROMPT.md`](../marketing/LEAD_MARKETING_PROMPT.md) | ads copy в чат |
+| WP → Next handoff (O280) | [`architect/WP_TO_NEXT_HANDOFF.md`](../architect/WP_TO_NEXT_HANDOFF.md) | Claude Code `web/` · до ads |
+| Активный план Portfolio | [`portfolio/LEAD_PORTFOLIO_PROMPT.md`](../portfolio/LEAD_PORTFOLIO_PROMPT.md) · Claude: [`portfolio/CLAUDE_CODE_HANDOFF.md`](../portfolio/CLAUDE_CODE_HANDOFF.md) | P288 legacy · `design/portfolio/refs/` |
 | Задача Coder | [`architect/CODER_PROMPT.md`](../architect/CODER_PROMPT.md) hot · [`archive/CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) | TASKS, чат (только копипаст) |
 | Задача Designer | [`design/DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) hot · [`archive/DESIGNER_PROMPT_ARCHIVE.md`](../archive/DESIGNER_PROMPT_ARCHIVE.md) | LEAD_DESIGN архив |
 | План Lead Designer | [`design/LEAD_DESIGN_PROMPT.md`](../design/LEAD_DESIGN_PROMPT.md) | |
 | Регламент Design | [`design/LEAD_DESIGN.md`](../design/LEAD_DESIGN.md) | **кто какой файл читает** |
 | WP канон / brief | `docs/design/wp/REFERENCE.md` · `wave-*-brief.md` | DESIGN_BRIEF (не WP) |
-| Снимок / блокеры | [`STATUS.md`](STATUS.md) hot · [`archive/STATUS_ARCHIVE.md`](../archive/STATUS_ARCHIVE.md) | не копировать ТЗ |
+| Снимок / блокеры | [`STATUS.md`](STATUS.md) hot · [`PROD_FACTS.md`](PROD_FACTS.md) **prod snapshot** · [`archive/STATUS_ARCHIVE.md`](../archive/STATUS_ARCHIVE.md) | не копировать ТЗ |
 | Очередь | [`TASKS.md`](TASKS.md) — одна строка на трек | FOR_YOU |
 | Шаги владельца | [`../FOR_YOU.md`](../FOR_YOU.md) | TASKS, STATUS |
 | Поломка | [`../problems/`](../problems/) один файл | новый md в `team/` |
@@ -37,7 +40,9 @@
 | Роль | Пишет | Не пишет |
 |------|-------|----------|
 | **Lead Product** | `PRODUCT_VISION`, `LEAD_PRODUCT_PROMPT` | `ROADMAP`, `CODER_PROMPT`, `FOR_YOU` |
+| **Lead Marketing** | `LEAD_MARKETING_PROMPT`, `LEAD_MARKETING.md` | `src/`, `CODER_PROMPT`, `PRODUCT_VISION` |
 | **Lead Designer** | `LEAD_DESIGN*`, `DESIGN_SYSTEM`, `docs/design/wp/` | `wordpress/`, `CODER_PROMPT`, WP в `DESIGN_BRIEF` |
+| **Lead Portfolio** | `LEAD_PORTFOLIO*`, `docs/design/portfolio/` | `portfolio/` код · `src/` · `CODER_PROMPT` · Claude CLI |
 | **Lead Architect** | `ROADMAP`, `TASKS`, `STATUS`, `CODER_PROMPT`, карты | `src/`, commit чужих без сдачи |
 | **Coder** | файлы из § «Файлы» в `CODER_PROMPT` + `STATUS` | `DESIGNER_PROMPT`, `LEAD_DESIGN_PROMPT`, design docs |
 | **Designer** | `docs/design/**`, § активная в `DESIGNER_PROMPT` | `LEAD_DESIGN_PROMPT`, архив §, `src/`, `wordpress/`, WP в `DESIGN_BRIEF` |
@@ -53,18 +58,22 @@
 
 | Папка | Кто | Содержание |
 |-------|-----|------------|
-| **`common/`** | все | PROJECT_MAP, STATUS, TASKS, SCALE, DOCS_ARCHITECTURE, MCP |
+| **`common/`** | все | PROJECT_MAP, **PROD_FACTS**, STATUS, TASKS, DOCS_ARCHITECTURE, MCP |
 | **`architect/`** | Lead Architect, Coder (промпт) | ROADMAP, CODER_PROMPT, ARCHITECTURE, CODE_STRUCTURE, TZ_*, NEON |
 | **`product/`** | Lead Product | PRODUCT_VISION, LEAD_PRODUCT_PROMPT |
+| **`marketing/`** | Lead Marketing | LEAD_MARKETING*, кампании, UTM |
 | **`design/`** | Lead Designer, Designer | LEAD_DESIGN*, DESIGN_SYSTEM, DESIGNER_PROMPT |
+| **`portfolio/`** | Lead Portfolio, Claude Code | LEAD_PORTFOLIO*, refs mood, CLAUDE_CODE_HANDOFF |
 | **`archive/`** | — | `*_ARCHIVE.md`, TASKS_HISTORY (не обновлять старое) |
 | **`templates/`** | Lead | **cursor-team-kit** — bootstrap других проектов |
 
 | Кому | Первый файл |
 |------|-------------|
 | **Lead Product** | `.cursor/rules/lead-product.mdc` § онбординг **A+B** → `product/PRODUCT_VISION.md` → `LEAD_PRODUCT_PROMPT.md` |
-| **Lead Architect** | `.cursor/rules/lead-architect.mdc` § онбординг **A+B** → `PRODUCT_VISION` v0.11 → `STATUS` → `CODER_PROMPT` |
+| **Lead Marketing** | `.cursor/rules/lead-marketing.mdc` § онбординг **A+B** → `PRODUCT_VISION` → `LEAD_MARKETING_PROMPT.md` |
+| **Lead Architect** | `.cursor/rules/lead-architect.mdc` § онбординг **A+B** → `PROD_FACTS` → `PRODUCT_VISION` v0.12 → `STATUS` → `CODER_PROMPT` |
 | **Lead Designer** | `.cursor/rules/lead-designer.mdc` § онбординг **A+B** → `feed-cabinet-mvp.md` → `LEAD_DESIGN_PROMPT.md` |
+| **Lead Portfolio** | `.cursor/rules/lead-portfolio.mdc` § **A+B+C** → `LEAD_PORTFOLIO_PROMPT.md` · Claude: `CLAUDE_CODE_HANDOFF.md` |
 | **Coder** | **`architect/CODER_PROMPT.md`** → § в шапке · **не** архив |
 | **Mechanic** | `docs/problems/` → § «Зоны» |
 | **Designer** | `design/DESIGNER_PROMPT.md` § **→ Сейчас** → `docs/design/wp/` |

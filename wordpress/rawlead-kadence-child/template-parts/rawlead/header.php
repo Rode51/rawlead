@@ -129,6 +129,7 @@ $ops = home_url('/ops/');
 			</a>
 			<?php endif; ?>
 			<a href="<?php echo esc_url($cabinet); ?>" class="rl-btn rl-nav-drawer__cta js-nav-drawer-login"><?php esc_html_e('Войти →', 'rawlead-kadence-child'); ?></a>
+			<button type="button" class="rl-btn rl-btn--ghost rl-nav-drawer__logout js-nav-drawer-logout" hidden><?php esc_html_e('Выйти', 'rawlead-kadence-child'); ?></button>
 		</nav>
 	</div>
 </header>
@@ -217,39 +218,78 @@ $ops = home_url('/ops/');
 		});
 	}
 
+	function clearQuizLocalKeys() {
+		try {
+			localStorage.removeItem("rawlead_quiz_session");
+			localStorage.removeItem("rawlead_quiz_completed_v1");
+			localStorage.removeItem("rawlead_quiz_restore_import_v1");
+			sessionStorage.removeItem("rawlead_quiz_restore_import_v1");
+			sessionStorage.removeItem("rawlead_quiz_retake");
+		} catch (e) {
+			/* private mode */
+		}
+	}
+
 	function applyHeaderMeta() {
 		var loginEl = document.querySelector(".js-header-login");
 		var userEl = document.querySelector(".js-header-user");
 		var drawerLoginEl = document.querySelector(".js-nav-drawer-login");
+		var drawerLogoutEl = document.querySelector(".js-nav-drawer-logout");
 		var avatarEl = document.querySelector(".js-header-avatar");
 		var nameEl = document.querySelector(".js-header-username");
-		if (!loginEl || !userEl) {
-			return;
-		}
 		var token = getToken();
-		if (!token) {
-			loginEl.hidden = false;
-			userEl.hidden = true;
-			syncAdminLinks(false);
-			if (drawerLoginEl) {
-				drawerLoginEl.hidden = false;
-			}
-			if (avatarEl) {
+		var loggedIn = !!token;
+
+		if (loginEl && userEl) {
+			loginEl.hidden = loggedIn;
+			userEl.hidden = !loggedIn;
+			if (!loggedIn && avatarEl) {
 				avatarEl.removeAttribute("src");
 			}
+		}
+
+		if (drawerLoginEl) {
+			drawerLoginEl.hidden = loggedIn;
+		}
+		if (drawerLogoutEl) {
+			drawerLogoutEl.hidden = !loggedIn;
+		}
+
+		if (!loggedIn) {
+			syncAdminLinks(false);
 			return;
 		}
-		loginEl.hidden = true;
-		userEl.hidden = false;
-		if (drawerLoginEl) {
-			drawerLoginEl.hidden = true;
-		}
+
 		var meta = readMeta();
 		syncAdminLinks(!!(meta && meta.can_ops_admin));
 		setHeaderAvatar(avatarEl, meta);
 		if (nameEl && meta) {
 			var username = (meta.username || "").trim();
 			nameEl.textContent = username ? "@" + username : meta.display || "Telegram";
+		}
+	}
+
+	function drawerLogout() {
+		try {
+			localStorage.removeItem(TOKEN_KEY);
+			localStorage.removeItem(META_KEY);
+			document.cookie = "rl_access=; path=/; max-age=0; SameSite=Lax";
+		} catch (e) {
+			/* private mode */
+		}
+		clearQuizLocalKeys();
+		if (typeof window.rawleadClearQuizLocalKeys === "function") {
+			window.rawleadClearQuizLocalKeys();
+		}
+		try {
+			window.dispatchEvent(new Event("rawlead-auth-changed"));
+		} catch (e) {
+			/* IE11 */
+		}
+		applyHeaderMeta();
+		closeNav();
+		if (document.querySelector("[data-rl-app=\"cabinet\"]")) {
+			window.location.reload();
 		}
 	}
 
@@ -341,6 +381,11 @@ $ops = home_url('/ops/');
 		if (!document.body.classList.contains("rl-feed-sheet-open") && !document.body.classList.contains("rl-skill-tree-open")) {
 			document.body.style.overflow = "";
 		}
+	}
+
+	var drawerLogoutBtn = document.querySelector(".js-nav-drawer-logout");
+	if (drawerLogoutBtn) {
+		drawerLogoutBtn.addEventListener("click", drawerLogout);
 	}
 
 	if (burger) {

@@ -69,6 +69,33 @@ cd C:\Users\hramo\uisness
 
 ---
 
+## Monica (O218 j5 · tier smoke trial path)
+
+**TG test persona** — не Telethon acc1. Сейчас на prod (**Neon 2026-06-17**):
+
+| Поле | Значение |
+|------|----------|
+| `tg_user_id` | `8688264540` |
+| `user_id` (uuid) | `8d5afb3d-e8bd-4970-a33d-21c3ddeafdef` |
+| TG username | `@RawLead` (display RawLead) |
+| `plan` | **agent** (premium) · `active_until` **2026-07-15** |
+| Quiz tags | **27** в Neon |
+
+**O218 j5:** Monica **как есть** — premium даёт реальный % на карточках (то же, что trial для UI). **Wipe не нужен.**
+
+**JWT для headless Playwright (j5):**
+
+```powershell
+cd C:\Users\hramo\uisness
+.venv\Scripts\python.exe scripts\grant_premium_local.py --username RawLead --plan agent --days 30
+```
+
+Токен → `data/_local_premium_token.txt` · Coder кладёт в `.env.site` как `RAWLEAD_MONICA_TOKEN` (не путать с acc1 `RAWLEAD_PREPROD_ACCESS_TOKEN`).
+
+**Полный wipe** (удалить user/tags/sub) — только если нужен сценарий **первого входа → auto trial 3 дня** (`FOR_YOU.md` tier smoke §2), не для O218.
+
+---
+
 ## Dolphin Anty / CDP
 
 | Env | Default |

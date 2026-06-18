@@ -1,0 +1,278 @@
+{
+  "generated_at": "2026-06-08T13:33:49.546034+00:00",
+  "base_url": "https://rawlead.ru",
+  "api_url": "https://api.rawlead.ru",
+  "mode": "quick",
+  "tier_plan_check": {
+    "pass": false,
+    "issues": [
+      {
+        "tier": "free",
+        "error": "plan_mismatch",
+        "expected_plan": "free",
+        "actual_plan": "agent",
+        "source": "env:RAWLEAD_PREPROD_FREE_TOKEN"
+      },
+      {
+        "tier": "trial",
+        "error": "no_token",
+        "expected_plan": "trial",
+        "source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN"
+      }
+    ]
+  },
+  "tiers": {
+    "anon": {
+      "source": "none",
+      "ok": true
+    },
+    "free": {
+      "source": "env:RAWLEAD_PREPROD_FREE_TOKEN",
+      "ok": false,
+      "plan_mismatch": {
+        "expected": "free",
+        "actual": "agent"
+      }
+    },
+    "trial": {
+      "source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN",
+      "ok": false
+    },
+    "premium": {
+      "source": "env:RAWLEAD_PREPROD_ACCESS_TOKEN",
+      "ok": true
+    }
+  },
+  "tier_matrix": {
+    "rows": [
+      {
+        "tier": "anon",
+        "feed_status": 200,
+        "feed_ms": 1420.6,
+        "items": 5,
+        "token_source": "none",
+        "subscription_status": null,
+        "plan": null,
+        "expected_plan": null,
+        "plan_ok": true,
+        "error": null,
+        "pass": true
+      },
+      {
+        "tier": "free",
+        "feed_status": 200,
+        "feed_ms": 1675.8,
+        "items": 5,
+        "token_source": "env:RAWLEAD_PREPROD_FREE_TOKEN",
+        "subscription_status": "active",
+        "plan": "agent",
+        "expected_plan": "free",
+        "plan_ok": false,
+        "error": {
+          "expected": "free",
+          "actual": "agent"
+        },
+        "pass": false
+      },
+      {
+        "tier": "trial",
+        "feed_status": 200,
+        "feed_ms": 1453.4,
+        "items": 5,
+        "token_source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN",
+        "subscription_status": null,
+        "plan": null,
+        "expected_plan": "trial",
+        "plan_ok": false,
+        "error": "tier_not_ready",
+        "pass": false
+      },
+      {
+        "tier": "premium",
+        "feed_status": 200,
+        "feed_ms": 1599.7,
+        "items": 5,
+        "token_source": "env:RAWLEAD_PREPROD_ACCESS_TOKEN",
+        "subscription_status": "active",
+        "plan": "agent",
+        "expected_plan": "agent",
+        "plan_ok": true,
+        "error": null,
+        "pass": true
+      }
+    ],
+    "pass": false
+  },
+  "load": {
+    "generated_at": "2026-06-08T13:37:08.355939+00:00",
+    "api_url": "https://api.rawlead.ru",
+    "mode": "ramp",
+    "stages": [
+      {
+        "generated_at": "2026-06-08T13:34:34.200120+00:00",
+        "api_url": "https://api.rawlead.ru",
+        "workers": 10,
+        "duration_sec": 30,
+        "requests_total": 259,
+        "feed_requests": 89,
+        "errors_count": 0,
+        "error_rate": 0.0,
+        "p50_feed_ms": 1687.5,
+        "p95_feed_ms": 1831.9,
+        "p99_feed_ms": 1915.4,
+        "p50_all_ms": 1409.0,
+        "p95_all_ms": 1754.0,
+        "s3_pass": true,
+        "sample_errors": []
+      },
+      {
+        "generated_at": "2026-06-08T13:35:35.864079+00:00",
+        "api_url": "https://api.rawlead.ru",
+        "workers": 30,
+        "duration_sec": 60,
+        "requests_total": 1435,
+        "feed_requests": 481,
+        "errors_count": 0,
+        "error_rate": 0.0,
+        "p50_feed_ms": 1755.2,
+        "p95_feed_ms": 2021.0,
+        "p99_feed_ms": 2187.9,
+        "p50_all_ms": 1473.7,
+        "p95_all_ms": 1942.0,
+        "s3_pass": false,
+        "sample_errors": []
+      },
+      {
+        "generated_at": "2026-06-08T13:37:08.354939+00:00",
+        "api_url": "https://api.rawlead.ru",
+        "workers": 50,
+        "duration_sec": 90,
+        "requests_total": 2933,
+        "feed_requests": 985,
+        "errors_count": 0,
+        "error_rate": 0.0,
+        "p50_feed_ms": 2038.1,
+        "p95_feed_ms": 2601.3,
+        "p99_feed_ms": 2890.9,
+        "p50_all_ms": 1718.4,
+        "p95_all_ms": 2390.2,
+        "s3_pass": false,
+        "sample_errors": []
+      }
+    ],
+    "workers_peak": 50,
+    "duration_total_sec": 180,
+    "requests_total": 4627,
+    "p95_feed_ms": 2601.3,
+    "p99_feed_ms": 2890.9,
+    "error_rate_max": 0.0,
+    "s3_pass": false,
+    "sample_errors": [],
+    "s3_pre_note": "Neon pooler recommended before 50 VU; see PREPROD_STRESS_RUN § S3-pre"
+  },
+  "draft_burst": {
+    "skipped": true,
+    "pass": true
+  },
+  "tz": {
+    "lead_ids": [
+      19396,
+      19332,
+      19331
+    ],
+    "rows": [
+      {
+        "lead_id": 19396,
+        "status": 200,
+        "tz_fetch_ms": 1498.5,
+        "body_chars": 11081,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      },
+      {
+        "lead_id": 19332,
+        "status": 200,
+        "tz_fetch_ms": 1513.2,
+        "body_chars": 11044,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      },
+      {
+        "lead_id": 19331,
+        "status": 200,
+        "tz_fetch_ms": 1694.7,
+        "body_chars": 11282,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      }
+    ],
+    "ok_extracted": 3,
+    "required_ok": 2,
+    "pass": true
+  },
+  "ux_journey": {
+    "skipped": true,
+    "pass": true
+  },
+  "skills_mismatch": {
+    "skipped": true,
+    "pass": true
+  },
+  "parser_snapshot": {
+    "health_lines": {
+      "fl": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-08 21:37:04 health:fl status=ok parsed=30 fresh=0 new=0 lag_p50=8m"
+      },
+      "kwork": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-08 21:37:04 health:kwork status=ok parsed=12 fresh=2 new=2 lag_p50=1m"
+      },
+      "youdo": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-08 21:37:04 health:youdo status=ok parsed=0 fresh=0 new=0"
+      },
+      "freelance_ru": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-08 21:37:04 health:freelance_ru status=ok parsed=24 fresh=24 new=0 lag_p50=4m"
+      },
+      "freelancejob": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-08 21:37:04 health:freelancejob status=ok parsed=40 fresh=40 new=0"
+      },
+      "pchyol": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-08 21:37:04 health:pchyol status=ok parsed=45 fresh=1 new=0"
+      }
+    },
+    "exchange_health": {},
+    "cascade_exhausted_hits": 0,
+    "cycle_sec_samples": [],
+    "runaway_cycle_count": 0,
+    "red_sources": [],
+    "pass": true,
+    "note": "См. PREPROD_STRESS_RUN § Parser — downloaded>0 ≠ сломан",
+    "log_source": "vps:/opt/rawlead/data/radar_site.log"
+  },
+  "pass_summary": {
+    "gates": {
+      "tier_matrix": false,
+      "load_p95_feed": false,
+      "draft_burst": "skipped",
+      "tz_leads": true,
+      "ux_journey": "skipped",
+      "parsers": true,
+      "skills_mismatch": "skipped"
+    },
+    "pass": false
+  }
+}

@@ -34,12 +34,24 @@ from exchange_browser_fetch import (  # noqa: E402
     invalidate_browser_slot,
     pick_browser_user_agent,
     reset_playwright_thread_for_tests,
+    _check_camoufox_playwright_compat,
+    _is_youdo_slot_retryable,
     youdo_browser_backend,
 )
+from html_fetch import HtmlFetchError  # noqa: E402
 
 
 def _html_ok() -> str:
     card = '<a data-id="99001" href="https://youdo.com/t99001">Task</a>'
+    return "<html><body>" + card + ("x" * 2000) + "</body></html>"
+
+
+def _fl_html_ok() -> str:
+    card = (
+        '<div class="b-page__lenta_item">'
+        '<a class="b-post__title" href="/projects/123/test.html">Title</a>'
+        "</div>"
+    )
     return "<html><body>" + card + ("x" * 2000) + "</body></html>"
 
 
@@ -126,7 +138,7 @@ class TestExchangeBrowserFetch(unittest.TestCase):
         mock_pw = MagicMock()
         mock_persistent = MagicMock()
         mock_page_fl = MagicMock()
-        mock_page_fl.content.return_value = _html_ok()
+        mock_page_fl.content.return_value = _fl_html_ok()
         mock_persistent.new_page.return_value = mock_page_fl
         mock_pw.chromium.launch_persistent_context.return_value = mock_persistent
 
@@ -198,6 +210,30 @@ class TestExchangeBrowserFetch(unittest.TestCase):
         with patch.dict("os.environ", {"YOUDO_BROWSER": "camoufox"}):
             self.assertEqual(youdo_browser_backend(), "camoufox")
 
+    def test_camoufox_playwright_compat_blocks_160(self) -> None:
+        fake_pw = MagicMock()
+        fake_pw.__version__ = "1.60.0"
+        with patch.dict("os.environ", {"YOUDO_BROWSER": "camoufox"}):
+            with patch.dict("sys.modules", {"playwright": fake_pw}):
+                with self.assertRaises(HtmlFetchError) as ctx:
+                    _check_camoufox_playwright_compat()
+        self.assertIn("1.60", str(ctx.exception))
+
+    def test_camoufox_playwright_compat_allows_158(self) -> None:
+        fake_pw = MagicMock()
+        fake_pw.__version__ = "1.58.0"
+        with patch.dict("os.environ", {"YOUDO_BROWSER": "camoufox"}):
+            with patch.dict("sys.modules", {"playwright": fake_pw}):
+                _check_camoufox_playwright_compat()
+
+    def test_youdo_slot_retryable_spa_shell(self) -> None:
+        exc = HtmlFetchError("SPA shell without task cards (youdo).")
+        self.assertTrue(_is_youdo_slot_retryable(exc))
+
+    def test_youdo_slot_retryable_connection_closed(self) -> None:
+        exc = HtmlFetchError("Browser.close: Connection closed while reading from the driver")
+        self.assertTrue(_is_youdo_slot_retryable(exc))
+
     def test_youdo_get_playwright_uses_playwright_for_camoufox(self) -> None:
         mock_inst = MagicMock()
         mock_sync = MagicMock(return_value=MagicMock(start=MagicMock(return_value=mock_inst)))
@@ -267,7 +303,7 @@ class TestExchangeBrowserFetch(unittest.TestCase):
         mock_pw = MagicMock()
         mock_persistent = MagicMock()
         mock_page = MagicMock()
-        mock_page.content.return_value = _html_ok()
+        mock_page.content.return_value = _fl_html_ok()
         mock_persistent.new_page.return_value = mock_page
         mock_pw.chromium.launch_persistent_context.return_value = mock_persistent
 
@@ -418,7 +454,7 @@ class TestExchangeBrowserFetch(unittest.TestCase):
             proc = MagicMock()
             proc.returncode = 0
             proc.stdout = json.dumps(
-                {"ok": True, "html": _html_ok(), "html_len": len(_html_ok())}
+                {"ok": True, "html": _fl_html_ok(), "html_len": len(_fl_html_ok())}
             )
             proc.stderr = ""
             return proc
@@ -438,7 +474,7 @@ class TestExchangeBrowserFetch(unittest.TestCase):
         with patch.dict("os.environ", {"FL_LISTING_SUBPROCESS": "1"}):
             html = run_fl()
 
-        self.assertEqual(html, _html_ok())
+        self.assertEqual(html, _fl_html_ok())
         self.assertTrue(all(pw_threads))
         self.assertTrue(worker_calls)
         self.assertIn("fl_fetch_worker.py", worker_calls[0][1])

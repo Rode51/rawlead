@@ -6,6 +6,65 @@
 
 ---
 
+# Перенесено из hot **2026-06-16** — doc hygiene trim
+
+Hot `CODER_PROMPT.md` сжат до ≤120 строк. Полные § O250/O250b/O250c/O250d/O253/O251 остаются ниже в этом архиве (grep по § id). Prod snapshot → [`PROD_FACTS.md`](../common/PROD_FACTS.md).
+
+---
+
+# Перенесено из hot **2026-06-15** — O226-QUIZ-RETAKE-SYNC ✅
+
+Retake → import → `bumpTagsSyncRev` + `refreshTagsAfterQuiz` (loadTags) · cabinet mirror · import error visible · theme **1.19.05**.
+
+---
+
+# Перенесено из hot **2026-06-15** — O225-MATCH-FLOORS-V2 ✅
+
+Primary niche floor **20%** · secondary **10%** · import weights 2.0/1.0 · trial lock fix · `reRenderMatchBlocks` · pytest 13/13 · deploy API+theme **2026-06-15**.
+
+---
+
+# Перенесено из hot **2026-06-15** — O224-THEME-BUMP ✅
+
+`functions.php` `RAWLEAD_CHILD_VERSION` **1.19.04** · theme deploy · cache bust aligned with `style.css`.
+
+---
+
+# Перенесено из hot **2026-06-15** — O224-MATCH-UX ✅ code
+
+`compatibility_match()` category floor **20%** · `GET /v1/me/tags` → `weights` · quiz import `niches[]` · neutral chips by weight · gradient bar red→green · gold 100% + black outline · no «ИДЕАЛЬНО» on cards · theme **1.19.04** · pytest `test_o224_compatibility` 6/6 · **deploy API + theme pending**.
+
+---
+
+# Перенесено из hot **2026-06-15** — O222-FL-HARD-RESET ✅
+
+`fl_hard_reset()` on first FL ban · `FL_SLOT_RETRY_MAX=1` · `FL_ROTATE_UA=1` · pytest `test_fl_hard_reset` 5/5 · deploy `deploy-o222-fl-hard-reset-vps.py` · VPS 8+× `parsed=30` DC. Runtime `hard_reset` log — pending first ban.
+
+---
+
+# Перенесено из hot **2026-06-15** — O223-YOUDO-L1-GUARD ✅
+
+`is_physical_service_job` · pre-L1 + post-L1 sanity · YouDo `detail:short` skip · pytest 9/9 · deploy `deploy-o223-youdo-guard-vps.py` · delist Neon **#25128** (`o223_non_digital`).
+
+---
+
+# Перенесено из hot **2026-06-15** — O221-QUIZ-ADAPTIVE ✅
+
+## § O221-QUIZ-ADAPTIVE — v2 full pack + coverage CI
+
+**Lead verify + deploy 2026-06-15:** b1–b4 closed.
+
+| Deliverable | Result |
+|-------------|--------|
+| `_QUIZ_CARD_PACKS` | v1 + v2 · **186** unique ids |
+| `QUIZ_SIGNALS` | **45** signals (r8 list) |
+| `tests/test_quiz_coverage.py` | Tier-A ≥2 anchor · P0 reachable · v2 signals in QUIZ_SIGNALS |
+| VPS | `deploy-o217-quiz-vps.py` DEPLOY OK · merged=186 · dedup strings |
+
+**pytest:** coverage + o217 + o197 — **64/64**
+
+---
+
 # Перенесено из hot **2026-06-14** — O220-MATCH-CODE (reopened)
 
 ## § O220-MATCH-CODE ✅ Lead verify + deploy 2026-06-14

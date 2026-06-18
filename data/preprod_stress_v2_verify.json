@@ -1,0 +1,398 @@
+{
+  "generated_at": "2026-06-07T14:04:44.447388+00:00",
+  "base_url": "https://rawlead.ru",
+  "api_url": "https://api.rawlead.ru",
+  "mode": "quick",
+  "tiers": {
+    "anon": {
+      "source": "none",
+      "ok": true
+    },
+    "free": {
+      "source": "env:RAWLEAD_PREPROD_FREE_TOKEN",
+      "ok": true
+    },
+    "trial": {
+      "source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN",
+      "ok": false
+    },
+    "premium": {
+      "source": "env:RAWLEAD_PREPROD_ACCESS_TOKEN",
+      "ok": true
+    }
+  },
+  "tier_matrix": {
+    "rows": [
+      {
+        "tier": "anon",
+        "feed_status": 200,
+        "feed_ms": 1481.3,
+        "items": 5,
+        "token_source": "none",
+        "subscription_status": null,
+        "plan": null,
+        "error": null,
+        "pass": true
+      },
+      {
+        "tier": "free",
+        "feed_status": 200,
+        "feed_ms": 2808.1,
+        "items": 5,
+        "token_source": "env:RAWLEAD_PREPROD_FREE_TOKEN",
+        "subscription_status": "active",
+        "plan": "agent",
+        "error": null,
+        "pass": true
+      },
+      {
+        "tier": "trial",
+        "feed_status": 200,
+        "feed_ms": 1459.0,
+        "items": 5,
+        "token_source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN",
+        "subscription_status": null,
+        "plan": null,
+        "error": null,
+        "pass": true
+      },
+      {
+        "tier": "premium",
+        "feed_status": 200,
+        "feed_ms": 2941.0,
+        "items": 5,
+        "token_source": "env:RAWLEAD_PREPROD_ACCESS_TOKEN",
+        "subscription_status": "active",
+        "plan": "agent",
+        "error": null,
+        "pass": true
+      }
+    ],
+    "pass": true
+  },
+  "load": {
+    "generated_at": "2026-06-07T14:08:01.944108+00:00",
+    "api_url": "https://api.rawlead.ru",
+    "mode": "ramp",
+    "stages": [
+      {
+        "generated_at": "2026-06-07T14:05:28.512444+00:00",
+        "api_url": "https://api.rawlead.ru",
+        "workers": 10,
+        "duration_sec": 30,
+        "requests_total": 247,
+        "feed_requests": 83,
+        "errors_count": 0,
+        "error_rate": 0.0,
+        "p50_feed_ms": 1841.1,
+        "p95_feed_ms": 2062.7,
+        "p99_feed_ms": 2127.1,
+        "p50_all_ms": 1410.0,
+        "p95_all_ms": 1947.1,
+        "s3_pass": false,
+        "sample_errors": []
+      },
+      {
+        "generated_at": "2026-06-07T14:06:30.037664+00:00",
+        "api_url": "https://api.rawlead.ru",
+        "workers": 30,
+        "duration_sec": 60,
+        "requests_total": 1167,
+        "feed_requests": 396,
+        "errors_count": 0,
+        "error_rate": 0.0,
+        "p50_feed_ms": 2330.1,
+        "p95_feed_ms": 2867.5,
+        "p99_feed_ms": 3071.6,
+        "p50_all_ms": 1628.5,
+        "p95_all_ms": 2700.0,
+        "s3_pass": false,
+        "sample_errors": []
+      },
+      {
+        "generated_at": "2026-06-07T14:08:01.942107+00:00",
+        "api_url": "https://api.rawlead.ru",
+        "workers": 50,
+        "duration_sec": 90,
+        "requests_total": 2553,
+        "feed_requests": 849,
+        "errors_count": 0,
+        "error_rate": 0.0,
+        "p50_feed_ms": 2442.8,
+        "p95_feed_ms": 3329.4,
+        "p99_feed_ms": 3505.0,
+        "p50_all_ms": 1868.3,
+        "p95_all_ms": 2813.9,
+        "s3_pass": false,
+        "sample_errors": []
+      }
+    ],
+    "workers_peak": 50,
+    "duration_total_sec": 180,
+    "requests_total": 3967,
+    "p95_feed_ms": 3329.4,
+    "p99_feed_ms": 3505.0,
+    "error_rate_max": 0.0,
+    "s3_pass": false,
+    "sample_errors": [],
+    "s3_pre_note": "Neon pooler recommended before 50 VU; see PREPROD_STRESS_RUN § S3-pre"
+  },
+  "draft_burst": {
+    "generated_at": "2026-06-07T14:10:07.445894+00:00",
+    "api_url": "https://api.rawlead.ru",
+    "max_leads": 5,
+    "concurrency": 3,
+    "attempted": 5,
+    "ready": 4,
+    "server_errors": 0,
+    "rate_limits": 0,
+    "error_rate_5xx": 0.0,
+    "p95_draft_ms": 106375.2,
+    "timings_agg": {
+      "feed": {
+        "p50_ms": 3205.0,
+        "p95_ms": 3361.4
+      },
+      "expand": {
+        "p50_ms": 1361.3,
+        "p95_ms": 1374.5
+      },
+      "tools": {
+        "p50_ms": 13998.7,
+        "p95_ms": 16398.4
+      },
+      "draft_wait": {
+        "p50_ms": 46852.6,
+        "p95_ms": 86461.9
+      },
+      "total": {
+        "p50_ms": 57835.8,
+        "p95_ms": 106375.2
+      }
+    },
+    "note_l2_l3": "shared_l2/l3 not split at API — see draft_wait_ms",
+    "pass": false,
+    "rows": [
+      {
+        "lead_id": 18183,
+        "http_status": 202,
+        "draft_status": "ready",
+        "error": null,
+        "reply_len": 299,
+        "tools_count": 3,
+        "rate_limited": false,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 3361.4,
+          "expand_ms": 1343.0,
+          "tools_ms": 13998.7,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 39996.4,
+          "total_ms": 50304.4
+        }
+      },
+      {
+        "lead_id": 18185,
+        "http_status": 202,
+        "draft_status": "ready",
+        "error": null,
+        "reply_len": 294,
+        "tools_count": 2,
+        "rate_limited": false,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 3205.0,
+          "expand_ms": 1374.5,
+          "tools_ms": 16398.4,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 46852.6,
+          "total_ms": 57835.8
+        }
+      },
+      {
+        "lead_id": 18180,
+        "http_status": 202,
+        "draft_status": "timeout",
+        "error": null,
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": false,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 3343.6,
+          "expand_ms": 1361.3,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 86461.9,
+          "total_ms": 106375.2
+        }
+      },
+      {
+        "lead_id": 18177,
+        "http_status": 202,
+        "draft_status": "ready",
+        "error": null,
+        "reply_len": 249,
+        "tools_count": 2,
+        "rate_limited": false,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 2892.0,
+          "expand_ms": 1342.8,
+          "tools_ms": 15790.5,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 45115.7,
+          "total_ms": 55754.5
+        }
+      },
+      {
+        "lead_id": 18178,
+        "http_status": 202,
+        "draft_status": "ready",
+        "error": null,
+        "reply_len": 386,
+        "tools_count": 0,
+        "rate_limited": false,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 2948.6,
+          "expand_ms": 1368.6,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 60734.4,
+          "total_ms": 72256.1
+        }
+      }
+    ]
+  },
+  "tz": {
+    "lead_ids": [
+      18103,
+      18102,
+      17999
+    ],
+    "rows": [
+      {
+        "lead_id": 18103,
+        "status": 200,
+        "tz_fetch_ms": 1529.2,
+        "body_chars": 11171,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      },
+      {
+        "lead_id": 18102,
+        "status": 200,
+        "tz_fetch_ms": 1526.4,
+        "body_chars": 11113,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      },
+      {
+        "lead_id": 17999,
+        "status": 200,
+        "tz_fetch_ms": 1667.3,
+        "body_chars": 11121,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      }
+    ],
+    "ok_extracted": 3,
+    "required_ok": 2,
+    "pass": true
+  },
+  "ux_journey": {
+    "skipped": true,
+    "pass": true
+  },
+  "skills_mismatch": {
+    "cmd": [
+      "C:\\Users\\hramo\\uisness\\.venv\\Scripts\\python.exe",
+      "C:\\Users\\hramo\\uisness\\scripts\\preprod_ai_matrix.py",
+      "--profile",
+      "site",
+      "--scenario",
+      "skills_mismatch",
+      "--output",
+      "C:\\Users\\hramo\\uisness\\data\\preprod_skills_mismatch.json"
+    ],
+    "exit_code": 1,
+    "duration_sec": 6.1,
+    "stdout_tail": "{\n  \"scenario\": \"skills_mismatch\",\n  \"pass\": false,\n  \"lead_id\": 18196,\n  \"error\": \"not_found\",\n  \"summary\": {\n    \"pass\": false,\n    \"errors\": [\n      \"not_found\"\n    ]\n  }\n}\n",
+    "stderr_tail": "",
+    "pass": false,
+    "summary": {
+      "pass": false,
+      "errors": [
+        "not_found"
+      ]
+    },
+    "artifact": "C:\\Users\\hramo\\uisness\\data\\preprod_skills_mismatch.json"
+  },
+  "parser_snapshot": {
+    "health_lines": {
+      "fl": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-07 22:08:27 health:fl status=ok downloaded=90 new=0"
+      },
+      "kwork": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-07 22:08:27 health:kwork status=ok downloaded=12 new=0"
+      },
+      "youdo": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-07 22:08:27 health:youdo status=ok downloaded=50 new=12"
+      },
+      "freelance_ru": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-07 22:08:27 health:freelance_ru status=ok downloaded=24 new=1"
+      },
+      "freelancejob": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-07 22:08:27 health:freelancejob status=ok downloaded=40 new=0"
+      },
+      "pchyol": {
+        "status": "ok",
+        "kind": "",
+        "line": "2026-06-07 22:08:27 health:pchyol status=ok downloaded=1 new=0"
+      }
+    },
+    "exchange_health": {},
+    "cascade_exhausted_hits": 0,
+    "cycle_sec_samples": [],
+    "runaway_cycle_count": 0,
+    "red_sources": [],
+    "pass": true,
+    "note": "См. PREPROD_STRESS_RUN § Parser — downloaded>0 ≠ сломан",
+    "log_source": "vps:/opt/rawlead/data/radar_site.log"
+  },
+  "pass_summary": {
+    "gates": {
+      "load_p95_feed": false,
+      "draft_burst": false,
+      "tz_leads": true,
+      "ux_journey": true,
+      "parsers": true,
+      "skills_mismatch": false
+    },
+    "pass": false
+  }
+}

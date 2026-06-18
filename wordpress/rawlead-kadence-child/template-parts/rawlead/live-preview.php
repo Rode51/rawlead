@@ -38,9 +38,7 @@ function rawlead_render_demo_preview_card(array $card, string $lenta_url): void 
 		$chips .= '<span class="rl-chip rl-chip--more">+' . (int) $extra . '</span>';
 	}
 
-	$perfect_badge = $perfect
-		? '<span class="rl-badge rl-badge--perfect">ИДЕАЛЬНО ✦</span>'
-		: '';
+	$perfect_badge = '';
 	$niche = (string) ($card['category'] ?? '');
 	$niche_icons = [
 		'dev'       => '</>',
@@ -62,16 +60,14 @@ function rawlead_render_demo_preview_card(array $card, string $lenta_url): void 
 		</div>
 		<h3 class="rl-lead-card__title"><?php echo esc_html($title); ?></h3>
 		<p class="rl-lead-card__budget"><?php esc_html_e('Бюджет: —', 'rawlead-kadence-child'); ?></p>
-		<div class="rl-match">
-			<div class="rl-match__label">
-				<span><?php echo esc_html(sprintf('Совместимость %d%%', $pct)); ?></span>
-			</div>
+		<div class="rl-match rl-match-bar">
 			<div
 				class="rl-match__bar"
 				role="progressbar"
 				aria-valuenow="<?php echo (int) $pct; ?>"
 				aria-valuemin="0"
 				aria-valuemax="100"
+				aria-label="<?php echo esc_attr(sprintf('Совместимость %d%%', $pct)); ?>"
 			>
 				<span class="rl-match__fill" style="--match-value:<?php echo (int) $pct; ?>%"></span>
 			</div>

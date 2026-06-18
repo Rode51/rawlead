@@ -8,11 +8,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from wp_install_rawlead_theme import LOCAL_SITE, _ensure_db_host, wp_cli
+
 ROOT = Path(__file__).resolve().parent.parent
 THEME_SRC = (ROOT / "wordpress" / "rawlead-kadence-child").resolve()
-LOCAL_SITE = Path.home() / "Local Sites" / "radarzakaz" / "app" / "public"
 THEME_DEST = LOCAL_SITE / "wp-content" / "themes" / "rawlead-kadence-child"
 CHILD_SLUG = "rawlead-kadence-child"
+QUIZ_SLUG = "quiz"
+QUIZ_TEMPLATE = "page-quiz.php"
 
 
 def _is_junction(path: Path) -> bool:
@@ -95,9 +98,100 @@ def link_theme(*, force: bool = False) -> int:
     return 0
 
 
+def ensure_quiz_page() -> int:
+    """Idempotent /quiz page with page-quiz.php (Local WP-CLI)."""
+    if not LOCAL_SITE.is_dir():
+        print(f"FAIL: Local site missing: {LOCAL_SITE}")
+        print("Start Local -> radarzakaz -> Start")
+        return 1
+
+    _ensure_db_host()
+    probe = wp_cli("option", "get", "siteurl")
+    if probe.returncode != 0:
+        print("FAIL: Local MySQL unavailable. Start radarzakaz in Local app.")
+        return 1
+
+    listed = wp_cli(
+        "post",
+        "list",
+        "--post_type=page",
+        f"--name={QUIZ_SLUG}",
+        "--field=ID",
+        "--format=ids",
+    )
+    page_id = (listed.stdout or "").strip() if listed.returncode == 0 else ""
+
+    if not page_id:
+        created = wp_cli(
+            "post",
+            "create",
+            "--post_type=page",
+            "--post_title=Quiz",
+            f"--post_name={QUIZ_SLUG}",
+            "--post_status=publish",
+            "--porcelain",
+        )
+        if created.returncode != 0:
+            print("FAIL: wp post create quiz")
+            print((created.stderr or created.stdout or "").strip())
+            return 1
+        page_id = (created.stdout or "").strip()
+        print(f"Created page {QUIZ_SLUG} id={page_id}")
+    else:
+        print(f"Page {QUIZ_SLUG} already exists id={page_id}")
+
+    meta = wp_cli("post", "meta", "get", page_id, "_wp_page_template")
+    current = (meta.stdout or "").strip() if meta.returncode == 0 else ""
+    if current != QUIZ_TEMPLATE:
+        updated = wp_cli(
+            "post",
+            "meta",
+            "update",
+            page_id,
+            "_wp_page_template",
+            QUIZ_TEMPLATE,
+        )
+        if updated.returncode != 0:
+            print("FAIL: wp post meta update _wp_page_template")
+            print((updated.stderr or updated.stdout or "").strip())
+            return 1
+        print(f"Set template {QUIZ_TEMPLATE}")
+    else:
+        print(f"Template already {QUIZ_TEMPLATE}")
+
+    site = wp_cli("option", "get", "siteurl")
+    base = (site.stdout or "").strip() if site.returncode == 0 else "http://radarzakaz.local"
+    url = f"{base.rstrip('/')}/{QUIZ_SLUG}/"
+    print(f"OK: quiz page id={page_id} url={url}")
+    return 0
+
+
+def _print_help() -> None:
+    print(
+        """usage: wp_link_theme_local.py [--force] [--ensure-pages]
+
+  Junction repo theme -> Local WP (radarzakaz).
+
+  --force         Replace existing theme dir with junction.
+  --ensure-pages  Create /quiz page with page-quiz.php (idempotent, WP-CLI).
+"""
+    )
+
+
 def main() -> int:
+    if "-h" in sys.argv or "--help" in sys.argv:
+        _print_help()
+        return 0
+
     force = "--force" in sys.argv
-    return link_theme(force=force)
+    ensure_pages = "--ensure-pages" in sys.argv
+
+    rc = link_theme(force=force)
+    if ensure_pages:
+        page_rc = ensure_quiz_page()
+        if page_rc != 0:
+            return page_rc
+    return rc
 
 
 if __name__ == "__main__":

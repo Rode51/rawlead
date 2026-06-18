@@ -1,10 +1,13 @@
 # Lead Designer — активный план
 
-**Обновлено:** 2026-06-07 · **Регламент:** [`LEAD_DESIGN.md`](LEAD_DESIGN.md) — **кто какой файл читает**
+**Обновлено:** 2026-06-14 · **Регламент:** [`LEAD_DESIGN.md`](LEAD_DESIGN.md) — **кто какой файл читает**
 
 | | |
 |--|--|
-| **→ Сейчас** | § **O174-D** — pricing + cabinet pay (YooKassa-only wire, до Coder O174b) |
+| **→ Сейчас** | **волна 3 Perf** — scope lenta/home/quiz load (после O209) |
+| **O209** | ✅ **delivered** 2026-06-14 · theme **1.18.84** · spec [`wave-o209-match-brief.md`](../../design/wp/wave-o209-match-brief.md) |
+| **O174-D** | pricing + cabinet pay (YooKassa wire) |
+| **O171-D** | ✅ `/ops/` Сводка + TG · **Lead verify Coder 2026-06-13** |
 | **O127-D** | ✅ Filter Bar v2 + Lead Card v3 · **2026-06-07** → **@coder O127-WP** |
 | **O121-D** | ✅ wireframes `/ops/` прокси + IA · **2026-06-05** → **@lead-architect** → Coder **O121-w1** |
 | **O116-D** | ✅ Lead Design 2026-06-04 |
@@ -16,7 +19,508 @@
 | **O105-D** | **✅ Lead verify 2026-06-03 · → @coder** (CODER_PROMPT § O105-WP · O106) |
 | **Vision** | [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.12** |
 
-**Gate:** O174-D → O174-COPY approve → Coder O174b · owner YooKassa keys.
+**Gate:** волна 1 TG (t2b+O207) → **O209** единый Design (UX+copy) → @coder · O174-D параллельно.
+
+---
+
+## § O209-MATCH-EXPERIENCE — Match-first UX+copy (**✅ delivered · Lead verify 2026-06-14**)
+
+**Owner:** match-модель в **текстах и логике** · **UI в целом оставить** — «всё хорошо», **кроме `/quiz/`** → там **переделать абсолютно всё**. Не ломать то, что уже работает.
+
+**Канон продуктовый (freeze):** `OWNER_INTENT` § **O208-B** · tier matrix · match-лексикон (без Tinder/дейтинг в UI).
+
+### ⚠️ Guard — не переломать UI (owner 2026-06-14)
+
+| Уровень | Страницы | Что делать |
+|---------|----------|------------|
+| **P0 FULL REBUILD** | **`/quiz/` только** | Новый layout · flow · карточки · progress · finale · mobile+desktop wireframes с нуля |
+| **P1 COPY + DELTA** | `/lenta/` · `/cabinet/` · `/` · `/pricing/` · `/faq/` · `/how/` | **Сохранить** текущую структуру/компоненты (`REFERENCE.md` v5 · feed-cabinet-mvp) · правки: **строки** · match-месседж · tier banners · убрать views/slots на карточке · усилить % match · **не** переделывать grid/nav/карточку с нуля |
+| **P2 OPTIONAL** | perf scope | Только если не трогает P1 layout |
+
+**Запрещено без явного слова владельца:** новый home hero с другой IA · другой filter bar · смена cabinet inbox grid · «редизайн ради редизайна».
+
+**Канон визуала:** [`docs/design/wp/REFERENCE.md`](../../design/wp/REFERENCE.md) · [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) — **baseline, не выбрасывать**.
+
+### Позиционирование (лексикон)
+
+| Использовать | Не использовать |
+|--------------|-----------------|
+| **совпадение** · **match** · **% под твой стек** | Tinder · тиндер · дейтинг (в customer copy) |
+| **профиль из квиза** · **система учится** | «Добавь навыки» · ручной picker |
+| **заказы под тебя** · **персональная лента** | «все фрилансеры» · аукцион · толпа |
+
+**Hero metric на карточке ленты:** **% совпадения** (усилить визуально, не менять каркас карточки).
+
+### Scope по URL
+
+| Surface | Depth |
+|---------|-------|
+| **`/quiz/`** | **P0** — полный rebuild UX+copy |
+| **`/lenta/`** | P1 — copy · promo quiz block · tier strips · card minimal (no views/slots) · expired banner |
+| **`/cabinet/`** | P1 — copy · trial badge · paywall · убрать manual skills в UI |
+| **`/` · pricing · faq · how** | P1 — copy под match · tier 30м/5h/trial |
+| **Errors / empty** | P1 — новые строки под flat feed / no match |
+
+**Наследует:** § O199-QUIZ-UX (только P0 quiz) · § O208-CARD-MINIMAL (P1 lenta deltas).
+
+### Deliverables
+
+1. **[`wave-o209-match-brief.md`](../../design/wp/wave-o209-match-brief.md)** ✅ Lead Designer 2026-06-14 · **Coder shipped 1.18.84** — quiz wireframes · P1 deltas · tier paywall
+2. **`feed-cabinet-mvp.md`** — § O209 supplement (quiz + tier states) ✅ 2026-06-14 · baseline structure **не менялся**
+
+### Handoff
+
+`@lead-designer` ✅ → `@designer` (review wire quiz + tier chips) → `@lead-architect` → `CODER_PROMPT` § O209 → `@coder`
+
+---
+
+## § O199-QUIZ-UX — Quiz page + promo + cards (**⏹ superseded O209 · 2026-06-14**)
+
+**Owner:** квиз неудобный · на карточке не видна **суть задания** · promo на ленте — «одна строка», не заметно · **весь сайт** хочет оптимизировать (волна после quiz).
+
+**Design deliverables (mobile 390 + desktop):**
+- [ ] **`/quiz/` rebuild** — layout, swipe affordance, progress, profile finale (wireframe + CSS delta spec)
+- [ ] **Expanded quiz card** — title + ** excerpt/description** (2–4 строки сути) + tags · не только заголовок
+- [ ] **Feed promo block** — заметный banner/card (не text link) → `/quiz/` · copy from PM § O199
+- [ ] **Feed card (lenta)** — collapsed vs expanded: когда показывать description (align feed-cabinet-mvp)
+- [ ] **Site optimization pass** — scope doc: `/lenta/` · `/quiz/` · home · priority list (не весь WP за раз)
+
+**Wait:** PM § O199-ONBOARD-COPY для финальных строк · Coder P0 feed fix первым
+
+**Out of scope:** `/ops/` · cabinet pay O174
+
+---
+
+## § O208-CARD-MINIMAL — Лента без шума (**⏹ superseded O209 · 2026-06-14**)
+
+**Канон:** `OWNER_INTENT` § **O208-B** · O106 · supersede O25 на preview.
+
+**Убрать с feed card (collapsed + meta row):**
+- [ ] Блок **просмотров** (eye icon · `rl-feed-card__views` · synthetic ~30 online)
+- [ ] **Счётчик откликов/слотов** («осталось N из K» · synthetic replies если есть)
+- [ ] Любой copy про «N фрилансеров» / конкуренцию на карточке
+
+**Оставить на preview:**
+- [ ] Источник · title · excerpt/суть (O199) · бюджет · **% match** · время · CTA
+- [ ] Glow/полоска при генерации черновика (O203) — **оставить**
+
+**Expanded card:** навыки · L2 tools (auth) · черновик tray — по tap, без дубля meta-счётчиков.
+
+**Paywall states (PM freeze O208-B4):**
+- [ ] Wireframe: trial active (badge «Trial · N дн.») · **expired-trial banner** (обязателен, dismissible?)
+- [ ] Expired banner copy: **«Пробный период закончился · Лента без фильтров и с задержкой 30 мин · Вернуть персонализацию → 790 ₽»** · CTA `/pricing/`
+- [ ] Anon strip: **30 мин** (не 15) · hook «Войди через TG — 3 дня Premium бесплатно»
+- [ ] Flat feed: filter bar hidden/disabled · empty state без «подстрой навыки»
+- [ ] Premium CTA disabled state (hourly 5 hit)
+
+**Files hint для Coder (не Design):** `rawlead-feed.js` viewsHeadHtml · `rawlead.css` `.rl-feed-card__views` · cabinet mirror если есть.
+
+**Handoff:** wireframe + CSS delta spec → `@coder` вместе с O199-QUIZ-UX freeze
+
+---
+
+## § O171-D — Owner Command Center: Сводка + TG (**✅ Lead Design 2026-06-13 · ✅ Coder w1 prod**)
+
+**PM spec:** [`LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) § **O171-ADMIN-RESEARCH** · [`OWNER_INTENT.md`](../architect/OWNER_INTENT.md) § **O171-w**.
+
+**JTBD:** J1 за 30 сек с телефона — жив ли радар · J2 разобрать 🟡/🔴 · J4 найти обрыв воронки · J5 починить без SSH.
+
+**Scope Design:** wireframes + CSS delta **только** (1) **Сводка** — ступени правды · (2) **TG** — acc + Bot API pool. **Не трогать:** Прокси (O121-D ✅) · Управление · Лиды · Боты (KEEP).
+
+**Стиль:** тёмный ops-UI O121-Q1 — `#0f1419` · карточки `#1a2332` · **не** NEO-brutalist.
+
+---
+
+### Решения (канон)
+
+| # | Вопрос | Решение |
+|---|--------|---------|
+| Q1 | Сводка vs Биржи | **Сводка** = 5 ламп + диагноз + truth ladder **компакт** · **Биржи** (существующая секция) = lag + действия — **не дублировать** длинные таблицы в Сводке |
+| Q2 | Ступени правды | **6 ламп** на источник: `process → fetch → parsed → new → L1 → visible` · последняя 🔴 = место обрыва |
+| Q3 | Источники в ladder | **FL · Kwork · YouDo · TG** — 4 карточки-воронки · **L1** — одна строка в шапке Сводки (очередь глобальная) |
+| Q4 | «5 ламп за 5 сек» | Sticky-полоса **Radar · FL · Kwork · YouDo · TG** — только 🟢🟡🔴 + 1 слово · tap → scroll к карточке источника |
+| Q5 | Диагноз «0 лидов» | Баннер под полосой: человеческий текст + **одна** ссылка-действие (не SSH) |
+| Q6 | TG vs Прокси | **TG-блок** = acc join/listen/strikes · **Bot API pool** = read-only strip (active слот · авто вкл · N/M свободно) · ссылка «Прокси →» на `#ops-proxies` — **не** дублировать O121-P1 таблицу |
+| Q7 | Mini-nav | Добавить chip **TG** между «Биржи» и «Прокси» · id `#ops-tg` · остальные chips O121-P0 **KEEP** |
+| Q8 | Mobile 390 | Полоса ламп — горизонтальный scroll · ladder — **вертикальный** stack из 6 строк · TG acc — карточки full-width · кнопки ≥ 44px |
+| Q9 | Боты | Секция `#ops-bots` **без wireframe** — restart FLPARSING остаётся там |
+
+---
+
+### IA delta (только новое / изменённое)
+
+```
+[Mini-nav] … Биржи · TG ● · Прокси · …     ← chip TG NEW
+
+1. #ops-summary   Сводка           ← REBUILD O171-P1/P2
+2. #ops-bots      Боты             ← KEEP
+3. #ops-exchanges Биржи            ← KEEP (lag/actions — не в scope O171-D)
+4. #ops-tg        Telegram         ← NEW O171-P3/P4
+5. #ops-proxies   Прокси           ← O121-D ✅ не трогать
+6. #ops-controls  Управление       ← KEEP
+7. #ops-leads     Лента            ← KEEP
+```
+
+**Порядок DOM:** TG-секция **после** «Биржи», **перед** «Прокси» (как в PM IA).
+
+---
+
+### O171-P0 — Mini-nav delta
+
+```
+Desktop / mobile 390 — добавить chip между «Биржи» и «Прокси»:
+
+[ Сводка ] [ Боты ] [ Биржи ] [ TG ] [ Прокси ] [ Управление ] [ Лента ]
+
+Mobile: overflow-x scroll · tap target chip ≥ 36px (как O121-P0)
+```
+
+Обновить `sections` в JS: `…,"ops-exchanges","ops-tg","ops-proxies",…`
+
+---
+
+### O171-P1 — Desktop 1440: секция «Сводка» (truth ladder)
+
+```
+<section id="ops-summary">
+  <h3>Сводка</h3>
+  <p class="sub">Жив ли радар · где обрыв воронки · что делать</p>
+
+  ┌─ Полоса 5 ламп (sticky внутри секции, не page-wide) ─────────────────────────┐
+  │  🟢 Радар 8м   🟢 FL   🟡 Kwork   🟢 YouDo   🟢 TG   │  L1: 🟢 очередь 0      │
+  └───────────────────────────────────────────────────────────────────────────────┘
+
+  ┌─ Диагноз (только если есть 🔴 или «0 visible» при parsed>0) ─────────────────┐
+  │  🔴 Обрыв на FL · fetch — 3 таймаута подряд                                    │
+  │  → [Проверить прокси FL]  (secondary .btn · scroll #ops-proxies data-group=ex) │
+  └───────────────────────────────────────────────────────────────────────────────┘
+  (норма «биржа пустая»: 🟡 YouDo parsed=0 · текст «Нет новых — биржа пустая» · без 🔴 баннера)
+
+  ── Воронки по источникам (grid 2×2 desktop) ────────────────────────────────────
+
+  ┌─ FL.ru ──────────────────────────────────────────────────────────────────────┐
+  │  🟢 FL · visible +3 за 24ч                                                    │
+  │  process ─ fetch ─ parsed ─ new ─ L1 ─ visible                                │
+  │    🟢      🟢      🟢       🟢    🟢     🟢                                     │
+  │  parsed 12 · new 4 · lag 6 мин                                                │
+  └───────────────────────────────────────────────────────────────────────────────┘
+
+  ┌─ Kwork ─────────────────────────────────────────────────────────────────────┐
+  │  🟡 Kwork · нет новых 2 ч (биржа может быть пустая)                         │
+  │    🟢      🟢      🟢       🟡    🟢     🟡                                     │
+  │  parsed 8 · new 0 · lag 11 мин                                                │
+  └───────────────────────────────────────────────────────────────────────────────┘
+
+  ┌─ YouDo ─────────────────────────────────────────────────────────────────────┐
+  │  🟡 YouDo · parsed 0 · fetch ок                                               │
+  │    🟢      🟢      🔴       —     —      —                                     │
+  │  «Биржа пустая — это норма» (muted)                                           │
+  └───────────────────────────────────────────────────────────────────────────────┘
+
+  ┌─ Telegram ──────────────────────────────────────────────────────────────────┐
+  │  🟢 TG · acc2 слушает · visible +1                                            │
+  │    🟢      🟢      🟢       🟢    🟢     🟢                                     │
+  │  parsed 5 · new 2 · [Подробнее → #ops-tg]                                     │
+  └───────────────────────────────────────────────────────────────────────────────┘
+
+  <p class="sub ctl-hint">Обновлено: 45 сек назад · цикл радара 8 мин назад</p>
+</section>
+```
+
+**Truth ladder — визуал (desktop):**
+
+```
+.ops-truth-ladder { display:flex; gap:.25rem; align-items:center; margin:.5rem 0 }
+.ops-truth-step { display:flex; flex-direction:column; align-items:center; flex:1; min-width:0 }
+.ops-truth-step__dot { width:.65rem; height:.65rem; border-radius:50% }
+.ops-truth-step__dot--ok { background:var(--ok) }
+.ops-truth-step__dot--warn { background:var(--warn) }
+.ops-truth-step__dot--bad { background:var(--bad) }
+.ops-truth-step__dot--na { background:var(--line) }
+.ops-truth-step__label { font-size:.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em }
+.ops-truth-step.is-break::after { content:'▼'; font-size:.55rem; color:var(--bad); margin-top:.1rem }
+```
+
+**Правила ламп (из PM, для Coder):**
+
+| Ступень | 🟢 | 🟡 | 🔴 |
+|---------|----|----|-----|
+| process | last_cycle < 15 мин | 15–20 мин | > 20 мин / dead |
+| fetch | HTTP OK · retry ≤ 3 | retry 1–2 | fail × 3 |
+| parsed | ≥ порога (FL/Kwork/YouDo ≥ 5) | 1–4 | 0 при живом fetch |
+| new | > 0 за 1 ч | 0 при parsed>0 | — |
+| L1 | очередь < 50 | 50–200 | > 200 / stuck |
+| visible | ≥ 10 / 24 ч | 1–9 | 0 при parsed>0 за 3 ч |
+
+**Подписи ступеней (RU, tooltip на tap mobile / title desktop):**
+
+| step | Короткий label | Пример tooltip |
+|------|----------------|----------------|
+| process | процесс | «Радар жив · цикл N мин назад» |
+| fetch | загрузка | «HTTP 200 · 1 попытка» / «timeout × 3» |
+| parsed | разбор | «12 карточек за цикл» |
+| new | новые | «4 без дублей» / «0 — биржа пустая» |
+| L1 | ИИ | «очередь 0 · avg 2.1 с» |
+| visible | лента | «+3 за 24 ч» |
+
+---
+
+### O171-P2 — Mobile 390px: Сводка
+
+```
+┌─────────────────────────────────────┐ 390px
+│ Сводка                              │
+│ Жив ли радар · где обрыв            │
+├─────────────────────────────────────┤
+│ ← scroll →                          │
+│ 🟢Радар 🟢FL 🟡Kw 🟢YD 🟢TG │L1🟢0│ │
+├─────────────────────────────────────┤
+│ 🔴 Обрыв FL · fetch                 │
+│ [ Проверить прокси FL ]  full-width │
+├─────────────────────────────────────┤
+│ FL.ru              🟢 · visible +3  │
+│ process      🟢  жив · 8 мин          │
+│ fetch        🟢  ок                   │
+│ parsed       🟢  12                   │
+│ new          🟢  4                    │
+│ L1           🟢  готово               │
+│ visible      🟢  +3 / 24ч             │
+├─────────────────────────────────────┤
+│ Kwork              🟡 · new 0       │
+│ … (те же 6 строк вертикально)       │
+├─────────────────────────────────────┤
+│ YouDo              🟡 пустая биржа  │
+│ process 🟢 · fetch 🟢 · parsed 🔴     │
+│ «Нет карточек — норма если биржа    │
+│  пустая»                            │
+├─────────────────────────────────────┤
+│ Telegram           🟢               │
+│ … 6 строк · [ TG подробнее → ]      │
+└─────────────────────────────────────┘
+```
+
+- Полоса 5 ламп: `overflow-x: auto` · `white-space: nowrap` · padding `.5rem 0`
+- Карточка источника: `.ops-funnel-card` · border `1px solid var(--line)` · margin-bottom `.5rem`
+- L1 в полосе: компакт `L1 🟢 0` — не отдельная карточка
+- Диагноз-баннер: `border-left: 3px solid var(--bad)` · bg `#2a1a1a`
+- Кнопка действия: min-height **44px** · full-width
+
+---
+
+### O171-P3 — Desktop 1440: секция «Telegram»
+
+```
+<section id="ops-tg">
+  <h3>Telegram</h3>
+  <p class="sub">Аккаунты парсинга · Bot API · без SSH</p>
+
+  ┌─ Bot API pool (read-only · O120) ─────────────────────────────────────────────┐
+  │  Bot API: слот 2 ● активен · Авто: вкл · свободно 2 из 3                    │
+  │  Последнее переключение: 2 ч назад (FLPARSING уведомил)                       │
+  │  [ Открыть прокси TG → ]  (ghost .btn · scroll #ops-proxies data-group=tg-bot)│
+  └───────────────────────────────────────────────────────────────────────────────┘
+
+  ── Telethon acc (парсинг чатов) ───────────────────────────────────────────────
+
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │ acc │ Состояние      │ Listen │ Join      │ Strikes │ Действия               │
+  ├─────┼────────────────┼────────┼───────────┼─────────┼────────────────────────┤
+  │ acc1│ 🟢 ready       │ 47 чат │ done      │ 0/3     │ [Перезапустить join]   │
+  │ acc2│ 🟢 listening   │ 43 чат │ идёт (3)  │ 1/3     │ [Пауза join] [Лог →]   │
+  │ acc3│ 🟡 join queue  │ 0 чат  │ pending 8 │ 0/3     │ [Докрутить join]       │
+  └──────────────────────────────────────────────────────────────────────────────┘
+
+  <p class="sub ctl-hint">Join: 115 done · 8 pending · 4 fail · лимит 10/ч</p>
+  <div id="rl-ops-tg-status" class="ctl-status"><span class="dot"></span><span>Ожидание</span></div>
+</section>
+```
+
+**Колонки acc (минимум):**
+
+| Колонка | Содержание |
+|---------|------------|
+| acc | `acc1` · `acc2` · `acc3` |
+| Состояние | `ready` · `listening` · `join queue` · `🔴 auth error` |
+| Listen | `N чатов` · `—` если 0 |
+| Join | `done` · `идёт (N)` · `pending N` · `fail` |
+| Strikes | `N/3` · 🟡 при 2/3 · 🔴 при 3/3 |
+| Действия | w1: `[Перезапустить join]` · `[Докрутить join]` · w3: CRUD ссылок — **disabled** `title="Скоро"` |
+
+**Copy состояний (RU):**
+
+| Статус | Текст |
+|--------|-------|
+| ready | «Готов · слушает» |
+| listening | «Слушает N чатов» |
+| join_active | «Вступает в чаты…» |
+| join_pending | «В очереди N» |
+| strikes_warn | «Предупреждение N/3» |
+| strikes_ban | «Страйки исчерпаны — пауза» |
+
+**Не дублировать:** masked proxy URL · probe inline · switch slot — всё в `#ops-proxies` O121.
+
+---
+
+### O171-P4 — Mobile 390px: Telegram
+
+```
+┌─────────────────────────────────────┐
+│ Telegram                            │
+│ Аккаунты · Bot API                  │
+├─────────────────────────────────────┤
+│ BOT API                             │
+│ ● Слот 2 активен                    │
+│ Авто-переключение: вкл              │
+│ Свободно 2 из 3                     │
+│ [ Открыть прокси TG → ]  44px       │
+├─────────────────────────────────────┤
+│ ACC1 · 🟢 Готов                     │
+│ Слушает 47 чатов · join done        │
+│ Strikes 0/3                         │
+│ [ Перезапустить join ]  full-width  │
+├─────────────────────────────────────┤
+│ ACC2 · 🟢 Слушает                   │
+│ 43 чата · join идёт (3)             │
+│ Strikes 1/3                         │
+│ [ Пауза join ] [ Лог ]              │
+├─────────────────────────────────────┤
+│ ACC3 · 🟡 Очередь                   │
+│ 0 чатов · pending 8                 │
+│ [ Докрутить join ]                  │
+├─────────────────────────────────────┤
+│ Join: 115/8/4 · 10/ч                │
+│ ● Ожидание                          │
+└─────────────────────────────────────┘
+```
+
+- Desktop table → mobile `.ops-tg-card` stack (как `.ops-proxy-card` O121-P2)
+- `@media (min-width:768px) { .ops-tg-card { display:none } }`
+- `@media (max-width:767px) { .ops-tg-table { display:none } }`
+
+---
+
+### O171-P5 — CSS delta (ops-тема)
+
+```css
+/* ── Сводка: полоса ламп ── */
+.ops-lamp-bar { display:flex; flex-wrap:nowrap; gap:.5rem; overflow-x:auto; padding:.5rem 0; margin-bottom:.75rem; align-items:center }
+.ops-lamp { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .55rem; border-radius:6px; border:1px solid var(--line); font-size:.78rem; white-space:nowrap; flex-shrink:0 }
+.ops-lamp--ok { border-color:var(--ok) }
+.ops-lamp--warn { border-color:var(--warn) }
+.ops-lamp--bad { border-color:var(--bad) }
+.ops-lamp__l1 { margin-left:auto; flex-shrink:0 } /* desktop; mobile — в scroll */
+
+/* ── Диагноз ── */
+.ops-diagnosis { padding:.65rem .85rem; border-radius:8px; border-left:3px solid var(--bad); background:#2a1a1a; margin-bottom:.75rem }
+.ops-diagnosis--warn { border-left-color:var(--warn); background:#2a2418 }
+.ops-diagnosis__action { margin-top:.5rem }
+
+/* ── Truth ladder ── */
+.ops-funnel-grid { display:grid; gap:.65rem; grid-template-columns:repeat(2,1fr) }
+@media (max-width:767px) { .ops-funnel-grid { grid-template-columns:1fr } }
+.ops-funnel-card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:.85rem }
+.ops-funnel-card__head { display:flex; justify-content:space-between; align-items:center; margin-bottom:.35rem; font-weight:600; font-size:.88rem }
+.ops-truth-ladder { display:flex; gap:.2rem; margin:.45rem 0 }
+.ops-truth-step { flex:1; text-align:center; min-width:0 }
+.ops-truth-step__label { font-size:.62rem; color:var(--muted); text-transform:uppercase }
+.ops-truth-step__dot { width:.6rem; height:.6rem; border-radius:50%; margin:.2rem auto 0 }
+.ops-truth-step.is-break .ops-truth-step__dot { box-shadow:0 0 0 2px var(--bad) }
+.ops-funnel-meta { font-size:.78rem; color:var(--muted) }
+
+/* mobile: вертикальный ladder */
+@media (max-width:767px) {
+  .ops-truth-ladder { flex-direction:column; gap:.25rem }
+  .ops-truth-step { display:flex; justify-content:space-between; align-items:center; text-align:left }
+  .ops-truth-step__label { text-transform:none; font-size:.8rem }
+  .ops-truth-step__dot { margin:0 }
+}
+
+/* ── TG секция ── */
+.ops-tg-botapi { padding:.75rem; border:1px solid var(--line); border-radius:10px; margin-bottom:1rem; background:#151d28 }
+.ops-tg-table { width:100%; font-size:.82rem }
+.ops-tg-card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:.85rem; margin-bottom:.5rem }
+.ops-tg-card__title { font-weight:600; margin-bottom:.35rem }
+.ops-tg-card__row { font-size:.82rem; color:var(--muted); margin:.15rem 0 }
+```
+
+**HTML-вставка (порядок):**
+
+```html
+<!-- mini-nav: + chip data-target="ops-tg" -->
+
+<section id="ops-summary">
+  <h3>Сводка</h3>
+  <div class="ops-lamp-bar" id="rl-ops-lamp-bar">…</div>
+  <div class="ops-diagnosis" id="rl-ops-diagnosis" hidden>…</div>
+  <div class="ops-funnel-grid" id="rl-ops-funnels">…4× .ops-funnel-card…</div>
+</section>
+
+<!-- после #ops-exchanges -->
+<section id="ops-tg">
+  <h3>Telegram</h3>
+  <div class="ops-tg-botapi" id="rl-ops-tg-botapi">…</div>
+  <div class="ops-tg-table-wrap">…table…</div>
+  <div class="ops-tg-cards">…cards mobile…</div>
+  <div id="rl-ops-tg-status" class="ctl-status">…</div>
+</section>
+```
+
+**API (для Coder handoff, имена ориентир):**
+
+| Endpoint | Данные |
+|----------|--------|
+| `GET /ops/funnel` | per-source 6 steps + aggregate lamps + diagnosis text + action link |
+| `GET /ops/tg` | acc1–3 status · join counts · botapi pool summary (из `tg_proxy_pool.json`) |
+| `POST /ops/control` | `tg-join-restart` · `tg-join-tick` — как у ботов `ctl-status` паттерн |
+
+---
+
+### Связь с /status и push (Design ↔ PM)
+
+**Бот @FLPARSING — тот же порядок строк что полоса ламп + краткий ladder:**
+
+```
+📊 Радар: жив · цикл 8 мин
+🔴 FL: fetch timeout → [Проверить прокси]
+🟢 Kwork: parsed=12 · new=4 · visible+3
+🟡 YouDo: parsed=0 · биржа пустая
+🟢 TG: acc2 · 43 чата
+🟢 L1: очередь 0
+```
+
+Push-триггеры — **не** в UI `/ops/` (только бот) · в Сводке показывать `last_push_at` muted опционально w2.
+
+---
+
+### Не в scope O171-D
+
+| Исключено | Где |
+|-----------|-----|
+| Прокси wireframes / probe / switch | O121-D ✅ |
+| Управление radar pause/delist | KEEP `#ops-controls` |
+| Лиды / consumer lag детально | KEEP `#ops-leads` + ingest в Биржи |
+| TG join CRUD ссылок | O121-w3 |
+| Публичные страницы / лента UI | другой чат |
+| O172 Green/Red runbook | после O171 |
+
+---
+
+### DoD Design O171-D
+
+- [x] Wireframe desktop **O171-P1** Сводка + truth ladder
+- [x] Wireframe mobile **O171-P2** 390px
+- [x] Wireframe desktop **O171-P3** TG + Bot API strip
+- [x] Wireframe mobile **O171-P4** 390px
+- [x] Mini-nav **O171-P0** chip TG
+- [x] CSS delta **O171-P5**
+- [x] Не дублирует O121 прокси / управление / лиды
+- [x] Handoff → @lead-architect
+
+---
+
+### Handoff → @lead-architect
+
+> **O171-D готово → Coder § O171-OPS-ADMIN-REBUILD:** rebuild `#ops-summary` (5 ламп + diagnosis + 4 funnel cards × 6 truth steps) · NEW `#ops-tg` между Биржи и Прокси (acc table/cards + Bot API read-only strip → link `#ops-proxies`) · mini-nav chip TG · mobile 390 vertical ladder · API `/ops/funnel` + `/ops/tg` · PM: `LEAD_PRODUCT_PROMPT` § O171 · **не** трогать O121 proxies / controls / leads.
 
 ---
 
@@ -2084,11 +2588,411 @@ Feed (с match %)
 | WP `/feed`: карточка, фильтры, sidebar, infinite scroll, состояния | Mobile app, отдельный сайт |
 | WP `/cabinet`: теги-чипы, match, AI-агент кнопка (disabled до 3f) | Coder-часть PHP (это CODER_PROMPT) |
 | Пульт: пульс лампы ok | Новый функционал пульта |
-| **P-PORTFOLIO** (личное на VPS) | **📋 после O76** — см. § D-P-PORTFOLIO |
+| **Portfolio (личный сайт)** | ⏸ **с нуля 2026-06-18** — только [`team/portfolio/README.md`](../portfolio/README.md) + ref sites |
 
 ---
 
-## § D-P-PORTFOLIO — личное портфолио исполнителя (**📋 после O76**)
+## § P288-D — Premium scroll portfolio (**✅ GO build 2026-06-17**)
+
+**Brief:** [`docs/design/portfolio/premium-scroll-brief.md`](../../design/portfolio/premium-scroll-brief.md) · **§3.1 + §3.2 freeze**  
+**Mood:** light editorial · hero **Rode51** · RawLead **serif terracotta** · **5 white tiles spiral** · terracotta scroll cues  
+**Cards:** единый **PortfolioCard** kit — **не** UI `/lenta` prod
+
+| # | Deliverable | Статус |
+|---|-------------|--------|
+| d1 | DS tokens §3.1 · grid · type pairing sans+serif | ✅ freeze §3 brief |
+| d2 | Wire: RawLead overlay · 5 module panels | ✅ ниже |
+| d3 | R3F tile spec: geometry · spiral · labels | ✅ ниже |
+| d4 | CD iPhone frame + Rive slot | 📋 pending |
+| d5 | Mobile no-WebGL fallback layout | 📋 pending |
+| d6 | **Card kit §3.2: PortfolioCard — 5 variants** | ✅ ниже |
+| d7 | Handoff `@coder` § **P288-1** | ✅ ниже |
+
+---
+
+### d6 — PortfolioCard kit (§3.2 freeze)
+
+> **Правило:** одна визуальная семья. Не prod brutalism. Каждый variant = тот же base component, разный slot-контент.
+
+#### Base tokens (все карточки)
+
+| Token | Value |
+|-------|-------|
+| Surface | `#FFFFFF` · radius `14px` |
+| Page bg | `#F7F5F0` |
+| Border default | `1px solid #E8E4DC` |
+| Border hover/active | `1px solid #C45C3E` (terracotta) |
+| Shadow | `0 8px 32px rgba(17,17,17,0.06)` |
+| Shadow hover | `0 12px 40px rgba(17,17,17,0.10)` |
+| Transition | `border-color 200ms ease, box-shadow 200ms ease` |
+| Title | sans · `#111111` · `17px` · `font-weight 500` |
+| Meta | mono · `#666666` · `11px` |
+| Tag pill | bg `#F7F5F0` · border `1px #E8E4DC` · mono `11px` · `#444` · radius `4px` · pad `2px 7px` |
+| Score / accent | terracotta `#C45C3E` text **or** `2px left bar` — единственный цвет |
+| Padding inner | `20px 24px` |
+| Max-width | `360px` (overlay demo) / fluid (device mock) |
+
+#### Variant 1 — ParseCard (Parser module demo)
+
+**Контекст:** 4 source-точки → Hub card · счётчик.
+
+```
+┌──────────────────────────────────────┐
+│ 11px MONO · FL.ru · 14:23           │  ← meta: source · time
+│                                      │
+│  Python backend-разработчик          │  ← title 17px sans #111
+│  Нужен FastAPI, celery, Postgres     │  ← body 13px #555 · 1–2 строки
+│                                      │
+│  [Python] [FastAPI] [Backend]        │  ← tag pills F7F5F0
+│                                      │
+│  ████ 78%  · не спам                 │  ← score bar terracotta · badge
+└──────────────────────────────────────┘
+```
+
+**Score bar:** 2px left border `#C45C3E` на всю высоту карточки — активация при «после AI».  
+**Badges:** `· не спам` mono `#666` — только text, нет prod цветных chips.  
+**Анимация в демо:** `scale(0.94) opacity(0)` → `scale(1) opacity(1)` · 320ms · ease out.
+
+---
+
+#### Variant 2 — AICard «после» (AI Layer scrub)
+
+**Контекст:** right side scrub-slider — clean output после L1/L2.
+
+```
+┌──────────────────────────────────────┐
+│ ТЕРРАКОТА | Python backend · L2      │  ← 2px left bar + label
+│                                      │
+│  Нужен FastAPI-разработчик           │  ← title очищенный
+│  Celery + Postgres, пишите цену      │  ← body 2 строки max
+│                                      │
+│  [Python] [FastAPI] [Celery]         │  ← tags
+│  score: 78% · L2 draft ready        │  ← score mono #C45C3E + status
+└──────────────────────────────────────┘
+```
+
+**Отличие от V1:** left bar активен всегда · `L2 draft ready` вместо `не спам`.  
+**Left (до) side:** серый `#F0EDEA` background · текст `#999` · без border-color.
+
+---
+
+#### Variant 3 — TGCard (Telegram bubble preview)
+
+**Контекст:** fake-chat · light bubbles portfolio palette (не TG green).
+
+```
+column · max-width 280px · centered
+
+  ┌────────────────────────────────┐
+  │ 🔥 Match 84% · Python backend  │  ← bot msg · bg #FFF · border #E8E4DC
+  │                                │    radius 12px 12px 12px 2px
+  └────────────────────────────────┘
+
+  ┌────────────────────────────────┐
+  │ [card mini: title + 2 lines]   │  ← embedded ParseCard smaller · 80%
+  └────────────────────────────────┘
+
+  ┌────────────────────────────────┐
+  │ Черновик отклика готов         │
+  │  [Скопировать]                 │  ← pill button terracotta outline
+  └────────────────────────────────┘
+```
+
+**Bubble base:** bg `#FFFFFF` · border `1px #E8E4DC` · shadow `0 2px 8px rgba(17,17,17,0.05)`.  
+**Кнопка:** outline `1.5px #C45C3E` · text terracotta · bg white · radius `6px` · non-interactive.  
+**Typewriter:** каждый bubble slides-up + chars `30ms` · gap `800ms`.
+
+---
+
+#### Variant 4 — APINode (архитектурная схема)
+
+**Контекст:** inline inside overlay · architecture diagram nodes.
+
+```
+┌──────────────────┐
+│ FastAPI :8000    │  ← title sans 14px #111
+│ /v1/leads · ops  │  ← meta mono 11px #666
+└──────────────────┘
+```
+
+**Все ноды:** одинаковый стиль · connected с `hairline path stroke="#E8E4DC"` · active path `stroke="#C45C3E"` · `stroke-dasharray` animate.  
+**Active node:** border terracotta · лёгкий `box-shadow 0 0 0 3px rgba(196,92,62,0.12)`.
+
+---
+
+#### Variant 5 — WebRow (device mock row)
+
+**Контекст:** laptop + phone frame · internal card скелеты.
+
+```
+[laptop wireframe chrome]      [phone wireframe chrome]
+┌─────────────────────────┐   ┌────────────────┐
+│ ▣ rawlead.ru/lenta      │   │ ▣ /cabinet     │
+│ ┌──────────────────────┐│   │ ┌────────────┐ │
+│ │ card skeleton ×3     ││   │ │ card detail│ │
+│ │ [score][tags][title] ││   │ │ terracotta │ │
+│ └──────────────────────┘│   │ │ border     │ │
+└─────────────────────────┘   └────────────────┘
+```
+
+**Важно:** внутри фреймов — **skeleton PortfolioCard**, не prod screenshot.  
+**Laptop:** `border-radius 8px` · grey chrome `#D8D4CE` · screen bg `#F7F5F0`.  
+**Phone:** `border-radius 20px` · notch top · same chrome.  
+**Одна карточка:** terracotta border → «draft ready» badge появляется при авто-анимации.
+
+---
+
+#### Запрет (§3.2)
+
+| ❌ Не делать |
+|-------------|
+| prod teal #1a6b6b в любом виде |
+| скрин /lenta 1:1 внутри mockup |
+| плотная информационная сетка FL-ленты |
+| prod match-% pill styled как на rawlead.ru |
+| тёмные блоки background |
+| более 3 цветов в одной карточке |
+
+---
+
+### d2 — Wire: RawLead overlays (5 панелей)
+
+> Каждый overlay = белая панель · `92vw × 85vh` · `backdrop-blur(12px)` · открывается при клике на tile.
+
+#### Общая структура панели
+
+```
+┌─── overlay panel ──────────────────────────────────────────────────┐
+│ [NN  Module name]                                     mono       [×] │  ← header 48px
+│─────────────────────────────────────────────────────────────────────│
+│                                                                     │
+│           [DEMO ZONE — описание ниже по модулю]                     │
+│                                                                     │
+│─────────────────────────────────────────────────────────────────────│
+│  [pill 1] [pill 2] [pill 3]              [Закрыть] [↺ Replay]       │  ← footer 52px
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Header:** `NN` mono `#C45C3E` 13px · `Module name` sans `#111` 20px bold · `×` icon 20px `#666` hover `#111`.  
+**Footer pills:** PortfolioCard tag token · `[Закрыть]` outline terracotta · `[↺ Replay]` ghost `#666`.  
+**Open anim:** `opacity 0→1` + `translateY(16px→0)` · 350ms · `ease [0.22,1,0.36,1]`.  
+**Close anim:** `opacity 1→0` · 200ms.
+
+---
+
+#### Overlay 01 · Parser
+
+```
+Demo zone (640×380 max):
+
+    [FL.ru ●]          [Kwork ●]
+         \    pulse ring   /
+          \               /
+           ──── [RADAR] ────
+          /               \
+         /                 \
+    [YouDo ●]         [TG ●]
+
+    В hub: мини ParseCard появляется (Variant 1)
+    Счётчик: +1 lead  +2 leads  +3 leads  (mono terracotta)
+    Subtext fade: «Прокси, антибот, auto-recovery»
+```
+
+**Точки:** circle `r=8` · border `1px #E8E4DC` · pulse ring `stroke #C45C3E opacity 0→0.5→0` `r=8→18`.  
+**Линии:** `stroke #E8E4DC 1px` · draw on anim `stroke-dashoffset`.  
+**Hub:** circle `r=24` bg white border `1.5px #C45C3E`.  
+**Timing:** 8–10s loop · stagger sources 1.2s.
+
+---
+
+#### Overlay 02 · AI Layer
+
+```
+Demo zone: horizontal split
+
+┌────────────────────┬────────────────────┐
+│  «до» · #F0EDEA    │  «после» · #FFFFFF  │
+│                    │                    │
+│  нужен сайт вчера  │  Python backend    │
+│  !!! без бюджета   │  [Python][FastAPI]  │
+│  копипаста бла бла │  score: 78% ████   │
+│                    │                    │
+└────────────────────┴────────────────────┘
+        ← drag divider (or auto 4s) →
+
+Stepper (bottom): [L1 filter] → [L2 draft] → [L3 uniquify]
+                   active = terracotta underline + bold
+```
+
+**Divider:** `2px #C45C3E` · handle circle `12px` bg white border terracotta · cursor drag.  
+**Auto mode:** divider animates `left: 0% → 100%` за 4s · pause 1.5s · reverse.  
+**Stepper:** mono 11px · steps highlight стagger с divider position.
+
+---
+
+#### Overlay 03 · Telegram
+
+```
+Demo zone: centered column 280px
+
+  [bot bubble: 🔥 Match 84% · Python backend]
+  [bot bubble: embedded ParseCard mini]
+  [bot bubble: Черновик отклика готов + [Скопировать]]
+  [user ghost: 👍]  (optional, fade in last)
+```
+
+Полностью — PortfolioCard Variant 3 TGCard.  
+**Auto typewriter:** delay `0ms · 800ms · 1800ms · 3200ms` · loop с `opacity 0→1` каждой bubble сверху.
+
+---
+
+#### Overlay 04 · API
+
+```
+Demo zone: architecture SVG 560×260
+
+[Visitor]──▶[nginx rawlead.ru]──▶[WP theme]
+                    │
+                    ▼
+             [api.rawlead.ru]──▶[FastAPI :8000]──▶[Neon Postgres]
+                    ▲
+             [Radar ingest]
+
+Corner mono log: GET /v1/leads 200 · 42ms   ← blink once at 2s
+```
+
+Ноды — APINode Variant 4.  
+**Data flow loop:** active path `stroke-dashoffset` animate по кругу: `ingest→DB→API→nginx` · 2.5s cycle · terracotta.  
+**Entry anim:** ноды fade in stagger 200ms.
+
+---
+
+#### Overlay 05 · Web
+
+```
+Demo zone: two device frames side by side
+
+[laptop 480×300]                [phone 180×320]
+  chrome bar rawlead.ru           chrome bar /cabinet
+  ┌──────────────────┐            ┌──────────────┐
+  │ card ×3 skeleton │            │ card detail  │
+  │ [one terracotta] │  ←───────▶ │ border       │
+  └──────────────────┘            └──────────────┘
+```
+
+PortfolioCard Variant 5 WebRow.  
+**Auto-scroll:** laptop scrolls +40px за 3s · phone slides in from right (+30px) at 1s.  
+**Highlight beat:** один skeleton в laptop получает `border-color #C45C3E` + badge «draft ready» через 2s.
+
+---
+
+### d3 — R3F tile spec
+
+#### Геометрия одного tile
+
+| Prop | Value |
+|------|-------|
+| Mesh | `<RoundedBox args={[2.4, 1.4, 0.12]} radius={0.12} smoothness={4}` |
+| Material | `MeshStandardMaterial` · color `#FFFFFF` · roughness `0.35` · metalness `0.05` |
+| Shadow cast/receive | да |
+| Ambient | `AmbientLight intensity={0.6}` |
+| Dir light | `position [4, 6, 4]` · intensity `0.8` · castShadow |
+
+**Edge glow (hover):** `@react-three/postprocessing` `<Bloom>` luminanceThreshold `0.85` intensity `0.4` — только при `hovered` state tile.  
+**Glow color:** emissive `#C45C3E` emissiveIntensity `0.0 → 0.6` · 300ms lerp.
+
+#### Spiral layout (5 tiles)
+
+Расположение в локальном пространстве сцены. Ось Y — вертикаль. Camera смотрит `[0, 0, 6]` → `[0, 0, 0]`.
+
+```js
+// spiral arc: helix feel, owner ref
+const TILE_POSITIONS = [
+  { id: 1, pos: [-3.2,  1.6,  0.0], rot: [0,  0.18, 0.06] },  // top-left
+  { id: 2, pos: [-1.4,  0.2, -0.8], rot: [0,  0.08, 0.03] },  // mid-left
+  { id: 3, pos: [ 0.0, -0.9, -1.4], rot: [0,  0.00, 0.00] },  // bottom-center (furthest)
+  { id: 4, pos: [ 1.4,  0.2, -0.8], rot: [0, -0.08, 0.03] },  // mid-right
+  { id: 5, pos: [ 3.2,  1.6,  0.0], rot: [0, -0.18, 0.06] },  // top-right
+];
+```
+
+**Float drift:** `<Float speed={1.4} rotationIntensity={0.12} floatIntensity={0.3}>` — каждый tile в своём Float с `floatIntensity` offset `[0.3, 0.5, 0.4, 0.6, 0.35]`.
+
+#### Scroll-driven entrance (GSAP → R3F)
+
+| Beat | 3D state |
+|------|----------|
+| section enter (0%) | все tiles `opacity=0` · `position.y -= 2` · `scale=0.7` |
+| scroll 0→20% | stagger `+40ms` · tiles fade in + rise to final pos · spring `tension:120 friction:18` |
+| scroll 20→80% | Float idle · hover events active |
+| click tile | camera `lookAt` tile pos · ease `[0.22,1,0.36,1]` 600ms · overlay DOM open |
+| overlay close | camera return · 400ms |
+| assemble btn | tiles fly `pos→[0,0,0]` 900ms · scale `1→0.1` · flash white plane · CTA DOM appear |
+
+#### Side labels (DOM, `<Html distanceFactor={8}>`)
+
+| Tile | Label | Position offset |
+|------|-------|-----------------|
+| 01 top-left | `Parser` | `left: -1.8rem · top: 0` vertical mono |
+| 02 mid-left | `AI Layer` | `left: -1.8rem` |
+| 03 bottom-center | `API` | `bottom: -1.4rem` horizontal |
+| 04 mid-right | `Telegram` | `right: -1.8rem` |
+| 05 top-right | `Web` | `right: -1.8rem` |
+
+**Label style:** `font-family: monospace · font-size: 10px · color: #666 · letter-spacing: 0.08em · writing-mode: vertical-lr` (left/right tiles) · `writing-mode: horizontal-tb` (bottom).
+
+#### DPR + perf guard
+
+```js
+<Canvas dpr={[1, 1.5]} performance={{ min: 0.5 }}>
+```
+
+Lazy load: `const R3FScene = dynamic(() => import('./RawLeadScene'), { ssr: false })` — только при `#work-rawlead` in viewport (`IntersectionObserver`).  
+Destroy: `useEffect` cleanup `gl.dispose()` при unmount.  
+Fallback: `prefers-reduced-motion` или `navigator.hardwareConcurrency < 4` → static vertical stack (div tiles, no WebGL).
+
+---
+
+### d7 — Handoff @coder P288-1
+
+**Старт сейчас:** параллельно с d6 card kit ✅
+
+**P288-1 scope (первая фаза, без 3D):**
+
+```
+Next.js 14 · output: 'export' · Tailwind · Framer Motion · GSAP ScrollTrigger
+Домен: labs.rawlead.ru · nginx static
+
+Компоненты P288-1:
+  - Layout: fixed nav · scroll-spy · blur on scroll
+  - Block 1 Hero: grid bg · Rode51 display · subtitle · tagline · scroll cue
+  - Block 2 About: section · body · bullets
+  - Block 5 Contact: TG link @rcnn43 · FL.ru link
+  - Block 6 Footer: doodle ARKHITEKT NIKITA · © 2026
+
+Анимации P288-1 (Framer Motion):
+  - Load sequence §11.1: grid → display stagger → subtitle → nav
+  - Scroll-out hero: opacity + scale + blur
+  - About enter: slide up + fade стagger
+
+НЕ в P288-1:
+  - R3F / Three.js (→ P288-2)
+  - Overlay panels (→ P288-2)
+  - Rive (→ P288-3)
+```
+
+**Design refs для @coder:**
+- DS tokens: `premium-scroll-brief.md` §3 (locked)
+- Hero copy: brief §11.1
+- Motion timing: `400–700ms · ease [0.22, 1, 0.36, 1]`
+- Font: **Rode51** — [fonts.google.com/specimen/Roboto+Condensed](https://fonts.google.com/specimen/Roboto+Condensed) (closest web-safe) · или custom via @font-face если owner загрузит woff2
+- Accent: `#C45C3E` только в scroll cue + nav underline
+
+**Card kit поставка к P288-2:** PortfolioCard компоненты нужны к старту P288-2 (overlay panels). P288-1 карточек не содержит.
+
+---
+
+## § D-P-PORTFOLIO — ~~личное портфолио~~ (**❌ archived — do not use**)
 
 **Владелец 2026-05-31:** тот же VPS · **интерактивно и стильно** — ссылка заказчикам и в FL · **параллельно** soft ads RawLead.
 

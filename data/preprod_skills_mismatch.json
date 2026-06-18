@@ -1,0 +1,25 @@
+{
+  "scenario": "skills_mismatch",
+  "pass": false,
+  "lead_id": 20250,
+  "user_id": "895912a1-ffb6-46fb-be7e-4e051f2ff8c1",
+  "user_tags": [
+    "yii2"
+  ],
+  "reply_draft": "Здравствуйте! Готов разработать бэкенд для CS-маркетплейса на Node.js (NestJS).\n\nПо описанию вижу стек: PostgreSQL для хранения данных о скинах и сделках, Redis для кэширования и WebSocket для real-time обновлений. Интеграцию со Steam API для авторизации и получения инвентарей учту.\n\nПодскажите, P2P-логика обмена будет включать escrow-систему или прямые трейды через Steam?",
+  "timings_ms": {
+    "total": 255075
+  },
+  "checks": {
+    "non_empty": true,
+    "no_yii2_fontlab": true,
+    "no_smell": true,
+    "node_from_tz": true,
+    "under_90s": false
+  },
+  "smell": null,
+  "errors": [],
+  "summary": {
+    "pass": false
+  }
+}

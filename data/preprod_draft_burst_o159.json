@@ -1,0 +1,98 @@
+{
+  "generated_at": "2026-06-08T14:33:14.685122+00:00",
+  "api_url": "https://api.rawlead.ru",
+  "max_leads": 3,
+  "concurrency": 3,
+  "attempted": 3,
+  "ready": 3,
+  "server_errors": 0,
+  "rate_limits": 0,
+  "error_rate_5xx": 0.0,
+  "p95_draft_ms": 69395.4,
+  "timings_agg": {
+    "feed": {
+      "p50_ms": 1866.9,
+      "p95_ms": 3763.8
+    },
+    "expand": {
+      "p50_ms": 1614.0,
+      "p95_ms": 1732.0
+    },
+    "tools": {
+      "p50_ms": 0,
+      "p95_ms": 0
+    },
+    "draft_wait": {
+      "p50_ms": 29766.7,
+      "p95_ms": 47428.5
+    },
+    "total": {
+      "p50_ms": 44750.3,
+      "p95_ms": 69395.4
+    }
+  },
+  "note_l2_l3": "shared_l2/l3 not split at API — see draft_wait_ms",
+  "pass": true,
+  "rows": [
+    {
+      "lead_id": 19526,
+      "http_status": 202,
+      "draft_status": "ready",
+      "error": null,
+      "reply_len": 395,
+      "tools_count": 0,
+      "rate_limited": false,
+      "server_error": false,
+      "smell": null,
+      "timings": {
+        "feed_ms": 1866.9,
+        "expand_ms": 1577.4,
+        "tools_ms": 0.0,
+        "shared_l2_ms": null,
+        "l3_ms": null,
+        "draft_wait_ms": 16189.7,
+        "total_ms": 22836.3
+      }
+    },
+    {
+      "lead_id": 19535,
+      "http_status": 202,
+      "draft_status": "ready",
+      "error": null,
+      "reply_len": 335,
+      "tools_count": 0,
+      "rate_limited": false,
+      "server_error": false,
+      "smell": null,
+      "timings": {
+        "feed_ms": 3763.8,
+        "expand_ms": 1614.0,
+        "tools_ms": 0.0,
+        "shared_l2_ms": null,
+        "l3_ms": null,
+        "draft_wait_ms": 29766.7,
+        "total_ms": 44750.3
+      }
+    },
+    {
+      "lead_id": 19531,
+      "http_status": 202,
+      "draft_status": "ready",
+      "error": null,
+      "reply_len": 193,
+      "tools_count": 0,
+      "rate_limited": false,
+      "server_error": false,
+      "smell": null,
+      "timings": {
+        "feed_ms": 1823.1,
+        "expand_ms": 1732.0,
+        "tools_ms": 0.0,
+        "shared_l2_ms": null,
+        "l3_ms": null,
+        "draft_wait_ms": 47428.5,
+        "total_ms": 69395.4
+      }
+    }
+  ]
+}

@@ -55,7 +55,7 @@ class TestYoudoTraffic(unittest.TestCase):
         )
         cfg = MagicMock()
         errors: list[str] = []
-        body, meta = _resolve_ingest_body(project, cfg, errors)
+        body, meta, _ = _resolve_ingest_body(project, cfg, errors)
         mock_detail.assert_not_called()
         self.assertEqual(len(body), 350)
         self.assertIsNone(meta)
@@ -74,7 +74,7 @@ class TestYoudoTraffic(unittest.TestCase):
             source=SOURCE_YOUDO,
         )
         cfg = MagicMock()
-        body, _ = _resolve_ingest_body(project, cfg, [])
+        body, _, _ = _resolve_ingest_body(project, cfg, [])
         mock_detail.assert_called_once()
         self.assertEqual(body, "full body text")
 
@@ -91,7 +91,7 @@ class TestYoudoTraffic(unittest.TestCase):
             source=SOURCE_YOUDO,
         )
         cfg = MagicMock()
-        body, meta = _resolve_ingest_body(project, cfg, [])
+        body, meta, _ = _resolve_ingest_body(project, cfg, [])
         mock_detail.assert_not_called()
         self.assertEqual(body, "short")
         self.assertIsNone(meta)
@@ -129,10 +129,15 @@ class TestYoudoTraffic(unittest.TestCase):
         os.environ.pop("YOUDO_LISTING_TIMEOUT_SEC", None)
         os.environ["YOUDO_GOTO_TIMEOUT_SEC"] = "90"
         os.environ["YOUDO_SLOT_RETRY_ON_TIMEOUT"] = "3"
-        from youdo_parser import _youdo_listing_wall_clock_sec, youdo_source_fetch_wall_sec
+        os.environ["YOUDO_CAROUSEL_WALL_EXTRA_SEC"] = "150"
+        from youdo_parser import (
+            _youdo_listing_wall_clock_sec,
+            youdo_source_fetch_wall_sec,
+        )
 
-        self.assertGreaterEqual(_youdo_listing_wall_clock_sec(), 90 * 3)
-        self.assertEqual(youdo_source_fetch_wall_sec(), _youdo_listing_wall_clock_sec())
+        inner = _youdo_listing_wall_clock_sec()
+        self.assertGreaterEqual(inner, 90 * 3 + 150)
+        self.assertGreater(youdo_source_fetch_wall_sec(), inner)
 
     @patch("youdo_parser._fetch_listing_html")
     def test_traffic_guard_skips_after_n_fails(self, mock_fetch: MagicMock) -> None:

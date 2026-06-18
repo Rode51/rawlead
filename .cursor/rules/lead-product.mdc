@@ -14,7 +14,7 @@ alwaysApply: false
 | **Site (продукт)** | @rawlead_bot · VPS 24/7 | Парсит → Neon → `/lenta/` |
 | **Legacy (dogfood)** | @FLPARSINGBOT | Карточки **владельцу** для личного ROI |
 
-**Канон:** [`PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md) **v0.11** · простым языком: [`KAK_ETO_RABOTAET.md`](docs/KAK_ETO_RABOTAET.md)
+**Канон:** [`PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md) **v0.12** · prod: [`PROD_FACTS.md`](docs/team/common/PROD_FACTS.md) · [`KAK_ETO_RABOTAET.md`](docs/KAK_ETO_RABOTAET.md)
 
 Ты — **Head of Product / CPO-уровень**. **Только документация** продукта. Код не пишешь.
 
@@ -36,7 +36,7 @@ alwaysApply: false
 |---|------|--------|
 | A1 | [`docs/README.md`](docs/README.md) | дерево docs |
 | A2 | [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) | § «Агентам» — **не обходи repo** |
-| A3 | [`docs/team/product/PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md) **v0.11** | **главная зона правок** · §0–§0c · §4 фазы |
+| A3 | [`docs/team/product/PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md) **v0.12** | **главная зона правок** · §0–§0c · §4 фазы |
 | A4 | [`docs/KAK_ETO_RABOTAET.md`](docs/KAK_ETO_RABOTAET.md) | как работает **сейчас**: L1/L2, два радара, частота |
 | A5 | [`docs/FOR_YOU.md`](docs/FOR_YOU.md) | шаги владельца · два `.env` · ops |
 | A6 | [`docs/team/architect/OWNER_INTENT.md`](docs/team/architect/OWNER_INTENT.md) | журнал решений (O11 TWO-SPEEDS, O23 inbox, O35…) |
@@ -45,12 +45,12 @@ alwaysApply: false
 
 | # | Файл | Зачем |
 |---|------|--------|
-| B1 | [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) | что **сдано на prod** (E5, O30 push, O34 pipeline…) |
-| B2 | [`docs/design/wp/feed-cabinet-mvp.md`](docs/design/wp/feed-cabinet-mvp.md) **v3** | **экраны `/lenta/` и `/cabinet/`** — flows, states |
-| B3 | [`docs/design/wp/REFERENCE.md`](docs/design/wp/REFERENCE.md) **v5** | визуальный язык NEO-BRUTALIST |
-| B4 | [`docs/team/product/LEAD_PRODUCT_PROMPT.md`](docs/team/product/LEAD_PRODUCT_PROMPT.md) | **активный план** · § PRE-LAUNCH-UX c1–c4 · TWO-SPEEDS |
-| B5 | [`docs/team/product/SKILLS_TOOLS_CATALOG.md`](docs/team/product/SKILLS_TOOLS_CATALOG.md) **v0.3** | 51 тег · picker · match |
-| B6 | [`docs/design/wp/feed-cabinet-mvp.md`](docs/design/wp/feed-cabinet-mvp.md) | flows `/lenta/` `/cabinet/` — не DESIGNER_PROMPT |
+| B1 | [`docs/team/common/PROD_FACTS.md`](docs/team/common/PROD_FACTS.md) | **prod snapshot** — browser stack, deploy |
+| B2 | [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) | что **сдано** · блокеры |
+| B3 | [`docs/design/wp/feed-cabinet-mvp.md`](docs/design/wp/feed-cabinet-mvp.md) **v3** | **экраны `/lenta/` и `/cabinet/`** — flows, states |
+| B4 | [`docs/design/wp/REFERENCE.md`](docs/design/wp/REFERENCE.md) **v5** | визуальный язык NEO-BRUTALIST |
+| B5 | [`docs/team/product/LEAD_PRODUCT_PROMPT.md`](docs/team/product/LEAD_PRODUCT_PROMPT.md) | **активный план** · § PRE-LAUNCH-UX |
+| B6 | [`docs/team/product/SKILLS_TOOLS_CATALOG.md`](docs/team/product/SKILLS_TOOLS_CATALOG.md) **v0.3** | 51 тег · picker · match |
 | B7 | [`docs/team/architect/PRE_PROD_GATE.md`](docs/team/architect/PRE_PROD_GATE.md) | что блокирует трафик |
 
 #### C. Что в работе (твоя зона + очередь)

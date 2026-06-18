@@ -13,7 +13,9 @@ from bs4 import BeautifulSoup
 
 from config import Config
 from exchange_browser_fetch import (
-    fetch_listing_html_browser_wall_clock,
+    fetch_listing_html_browser_slots_wall_clock,
+    fl_listing_subprocess_enabled,
+    fl_listing_user_agent,
     listing_browser_enabled,
 )
 from exchange_proxy import exchange_fetch_begin, exchange_fetch_end, exchange_get, proxy_log_hint
@@ -25,6 +27,8 @@ from listing_fresh import trim_listing_at_known
 from radar_cycle_log import log_pipeline_line, stash_listing_metrics
 
 logger = logging.getLogger(__name__)
+
+_fl_last_listing_html: str = ""
 
 # Сколько страниц ленты запрашивать за один цикл (см. docs/SOURCES.md).
 def _fl_listing_max_pages() -> int:
@@ -48,6 +52,222 @@ def _fl_listing_wall_clock_sec() -> float:
         return max(float(raw), 10.0)
     except ValueError:
         return 120.0
+
+
+def _fl_allow_httpx_fallback() -> bool:
+    """O210: skip httpx cascade when browser subprocess handles listing."""
+    if listing_browser_enabled() and fl_listing_subprocess_enabled():
+        return os.getenv("FL_HTTPX_FALLBACK", "0").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+    return os.getenv("FL_HTTPX_FALLBACK", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
+
+
+def _fl_httpx_auto_fallback_enabled() -> bool:
+    """O257: auto httpx fallback when browser/subprocess fails or returns empty.
+
+    Enabled by default regardless of FL_LISTING_SUBPROCESS.
+    Disable with FL_HTTPX_AUTO_FALLBACK=0 if httpx is also blocked.
+    """
+    return os.getenv("FL_HTTPX_AUTO_FALLBACK", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
+
+
+def _fl_httpx_max_bans() -> int:
+    raw = os.getenv("FL_HTTPX_MAX_BANS", "4").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 4
+
+
+def _fl_parsed_zero_streak_threshold() -> int:
+    raw = os.getenv("FL_PARSED_ZERO_STREAK", "3").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 3
+
+
+def _fl_soft_antibot_streak_threshold() -> int:
+    raw = os.getenv("FL_SOFT_ANTIBOT_STREAK", "5").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 5
+
+
+def _fl_count_source_bans() -> int:
+    try:
+        from exchange_proxy import cascade_status_summary
+
+        summary = cascade_status_summary()
+        fl_ps = summary.get("primary") or summary
+        return len(fl_ps.get("banned") or [])
+    except Exception:
+        return 0
+
+
+def _fl_html_snip_for_log(html: str, *, limit: int = 300) -> str:
+    text = (html or "")[:limit]
+    return text.replace("\n", "\\n").replace("\r", "\\r").replace("\t", " ")
+
+
+def _fl_auto_ban_clear_cooldown_sec() -> float:
+    raw = os.getenv("FL_AUTO_BAN_CLEAR_COOLDOWN_SEC", "1800").strip()
+    try:
+        return max(60.0, float(raw))
+    except ValueError:
+        return 1800.0
+
+
+def _fl_auto_ban_clear_enabled() -> bool:
+    return os.getenv("FL_AUTO_BAN_CLEAR", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _fl_fetch_pool_ok() -> bool:
+    hint = proxy_log_hint("fl").lower()
+    return "pool_exhausted" not in hint and "alive=0/" not in hint
+
+
+def _fl_streak_get(storage: object | None) -> int:
+    if storage is None:
+        return 0
+    try:
+        return int(getattr(storage, "get_setting")("fl_parsed_zero_streak", "0") or "0")
+    except (TypeError, ValueError):
+        return 0
+
+
+def _fl_streak_set(storage: object | None, value: int) -> None:
+    if storage is None:
+        return
+    try:
+        storage.set_setting("fl_parsed_zero_streak", str(max(0, value)))
+    except Exception:
+        pass
+
+
+def _fl_last_auto_clear_at(storage: object | None) -> float:
+    if storage is None:
+        return 0.0
+    try:
+        return float(getattr(storage, "get_setting")("fl_auto_ban_clear_at", "0") or "0")
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _log_fl_parsed_zero_html_snip(cfg: Config) -> None:
+    if not listing_browser_enabled():
+        return
+    snip = _fl_html_snip_for_log(_fl_last_listing_html)
+    line = f"fl_listing:html_snip snip={snip}"
+    logger.warning(line)
+    log_pipeline_line(cfg.radar_log_path, line)
+
+
+def _maybe_fl_soft_antibot_reset(
+    cfg: Config,
+    storage: object | None,
+    streak: int,
+) -> bool:
+    """O256/O257: parsed=0 antibot HTML, proxy pool alive, no bans — hard reset.
+
+    O257: set_restart_source=False when subprocess enabled — teardown is inline;
+    deferred restart_source_fl flag only causes a no-op context close next cycle
+    and prolongs the restart loop.
+    """
+    if storage is None or streak < _fl_soft_antibot_streak_threshold():
+        return False
+    if _fl_count_source_bans() > 0:
+        return False
+    from exchange_browser_fetch import fl_hard_reset
+
+    fl_hard_reset(
+        reason=f"soft_antibot streak={streak}",
+        storage=storage,
+        set_restart_source=not fl_listing_subprocess_enabled(),
+    )
+    log_pipeline_line(
+        cfg.radar_log_path,
+        f"fl_listing:soft_antibot_reset streak={streak} bans_cleared=0",
+    )
+    _fl_streak_set(storage, 0)
+    return True
+
+
+def _maybe_fl_parsed_zero_recovery(
+    cfg: Config,
+    storage: object | None,
+    parsed_cards: int,
+) -> None:
+    """O233/O256: parsed=0 with alive pool → snip log + ban-clear or soft antibot reset."""
+    global _fl_last_listing_html
+    if parsed_cards > 0:
+        _fl_streak_set(storage, 0)
+        return
+    if not _fl_fetch_pool_ok():
+        return
+    streak = _fl_streak_get(storage) + 1
+    _fl_streak_set(storage, streak)
+    _log_fl_parsed_zero_html_snip(cfg)
+    sample = _fl_last_listing_html[:400].replace("\n", " ").replace("\r", " ")
+    line = f"fl_listing:empty_html streak={streak}"
+    if sample:
+        line = f"{line} sample={sample}"
+    logger.warning(line)
+    log_pipeline_line(cfg.radar_log_path, line)
+    if _maybe_fl_soft_antibot_reset(cfg, storage, streak):
+        return
+    threshold = _fl_parsed_zero_streak_threshold()
+    if streak < threshold or not _fl_auto_ban_clear_enabled() or storage is None:
+        return
+    now = time.time()
+    cooldown = _fl_auto_ban_clear_cooldown_sec()
+    last = _fl_last_auto_clear_at(storage)
+    if now - last < cooldown:
+        logger.info(
+            "fl_listing:auto_ban_clear skipped cooldown %ds left",
+            int(cooldown - (now - last)),
+        )
+        return
+    cleared = 0
+    try:
+        from exchange_proxy import clear_fl_source_bans
+
+        cleared = clear_fl_source_bans()
+    except Exception as exc:
+        logger.warning("fl_listing:auto_ban_clear failed: %s", exc)
+        return
+    from exchange_browser_fetch import fl_hard_reset
+
+    fl_hard_reset(
+        reason=f"parsed_zero streak={streak}",
+        storage=storage,
+        set_restart_source=not fl_listing_subprocess_enabled(),
+    )
+    try:
+        storage.set_setting("fl_auto_ban_clear_at", str(now))
+    except Exception:
+        pass
+    _fl_streak_set(storage, 0)
+    log_pipeline_line(
+        cfg.radar_log_path,
+        f"fl_listing:auto_ban_clear streak={streak} bans_cleared={cleared}",
+    )
 
 
 def _fl_listing_page_url(base_url: str, page: int) -> str:
@@ -149,10 +369,16 @@ def _fetch_listing_html_requests(
     timeout_sec: float,
     page: int,
 ) -> str | None:
-    headers = {"User-Agent": cfg.http_user_agent}
+    headers = {"User-Agent": fl_listing_user_agent(cfg.http_user_agent)}
     hint = proxy_log_hint("fl")
     try:
-        resp = exchange_get("fl", url, headers=headers, timeout_sec=timeout_sec)
+        resp = exchange_get(
+            "fl",
+            url,
+            headers=headers,
+            timeout_sec=timeout_sec,
+            max_bans=_fl_httpx_max_bans(),
+        )
     except requests.RequestException as exc:
         msg = f"Сетевой сбой при запросе ленты (стр. {page}, {hint}): {exc}"
         if page <= 1:
@@ -177,42 +403,84 @@ def _fetch_listing_html(
     *,
     timeout_sec: float,
     page: int,
+    storage: object | None = None,
 ) -> str | None:
+    """O257: browser fetch with pipeline-logged failures + auto httpx fallback."""
     hint = proxy_log_hint("fl")
+    ua = fl_listing_user_agent(cfg.http_user_agent)
     html: str | None = None
+    browser_fail_reason: str = ""
+    browser_fail_detail: str = ""
+
     if listing_browser_enabled():
         wall = _fl_listing_wall_clock_sec()
         try:
-            html = fetch_listing_html_browser_wall_clock(
+            html = fetch_listing_html_browser_slots_wall_clock(
                 "fl",
                 url,
-                user_agent=cfg.http_user_agent,
+                user_agent=ua,
                 timeout_sec=min(timeout_sec, wall),
                 wall_clock_sec=wall,
+                storage=storage,
             )
         except HtmlFetchError as exc:
-            if "timeout" in str(exc).lower():
+            exc_str = str(exc)
+            if "timeout" in exc_str.lower() or "wall-clock" in exc_str.lower():
+                browser_fail_reason = "browser_timeout"
                 logger.warning(
-                    "fl_listing: timeout after %ss — httpx fallback (%s)",
+                    "fl_listing: timeout after %ss — browser slots exhausted (%s)",
                     int(wall),
                     hint,
                 )
+            elif "ru_pool_dead" in exc_str.lower():
+                browser_fail_reason = "ru_pool_dead"
+                logger.warning("fl_listing: ru_pool_dead (%s)", hint)
             else:
+                browser_fail_reason = "browser_error"
                 logger.warning(
-                    "fl_listing: Playwright failed (%s) — httpx fallback (%s)",
+                    "fl_listing: Playwright failed (%s) — browser slots exhausted (%s)",
                     exc,
                     hint,
                 )
-    if html is None:
-        fb_t0 = time.monotonic() if os.getenv("RADAR_STAGE_LOG", "0").strip() in ("1", "true", "yes") else 0.0
-        html = _fetch_listing_html_requests(
-            url, cfg, timeout_sec=timeout_sec, page=page
-        )
-        if fb_t0 and html is not None:
-            logger.info(
-                "fetch:fl stage=fallback httpx elapsed=%.1fs",
-                time.monotonic() - fb_t0,
+            browser_fail_detail = exc_str[:200]
+            # O257: log browser failure to pipeline so it appears in radar_site.log
+            log_pipeline_line(
+                cfg.radar_log_path,
+                f"fetch:fl outcome=fail reason={browser_fail_reason}"
+                f" proxy_hint={hint} err={browser_fail_detail}",
             )
+
+    # O257: auto httpx fallback — fires when browser/subprocess returns None/empty,
+    # regardless of FL_LISTING_SUBPROCESS env (which disabled fallback in O210).
+    # Owner can disable with FL_HTTPX_AUTO_FALLBACK=0.
+    use_auto_fallback = html is None and _fl_httpx_auto_fallback_enabled()
+    use_legacy_fallback = html is None and not use_auto_fallback and _fl_allow_httpx_fallback()
+
+    if use_auto_fallback or use_legacy_fallback:
+        fb_t0 = time.monotonic()
+        try:
+            html = _fetch_listing_html_requests(url, cfg, timeout_sec=timeout_sec, page=page)
+        except Exception as fb_exc:
+            log_pipeline_line(
+                cfg.radar_log_path,
+                f"fetch:fl stage=fallback httpx outcome=fail"
+                f" reason=httpx_fail proxy_hint={hint} err={str(fb_exc)[:200]}",
+            )
+            logger.warning("fl_listing: httpx fallback failed (%s): %s", hint, fb_exc)
+            return None
+        elapsed = time.monotonic() - fb_t0
+        if html is not None:
+            log_pipeline_line(
+                cfg.radar_log_path,
+                f"fetch:fl stage=fallback httpx outcome=ok elapsed={elapsed:.1f}s",
+            )
+            logger.info("fetch:fl stage=fallback httpx outcome=ok elapsed=%.1fs", elapsed)
+        else:
+            log_pipeline_line(
+                cfg.radar_log_path,
+                f"fetch:fl stage=fallback httpx outcome=fail reason=httpx_empty proxy_hint={hint}",
+            )
+
     return html
 
 
@@ -244,7 +512,21 @@ def fetch_listing_projects(
             cfg.radar_log_path,
             f"listing:fl parsed={parsed_cards} fresh={fresh}",
         )
+        # O257: structured outcome line — owner can grep fetch:fl outcome= for daily triage.
+        hint = proxy_log_hint("fl")
+        if parsed_cards > 0:
+            log_pipeline_line(
+                cfg.radar_log_path,
+                f"fetch:fl outcome=ok reason=ok tier=dc parsed={parsed_cards}",
+            )
+        else:
+            reason = "browser_empty" if listing_browser_enabled() else "httpx_empty"
+            log_pipeline_line(
+                cfg.radar_log_path,
+                f"fetch:fl outcome=fail reason={reason} tier=dc parsed=0 proxy_hint={hint}",
+            )
         stash_listing_metrics("fl", parsed_cards, fresh)
+        _maybe_fl_parsed_zero_recovery(cfg, storage, parsed_cards)
         return trimmed
     finally:
         exchange_fetch_end("fl")
@@ -261,9 +543,14 @@ def _fetch_listing_pages(
 ) -> list[ListingProject]:
     for page in range(1, max_pages + 1):
         page_url = _fl_listing_page_url(cfg.fl_projects_url, page)
-        html = _fetch_listing_html(page_url, cfg, timeout_sec=timeout_sec, page=page)
+        html = _fetch_listing_html(
+            page_url, cfg, timeout_sec=timeout_sec, page=page, storage=storage
+        )
         if html is None:
             break
+        if page == 1:
+            global _fl_last_listing_html
+            _fl_last_listing_html = html
         batch = _parse_items(html, page_url)
 
         if not batch:

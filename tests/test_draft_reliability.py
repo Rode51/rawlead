@@ -19,7 +19,7 @@ from src.ai_analyze import (  # noqa: E402
     note_draft_request,
 )
 from src.draft_limits import draft_hourly_limit  # noqa: E402
-from src.match_push import draft_rate_limit_retry_after  # noqa: E402
+from src.match_push import draft_quota_for_user, draft_rate_limit_retry_after  # noqa: E402
 
 
 class TestDraftStats(unittest.TestCase):
@@ -34,7 +34,7 @@ class TestDraftStats(unittest.TestCase):
 
 
 class TestDraftRateLimit(unittest.TestCase):
-    def test_default_limit_disabled(self) -> None:
+    def test_default_limit_ten(self) -> None:
         import os
 
         old = os.environ.pop("DRAFT_HOURLY_LIMIT", None)
@@ -44,13 +44,28 @@ class TestDraftRateLimit(unittest.TestCase):
             import src.draft_limits as dl
 
             reload(dl)
-            self.assertEqual(dl.draft_hourly_limit(), 0)
-            uid = "00000000-0000-0000-0000-000000000010"
-            for _ in range(20):
-                self.assertIsNone(draft_rate_limit_retry_after(uid))
+            self.assertEqual(dl.draft_hourly_limit(), 10)
+            self.assertIn("10", dl.draft_rate_limit_detail())
         finally:
             if old is not None:
                 os.environ["DRAFT_HOURLY_LIMIT"] = old
+
+    def test_zero_disables_limit(self) -> None:
+        import os
+
+        os.environ["DRAFT_HOURLY_LIMIT"] = "0"
+        from importlib import reload
+
+        import src.draft_limits as dl
+
+        reload(dl)
+        self.assertEqual(dl.draft_hourly_limit(), 0)
+        self.assertEqual(dl.draft_rate_limit_detail(), "")
+        uid = "00000000-0000-0000-0000-000000000010"
+        for _ in range(20):
+            self.assertIsNone(draft_rate_limit_retry_after(uid))
+        os.environ.pop("DRAFT_HOURLY_LIMIT", None)
+        reload(dl)
 
     def test_rate_limit_blocks_when_configured(self) -> None:
         import os
@@ -70,6 +85,36 @@ class TestDraftRateLimit(unittest.TestCase):
         self.assertGreater(retry, 0)
         os.environ.pop("DRAFT_HOURLY_LIMIT", None)
         reload(dl)
+
+
+class TestDraftQuota(unittest.TestCase):
+    def test_quota_tracks_used_and_remaining(self) -> None:
+        import os
+        from importlib import reload
+
+        import src.draft_limits as dl
+        import src.match_push as mp
+
+        os.environ["DRAFT_HOURLY_LIMIT"] = "10"
+        reload(dl)
+        reload(mp)
+        uid = "00000000-0000-0000-0000-000000000088"
+        mp._draft_attempts.pop(uid, None)
+        self.assertEqual(draft_quota_for_user(uid)["draft_remaining"], 10)
+        for _ in range(9):
+            self.assertIsNone(draft_rate_limit_retry_after(uid))
+        quota = draft_quota_for_user(uid)
+        self.assertEqual(quota["draft_used"], 9)
+        self.assertEqual(quota["draft_remaining"], 1)
+        self.assertIsNone(draft_rate_limit_retry_after(uid))
+        quota = draft_quota_for_user(uid)
+        self.assertEqual(quota["draft_used"], 10)
+        self.assertEqual(quota["draft_remaining"], 0)
+        self.assertGreater(quota["draft_retry_after_sec"], 0)
+        self.assertIsNotNone(draft_rate_limit_retry_after(uid))
+        os.environ.pop("DRAFT_HOURLY_LIMIT", None)
+        reload(dl)
+        reload(mp)
 
 
 class TestAnalyzePremiumRetries(unittest.TestCase):

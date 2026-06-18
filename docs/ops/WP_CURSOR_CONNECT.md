@@ -87,6 +87,8 @@ cd C:\Users\hramo\uisness
 .venv\Scripts\python.exe scripts\wp_link_theme_local.py --force
 ```
 
+Страница **`/quiz/`** (шаблон `page-quiz.php`, не в плагине skeleton): junction + WP-CLI одной командой — `.venv\Scripts\python.exe scripts\wp_link_theme_local.py --force --ensure-pages` (Local **Start**, idempotent).
+
 **BrowserSync** (прокси + inject CSS без F5):
 
 ```powershell

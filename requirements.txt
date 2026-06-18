@@ -15,7 +15,8 @@ psutil>=5.9.0
 # VPS deploy scripts (deploy_vps_ssh.py, wp-vps-skeleton-pages.py)
 paramiko>=3.0.0
 # P1.3c: fallback HTML при антиботе (после pip install: playwright install chromium)
-playwright>=1.40.0
+# Camoufox 0.4.x: playwright>=1.60 ломает FF driver на youdo.com (camoufox#617) — pin <1.60
+playwright>=1.40.0,<1.60.0
 # O189: YouDo antibot — patch Runtime.Enable CDP (после pip: patchright install chromium)
 patchright>=1.49.0
 # O190: YouDo camoufox fallback (после pip: python -m camoufox fetch)

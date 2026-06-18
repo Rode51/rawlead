@@ -184,16 +184,20 @@ UI Healthchecks: **Period 10 min** · **Grace 15 min** · Integrations → Teleg
 
 **O158 match UX** (push dedup · feed bar · `?lead=` km): `scripts/deploy-o158-vps.py` — api + radar + theme **1.18.49**.
 
-**O156–O157 YouDo** (residential, один прокси):
+**O156–O157 YouDo** (residential, camoufox):
 
 ```env
+YOUDO_BROWSER=camoufox          # prod: Firefox antidetect, NOT Chromium
 YOUDO_BROWSER_ONLY=1
 YOUDO_ONE_SLOT_PER_CYCLE=1
 YOUDO_DETAIL_MIN_CHARS=300
 YOUDO_FETCH_EVERY_N_CYCLES=4
 YOUDO_WARM_TTL_MIN=45
+YOUDO_HARD_RESET_FAILS=3        # O254 auto-recovery
 SECONDARY_FETCH_EVERY_N_CYCLES=4   # опц. все secondary реже
 ```
+
+Listing: subprocess `scripts/youdo_fetch_worker.py` · recovery: `youdo_hard_reset()` (O254).
 
 **ПК / Cursor:** те же `TG_*` / `TELETHON_*` в локальном `.env`; `FL_PROXY_URLS` на ПК **не нужны**, если Site ■ (парсинг только VPS).
 

@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""FL listing fetch worker — clean subprocess (O193)."""
+"""FL listing fetch worker — clean subprocess (O193/O233)."""
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from pathlib import Path
+
+logging.basicConfig(level=logging.WARNING, stream=sys.stderr, force=True)
 
 _SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(_SRC))

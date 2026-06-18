@@ -16,15 +16,36 @@
 
 ---
 
+## PROD_FACTS — анти-drift (2026-06-16)
+
+**Проблема:** агенты читают старые `problems/`, архив или устаревший § CODER → путают Playwright/Chromium с Camoufox, «deploy ⏳» с prod.
+
+**Решение:** [`PROD_FACTS.md`](PROD_FACTS.md) — **единый снимок prod** (browser stack, deploy, theme, systemd).
+
+| Когда | Кто | Действие |
+|-------|-----|----------|
+| **Перед triage / «что на prod»** | Lead · Mechanic · Coder | Прочитать `PROD_FACTS` + `STATUS` hot |
+| **После verify/deploy** | Lead | Обновить `PROD_FACTS` (5 мин) · `STATUS` · при необходимости `FOR_YOU` |
+| **Новый факт о prod** | Lead | Только в `PROD_FACTS`, не в чат и не в новый md |
+| **Исторический тикет** | Mechanic | Не менять задним числом · в шапке «сверять PROD_FACTS» |
+
+**Иерархия правды (новое > старое):**
+
+```
+PROD_FACTS.md  →  STATUS.md hot  →  CODER_PROMPT hot  →  problems/ (дата тикета)  →  archive (не трогать)
+```
+
+---
+
 ## Папки `docs/team/`
 
 | Папка | Кто | Содержание |
 |-------|-----|------------|
-| **`common/`** | все AI | PROJECT_MAP, STATUS, TASKS, SCALE, DOCS_ARCHITECTURE, HOW_TO_USE_CURSOR, MCP |
-| **`architect/`** | Lead Architect, Coder (промпт) | LEAD, ROADMAP, CODER_PROMPT, ARCHITECTURE, CODE_STRUCTURE, NEON_SCHEMA, TZ_* |
-| **`product/`** | Lead Product | PRODUCT_VISION, LEAD_PRODUCT*, PORTFOLIO |
-| **`design/`** | Lead Designer, Designer | LEAD_DESIGN*, DESIGN_SYSTEM, DESIGNER_PROMPT, DESIGN_BRIEF |
-| **`archive/`** | — | история, исследования (не обновлять) |
+| **`common/`** | все AI | PROJECT_MAP, **PROD_FACTS**, STATUS, TASKS, DOCS_ARCHITECTURE, MCP |
+| **`architect/`** | Lead Architect, Coder (промпт) | LEAD, ROADMAP, CODER_PROMPT, ARCHITECTURE, CODE_STRUCTURE |
+| **`product/`** | Lead Product | PRODUCT_VISION, LEAD_PRODUCT* |
+| **`design/`** | Lead Designer | LEAD_DESIGN*, DESIGNER_PROMPT |
+| **`archive/`** | — | история (не обновлять) |
 
 Другие папки `docs/`: `ops/`, `problems/`, `design/` (макеты PNG), `archive/`.
 
@@ -34,78 +55,41 @@
 
 | Тема | Файл |
 |------|------|
+| **Prod snapshot (browser, deploy)** | **`team/common/PROD_FACTS.md`** |
 | **Навигация AI** | `team/common/PROJECT_MAP.md` |
-| Фазы (из vision) | `team/architect/ROADMAP.md` — **Lead Architect** |
-| **Мысли / решения владельца** (handoff Lead) | `team/architect/OWNER_INTENT.md` — **Lead Architect** · § Бэклог владельца (triage) |
-| Vision продукта | `team/product/PRODUCT_VISION.md` — **Lead Product** |
+| Фазы | `team/architect/ROADMAP.md` |
+| Мысли владельца | `team/architect/OWNER_INTENT.md` |
+| Vision | `team/product/PRODUCT_VISION.md` v0.12 |
 | Шаги владельца | `FOR_YOU.md` |
 | Как устроено | `KAK_ETO_RABOTAET.md` |
-| Очередь | `team/common/TASKS.md` |
-| Снимок | `team/common/STATUS.md` (**≤~80 строк**, hot) · детали → `team/archive/STATUS_ARCHIVE.md` |
-| Coder ТЗ | `team/architect/CODER_PROMPT.md` (**hot ≤120**) · `archive/CODER_PROMPT_ARCHIVE.md` |
-| Design § | `team/design/DESIGNER_PROMPT.md` (**hot ≤80**) · `archive/DESIGNER_PROMPT_ARCHIVE.md` |
-| **Team kit (новые проекты)** | `team/templates/cursor-team-kit/` |
-| Product план | `team/product/LEAD_PRODUCT_PROMPT.md` |
-| Конкурентная разведка + пивот | `team/product/MARKET_INTEL.md` |
-| Design план | `team/design/LEAD_DESIGN_PROMPT.md` |
-| Design спека (активная §) | `team/design/DESIGNER_PROMPT.md` |
-| Design регламент | `team/design/LEAD_DESIGN.md` |
-| WP визуальный канон | `docs/design/wp/REFERENCE.md` |
-| WP техспека волны | `docs/design/wp/wave-*-brief.md` |
-| Пульт desktop | `team/design/DESIGN_BRIEF.md` (**не WP**) |
-| Product регламент | `team/product/LEAD_PRODUCT.md` |
-| Design регламент | `team/design/LEAD_DESIGN.md` |
-| Git / чистота | `team/architect/LEAD.md` § Git |
-| MCP | `team/common/MCP_POOL.md` |
-| Запуск | `ops/RUN.md` |
-| TG acc | `ops/TELEGRAM_ACCOUNTS.md` |
-| Фильтр (код) | `ops/FILTERS.md` |
-| FL/Kwork + TG | `ops/SOURCES_POOLS.md` |
-
----
-
-## Архив (не обновлять)
-
-| Было | Стало |
-|------|--------|
-| `docs/ROADMAP.md` | `team/architect/ROADMAP.md` |
-| `docs/PORTFOLIO.md` | `team/common/PORTFOLIO.md` |
-| `team/*.md` в корне team | `common/` · `architect/` · `product/` · `design/` |
-| `ops/SOURCES.md` | `archive/SOURCES.md` |
-| `ops/SOURCES_SAAS.md` | `archive/SOURCES_SAAS.md` + stub в `ops/` |
-| `architect/PORTFOLIO_SPRINT.md` | `team/archive/PORTFOLIO_SPRINT.md` (2026-05-28) |
+| Очередь | `TASKS.md` |
+| Снимок задач | `STATUS.md` (≤~80) · `STATUS_ARCHIVE` |
+| Coder ТЗ | `CODER_PROMPT.md` (≤~120 hot) · `CODER_PROMPT_ARCHIVE` |
+| Поломка | `problems/` — **дата + сверка PROD_FACTS** |
+| Deploy runbook | `ops/DEPLOY_VPS.md` |
+| Биржи env | `ops/SOURCES_POOLS.md` + **PROD_FACTS § browser** |
 
 ---
 
 ## Правила
 
 1. Одна тема = один канон (таблица выше).
-2. FOR_YOU ≤ 1 экран; детали → README или KAK_ETO.
-3. **STATUS ≤ ~80** · **CODER_PROMPT ≤ ~120** · **DESIGNER_PROMPT ≤ ~80** — hot-only; закрытое → `team/archive/*_ARCHIVE.md`.
-4. Новый `.md` — только с согласия владельца + строка в § Канон.
-5. **Зоны ролей (не путать):**
-
-| Файл | Кто пишет | Lead Architect |
-|------|-----------|----------------|
-| `OWNER_INTENT.md` | Lead + журнал решений | ✅ решения владельца |
-| `LEAD_PRODUCT_PROMPT.md` | **@lead-product** | ❌ только read · handoff в TASKS |
-| `LEAD_DESIGN_PROMPT.md` | **@lead-designer** | ❌ только read |
-| `CODER_PROMPT.md` hot | Lead | ✅ · DoD закрытый → archive |
-| `PRODUCT_VISION.md` | PM + owner | ❌ Lead read-only |
-| `docs/problems/` | Mechanic | triage → Mechanic |
-
-6. **DRAFT:** идея/copy из чата владельца → сначала `OWNER_INTENT` §; **не** черновить product-copy в Architect-чате (ошибка 2026-06-03, § O105).
+2. **PROD_FACTS** обязателен при любом ответе «как у нас на prod».
+3. FOR_YOU ≤ 1 экран; детали → README / KAK_ETO / PROD_FACTS.
+4. **STATUS ≤ ~80** · **CODER_PROMPT ≤ ~120** · закрытое → archive.
+5. Новый `.md` — с согласия владельца + строка в § Канон.
+6. `problems/` — исторический снимок; не переписывать прошлое, добавлять resolution §.
 
 ---
 
-## Проверка чистоты
+## Проверка чистоты (Lead, раз в неделю или после волны)
 
-| Проверено | Результат |
-|-----------|-----------|
-| Корень `docs/` | 3 файла |
-| `docs/team/` | 4 рабочие папки + `archive/` |
-| `docs/team/design/` vs `docs/design/` | markdown vs макеты — **не путать** |
+- [ ] `PROD_FACTS` дата ≤ 7 дней или после последнего deploy
+- [ ] `FOR_YOU` «Сейчас» совпадает с `STATUS` Next
+- [ ] `ARCHITECTURE` / `CODE_STRUCTURE` browser stack = `PROD_FACTS`
+- [ ] `CODER_PROMPT` ≤ 120 строк · closed § только index
+- [ ] Нет «deploy ⏳» в index для уже prod §
 
 ---
 
-_Lead Architect · 2026-05-24 · реорганизация team/_
+_Lead Architect · 2026-05-24 · PROD_FACTS anti-drift 2026-06-16_

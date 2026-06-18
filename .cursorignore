@@ -1,0 +1,8 @@
+﻿.venv/
+desktop/src-tauri/target/
+data/
+.playwright-mcp/
+**/node_modules/
+audit_*.png
+o105_*.png
+rawlead_*.png

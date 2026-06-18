@@ -6,8 +6,8 @@ import os
 
 
 def draft_hourly_limit() -> int:
-    """DRAFT_HOURLY_LIMIT: 0 = без лимита (default)."""
-    raw = os.environ.get("DRAFT_HOURLY_LIMIT", "0").strip()
+    """DRAFT_HOURLY_LIMIT: 0 = без лимита · default 10 (O220 r1)."""
+    raw = os.environ.get("DRAFT_HOURLY_LIMIT", "10").strip()
     try:
         n = int(raw)
     except ValueError:
@@ -19,7 +19,7 @@ def draft_rate_limit_detail() -> str:
     lim = draft_hourly_limit()
     if lim <= 0:
         return ""
-    return f"draft rate limit: max {lim}/hour"
+    return f"Лимит — {lim} черновиков в час. Попробуй позже."
 
 
 def draft_warm_hourly_cap() -> int:

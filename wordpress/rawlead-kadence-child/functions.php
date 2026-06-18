@@ -11,12 +11,13 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('RAWLEAD_CHILD_VERSION', '1.19.02');
+define('RAWLEAD_CHILD_VERSION', '1.19.20');
 define('RAWLEAD_CHILD_DIR', get_stylesheet_directory());
 define('RAWLEAD_CHILD_URI', get_stylesheet_directory_uri());
 
 require_once RAWLEAD_CHILD_DIR . '/inc/template-tags.php';
 require_once RAWLEAD_CHILD_DIR . '/inc/marketing.php';
+require_once RAWLEAD_CHILD_DIR . '/inc/yandex-metrika.php';
 require_once RAWLEAD_CHILD_DIR . '/inc/rawlead-api.php';
 
 /**
@@ -258,6 +259,7 @@ add_action('wp_enqueue_scripts', static function (): void {
             'restTags'         => esc_url_raw(rest_url('rawlead/v1/me/tags')),
             'restSkills'       => esc_url_raw(rest_url('rawlead/v1/skills/catalog')),
             'restDraft'        => esc_url_raw(rest_url('rawlead/v1/me/leads')),
+            'restDraftQuota'   => esc_url_raw(rest_url('rawlead/v1/me/draft/quota')),
             'restLeadAdmin'    => esc_url_raw(rest_url('rawlead/v1/leads')),
             'restSubscription' => esc_url_raw(rest_url('rawlead/v1/me/subscription')),
             'restMe'           => esc_url_raw(rest_url('rawlead/v1/me')),

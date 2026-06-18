@@ -178,6 +178,50 @@ class TestFeedSourceParamEndpoint(unittest.TestCase):
         mock_match.assert_called_once()
         self.assertEqual(mock_match.call_args.kwargs.get("source_keys"), ["fl"])
 
+    def test_me_feed_passes_source_keys(self) -> None:
+        user_id = "00000000-0000-0000-0000-000000000066"
+        token = issue_access_token(user_id, tg_user_id=666)
+        empty_page = ([], 0, 0)
+        with patch.object(api_server, "psycopg") as mock_pg:
+            conn = MagicMock()
+            cur = MagicMock()
+            mock_pg.connect.return_value.__enter__.return_value = conn
+            conn.cursor.return_value.__enter__.return_value = cur
+            with patch.object(
+                api_server, "_personal_feed_page", return_value=empty_page
+            ) as mock_personal:
+                client = TestClient(app)
+                resp = client.get(
+                    "/v1/me/feed?sort=time&source=tg&limit=5",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["source"], ["tg"])
+        mock_personal.assert_called_once()
+        self.assertEqual(mock_personal.call_args.kwargs.get("source_keys"), ["tg"])
+
+    def test_me_feed_source_fl_only(self) -> None:
+        user_id = "00000000-0000-0000-0000-000000000067"
+        token = issue_access_token(user_id, tg_user_id=667)
+        empty_page = ([], 0, 0)
+        with patch.object(api_server, "psycopg") as mock_pg:
+            conn = MagicMock()
+            cur = MagicMock()
+            mock_pg.connect.return_value.__enter__.return_value = conn
+            conn.cursor.return_value.__enter__.return_value = cur
+            with patch.object(
+                api_server, "_personal_feed_page", return_value=empty_page
+            ) as mock_personal:
+                client = TestClient(app)
+                resp = client.get(
+                    "/v1/me/feed?source=fl&limit=5",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["source"], ["fl"])
+        mock_personal.assert_called_once()
+        self.assertEqual(mock_personal.call_args.kwargs.get("source_keys"), ["fl"])
+
 
 class TestFeedPrefsSource(unittest.TestCase):
     def test_normalize_source_csv(self) -> None:

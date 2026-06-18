@@ -10,7 +10,7 @@ declare(strict_types=1);
 $cabinet_login = esc_url(rawlead_cabinet_login_url());
 $pricing = esc_url(rawlead_page_url('pricing'));
 ?>
-<?php $quiz = esc_url(rawlead_page_url('quiz')); ?>
+<?php $quiz = esc_url(rawlead_quiz_url()); ?>
 <div class="rl-feed-strip" id="rl-feed-strip" hidden>
 	<div class="rl-feed-strip__anon rl-feed-anon-strip">
 		<span class="rl-feed-anon-strip__delay"><?php esc_html_e('Заказы с задержкой 30 мин.', 'rawlead-kadence-child'); ?></span>

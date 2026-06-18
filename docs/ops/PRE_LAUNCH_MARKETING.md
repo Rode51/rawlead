@@ -20,7 +20,9 @@
 | **O72** prod audit (auto) | **✅ O72b** | `preprod_ai_prod_audit.json` |
 | **O72c LLM judge + промпты** | **📋 перед рекламой** | § O72c |
 | **O76 UX re-audit** | **📋 gate soft ads** | § O76 · re-run O37c |
-| **Heatmap (Metrika / Clarity)** | **📋 backlog** | § O73 |
+| **SEO (O113)** | **📋 до ads** | `ROADMAP` волна 5 · `TASKS` 62 |
+| **Яндекс.Метрика (счётчик + цели)** | **📋 до ads** | `TASKS` 63 · owner — ID счётчика |
+| **Heatmap (Metrika / Clarity)** | **📋 после базового счётчика** | § O73 |
 | Draft burst под нагрузкой | **не тестировали** | опционально перед большой кампанией |
 
 **Infra gate закрыт.** Реклама проекта — после **ручной приёмки draft** + желательно **O72 baseline**.
@@ -112,7 +114,7 @@
 |----------|-----------------|----------|
 | ~50 concurrent **читателей** ленты/API | **✅** k6 O71 | повтор после крупного deploy API |
 | **50× draft** одновременно | **❌** | опционально `preprod_k6` расширение или ручной burst перед большой рекламой |
-| Playwright UX | **✅** 18/19 (O37c) | **O76 re-run** перед soft ads (theme v1.11.15 + O75) |
+| Playwright UX | **✅** 18/19 (O37c) · **📋 O218** quiz E2E multi-user mobile+desktop | § O218-w · после tier smoke |
 
 Runbook stress: [`PREPROD_STRESS_RUN.md`](PREPROD_STRESS_RUN.md)
 

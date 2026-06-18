@@ -1,6 +1,6 @@
-"""O114: pre-L1 отсечение вакансий / найма в штат (не фриланс-заказ).
+"""O114/O223: pre-L1 отсечение вакансий и физических услуг (не digital-фриланс).
 
-Синхрон с docs/team/archive/FILTERS_DEEP_RESEARCH_2026.md §3 и CODER_PROMPT § O114.
+Синхрон с docs/team/archive/FILTERS_DEEP_RESEARCH_2026.md §3 и CODER_PROMPT § O114/O223.
 """
 
 from __future__ import annotations
@@ -150,6 +150,86 @@ def vacancy_lite_analysis(*, title: str, body: str = "") -> AiLiteAnalysis | Non
         ai_reasons=(
             "Найм в штат / вакансия — не фриланс-заказ",
             "Маркеры HR, зарплаты или трудового договора",
+        ),
+        complexity=1,
+        primary_category="",
+    )
+
+
+# O223/O245: физические / логистические / onsite-услуги YouDo (не digital-фриланс)
+_PHYSICAL_SERVICE_MARKERS: tuple[str, ...] = (
+    "гидроборт",
+    "перевоз",
+    "грузчик",
+    "междугород",
+    "эвакуатор",
+    "погрузк",
+    "паллет",
+    "рохл",
+    "курьер",
+    "выезд",
+    "на дому",
+    "у клиента",
+    "с указанием адреса",
+    "по адресу",
+    "установить виндоус",
+    "установить windows",
+    "установка виндоус",
+    "установка windows",
+    "на imac",
+    "на macbook",
+)
+
+# «курьер» без digital-контекста — физуслуга; API/бот/CRM — dev
+_DIGITAL_COURIER_HINTS: tuple[str, ...] = (
+    "api",
+    "интеграц",
+    "telegram",
+    "телеграм",
+    "бот",
+    "crm",
+    "разработ",
+    "программ",
+    "сайт",
+    "приложен",
+    "wordpress",
+    "бэкенд",
+    "backend",
+    "rest api",
+)
+
+
+def _has_digital_courier_hint(hay: str) -> bool:
+    return any(h in hay for h in _DIGITAL_COURIER_HINTS)
+
+
+def is_physical_service_job(title: str, body: str = "") -> bool:
+    """True — логистика/физическая услуга, не показывать в /lenta/."""
+    hay = _haystack(title, body)
+    if not hay.strip():
+        return False
+    for marker in _PHYSICAL_SERVICE_MARKERS:
+        if marker.casefold() not in hay:
+            continue
+        if marker == "курьер" and _has_digital_courier_hint(hay):
+            continue
+        return True
+    return False
+
+
+def physical_service_lite_analysis(*, title: str, body: str = "") -> AiLiteAnalysis | None:
+    """Готовый L1-результат без OpenRouter, если физическая услуга."""
+    if not is_physical_service_job(title, body):
+        return None
+    from ai_analyze import AiLiteAnalysis
+
+    return AiLiteAnalysis(
+        feed_visible=False,
+        task_summary="физическая услуга, не digital-фриланс",
+        lead_tags=(),
+        ai_reasons=(
+            "Физическая или onsite-услуга — не digital-фриланс",
+            "Маркеры выезда, адреса клиента, перевозки или onsite-установки",
         ),
         complexity=1,
         primary_category="",

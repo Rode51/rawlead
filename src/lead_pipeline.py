@@ -73,39 +73,45 @@ def _resolve_ingest_body(
     project: ListingProject,
     cfg: Config,
     errors: list[str],
-) -> tuple[str, dict | None]:
-    """Полный текст ТЗ для ingest/L1/L2: detail page + O108 вложения."""
+) -> tuple[str, dict | None, bool | None]:
+    """Полный текст ТЗ для ingest/L1/L2: detail page + O108 вложения.
+
+    Третий элемент — detail fetch ok для YouDo (None если fetch не вызывался).
+    """
     base = (project.listing_snippet or project.title or "").strip()
     html = ""
     ext_id = str(project.project_id)
     source = project.source
+    detail_ok: bool | None = None
 
     if is_web_detail_source(source):
         if source == SOURCE_YOUDO:
             if not _youdo_detail_fetch_enabled():
-                return base, None
+                return base, None, None
             if len(base) >= _youdo_detail_min_chars():
-                return base, None
+                return base, None, None
         text, html, ok = fetch_project_detail(
             source,
             project.url,
             cfg,
             fallback_snippet=base,
         )
+        if source == SOURCE_YOUDO:
+            detail_ok = ok
         if ok and text:
             base = text
         elif not ok:
             errors.append(f"{source}:id={ext_id} ai:detail:fallback")
     else:
-        return base, None
+        return base, None, None
 
     if source not in (SOURCE_FL, SOURCE_KWORK) or not html.strip():
-        return base, None
+        return base, None, detail_ok
 
     from tz_attachments import enrich_body_with_attachments, tz_attachments_enabled
 
     if not tz_attachments_enabled():
-        return base, None
+        return base, None, detail_ok
 
     result = enrich_body_with_attachments(
         project.source,
@@ -119,7 +125,7 @@ def _resolve_ingest_body(
     if result.tz_attachment:
         st = result.tz_attachment.status
         errors.append(f"{project.source}:id={ext_id} tz_attachment:{st}")
-    return result.body, tz_dict
+    return result.body, tz_dict, detail_ok
 
 
 def _resolve_description(
@@ -128,9 +134,54 @@ def _resolve_description(
     errors: list[str],
 ) -> str:
     if is_web_detail_source(project.source):
-        body, _ = _resolve_ingest_body(project, cfg, errors)
+        body, _, _ = _resolve_ingest_body(project, cfg, errors)
         return body or (project.listing_snippet or project.title)
     return project.listing_snippet or project.title
+
+
+def _youdo_detail_short_skips_l1(
+    project: ListingProject,
+    body: str,
+    detail_ok: bool | None,
+) -> bool:
+    """O223: detail fetch failed and body too short — не вызывать L1."""
+    if project.source != SOURCE_YOUDO:
+        return False
+    if detail_ok is not False:
+        return False
+    return len((body or "").strip()) < _youdo_detail_min_chars()
+
+
+def _apply_physical_pre_l1(
+    project: ListingProject,
+    *,
+    ingest_body: str,
+    cfg: Config,
+    pg: NeonLeadStorage | None,
+    errors: list[str],
+    stats: SourceCycleStats | None,
+    tz_attachment_meta: dict | None,
+) -> bool:
+    """O223: физуслуга без OpenRouter — Neon + rollup. True если обработано."""
+    from vacancy_filter import physical_service_lite_analysis
+
+    lite = physical_service_lite_analysis(title=project.title, body=ingest_body)
+    if lite is None:
+        return False
+    reason = "skip:physical_service"
+    errors.append(f"{project.source}:id={project.project_id} {reason}")
+    if stats is not None:
+        stats.note_skip(reason)
+    if pg is not None:
+        pg.update_after_lite(
+            project,
+            lite=lite,
+            errors=errors,
+            body_snippet=ingest_body,
+            tz_attachment=tz_attachment_meta,
+        )
+        _rollup_after_lite(cfg, project, lite, ingest_snippet=ingest_body)
+    return True
 
 
 def _should_notify_bot_lite(
@@ -296,18 +347,12 @@ def _insert_neon_after_gates(
         return True, neon_replay, neon_sqlite_resync, False
 
     if not pg.lead_exists(project.source, ext_id, errors):
+        # O252: same normalized text, new TG message.id — abort; never content_hash=""
+        if fingerprint and pg.fetch_lead_lite_state(
+            content_hash=fingerprint, errors=errors
+        ) is not None:
+            return False, False, False, True
         if exchange_neon:
-            neon_inserted = pg.record_new_lead(
-                project,
-                errors,
-                content_hash="",
-                body=ingest_body,
-            )
-            if neon_inserted:
-                note_neon_insert()
-                if not inserted:
-                    _mark_sqlite_resync()
-                return True, neon_replay, neon_sqlite_resync, False
             if _neon_needs_l1_replay(
                 pg,
                 content_hash=fingerprint,
@@ -506,7 +551,7 @@ def plan_new_listing(
             stats.note_skip("skip:budget")
         return inserted or neon_replay or neon_sqlite_resync, None
 
-    ingest_body, tz_attachment_meta = _resolve_ingest_body(project, cfg, errors)
+    ingest_body, tz_attachment_meta, detail_ok = _resolve_ingest_body(project, cfg, errors)
 
     if neon_wide and pg is not None and not in_neon:
         in_neon, neon_replay, neon_sqlite_resync, dup_abort = _insert_neon_after_gates(
@@ -545,6 +590,26 @@ def plan_new_listing(
 
     was_new = inserted or neon_replay or neon_sqlite_resync
     ingest_snippet = ingest_body
+
+    if pg is not None and (in_neon or neon_replay):
+        if _apply_physical_pre_l1(
+            project,
+            ingest_body=ingest_snippet,
+            cfg=cfg,
+            pg=pg,
+            errors=errors,
+            stats=stats,
+            tz_attachment_meta=tz_attachment_meta,
+        ):
+            return was_new, None
+
+        if _youdo_detail_short_skips_l1(project, ingest_snippet, detail_ok):
+            line = f"pipeline:skip youdo:id={ext_id} detail:short"
+            errors.append(line)
+            log_pipeline_line(cfg.radar_log_path, line)
+            if stats is not None:
+                stats.note_skip("skip:youdo_detail_short")
+            return was_new, None
 
     if (
         cfg.radar_profile == "site"
@@ -811,6 +876,10 @@ def _listing_from_neon_row(row: NeonLeadRow) -> ListingProject:
     )
 
 
+def _youdo_stuck_l1_since() -> str:
+    return os.getenv("YOUDO_STUCK_L1_SINCE", "2026-06-15").strip() or "2026-06-15"
+
+
 def drain_l1_backlog(
     cfg: Config,
     pg: NeonLeadStorage,
@@ -822,7 +891,21 @@ def drain_l1_backlog(
     """Конвейер: L1 для строк Neon без ai_verdict (свежие id первыми)."""
     if not cfg.ai_active or not pg.enabled:
         return 0
-    rows = pg.fetch_leads_missing_l1(limit=limit, order_desc=True, errors=errors)
+    lim = max(1, int(limit))
+    youdo_budget = min(20, lim)
+    youdo_rows = pg.fetch_youdo_invisible_missing_l1(
+        since=_youdo_stuck_l1_since(),
+        limit=youdo_budget,
+        errors=errors,
+    )
+    seen_ids = {row.lead_id for row in youdo_rows}
+    rest_limit = max(0, lim - len(youdo_rows))
+    rest_rows = (
+        pg.fetch_leads_missing_l1(limit=rest_limit or lim, order_desc=True, errors=errors)
+        if rest_limit > 0
+        else []
+    )
+    rows = youdo_rows + [r for r in rest_rows if r.lead_id not in seen_ids][:lim]
     if not rows:
         return 0
     from ai_analyze import analyze_lite
@@ -999,7 +1082,7 @@ def process_legacy_neon_listing(
         log_prefix = f"{project.source}:id={project.project_id} "
         neon_body = (project.listing_snippet or "").strip()
         if is_web_detail_source(project.source) and len(neon_body) < 300:
-            body, _ = _resolve_ingest_body(project, cfg, errors)
+            body, _, _ = _resolve_ingest_body(project, cfg, errors)
             description = body or neon_body or project.title
         else:
             description = neon_body or project.title

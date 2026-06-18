@@ -115,7 +115,10 @@ def _radar_source_fetch_wall_sec(source: str = "") -> float:
 
 
 def _radar_cycle_wall_sec() -> float:
-    return _env_float("RADAR_CYCLE_WALL_SEC", 600.0, minimum=0.0)
+    base = _env_float("RADAR_CYCLE_WALL_SEC", 600.0, minimum=0.0)
+    if "youdo" in public_feed_sources():
+        return max(base, 900.0)
+    return base
 
 
 def _sd_notify(message: str) -> None:
@@ -353,7 +356,12 @@ def _fetch_source(
     if storage is not None:
         flag_key = f"restart_source_{label.strip().lower()}"
         if storage.get_setting(flag_key, "0") == "1":
-            _safe_close_browser_contexts()
+            if label.strip().lower() == "youdo":
+                from youdo_parser import youdo_hard_reset
+
+                youdo_hard_reset(reason="restart_source_flag", storage=storage)
+            else:
+                _safe_close_browser_contexts()
             storage.set_setting(flag_key, "0")
             _append_log_line(
                 cfg.radar_log_path,
@@ -387,7 +395,15 @@ def _fetch_source(
     try:
         return fut.result(timeout=wall)
     except FuturesTimeout:
-        _safe_close_browser_contexts()
+        if (label or "").strip().lower() == "youdo":
+            try:
+                from exchange_browser_fetch import youdo_browser_teardown
+
+                youdo_browser_teardown()
+            except Exception:
+                _safe_close_browser_contexts()
+        else:
+            _safe_close_browser_contexts()
         msg = f"source wall-clock {int(wall)}s"
         errors.append(f"{label}:fetch:{msg}")
         if stats is not None:
@@ -698,6 +714,12 @@ def _run_cycle_body(
             stats_web.new_ids = n
             stats_web.to_bot = notify
             summary.total_to_bot += notify
+            if source_label == "youdo":
+                _append_log_line(
+                    cfg.radar_log_path,
+                    f"youdo:ingest done={stats_web.downloaded} new={n}",
+                    echo=True,
+                )
         _log_source_line(cfg.radar_log_path, stats_web)
         _record_source_health(storage, source_label, stats_web, ts=ts, cfg=cfg)
         watchdog.check()

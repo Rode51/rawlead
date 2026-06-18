@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0e0e0e;
+  --foreground: #e8e8e8;
+}
+
+html {
+  background: #0e0e0e;
+  color: #e8e8e8;
+}
+
+body {
+  background: #0e0e0e;
+  color: #e8e8e8;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  -webkit-font-smoothing: antialiased;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  cursor: none !important;
+}
+
+@keyframes twBlink {
+  0%, 100% { opacity: 1 }
+  50%       { opacity: 0 }
+}
+.tw-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 0.82em;
+  background: #F5A623;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: twBlink 0.7s step-end infinite;
+}

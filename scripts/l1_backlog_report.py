@@ -55,7 +55,10 @@ def main() -> int:
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
-        src_line = " ".join(f"{k}:{by_source.get(k, 0)}" for k in ("fl", "kwork", "tg"))
+        src_line = " ".join(
+            f"{k}:{by_source.get(k, 0)}"
+            for k in ("fl", "kwork", "tg", "youdo")
+        )
         age_line = " · ".join(f"{k}={age.get(k, 0)}" for k in ("0-24h", "1-2d", "2-7d", ">7d"))
         print(f"[l1_backlog_report] profile={args.profile} hours={args.hours}")
         print(f"  L1 {args.hours}h: {src_line}")

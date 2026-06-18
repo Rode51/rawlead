@@ -1,0 +1,666 @@
+[
+  {
+    "id": "qc2_dev_srv_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "dev",
+    "signal": "server_administration",
+    "complexity": 2,
+    "title": "Настроить VPS под игровой сервер Rust: установка, автозапуск, бэкапы",
+    "task_summary": "Развернуть игровой сервер Rust на VPS: установка, настройка автозапуска через systemd и ежедневные бэкапы мира. Нужен опыт Linux-администрирования и базовая безопасность (firewall, SSH-ключи).",
+    "skills_on_like": [
+      "server_administration"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor dev/server_administration cx=2"
+  },
+  {
+    "id": "qc2_dev_srv_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "dev",
+    "signal": "server_administration",
+    "complexity": 3,
+    "title": "Перенести WordPress на новый хостинг: DNS, SSL, миграция БД без даунтайма",
+    "task_summary": "Миграция WordPress-сайта на новый хостинг: перенос файлов и БД, настройка DNS, выпуск SSL, проверка форм и плагинов. Цель — минимальный даунтайм и сохранение SEO-настроек.",
+    "skills_on_like": [
+      "server_administration",
+      "wordpress_dev"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor dev/server_administration cx=3"
+  },
+  {
+    "id": "qc2_dev_srv_03",
+    "pack_version": "v2-pilot",
+    "card_type": "trap",
+    "niche": "dev",
+    "signal": null,
+    "complexity": 1,
+    "title": "Написать bash-скрипт парсинга цен конкурентов с маркетплейса",
+    "task_summary": "Нужен bash-скрипт для регулярного сбора цен конкурентов с маркетплейса и выгрузки в CSV. По сути задача на парсинг и автоматизацию, а не классическое серверное администрирование.",
+    "skills_on_like": [
+      "web_scraping",
+      "python"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "trap dev: server context, scraping task"
+  },
+  {
+    "id": "qc2_dev_js_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "dev",
+    "signal": "javascript",
+    "complexity": 2,
+    "title": "Сендер формы на сайте: валидация, отправка в Telegram без перезагрузки",
+    "task_summary": "Реализовать на сайте форму заявки с клиентской валидацией и отправкой данных в Telegram-бот без перезагрузки страницы. Нужен чистый JS или лёгкий фреймворк и интеграция с Bot API.",
+    "skills_on_like": [
+      "javascript",
+      "api_integration"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor dev/javascript cx=2"
+  },
+  {
+    "id": "qc2_dev_js_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "dev",
+    "signal": "javascript",
+    "complexity": 3,
+    "title": "React-лендинг SaaS: адаптив, форма регистрации, интеграция с REST API",
+    "task_summary": "Сверстать и подключить React-лендинг для SaaS: адаптивная вёрстка, форма регистрации, интеграция с REST API бэкенда. Важны аккуратная типизация, обработка ошибок и mobile-first.",
+    "skills_on_like": [
+      "javascript",
+      "api_integration"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor dev/javascript cx=3"
+  },
+  {
+    "id": "qc2_dev_js_03",
+    "pack_version": "v2-pilot",
+    "card_type": "boundary",
+    "niche": "dev",
+    "signal": "javascript",
+    "complexity": 2,
+    "title": "Анимированный интерактивный прототип лендинга в Figma + экспорт в HTML/CSS",
+    "task_summary": "Сделать интерактивный анимированный прототип лендинга в Figma и экспортировать рабочую HTML/CSS версию с hover-состояниями. На стыке фронтенда и UI-дизайна.",
+    "skills_on_like": [
+      "javascript",
+      "ui_ux",
+      "figma"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": "design",
+    "notes_pm": "boundary dev<->design javascript cx=2"
+  },
+  {
+    "id": "qc2_dev_scrape_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "dev",
+    "signal": "web_scraping",
+    "complexity": 2,
+    "title": "Спарсить каталог товаров конкурента (500 SKU) в CSV для анализа цен",
+    "task_summary": "Собрать каталог конкурента (~500 SKU) в CSV: название, цена, наличие, ссылка. Нужен устойчивый парсер с обходом базовых ограничений и понятная структура выгрузки для аналитики.",
+    "skills_on_like": [
+      "web_scraping",
+      "python"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor dev/web_scraping cx=2"
+  },
+  {
+    "id": "qc2_dev_scrape_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "dev",
+    "signal": "web_scraping",
+    "complexity": 3,
+    "title": "Telethon-бот: мониторинг TG-каналов конкурентов, дайджест новых постов",
+    "task_summary": "Telethon-бот для мониторинга списка TG-каналов конкурентов: отслеживание новых постов, дедуп, ежедневный дайджест в личку или канал. Нужен опыт Telethon и аккуратная работа с лимитами API.",
+    "skills_on_like": [
+      "web_scraping",
+      "telegram_bot_dev"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor dev/web_scraping cx=3"
+  },
+  {
+    "id": "qc2_dev_tilda_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "dev",
+    "signal": "tilda_dev",
+    "complexity": 1,
+    "title": "Собрать лендинг на Tilda по готовому макету: 7 блоков, формы, аналитика",
+    "task_summary": "Собрать лендинг на Tilda по готовому макету: 7 блоков, формы заявки, подключение Яндекс.Метрики и целей. Нужна аккуратная адаптивность и базовая SEO-настройка страницы.",
+    "skills_on_like": [
+      "tilda_dev"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor dev/tilda_dev cx=1"
+  },
+  {
+    "id": "qc2_dev_tilda_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "dev",
+    "signal": "tilda_dev",
+    "complexity": 2,
+    "title": "Интернет-магазин на Tilda: каталог 40 позиций, корзина, оплата ЮKassa",
+    "task_summary": "Собрать интернет-магазин на Tilda: каталог ~40 позиций, корзина, интеграция оплаты ЮKassa, базовые письма после заказа. Важны корректные карточки товара и мобильная версия.",
+    "skills_on_like": [
+      "tilda_dev",
+      "ecommerce_dev"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor dev/tilda_dev cx=2"
+  },
+  {
+    "id": "qc2_design_pres_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "design",
+    "signal": "presentation_design",
+    "complexity": 2,
+    "title": "Pitch deck для инвесторов IT-стартапа: 15 слайдов, единый визуальный стиль",
+    "task_summary": "Подготовить pitch deck для IT-стартапа: 15 слайдов, единая типографика и визуальный стиль, акцент на проблему, решение, рынок и traction. Формат для отправки инвесторам и выступления.",
+    "skills_on_like": [
+      "presentation_design"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor design/presentation_design cx=2"
+  },
+  {
+    "id": "qc2_design_pres_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "design",
+    "signal": "presentation_design",
+    "complexity": 1,
+    "title": "Оформить презентацию для вебинара (40 слайдов) по брендбуку заказчика",
+    "task_summary": "Оформить презентацию для вебинара (~40 слайдов) строго по брендбуку заказчика: шрифты, цвета, сетка, иконки. Контент текста уже есть, нужен чистый визуал и единый стиль.",
+    "skills_on_like": [
+      "presentation_design",
+      "brand_identity"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor design/presentation_design cx=1"
+  },
+  {
+    "id": "qc2_design_pres_03",
+    "pack_version": "v2-pilot",
+    "card_type": "trap",
+    "niche": "design",
+    "signal": null,
+    "complexity": 1,
+    "title": "Написать текст выступления спикера к готовым слайдам вебинара",
+    "task_summary": "Нужен текст выступления спикера к уже готовым слайдам вебинара: логичные переходы, живой язык, тайминг ~45 минут. По сути копирайтинг, а не дизайн презентации.",
+    "skills_on_like": [
+      "script_writing",
+      "copywriting"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "trap design: slides context, writing task"
+  },
+  {
+    "id": "qc2_design_3d_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "design",
+    "signal": "threed_modeling",
+    "complexity": 2,
+    "title": "3D-модель упаковки косметики для рендера на маркетплейс (Blender)",
+    "task_summary": "Смоделировать упаковку косметики в Blender для фотореалистичного рендера карточки маркетплейса. Нужны чистая топология, материалы и несколько ракурсов под ключ.",
+    "skills_on_like": [
+      "threed_modeling"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor design/threed_modeling cx=2"
+  },
+  {
+    "id": "qc2_design_3d_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "design",
+    "signal": "threed_modeling",
+    "complexity": 3,
+    "title": "Low-poly 3D-сцена для мобильной игры: 5 объектов, UV, текстуры",
+    "task_summary": "Создать low-poly 3D-сцену для мобильной игры: 5 объектов окружения, UV-развёртка и текстуры под Unity/Unreal. Важен оптимальный полигонаж и единый стиль.",
+    "skills_on_like": [
+      "threed_modeling"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor design/threed_modeling cx=3"
+  },
+  {
+    "id": "qc2_design_3d_03",
+    "pack_version": "v2-pilot",
+    "card_type": "trap",
+    "niche": "design",
+    "signal": null,
+    "complexity": 1,
+    "title": "Смонтировать 3D-обзор продукта из готовых рендеров в 60-сек видео",
+    "task_summary": "Смонтировать 60-секундный обзор продукта из готовых 3D-рендеров: музыка, титры, переходы. Это видеомонтаж, а не 3D-моделирование с нуля.",
+    "skills_on_like": [
+      "video_editing",
+      "motion_design"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "trap design: 3D context, video editing task"
+  },
+  {
+    "id": "qc2_design_info_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "design",
+    "signal": "infographic_design",
+    "complexity": 2,
+    "title": "Инфографика для карточки товара на WB: преимущества, размерная сетка",
+    "task_summary": "Сделать инфографику для карточки товара на Wildberries: блок преимуществ, размерная сетка, читаемость на мобильном. Нужен опыт инфографики под маркетплейсы.",
+    "skills_on_like": [
+      "infographic_design"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor design/infographic_design cx=2"
+  },
+  {
+    "id": "qc2_design_info_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "design",
+    "signal": "infographic_design",
+    "complexity": 2,
+    "title": "Серия из 5 инфографик для Ozon: сравнение с конкурентами, USP",
+    "task_summary": "Подготовить серию из 5 инфографик для Ozon: сравнение с конкурентами, USP, характеристики. Единый визуальный стиль и акцент на конверсию карточки.",
+    "skills_on_like": [
+      "infographic_design",
+      "banner_design"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor design/infographic_design cx=2"
+  },
+  {
+    "id": "qc2_design_ill_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "design",
+    "signal": "illustration",
+    "complexity": 2,
+    "title": "Иллюстрации для детской книги: 8 разворотов, единый стиль персонажей",
+    "task_summary": "Нарисовать иллюстрации для детской книги: 8 разворотов, единый стиль персонажей и палитра. Нужны исходники в слоях и согласование с автором текста.",
+    "skills_on_like": [
+      "illustration"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor design/illustration cx=2"
+  },
+  {
+    "id": "qc2_design_ill_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "design",
+    "signal": "illustration",
+    "complexity": 1,
+    "title": "Апскейл и ретушь фотографий товаров для каталога (batch 50 шт.)",
+    "task_summary": "Апскейл и ретушь 50 фотографий товаров для интернет-каталога: белый фон, цветокор, единый размер. Пакетная обработка с контролем качества на выборке.",
+    "skills_on_like": [
+      "illustration"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor design/illustration cx=1"
+  },
+  {
+    "id": "qc2_mkt_mp_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "marketing",
+    "signal": "marketplace_promotion",
+    "complexity": 2,
+    "title": "Вывести 20 SKU на Ozon: карточки, SEO-поля, ставки, аналитика продаж",
+    "task_summary": "Вывести 20 SKU на Ozon: заполнение карточек, SEO-поля, настройка ставок и базовая аналитика продаж. Нужен опыт работы с личным кабинетом и рекламными инструментами площадки.",
+    "skills_on_like": [
+      "marketplace_promotion"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor marketing/marketplace_promotion cx=2"
+  },
+  {
+    "id": "qc2_mkt_mp_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "marketing",
+    "signal": "marketplace_promotion",
+    "complexity": 3,
+    "title": "Стратегия продвижения на Wildberries: внутренняя реклама + акции + A/B фото",
+    "task_summary": "Разработать и запустить стратегию продвижения на Wildberries: внутренняя реклама, акции, A/B тесты главного фото. Нужен анализ конкурентов и еженедельная отчётность.",
+    "skills_on_like": [
+      "marketplace_promotion"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor marketing/marketplace_promotion cx=3"
+  },
+  {
+    "id": "qc2_mkt_mp_03",
+    "pack_version": "v2-pilot",
+    "card_type": "trap",
+    "niche": "marketing",
+    "signal": null,
+    "complexity": 1,
+    "title": "Сверстать HTML-шаблон email-рассылки для базы подписчиков",
+    "task_summary": "Сверстать HTML-шаблон email-рассылки для базы подписчиков: адаптив, корректное отображение в Gmail и Outlook. Это email-вёрстка, а не продвижение на маркетплейсах.",
+    "skills_on_like": [
+      "email_marketing"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "trap marketing: MP context, email task"
+  },
+  {
+    "id": "qc2_mkt_tads_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "marketing",
+    "signal": "target_ads",
+    "complexity": 2,
+    "title": "Таргет VK Ads для онлайн-школы: 3 креатива, lookalike, пиксель",
+    "task_summary": "Запустить таргет VK Ads для онлайн-школы: 3 креатива, lookalike-аудитории, установка пикселя и оптимизация по заявкам. Нужен опыт VK Рекламы и аналитики.",
+    "skills_on_like": [
+      "target_ads"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor marketing/target_ads cx=2"
+  },
+  {
+    "id": "qc2_mkt_tads_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "marketing",
+    "signal": "target_ads",
+    "complexity": 2,
+    "title": "Meta Ads (Instagram/Facebook) для e-commerce: ROAS-оптимизация, 5 ad set",
+    "task_summary": "Настроить Meta Ads для e-commerce: 5 ad set, оптимизация по ROAS, тест креативов и аудиторий. Нужен опыт Instagram/Facebook Ads и работы с каталогом товаров.",
+    "skills_on_like": [
+      "target_ads",
+      "smm"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor marketing/target_ads cx=2"
+  },
+  {
+    "id": "qc2_mkt_tads_03",
+    "pack_version": "v2-pilot",
+    "card_type": "boundary",
+    "niche": "marketing",
+    "signal": "target_ads",
+    "complexity": 1,
+    "title": "Подготовить 10 креативов для таргета: баннеры + тексты по ТЗ маркетолога",
+    "task_summary": "Подготовить 10 креативов для таргетированной рекламы: баннеры и тексты по ТЗ маркетолога. На стыке performance-маркетинга и дизайна рекламных материалов.",
+    "skills_on_like": [
+      "target_ads",
+      "banner_design"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": "design",
+    "notes_pm": "boundary marketing<->design target_ads cx=1"
+  },
+  {
+    "id": "qc2_mkt_bot_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "marketing",
+    "signal": "chatbot_marketing",
+    "complexity": 2,
+    "title": "Воронка Salebot: квиз → сегментация → рассылка оффера в Telegram",
+    "task_summary": "Собрать воронку в Salebot: квиз для сегментации аудитории и автоматическая рассылка оффера в Telegram. Нужен опыт чат-бот маркетинга и интеграций.",
+    "skills_on_like": [
+      "chatbot_marketing",
+      "email_marketing"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor marketing/chatbot_marketing cx=2"
+  },
+  {
+    "id": "qc2_mkt_bot_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "marketing",
+    "signal": "chatbot_marketing",
+    "complexity": 2,
+    "title": "Senler-бот для VK-сообщества: автоответы, сбор заявок, интеграция с CRM",
+    "task_summary": "Настроить Senler-бота для VK-сообщества: автоответы, сбор заявок, передача лидов в CRM. Нужен опыт Senler и базовая схема воронки в VK.",
+    "skills_on_like": [
+      "chatbot_marketing"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor marketing/chatbot_marketing cx=2"
+  },
+  {
+    "id": "qc2_mkt_bot_03",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "marketing",
+    "signal": "chatbot_marketing",
+    "complexity": 3,
+    "title": "Чат-бот поддержки на сайте: FAQ, передача оператору, сбор NPS",
+    "task_summary": "Чат-бот поддержки на сайте: FAQ, эскалация оператору, сбор NPS после диалога. Нужна интеграция с виджетом сайта и логирование обращений.",
+    "skills_on_like": [
+      "chatbot_marketing",
+      "api_integration"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor marketing/chatbot_marketing cx=3"
+  },
+  {
+    "id": "qc2_mkt_bot_04",
+    "pack_version": "v2-pilot",
+    "card_type": "trap",
+    "niche": "marketing",
+    "signal": null,
+    "complexity": 1,
+    "title": "Написать 10 SEO-статей для блога интернет-магазина",
+    "task_summary": "Написать 10 SEO-статей для блога интернет-магазина по списку ключей. Это контент/SEO-копирайтинг, а не настройка чат-ботов или рекламных воронок.",
+    "skills_on_like": [
+      "seo_copywriting",
+      "article_writing"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "trap marketing: bot context, SEO writing task"
+  },
+  {
+    "id": "qc2_text_tr_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "text",
+    "signal": "translation",
+    "complexity": 2,
+    "title": "Редакционный перевод EN→RU IT-документации (API guide, 40 стр.)",
+    "task_summary": "Редакционный перевод IT-документации EN→RU (~40 страниц API guide): терминология, единый глоссарий, сохранение структуры исходника. Нужен опыт технического перевода.",
+    "skills_on_like": [
+      "translation",
+      "technical_writing"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor text/translation cx=2"
+  },
+  {
+    "id": "qc2_text_tr_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "text",
+    "signal": "translation",
+    "complexity": 2,
+    "title": "Перевод маркетинговых материалов RU→EN: лендинг + 5 email-писем",
+    "task_summary": "Перевести маркетинговые материалы RU→EN: лендинг и 5 email-писем с сохранением tone of voice бренда. Нужен опыт локализации рекламных текстов.",
+    "skills_on_like": [
+      "translation",
+      "copywriting"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor text/translation cx=2"
+  },
+  {
+    "id": "qc2_text_tr_03",
+    "pack_version": "v2-pilot",
+    "card_type": "boundary",
+    "niche": "text",
+    "signal": "translation",
+    "complexity": 2,
+    "title": "Локализация рекламных креативов для выхода на рынок Казахстана",
+    "task_summary": "Локализовать рекламные креативы для выхода на рынок Казахстана: перевод, адаптация офферов и проверка культурных формулировок. На стыке перевода и таргет-маркетинга.",
+    "skills_on_like": [
+      "translation",
+      "target_ads"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": "marketing",
+    "notes_pm": "boundary text<->marketing translation cx=2"
+  },
+  {
+    "id": "qc2_text_tr_04",
+    "pack_version": "v2-pilot",
+    "card_type": "trap",
+    "niche": "text",
+    "signal": null,
+    "complexity": 1,
+    "title": "Вычитать русский текст лендинга без перевода с другого языка",
+    "task_summary": "Вычитать и отредактировать русский текст лендинга: орфография, стиль, логика блоков. Перевода с другого языка нет — это чистая редактура, а не локализация.",
+    "skills_on_like": [
+      "editing_proofreading"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "trap text: translation context, proofreading task"
+  },
+  {
+    "id": "qc2_text_transcr_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "text",
+    "signal": "transcription",
+    "complexity": 1,
+    "title": "Транскрибация 90-мин вебинара: таймкоды, спикеры, выделение action items",
+    "task_summary": "Транскрибировать 90-минутный вебинар: таймкоды, разметка спикеров, выделение action items. Нужна аккуратная расшифровка и структурированный документ.",
+    "skills_on_like": [
+      "transcription"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor text/transcription cx=1"
+  },
+  {
+    "id": "qc2_text_transcr_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "text",
+    "signal": "transcription",
+    "complexity": 2,
+    "title": "Расшифровка 20 подкаст-эпизодов + саммари ключевых тезисов для блога",
+    "task_summary": "Расшифровать 20 эпизодов подкаста и подготовить краткие саммари ключевых тезисов для блога. Нужен единый формат и вычитка имён и терминов.",
+    "skills_on_like": [
+      "transcription",
+      "article_writing"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor text/transcription cx=2"
+  },
+  {
+    "id": "qc2_text_transcr_03",
+    "pack_version": "v2-pilot",
+    "card_type": "trap",
+    "niche": "text",
+    "signal": null,
+    "complexity": 1,
+    "title": "Написать сценарий подкаста на основе расшифровки интервью",
+    "task_summary": "Написать сценарий подкаста на основе расшифровки интервью: структура выпуска, интро, переходы. Это сценарное написание, а не чистая транскрибация.",
+    "skills_on_like": [
+      "script_writing"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "trap text: transcription context, script task"
+  },
+  {
+    "id": "qc2_text_pd_01",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "text",
+    "signal": "product_description",
+    "complexity": 2,
+    "title": "Описания 100 товаров для Ozon/WB: SEO-ключи, УТП, без воды",
+    "task_summary": "Написать описания 100 товаров для Ozon/WB: SEO-ключи, УТП, без воды. Единый шаблон, проверка уникальности и соответствие правилам площадок.",
+    "skills_on_like": [
+      "product_description",
+      "seo_copywriting"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor text/product_description cx=2"
+  },
+  {
+    "id": "qc2_text_pd_02",
+    "pack_version": "v2-pilot",
+    "card_type": "anchor",
+    "niche": "text",
+    "signal": "product_description",
+    "complexity": 1,
+    "title": "Карточки товаров для интернет-магазина мебели: характеристики + продающий текст",
+    "task_summary": "Подготовить тексты карточек товаров для интернет-магазина мебели: характеристики, продающие описания, единый tone of voice. Пакет ~30 позиций.",
+    "skills_on_like": [
+      "product_description"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": null,
+    "notes_pm": "anchor text/product_description cx=1"
+  },
+  {
+    "id": "qc2_text_pd_03",
+    "pack_version": "v2-pilot",
+    "card_type": "boundary",
+    "niche": "text",
+    "signal": "product_description",
+    "complexity": 2,
+    "title": "Тексты для карточек маркетплейса + ТЗ дизайнеру на инфографику блоков",
+    "task_summary": "Написать тексты для карточек маркетплейса и подготовить ТЗ дизайнеру на инфографику блоков. На стыке product copy и визуального оформления карточки.",
+    "skills_on_like": [
+      "product_description",
+      "infographic_design"
+    ],
+    "skills_on_dislike": [],
+    "boundary_with": "design",
+    "notes_pm": "boundary text<->design product_description cx=2"
+  }
+]

@@ -116,6 +116,7 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 				<p class="rl-cabinet-head__label rl-cabinet-head__label--skills"><?php esc_html_e('Твои навыки', 'rawlead-kadence-child'); ?></p>
 				<div class="rl-cabinet-tags" id="rl-cabinet-tags" role="list" aria-live="polite"></div>
 				<button type="button" class="rl-btn rl-btn--ghost rl-cabinet-tags-clear" id="rl-cabinet-tags-clear" hidden><?php esc_html_e('Сбросить', 'rawlead-kadence-child'); ?></button>
+				<button type="button" class="rl-btn rl-btn--ghost rl-cabinet-quiz-retake" id="rl-cabinet-quiz-retake" hidden><?php esc_html_e('Пройти тест заново', 'rawlead-kadence-child'); ?></button>
 				<p class="rl-cabinet-head__hint rl-cabinet-head__hint--empty rl-cabinet-head__hint--skills" id="rl-cabinet-tags-hint" hidden>
 					<?php esc_html_e('Лента автоматически подбирает заказы под профиль из квиза.', 'rawlead-kadence-child'); ?>
 					<a href="<?php echo esc_url(rawlead_page_url('quiz')); ?>"><?php esc_html_e('Пройти квиз →', 'rawlead-kadence-child'); ?></a>

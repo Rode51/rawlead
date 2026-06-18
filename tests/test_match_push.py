@@ -247,6 +247,39 @@ class TestO220LeadCoverageMatch(unittest.TestCase):
         assert km is not None
         self.assertGreaterEqual(km, 70)
 
+    def test_quiz_import_weight_reaches_100_on_full_lead(self) -> None:
+        from rank import lead_coverage_match
+
+        user = {"smm": 4.0, "content_marketing": 4.0}
+        self.assertEqual(lead_coverage_match(["smm", "content_marketing"], user), 100)
+
+    def test_weight_one_caps_at_25(self) -> None:
+        from rank import lead_coverage_match
+
+        user = {"smm": 1.0, "content_marketing": 1.0}
+        self.assertEqual(lead_coverage_match(["smm", "content_marketing"], user), 25)
+
+
+class TestO220TagWeightCanonicalize(unittest.TestCase):
+    def test_merge_preserves_max_weight(self) -> None:
+        from src.api_server import _merge_user_tag_rows
+
+        merged = _merge_user_tag_rows(
+            [
+                ("SMM", 4.0, None, 1),
+                ("smm", 1.0, None, 2),
+            ]
+        )
+        self.assertEqual(list(merged.keys()), ["smm"])
+        self.assertEqual(merged["smm"][0], 4.0)
+
+    def test_rewrite_needed_for_alias(self) -> None:
+        from src.api_server import _merge_user_tag_rows, _user_tags_need_canonical_rewrite
+
+        rows = [("SMM", 4.0, None, 1)]
+        merged = _merge_user_tag_rows(rows)
+        self.assertTrue(_user_tags_need_canonical_rewrite(rows, merged))
+
 
 class TestO220PriorityMatch(unittest.TestCase):
     def test_empty_lead_tags_returns_none(self) -> None:

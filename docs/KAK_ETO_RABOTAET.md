@@ -65,7 +65,7 @@
 | **C (O99) ✅** | Hot L1 после FL/Kwork; secondary каждый 2-й цикл; лента только `feed_visible` | VPS 2026-06-03 |
 | **D (инфра)** | +2–4 IP **только** под FL/Kwork; secondary — отдельные IP или реже опрос | Запас без «все 4 в бане» |
 | **E (опц.)** | 1× residential RU под FL | Если B+D не хватает |
-| **F (YouDo)** | browser-first в коде ✅ · **ingest ⏳ O63-FIX** (VPS: 403/bans, Neon 0) · `YOUDO_PROXY_URLS` — отдельный IP | § O63-FIX |
+| **F (YouDo)** | **Camoufox Firefox** ✅ prod · `YOUDO_BROWSER=camoufox` · listing subprocess · O254 auto-restart ⏳ deploy | residential proxy · § O254 |
 
 **Не делаем:** крутить IP каждую минуту (ускоряет бан); лить YouDo 403 в общий котёл (исправлено v2).
 

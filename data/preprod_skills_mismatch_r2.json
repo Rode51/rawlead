@@ -1,0 +1,25 @@
+{
+  "scenario": "skills_mismatch",
+  "pass": true,
+  "lead_id": 18207,
+  "user_id": "895912a1-ffb6-46fb-be7e-4e051f2ff8c1",
+  "user_tags": [
+    "yii2"
+  ],
+  "reply_draft": "Здравствуйте! По ТЗ вижу, что для CS-маркетплейса нужен бэкенд на Node.js (NestJS). Разверну архитектуру с PostgreSQL для данных и Redis для кеша. Основной функционал — интеграция со Steam API для инвентарей и реализация P2P-сделок, для которых настрою WebSocket. Подскажите, комиссия с P2P-сделок будет фиксированной или будет зависеть от типа предмета и статуса пользователя?",
+  "timings_ms": {
+    "total": 33710
+  },
+  "checks": {
+    "non_empty": true,
+    "no_yii2_fontlab": true,
+    "no_smell": true,
+    "node_from_tz": true,
+    "under_90s": true
+  },
+  "smell": null,
+  "errors": [],
+  "summary": {
+    "pass": true
+  }
+}

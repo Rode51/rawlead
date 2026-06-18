@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 _SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
 _leads_columns_ready = False
 _leads_columns_lock = __import__("threading").Lock()
+_user_tags_columns_ready = False
+_user_tags_columns_lock = __import__("threading").Lock()
 
 _OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
 _MIN_AI_SCORE_VISIBLE = 40
@@ -181,6 +183,23 @@ def _ensure_leads_columns(database_url: str) -> None:
         _leads_columns_ready = True
 
 
+def _ensure_user_tags_columns(database_url: str) -> None:
+    global _user_tags_columns_ready
+    if _user_tags_columns_ready:
+        return
+    with _user_tags_columns_lock:
+        if _user_tags_columns_ready:
+            return
+        sql_path = _SQL_DIR / "023_user_tags_active.sql"
+        ddl = sql_path.read_text(encoding="utf-8") if sql_path.is_file() else ""
+        if ddl.strip():
+            with psycopg.connect(database_url) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(ddl)
+                conn.commit()
+        _user_tags_columns_ready = True
+
+
 def _source_bucket(source: str) -> str:
     s = (source or "").strip().lower()
     if s.startswith("tg"):
@@ -203,6 +222,7 @@ class NeonLeadStorage:
     @contextmanager
     def connection(self):
         _ensure_leads_columns(self._url)
+        _ensure_user_tags_columns(self._url)
         with psycopg.connect(self._url) as conn:
             yield conn
 
@@ -431,10 +451,10 @@ class NeonLeadStorage:
         errors: list[str],
         body_snippet: str,
         tz_attachment: dict[str, Any] | None = None,
-    ) -> None:
-        """После L1: поля ленты (не перезаписывать полным FL-body)."""
+    ) -> int | None:
+        """После L1: поля ленты (не перезаписывать полным FL-body). id строки или None."""
         if not self.enabled:
-            return
+            return None
         snippet = (body_snippet or project.listing_snippet or project.title or "").strip()
         ai_verdict = neon_ai_verdict(lite)
         ai_score = _ai_score_lite(lite)
@@ -477,6 +497,7 @@ class NeonLeadStorage:
                             category = %s,
                             l1_completed_at = NOW()
                         WHERE source = %s AND external_id = %s
+                        RETURNING id
                         """,
                         (
                             snippet,
@@ -491,6 +512,8 @@ class NeonLeadStorage:
                             str(project.project_id),
                         ),
                     )
+                    row = cur.fetchone()
+            return int(row[0]) if row else None
         except Exception as exc:
             msg = (
                 f"pg:lite:{project.source}:id={project.project_id}:"
@@ -498,6 +521,7 @@ class NeonLeadStorage:
             )
             logger.warning("%s", msg)
             errors.append(msg)
+            return None
 
     def fetch_lead_id(
         self,
@@ -738,6 +762,195 @@ class NeonLeadStorage:
             logger.warning("%s", msg)
             err.append(msg)
             return []
+
+    def fetch_youdo_invisible_missing_l1(
+        self,
+        *,
+        since: datetime | str,
+        limit: int = 20,
+        errors: list[str] | None = None,
+    ) -> list[NeonLeadRow]:
+        """O262g: invisible YouDo без L1 — приоритет для drain_l1_backlog."""
+        if not self.enabled:
+            return []
+        err = errors if errors is not None else []
+        lim = max(1, min(int(limit), 200))
+        since_val = since
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id, source, external_id, title, body, url,
+                               budget_text, COALESCE(category, '')
+                        FROM leads
+                        WHERE source = 'youdo'
+                          AND is_visible = FALSE
+                          AND ai_verdict IS NULL
+                          AND ai_score IS NULL
+                          AND created_at >= %s
+                        ORDER BY id DESC
+                        LIMIT %s
+                        """,
+                        (since_val, lim),
+                    )
+                    rows = cur.fetchall()
+            return [
+                NeonLeadRow(
+                    lead_id=int(r[0]),
+                    source=str(r[1]),
+                    external_id=str(r[2]),
+                    title=str(r[3] or ""),
+                    body=str(r[4] or ""),
+                    url=str(r[5] or ""),
+                    budget_text=str(r[6] or ""),
+                    category=str(r[7] or ""),
+                )
+                for r in rows
+            ]
+        except Exception as exc:
+            msg = f"pg:fetch_youdo_stuck_l1:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return []
+
+    def youdo_stuck_invisible_diag(
+        self,
+        *,
+        since: datetime | str,
+        errors: list[str] | None = None,
+    ) -> dict[str, int | list[tuple[str, int]]]:
+        """O262g: breakdown invisible YouDo since date — почему backlog «пуст»."""
+        empty: dict[str, int | list[tuple[str, int]]] = {
+            "total_invisible": 0,
+            "missing_l1": 0,
+            "has_verdict": 0,
+            "by_verdict": [],
+        }
+        if not self.enabled:
+            return empty
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM leads
+                        WHERE source = 'youdo'
+                          AND is_visible = FALSE
+                          AND created_at >= %s
+                        """,
+                        (since,),
+                    )
+                    row = cur.fetchone()
+                    empty["total_invisible"] = int(row[0]) if row else 0
+
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM leads
+                        WHERE source = 'youdo'
+                          AND is_visible = FALSE
+                          AND created_at >= %s
+                          AND ai_verdict IS NULL
+                          AND ai_score IS NULL
+                        """,
+                        (since,),
+                    )
+                    row = cur.fetchone()
+                    empty["missing_l1"] = int(row[0]) if row else 0
+
+                    cur.execute(
+                        """
+                        SELECT COALESCE(ai_verdict, '(null)'), COUNT(*)
+                        FROM leads
+                        WHERE source = 'youdo'
+                          AND is_visible = FALSE
+                          AND created_at >= %s
+                        GROUP BY 1
+                        ORDER BY 2 DESC
+                        """,
+                        (since,),
+                    )
+                    by_verdict = [(str(r[0]), int(r[1])) for r in cur.fetchall()]
+                    empty["by_verdict"] = by_verdict
+                    empty["has_verdict"] = int(empty["total_invisible"]) - int(
+                        empty["missing_l1"]
+                    )
+            return empty
+        except Exception as exc:
+            msg = f"pg:youdo_stuck_diag:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return empty
+
+    def requeue_youdo_stuck_l1(
+        self,
+        *,
+        since: datetime | str,
+        dry_run: bool = True,
+        limit: int = 500,
+        errors: list[str] | None = None,
+    ) -> dict[str, int]:
+        """O262g: сброс ai_verdict/ai_score для invisible YouDo → drain_l1_backlog."""
+        stats = {"candidates": 0, "requeued": 0}
+        if not self.enabled:
+            return stats
+        err = errors if errors is not None else []
+        lim = max(1, min(int(limit), 2000))
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM leads
+                        WHERE source = 'youdo'
+                          AND is_visible = FALSE
+                          AND created_at >= %s
+                          AND (
+                            ai_verdict IS NOT NULL
+                            OR ai_score IS NOT NULL
+                          )
+                        """,
+                        (since,),
+                    )
+                    row = cur.fetchone()
+                    stats["candidates"] = int(row[0]) if row else 0
+                    if dry_run or stats["candidates"] <= 0:
+                        return stats
+                    cur.execute(
+                        """
+                        WITH stuck AS (
+                            SELECT id
+                            FROM leads
+                            WHERE source = 'youdo'
+                              AND is_visible = FALSE
+                              AND created_at >= %s
+                              AND (
+                                ai_verdict IS NOT NULL
+                                OR ai_score IS NOT NULL
+                              )
+                            ORDER BY id DESC
+                            LIMIT %s
+                        )
+                        UPDATE leads
+                        SET ai_verdict = NULL,
+                            ai_score = NULL,
+                            ai_reasons = '[]'::jsonb,
+                            is_visible = FALSE
+                        WHERE id IN (SELECT id FROM stuck)
+                        """,
+                        (since, lim),
+                    )
+                    stats["requeued"] = cur.rowcount
+            return stats
+        except Exception as exc:
+            msg = f"pg:requeue_youdo_stuck:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return stats
 
     def fetch_leads_missing_complexity(
         self,
@@ -1475,8 +1688,8 @@ class NeonLeadStorage:
         hours: int = 48,
         errors: list[str] | None = None,
     ) -> dict[str, int]:
-        """Без L1 за N часов — breakdown fl/kwork/tg (O64)."""
-        out = {"fl": 0, "kwork": 0, "tg": 0}
+        """Без L1 за N часов — breakdown fl/kwork/tg/youdo (O64 + O262g)."""
+        out = {"fl": 0, "kwork": 0, "tg": 0, "youdo": 0}
         if not self.enabled:
             return out
         sources = sorted(public_feed_sources())
@@ -1854,6 +2067,160 @@ class NeonLeadStorage:
         except Exception as exc:
             msg = (
                 f"pg:notify:{project.source}:id={project.project_id}:"
+                f"{_short_pg_err(exc)}"
+            )
+            logger.warning("%s", msg)
+            errors.append(msg)
+
+    def fetch_retag_pilot_leads(
+        self,
+        *,
+        per_category: int = 10,
+        categories: tuple[str, ...] = ("dev", "design", "marketing", "text"),
+        errors: list[str] | None = None,
+    ) -> list[NeonLeadRow]:
+        """O220-L1: visible old leads with thin tags, 10 per niche, public feed only."""
+        if not self.enabled:
+            return []
+        sources = sorted(public_feed_sources())
+        if not sources:
+            return []
+        err = errors if errors is not None else []
+        lim = max(1, min(int(per_category), 50))
+        out: list[NeonLeadRow] = []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    for cat in categories:
+                        cur.execute(
+                            """
+                            SELECT id, source, external_id, title, body, url,
+                                   budget_text, COALESCE(category, '')
+                            FROM leads
+                            WHERE is_visible = TRUE
+                              AND category = %s
+                              AND source = ANY(%s)
+                            ORDER BY
+                              CASE
+                                WHEN COALESCE(jsonb_array_length(lead_tags), 0) <= 2 THEN 0
+                                ELSE 1
+                              END,
+                              id DESC
+                            LIMIT %s
+                            """,
+                            (cat, sources, lim),
+                        )
+                        for r in cur.fetchall():
+                            out.append(
+                                NeonLeadRow(
+                                    lead_id=int(r[0]),
+                                    source=str(r[1]),
+                                    external_id=str(r[2]),
+                                    title=str(r[3] or ""),
+                                    body=str(r[4] or ""),
+                                    url=str(r[5] or ""),
+                                    budget_text=str(r[6] or ""),
+                                    category=str(r[7] or ""),
+                                )
+                            )
+        except Exception as exc:
+            msg = f"pg:retag_pilot_select:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return []
+        return out
+
+    def fetch_lead_tags_by_ids(
+        self,
+        lead_ids: list[int],
+        *,
+        errors: list[str] | None = None,
+    ) -> dict[int, list[str]]:
+        """lead_id → lead_tags (for pilot before/after)."""
+        if not self.enabled or not lead_ids:
+            return {}
+        err = errors if errors is not None else []
+        ids = [int(x) for x in lead_ids if int(x) > 0]
+        if not ids:
+            return {}
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id, lead_tags
+                        FROM leads
+                        WHERE id = ANY(%s)
+                        """,
+                        (ids,),
+                    )
+                    rows = cur.fetchall()
+            out: dict[int, list[str]] = {}
+            for r in rows:
+                lid = int(r[0])
+                raw = r[1]
+                if isinstance(raw, list):
+                    out[lid] = [str(t) for t in raw if str(t).strip()]
+                else:
+                    out[lid] = []
+            return out
+        except Exception as exc:
+            msg = f"pg:fetch_tags_by_ids:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return {}
+
+    def update_lite_retag_pilot(
+        self,
+        lead_id: int,
+        project: ListingProject,
+        *,
+        lite: AiLiteAnalysis | None,
+        errors: list[str],
+        body_snippet: str,
+    ) -> None:
+        """O220-L1: re-tag only — preserve is_visible, verdict, score, reply_draft, body."""
+        if not self.enabled:
+            return
+        snippet = (body_snippet or project.listing_snippet or project.title or "").strip()
+        task_summary = lite.task_summary.strip() if lite is not None else None
+        lead_tags = _lite_tags_json(lite)
+        reasons = _lite_reasons_json(lite)
+        if lite is not None:
+            category = resolve_l1_primary_category(
+                lite.primary_category,
+                lite.lead_tags,
+                title=project.title,
+                snippet=snippet,
+            )
+        else:
+            category = _ingest_category(project, snippet)
+        if lite is not None and lite.pending_tags:
+            self.record_pending_tags(list(lite.pending_tags), category=category)
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE leads
+                        SET lead_tags = %s::jsonb,
+                            ai_reasons = COALESCE(%s::jsonb, ai_reasons),
+                            task_summary = COALESCE(%s, task_summary),
+                            category = %s,
+                            l1_completed_at = NOW()
+                        WHERE id = %s
+                        """,
+                        (
+                            lead_tags,
+                            reasons,
+                            task_summary,
+                            category,
+                            int(lead_id),
+                        ),
+                    )
+        except Exception as exc:
+            msg = (
+                f"pg:retag_pilot:{lead_id}:"
                 f"{_short_pg_err(exc)}"
             )
             logger.warning("%s", msg)

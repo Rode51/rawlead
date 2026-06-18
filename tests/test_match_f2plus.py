@@ -18,12 +18,12 @@ class TestMatchF2Plus(TestCase):
         user = tags_as_weights(["yandex_direct"])
         self.assertGreater(keyword_match(lead, user), 0)
 
-    def test_full_lead_match_is_100_even_with_extra_user_tags(self) -> None:
+    def test_matched_share_with_extra_user_tags(self) -> None:
         lead = ["python", "php"]
         user = tags_as_weights(
             ["python", "php", "javascript", "wordpress_dev", "figma", "seo"]
         )
-        self.assertEqual(keyword_match(lead, user), 100)
+        self.assertEqual(keyword_match(lead, user), 50)
 
     def test_partial_lead_coverage(self) -> None:
         lead = ["wordpress_dev", "php", "api_integration"]
@@ -35,12 +35,16 @@ class TestMatchF2Plus(TestCase):
             ["python", "django", "fastapi"],
             tags_as_weights(["python"]),
         )
-        self.assertEqual(bd["matched"], 3)
-        self.assertEqual(bd["total"], 3)
-        self.assertEqual(bd["percent"], keyword_match(
-            ["python", "django", "fastapi"],
-            tags_as_weights(["python"]),
-        ))
+        self.assertEqual(bd["matched"], 1)
+        self.assertEqual(bd["total"], 1)
+        self.assertEqual(bd["percent"], 100)
+        self.assertEqual(
+            bd["percent"],
+            keyword_match(
+                ["python", "django", "fastapi"],
+                tags_as_weights(["python"]),
+            ),
+        )
 
     def test_zero_on_no_overlap(self) -> None:
         self.assertEqual(

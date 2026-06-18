@@ -16,7 +16,10 @@
   var overlayReturnFocus = null;
 
   var SESSION_KEY = "rawlead_quiz_session";
+  var COMPLETED_KEY = "rawlead_quiz_completed_v1";
   var TOKEN_KEY = "rawlead_access_token";
+  var TAGS_SYNC_KEY = "rawlead_user_tags_rev";
+  var RESTORE_IMPORT_KEY = "rawlead_quiz_restore_import_v1";
   var IMPORT_WEIGHT = 4.0;
   var MIN_EARLY_CTA = 5;
   var TOTAL_EXPECTED = 12;
@@ -67,12 +70,12 @@
   var loginBlockEl = document.getElementById("rl-quiz-login");
   var cabinetCtaEl = document.getElementById("rl-quiz-cabinet-cta");
   var trialPromoEl = cabinetCtaEl;
-  var openLentaEl = document.getElementById("rl-quiz-open-lenta");
   var retryEl = document.getElementById("rl-quiz-retry");
   var skipResultEl = document.getElementById("rl-quiz-skip-result");
   var loginStateEl = document.getElementById("rl-quiz-login-state");
   var widgetBox = document.getElementById("rl-quiz-telegram-widget");
   var stageEl = document.getElementById("rl-quiz-stage");
+  var retakeCompletedEl = document.getElementById("rl-quiz-retake-completed");
 
   var session = { history: [], started_at: null };
   var currentCard = null;
@@ -81,6 +84,14 @@
   var animating = false;
   var prefetchPromise = null;
   var prefetchData = null;
+  var retakeMode = false;
+  var retakeBackup = null;
+  var pendingImportPromise = null;
+  var pendingFeedRefresh = false;
+  var anonCtaHtml = cabinetCtaEl ? cabinetCtaEl.innerHTML : "";
+  var loggedInCtaLabel = "Открыть ленту →";
+  var importPendingLabel = "Сохраняем навыки…";
+  var primaryCtaPending = false;
 
   function escapeHtml(s) {
     return String(s)
@@ -115,6 +126,89 @@
     } catch (err) {
       /* ignore */
     }
+  }
+
+  function readCompleted() {
+    try {
+      var raw = localStorage.getItem(COMPLETED_KEY);
+      if (!raw) {
+        return null;
+      }
+      var data = JSON.parse(raw);
+      if (!data || typeof data !== "object") {
+        return null;
+      }
+      return data;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function writeCompleted(snap) {
+    try {
+      localStorage.setItem(COMPLETED_KEY, JSON.stringify(snap));
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  function clearCompleted() {
+    try {
+      localStorage.removeItem(COMPLETED_KEY);
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  function clearQuizLocalKeys() {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(COMPLETED_KEY);
+      localStorage.removeItem(RESTORE_IMPORT_KEY);
+      sessionStorage.removeItem(RESTORE_IMPORT_KEY);
+      sessionStorage.removeItem("rawlead_quiz_retake");
+    } catch (err) {
+      /* ignore */
+    }
+    session = { history: [], started_at: null };
+    profile = null;
+    currentCard = null;
+    animating = false;
+    retakeMode = false;
+    retakeBackup = null;
+  }
+
+  window.rawleadClearQuizLocalKeys = clearQuizLocalKeys;
+
+  window.addEventListener("rawlead-auth-changed", function () {
+    if (!isAnon()) {
+      return;
+    }
+    if (overlayMode && overlayOpen) {
+      closeOverlay(false);
+    }
+  });
+
+  window.addEventListener("pagehide", function () {
+    if (!overlayMode || !overlayOpen || retakeMode) {
+      return;
+    }
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch (err) {
+      /* ignore */
+    }
+  });
+
+  function discardIncompleteQuizSession() {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch (err) {
+      /* ignore */
+    }
+    session = { history: [], started_at: null };
+    currentCard = null;
+    animating = false;
   }
 
   function authHeaders() {
@@ -478,7 +572,7 @@
   }
 
   function renderSourceBadge(card) {
-    if (!card.source) {
+    if (!card.source || String(card.source).toLowerCase() === "synthetic") {
       return "";
     }
     var src = sourceLabel(card.source);
@@ -497,8 +591,9 @@
     }
     var headEl = cardEl.querySelector(".rl-feed-card__head");
     if (sourceEl) {
-      if (currentCard.source) {
-        sourceEl.innerHTML = renderSourceBadge(currentCard);
+      var badgeHtml = renderSourceBadge(currentCard);
+      if (badgeHtml) {
+        sourceEl.innerHTML = badgeHtml;
         sourceEl.hidden = false;
       } else {
         sourceEl.innerHTML = "";
@@ -610,12 +705,43 @@
     return prefetchPromise;
   }
 
+  function applyPrimaryCta(nullProfile) {
+    if (!cabinetCtaEl) {
+      return;
+    }
+    if (nullProfile) {
+      cabinetCtaEl.hidden = true;
+      return;
+    }
+    cabinetCtaEl.hidden = false;
+    if (isAnon()) {
+      cabinetCtaEl.innerHTML = anonCtaHtml;
+      cabinetCtaEl.classList.remove("is-disabled");
+      cabinetCtaEl.removeAttribute("aria-disabled");
+      cabinetCtaEl.removeAttribute("role");
+      var loginUrl = cfg.loginUrl || cfg.cabinetUrl || cabinetCtaEl.getAttribute("href");
+      if (loginUrl) {
+        cabinetCtaEl.setAttribute("href", loginUrl);
+      }
+      return;
+    }
+    cabinetCtaEl.innerHTML = "<span>" + escapeHtml(loggedInCtaLabel) + "</span>";
+    if (overlayMode) {
+      cabinetCtaEl.setAttribute("href", "#");
+      cabinetCtaEl.setAttribute("role", "button");
+    } else {
+      cabinetCtaEl.setAttribute("href", cfg.lentaUrl || "/lenta/");
+      cabinetCtaEl.removeAttribute("role");
+    }
+    setImportUiPending(primaryCtaPending);
+  }
+
   function resetPrefetch() {
     prefetchPromise = null;
     prefetchData = null;
   }
 
-  function showResult(fromProfile) {
+  function showResult(fromProfile, isRestore) {
     writeSession(session);
     profile = fromProfile != null ? fromProfile : profile;
     [introEl, loadingEl, errorEl, playEl].forEach(function (el) {
@@ -648,24 +774,88 @@
       loginBlockEl.hidden = true;
     }
     if (cabinetCtaEl) {
-      var loginUrl = cfg.loginUrl || cfg.cabinetUrl || cabinetCtaEl.getAttribute("href");
-      if (loginUrl) {
-        cabinetCtaEl.setAttribute("href", loginUrl);
-      }
-      cabinetCtaEl.hidden = nullProfile || !isAnon();
-    }
-    if (openLentaEl) {
-      openLentaEl.hidden = nullProfile || isAnon();
+      applyPrimaryCta(nullProfile);
     }
     if (skipResultEl) {
-      skipResultEl.hidden = nullProfile;
+      skipResultEl.hidden = nullProfile || !isAnon();
     }
     if (retryEl) {
       retryEl.hidden = !nullProfile;
     }
 
+    if (retakeCompletedEl) {
+      retakeCompletedEl.hidden = !!nullProfile;
+    }
+
     if (progressFillEl) {
       progressFillEl.style.width = "100%";
+    }
+
+    if (!isRestore) {
+      var completedSnap = {
+        profile: profile,
+        history: session.history.slice(),
+        completed_at: new Date().toISOString(),
+      };
+      var wasRetake = retakeMode;
+      var failBackup = wasRetake && retakeBackup ? retakeBackup : null;
+      var prevCompleted = failBackup || readCompleted();
+      retakeMode = false;
+      retakeBackup = null;
+      pendingFeedRefresh = false;
+
+      function onImportSuccess() {
+        writeCompleted(completedSnap);
+        try {
+          localStorage.removeItem(SESSION_KEY);
+        } catch (err) {
+          /* ignore */
+        }
+        pendingFeedRefresh = true;
+        setImportUiPending(false);
+        window.dispatchEvent(new CustomEvent("rawlead-quiz-complete"));
+      }
+
+      function onImportFail(err) {
+        if (failBackup) {
+          writeCompleted(failBackup);
+          profile = failBackup.profile || null;
+        } else if (prevCompleted) {
+          writeCompleted(prevCompleted);
+          profile = prevCompleted.profile || null;
+        } else {
+          clearCompleted();
+          profile = null;
+        }
+        renderCategoryBars(profile && profile.niches && profile.niches.length ? profile : null);
+        setImportUiPending(false);
+        showImportError(
+          "Не удалось сохранить навыки. " +
+            (err && err.message ? err.message + ". " : "") +
+            "В ленте остались прежние навыки."
+        );
+      }
+
+      function finishImportPromise() {
+        pendingImportPromise = null;
+      }
+
+      if (!nullProfile && !isAnon()) {
+        setImportUiPending(true);
+        pendingImportPromise = importQuizTags()
+          .then(onImportSuccess)
+          .catch(onImportFail)
+          .finally(finishImportPromise);
+      } else {
+        writeCompleted(completedSnap);
+        try {
+          localStorage.removeItem(SESSION_KEY);
+        } catch (err) {
+          /* ignore */
+        }
+      }
+    } else {
+      maybeRestoreImport();
     }
   }
 
@@ -713,8 +903,16 @@
   }
 
   function tagsImportPayload() {
+    var niches = [];
+    if (profile && profile.niches && profile.niches.length) {
+      profile.niches.forEach(function (row) {
+        if (row && row.niche) {
+          niches.push(row.niche);
+        }
+      });
+    }
     if (!profile || !profile.tags_to_import || !profile.tags_to_import.length) {
-      return { tags: {}, cx_pref: null };
+      return { tags: {}, cx_pref: profile && profile.cx_pref != null ? profile.cx_pref : null, niches: niches };
     }
     var out = {};
     profile.tags_to_import.forEach(function (tag) {
@@ -723,12 +921,47 @@
     return {
       tags: out,
       cx_pref: profile.cx_pref != null ? profile.cx_pref : null,
+      niches: niches,
     };
+  }
+
+  function maybeRestoreImport() {
+    if (isAnon()) {
+      return;
+    }
+    if (!profile || !profile.niches || !profile.niches.length) {
+      return;
+    }
+    try {
+      if (sessionStorage.getItem(RESTORE_IMPORT_KEY)) {
+        return;
+      }
+    } catch (err) {
+      return;
+    }
+    importQuizTags()
+      .then(function () {
+        try {
+          sessionStorage.setItem(RESTORE_IMPORT_KEY, "1");
+        } catch (err) {
+          /* ignore */
+        }
+        window.dispatchEvent(new CustomEvent("rawlead-quiz-complete"));
+      })
+      .catch(function () {
+        /* best-effort sync for stale local profile; retake path surfaces errors */
+      });
   }
 
   function importQuizTags() {
     var payload = tagsImportPayload();
-    if (!Object.keys(payload.tags).length || !cfg.restTagsImport) {
+    var hasTags = Object.keys(payload.tags).length > 0;
+    var hasNiches = payload.niches && payload.niches.length > 0;
+    var hasCx = payload.cx_pref != null;
+    if (!hasTags && !hasNiches && !hasCx) {
+      return Promise.resolve();
+    }
+    if (!cfg.restTagsImport) {
       return Promise.resolve();
     }
     return fetch(cfg.restTagsImport, {
@@ -748,8 +981,59 @@
               throw new Error((data && data.message) || "import failed");
             }
             clearSession();
+            bumpTagsSyncRev();
           });
       });
+  }
+
+  function bumpTagsSyncRev() {
+    var rev = String(Date.now());
+    try {
+      localStorage.setItem(TAGS_SYNC_KEY, rev);
+    } catch (err) {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("rawlead-tags-imported", { detail: { rev: rev } }));
+  }
+
+  function setImportUiPending(pending) {
+    primaryCtaPending = !!pending;
+    if (!cabinetCtaEl || isAnon()) {
+      return;
+    }
+    var labelEl = cabinetCtaEl.querySelector("span");
+    if (pending) {
+      cabinetCtaEl.classList.add("is-disabled");
+      cabinetCtaEl.setAttribute("aria-disabled", "true");
+      if (labelEl) {
+        labelEl.textContent = importPendingLabel;
+      }
+      return;
+    }
+    cabinetCtaEl.classList.remove("is-disabled");
+    cabinetCtaEl.removeAttribute("aria-disabled");
+    if (labelEl) {
+      labelEl.textContent = loggedInCtaLabel;
+    }
+  }
+
+  function flushFeedRefreshAfterImport() {
+    if (!pendingFeedRefresh) {
+      return;
+    }
+    pendingFeedRefresh = false;
+    window.dispatchEvent(new CustomEvent("rawlead-quiz-complete"));
+  }
+
+  function showImportError(msg) {
+    if (loginBlockEl) {
+      loginBlockEl.hidden = false;
+    }
+    setLoginState(
+      "error",
+      msg ||
+        "Не удалось сохранить навыки. В ленте остались прежние навыки — попробуй ещё раз."
+    );
   }
 
   function setLoginState(kind, msg) {
@@ -797,6 +1081,19 @@
     if (!overlayMode || !overlayOpen) {
       return;
     }
+    if (retakeMode && retakeBackup && !pendingImportPromise) {
+      retakeMode = false;
+      writeCompleted(retakeBackup);
+      retakeBackup = null;
+    } else {
+      retakeMode = false;
+    }
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch (err) {
+      /* ignore */
+    }
+    session = { history: [], started_at: null };
     setOverlayVisible(false);
     setOverlayPhase(null);
     if (fromHistory) {
@@ -811,6 +1108,35 @@
     if (location.hash === "#quiz") {
       history.replaceState(null, "", location.pathname + location.search);
     }
+    flushFeedRefreshAfterImport();
+  }
+
+  function startRetake() {
+    var completed = readCompleted();
+    retakeBackup = completed || null;
+    retakeMode = true;
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch (err) {
+      /* ignore */
+    }
+    resetPrefetch();
+    if (widgetBox) {
+      widgetBox.innerHTML = "";
+    }
+    if (resultEl) {
+      resultEl.hidden = true;
+      resultEl.classList.remove("rl-quiz__result--compact");
+    }
+    if (stageEl) {
+      stageEl.hidden = false;
+    }
+    if (retakeCompletedEl) {
+      retakeCompletedEl.hidden = true;
+    }
+    showStageScreen("intro");
+    revealIntroAnimation();
+    prefetchQuizStart();
   }
 
   function openOverlay(options) {
@@ -822,6 +1148,26 @@
       return;
     }
     options = options || {};
+
+    if (!options.retake) {
+      discardIncompleteQuizSession();
+      var completed = readCompleted();
+      if (completed) {
+        setOverlayVisible(true);
+        setOverlayPhase("result");
+        if (location.hash !== "#quiz") {
+          history.pushState({ rlQuizOverlay: true }, "", "#quiz");
+          overlayDidPush = true;
+        } else {
+          overlayDidPush = false;
+        }
+        profile = completed.profile || null;
+        session = { history: completed.history || [], started_at: null };
+        showResult(profile, true);
+        return;
+      }
+    }
+
     setOverlayVisible(true);
     setOverlayPhase("intro");
     if (location.hash !== "#quiz") {
@@ -846,6 +1192,12 @@
     el.addEventListener("click", function (event) {
       if (el.classList.contains("js-quiz-overlay-close")) {
         event.preventDefault();
+      }
+      if (pendingImportPromise) {
+        pendingImportPromise.finally(function () {
+          closeOverlay(false);
+        });
+        return;
       }
       closeOverlay(false);
     });
@@ -984,9 +1336,11 @@
       showError("Квиз не настроен на сайте.");
       return;
     }
-    session = readSession();
-    if (!session.started_at) {
-      session.started_at = new Date().toISOString();
+    session = { history: [], started_at: new Date().toISOString() };
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch (err) {
+      /* ignore */
     }
 
     if (prefetchData) {
@@ -1081,6 +1435,16 @@
       restartQuiz();
     });
   }
+  if (retakeCompletedEl) {
+    retakeCompletedEl.addEventListener("click", function () {
+      if (overlayMode) {
+        startRetake();
+      } else {
+        clearCompleted();
+        restartQuiz();
+      }
+    });
+  }
   if (errorRetryBtn) {
     errorRetryBtn.addEventListener("click", function () {
       resetPrefetch();
@@ -1089,17 +1453,35 @@
   }
   if (cabinetCtaEl) {
     cabinetCtaEl.addEventListener("click", function (event) {
+      if (primaryCtaPending) {
+        event.preventDefault();
+        return;
+      }
+      if (isAnon()) {
+        if (!overlayMode) {
+          return;
+        }
+        var loginUrl = cfg.loginUrl || cfg.cabinetUrl || cabinetCtaEl.getAttribute("href");
+        if (!loginUrl) {
+          return;
+        }
+        event.preventDefault();
+        overlayDidPush = false;
+        setOverlayVisible(false);
+        window.location.href = loginUrl;
+        return;
+      }
       if (!overlayMode) {
         return;
       }
-      var url = cfg.loginUrl || cfg.cabinetUrl || cabinetCtaEl.getAttribute("href");
-      if (!url) {
+      event.preventDefault();
+      if (pendingImportPromise) {
+        pendingImportPromise.finally(function () {
+          closeOverlay(false);
+        });
         return;
       }
-      event.preventDefault();
-      overlayDidPush = false;
-      setOverlayVisible(false);
-      window.location.href = url;
+      closeOverlay(false);
     });
   }
 
@@ -1119,23 +1501,90 @@
       }
     });
     if (location.hash === "#quiz") {
-      openOverlay({ autoStart: false });
+      var pendingRetake = false;
+      try {
+        pendingRetake = sessionStorage.getItem("rawlead_quiz_retake") === "1";
+        if (pendingRetake) {
+          sessionStorage.removeItem("rawlead_quiz_retake");
+        }
+      } catch (err) {
+        /* ignore */
+      }
+      if (pendingRetake) {
+        setOverlayVisible(true);
+        setOverlayPhase("intro");
+        startRetake();
+      } else {
+        openOverlay({ autoStart: false });
+      }
     }
   }
+
+  function importCompletedQuizIfPresent() {
+    if (isAnon()) {
+      return Promise.resolve(false);
+    }
+    if (!profile) {
+      var completed = readCompleted();
+      if (completed && completed.profile) {
+        profile = completed.profile;
+      }
+    }
+    if (!profile) {
+      return Promise.resolve(false);
+    }
+    try {
+      if (sessionStorage.getItem(RESTORE_IMPORT_KEY)) {
+        return Promise.resolve(true);
+      }
+    } catch (err) {
+      /* ignore */
+    }
+    var payload = tagsImportPayload();
+    var hasTags = Object.keys(payload.tags).length > 0;
+    var hasNiches = payload.niches && payload.niches.length > 0;
+    var hasCx = payload.cx_pref != null;
+    if (!hasTags && !hasNiches && !hasCx) {
+      return Promise.resolve(false);
+    }
+    return importQuizTags()
+      .then(function () {
+        try {
+          sessionStorage.setItem(RESTORE_IMPORT_KEY, "1");
+        } catch (err) {
+          /* ignore */
+        }
+        return true;
+      })
+      .catch(function () {
+        return false;
+      });
+  }
+
+  window.rawleadImportCompletedQuiz = importCompletedQuizIfPresent;
 
   window.rawleadQuizApp = {
     open: openOverlay,
     close: closeOverlay,
     start: beginQuizPlay,
+    retake: startRetake,
   };
 
-  session = readSession();
+  session = { history: [], started_at: null };
 
   if (overlayMode) {
     prefetchQuizStart();
   } else if (introEl && (!resultEl || resultEl.hidden)) {
-    showStageScreen("intro");
-    revealIntroAnimation();
-    prefetchQuizStart();
+    discardIncompleteQuizSession();
+    var _initCompleted = readCompleted();
+    if (_initCompleted) {
+      profile = _initCompleted.profile || null;
+      session = { history: _initCompleted.history || [], started_at: null };
+      showResult(profile, true);
+    } else {
+      showStageScreen("intro");
+      revealIntroAnimation();
+      prefetchQuizStart();
+    }
   }
 })();

@@ -57,6 +57,7 @@ class TestKworkListingWallClock(unittest.TestCase):
     @patch("kwork_parser.exchange_get")
     @patch("kwork_parser.fetch_listing_html_browser_wall_clock")
     @patch("kwork_parser.listing_browser_enabled", return_value=True)
+    @patch.dict("os.environ", {"KWORK_MAX_PAGES": "1"})
     def test_playwright_timeout_falls_back_to_httpx(
         self,
         _browser_on: MagicMock,

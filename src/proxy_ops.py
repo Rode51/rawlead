@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import socket
 from typing import Any
 from urllib.parse import urlparse
@@ -9,6 +10,8 @@ from urllib.parse import urlparse
 import requests
 
 from config import normalize_proxy_url, radar_timestamp
+
+logger = logging.getLogger(__name__)
 
 PROBE_TARGETS: dict[str, str] = {
     "tg-bot": "https://api.telegram.org/",
@@ -220,6 +223,32 @@ def run_proxy_control(
         ok, msg = set_active_slot_manual(grp, int(slot))
         payload = collect_proxies_payload()
         return {"ok": ok, "message": msg, "proxies": strip_internal_urls(payload)}
+
+    if act == "clear-youdo-bans":
+        from exchange_proxy import clear_youdo_source_bans
+
+        cleared = clear_youdo_source_bans()
+        try:
+            from youdo_parser import youdo_hard_reset
+
+            youdo_hard_reset(reason="ops_clear_youdo_bans")
+        except Exception:
+            pass
+        payload = collect_proxies_payload()
+        if cleared:
+            msg = (
+                f"Сбросили {cleared} банов YouDo (DC + node). "
+                "Сейчас перезапустим радар — подожди 10 сек и обнови страницу."
+            )
+        else:
+            msg = "Банов YouDo не было — пул уже чист."
+        logger.info("ops: youdo bans cleared %d", cleared)
+        return {
+            "ok": True,
+            "message": msg,
+            "cleared": cleared,
+            "proxies": strip_internal_urls(payload),
+        }
 
     if act == "clear-bans":
         from exchange_proxy import clear_all_bans as clear_exchange_bans

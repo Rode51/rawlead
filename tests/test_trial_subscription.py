@@ -128,5 +128,45 @@ class TestTrialApi(unittest.TestCase):
         self.assertIn("yookassa.ru", body["confirmation_url"])
 
 
+class TestAutoTrialOnLogin(unittest.TestCase):
+    def test_starts_trial_for_fresh_user(self) -> None:
+        cur = MagicMock()
+        user_id = "00000000-0000-0000-0000-000000000077"
+        with patch.object(api_server, "_owner_telegram_id", return_value=None):
+            with patch.object(
+                api_server,
+                "fetch_subscription_row",
+                return_value=("free", False, None, None, None),
+            ):
+                with patch.object(api_server, "has_active_premium", return_value=False):
+                    with patch.object(api_server, "start_trial") as mock_start:
+                        with patch.object(api_server, "notify_trial_started") as mock_notify:
+                            api_server._try_auto_start_trial_on_login(cur, user_id, 77001)
+        mock_start.assert_called_once_with(cur, user_id)
+        mock_notify.assert_called_once()
+
+    def test_skips_owner_tg_id(self) -> None:
+        cur = MagicMock()
+        user_id = "00000000-0000-0000-0000-000000000001"
+        with patch.object(api_server, "_owner_telegram_id", return_value=99001):
+            with patch.object(api_server, "start_trial") as mock_start:
+                api_server._try_auto_start_trial_on_login(cur, user_id, 99001)
+        mock_start.assert_not_called()
+
+    def test_skips_when_trial_already_used(self) -> None:
+        cur = MagicMock()
+        user_id = "00000000-0000-0000-0000-000000000078"
+        now = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        with patch.object(api_server, "_owner_telegram_id", return_value=None):
+            with patch.object(
+                api_server,
+                "fetch_subscription_row",
+                return_value=("free", False, None, None, now),
+            ):
+                with patch.object(api_server, "start_trial") as mock_start:
+                    api_server._try_auto_start_trial_on_login(cur, user_id, 78001)
+        mock_start.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,177 @@
+{
+  "generated_at": "2026-06-07T14:17:01.138805+00:00",
+  "base_url": "https://rawlead.ru",
+  "api_url": "https://api.rawlead.ru",
+  "mode": "quick",
+  "tier_plan_check": {
+    "pass": false,
+    "issues": [
+      {
+        "tier": "free",
+        "error": "plan_mismatch",
+        "expected_plan": "free",
+        "actual_plan": "agent",
+        "source": "env:RAWLEAD_PREPROD_FREE_TOKEN"
+      },
+      {
+        "tier": "trial",
+        "error": "no_token",
+        "expected_plan": "trial",
+        "source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN"
+      }
+    ]
+  },
+  "tiers": {
+    "anon": {
+      "source": "none",
+      "ok": true
+    },
+    "free": {
+      "source": "env:RAWLEAD_PREPROD_FREE_TOKEN",
+      "ok": false,
+      "plan_mismatch": {
+        "expected": "free",
+        "actual": "agent"
+      }
+    },
+    "trial": {
+      "source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN",
+      "ok": false
+    },
+    "premium": {
+      "source": "env:RAWLEAD_PREPROD_ACCESS_TOKEN",
+      "ok": true
+    }
+  },
+  "tier_matrix": {
+    "rows": [
+      {
+        "tier": "anon",
+        "feed_status": 200,
+        "feed_ms": 1529.7,
+        "items": 5,
+        "token_source": "none",
+        "subscription_status": null,
+        "plan": null,
+        "expected_plan": null,
+        "plan_ok": true,
+        "error": null,
+        "pass": true
+      },
+      {
+        "tier": "free",
+        "feed_status": 200,
+        "feed_ms": 3110.4,
+        "items": 5,
+        "token_source": "env:RAWLEAD_PREPROD_FREE_TOKEN",
+        "subscription_status": "active",
+        "plan": "agent",
+        "expected_plan": "free",
+        "plan_ok": false,
+        "error": {
+          "expected": "free",
+          "actual": "agent"
+        },
+        "pass": false
+      },
+      {
+        "tier": "trial",
+        "feed_status": 200,
+        "feed_ms": 1477.3,
+        "items": 5,
+        "token_source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN",
+        "subscription_status": null,
+        "plan": null,
+        "expected_plan": "trial",
+        "plan_ok": false,
+        "error": "tier_not_ready",
+        "pass": false
+      },
+      {
+        "tier": "premium",
+        "feed_status": 200,
+        "feed_ms": 3090.1,
+        "items": 5,
+        "token_source": "env:RAWLEAD_PREPROD_ACCESS_TOKEN",
+        "subscription_status": "active",
+        "plan": "agent",
+        "expected_plan": "agent",
+        "plan_ok": true,
+        "error": null,
+        "pass": true
+      }
+    ],
+    "pass": false
+  },
+  "load": {
+    "skipped": true,
+    "s3_pass": true
+  },
+  "draft_burst": {
+    "skipped": true,
+    "pass": true
+  },
+  "tz": {
+    "lead_ids": [
+      18205,
+      18103,
+      18102
+    ],
+    "rows": [
+      {
+        "lead_id": 18205,
+        "status": 200,
+        "tz_fetch_ms": 1592.3,
+        "body_chars": 11339,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      },
+      {
+        "lead_id": 18103,
+        "status": 200,
+        "tz_fetch_ms": 1498.2,
+        "body_chars": 11171,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      },
+      {
+        "lead_id": 18102,
+        "status": 200,
+        "tz_fetch_ms": 1526.1,
+        "body_chars": 11113,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      }
+    ],
+    "ok_extracted": 3,
+    "required_ok": 2,
+    "pass": true
+  },
+  "ux_journey": {
+    "skipped": true,
+    "pass": true
+  },
+  "skills_mismatch": {
+    "skipped": true,
+    "pass": true
+  },
+  "parser_snapshot": {
+    "skipped": true,
+    "pass": true
+  },
+  "pass_summary": {
+    "gates": {
+      "tier_matrix": false,
+      "load_p95_feed": "skipped",
+      "draft_burst": "skipped",
+      "tz_leads": true,
+      "ux_journey": "skipped",
+      "parsers": "skipped",
+      "skills_mismatch": "skipped"
+    },
+    "pass": false
+  }
+}
