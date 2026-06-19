@@ -4,15 +4,16 @@
 
 **Очередь:** [`TASKS.md`](TASKS.md) · **Coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md)
 
-**Next:** **O283-MIMO** deploy · **O280-R10** admin · owner draft smoke
+**Next:** **O280-R10** verify admin · owner draft smoke · R11 A3 proxy ops
 
 **Откат WP:** `/var/www/rawlead.ru-wp` · `DEPLOY_VPS.md`
 
 ---
 
-## MiMo audit — triaged (2026-06-19)
+## O283 MiMo — deployed (2026-06-19)
 
-FL-LOOP + MOCK + AI-CTX + favicon → code ✅ · [`2026-06-19-mimo-parsers-fl.md`](../../problems/2026-06-19-mimo-parsers-fl.md)
+FL-LOOP · MOCK · AI-CTX · R11 · cabinet poll · nginx headers · favicon → **prod** ✅
+
 
 ---
 

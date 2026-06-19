@@ -65,6 +65,15 @@ export default function Header({ onLoginClick }: Props) {
         {/* Auth CTA */}
         {auth.status === 'auth' && auth.profile ? (
           <div className="flex items-center gap-3">
+            {auth.profile.can_ops_admin ? (
+              <Link
+                href="/ops/"
+                data-testid="header-admin"
+                className="hidden md:inline text-[11px] font-display font-black uppercase tracking-[0.12em] text-[#1A1918] no-underline hover:text-rl-inverse transition-colors"
+              >
+                Админка
+              </Link>
+            ) : null}
             <Link
               href="/cabinet/"
               data-testid="header-cabinet"

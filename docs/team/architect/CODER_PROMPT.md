@@ -1,28 +1,26 @@
 # Coder — hot queue (active)
 
-**→ Now:** **§ O283-MIMO** (остаток) · **O280-R10** admin link · owner smoke draft
+**→ Now:** owner smoke draft (R11) · verify admin `/ops/` · P1 backlog
 
 ---
 
-## § O283-MIMO — MiMo audit (2026-06-19)
+## § O283-MIMO — MiMo audit (2026-06-19) ✅ deployed
 
 **Source:** [`2026-06-19-mimo-audit.md`](../../problems/2026-06-19-mimo-audit.md) · parsers: [`2026-06-19-mimo-parsers-fl.md`](../../problems/2026-06-19-mimo-parsers-fl.md)
 
 | ID | Pri | Status | Fix |
 |----|-----|--------|-----|
-| **FL-LOOP** | P0 | ✅ code | `exchange_browser_fetch.py:717` · `exchange_proxy.py:1287` — `set_restart_source=not fl_listing_subprocess_enabled()` |
-| **MOCK** | P0 | ✅ code | `lenta/page.tsx` — MOCK только localhost |
-| **AI-CTX** | P0 | ✅ code | `_reply_validate_lead_ctx` → `ContextVar` |
-| **R11** | P0 | ✅ code | `_log_ai_failure` · OpenRouter proxy → direct fallback |
-| **CABINET** | P0 | ⏳ | pending draft API poll in cabinet |
-| **NGINX** | P1 | ⏳ | security headers `deploy/nginx/rawlead.ru.conf` |
-| **Favicon** | P1 | ✅ | `rawlead-next/app/icon.svg` — R on `#E8A020` |
+| **FL-LOOP** | P0 | ✅ prod | `exchange_browser_fetch.py` · `exchange_proxy.py` |
+| **MOCK** | P0 | ✅ prod | `lenta/page.tsx` — localhost only |
+| **AI-CTX** | P0 | ✅ prod | `ContextVar` in `ai_analyze.py` |
+| **R11** | P0 | ✅ prod | proxy → direct fallback |
+| **CABINET** | P0 | ✅ prod | pending draft poll |
+| **NGINX** | P1 | ✅ prod | security headers |
+| **Favicon** | P1 | ✅ prod | R on `#E8A020` |
+
+**Deploy:** `deploy-o283-mimo-fixes-vps.py` · `deploy-web-rawlead-vps.py` (2026-06-19)
 
 **P1 backlog:** Kwork parsed-zero · proxy health-check · TG notify retry · Metrika Next
-
-### DoD (остаток)
-
-- Cabinet poll pending drafts · nginx headers · `npm run build` · deploy web + radar (FL fix)
 
 ---
 
@@ -40,13 +38,13 @@
 
 ---
 
-## § O280-R10 — Next: ссылка `/ops/` (owner admin)
+## § O280-R10 — Next: ссылка `/ops/` (owner admin) ✅ prod
 
 | Fix | File |
 |-----|------|
 | «Админка» при `can_ops_admin` | `rawlead-next/components/layout/Header.tsx` |
 
-**DoD:** owner → `https://rawlead.ru/ops/` · build + deploy web
+**DoD:** owner → `https://rawlead.ru/ops/` · verify logged in
 
 ---
 

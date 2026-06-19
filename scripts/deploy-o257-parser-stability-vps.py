@@ -25,6 +25,7 @@ import deploy_vps_ssh as ssh  # noqa: E402
 _SRC_FILES = (
     "src/fl_parser.py",
     "src/exchange_browser_fetch.py",
+    "src/exchange_proxy.py",
     "src/kwork_parser.py",
     "src/youdo_parser.py",
 )

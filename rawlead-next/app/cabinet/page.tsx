@@ -16,6 +16,7 @@ import {
   INBOX_REFRESH_EVENT,
   readPendingDraftsMap,
   removePendingDraft,
+  notifyInboxRefresh,
 } from '@/lib/pending-drafts'
 
 // ─── Dev mocks (localhost only) ────────────────────────────────────────────────
@@ -167,6 +168,47 @@ function CabinetInner() {
     loadInbox(0)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.status, isDevMode])
+
+  const pendingPollRef = useRef(new Set<number>())
+
+  useEffect(() => {
+    if (!isAuth || isDevMode || !isPaid) return
+
+    async function pollPendingDrafts() {
+      const pending = readPendingDraftsMap()
+      const ids = Object.keys(pending)
+        .map((k) => parseInt(k, 10))
+        .filter((id) => Number.isFinite(id) && id > 0)
+      if (!ids.length) return
+
+      for (const id of ids) {
+        if (pendingPollRef.current.has(id)) continue
+        pendingPollRef.current.add(id)
+        try {
+          const res = await meApi.createDraft(id)
+          const draft = res.reply_draft?.trim()
+          if (draft) {
+            removePendingDraft(id)
+            setInbox((prev) =>
+              prev.map((item) =>
+                item.id === id ? { ...item, reply_draft: draft } : item,
+              ),
+            )
+            notifyInboxRefresh()
+          }
+        } catch {
+          // still generating or transient API error
+        } finally {
+          pendingPollRef.current.delete(id)
+        }
+      }
+    }
+
+    void pollPendingDrafts()
+    const onRefresh = () => void pollPendingDrafts()
+    window.addEventListener(INBOX_REFRESH_EVENT, onRefresh)
+    return () => window.removeEventListener(INBOX_REFRESH_EVENT, onRefresh)
+  }, [isAuth, isDevMode, isPaid])
 
   // Cleanup on unmount — none needed for modal login
 
