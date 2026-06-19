@@ -2,6 +2,8 @@
 
 **Не читать @designer / @coder по умолчанию.** Активное: [DESIGNER_PROMPT.md](../design/DESIGNER_PROMPT.md) · план: [LEAD_DESIGN_PROMPT.md](../design/LEAD_DESIGN_PROMPT.md).
 
+> **2026-06-19 flush:** hot переписан под O280 + quiz-first. § **O92–O98 Skill Tree** ниже — **DEPRECATED** (owner 2026-06-15). Полный hot до flush — git history.
+
 ---
 
 

@@ -1,6 +1,6 @@
 # Портфолио — цели (Rode51 / labs)
 
-**Статус:** 2026-06-18 · **P1 v1 desktop ✅** · **prod:** `https://rawlead.ru/portfolio/` (временно)
+**Статус:** 2026-06-19 · **P1 v1 desktop ✅** · **prod:** `https://rode51.ru` (VPS nginx+static ✅ · публично после DNS + certbot)
 
 ---
 
@@ -13,7 +13,7 @@
 | **Запомнить** | Бренд **Rode51** · не RawLead как продукт |
 | **Действие** | Telegram **@rcnn43** · [FL профиль](https://www.fl.ru/users/KhramovskikhN/portfolio/) |
 
-**Домен (цель):** `labs.rawlead.ru` · static site · отдельно от prod rawlead.ru.
+**Домен (цель):** **`https://rode51.ru`** · static · **не** rawlead.ru/portfolio · **не** product UI.
 
 **Не цель:** копия rawlead.ru · не agency-лендинг «AI slop».
 

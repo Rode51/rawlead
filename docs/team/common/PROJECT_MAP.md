@@ -24,7 +24,7 @@
 | Мысли / решения владельца | [`architect/OWNER_INTENT.md`](../architect/OWNER_INTENT.md) | чат, дубли в FOR_YOU |
 | Активный план Product | [`product/LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) | новый `TZ_*.md` |
 | Активный план Marketing | [`marketing/LEAD_MARKETING_PROMPT.md`](../marketing/LEAD_MARKETING_PROMPT.md) | ads copy в чат |
-| WP → Next handoff (O280) | [`architect/WP_TO_NEXT_HANDOFF.md`](../architect/WP_TO_NEXT_HANDOFF.md) | Claude Code `web/` · до ads |
+| WP → Next handoff (O280) | [`architect/WP_TO_NEXT_HANDOFF.md`](../architect/WP_TO_NEXT_HANDOFF.md) · [`migration/README.md`](../../migration/README.md) | Claude Code **`rawlead-next/`** · до ads |
 | Активный план Portfolio | [`portfolio/LEAD_PORTFOLIO_PROMPT.md`](../portfolio/LEAD_PORTFOLIO_PROMPT.md) · Claude: [`portfolio/CLAUDE_CODE_HANDOFF.md`](../portfolio/CLAUDE_CODE_HANDOFF.md) | P288 legacy · `design/portfolio/refs/` |
 | Задача Coder | [`architect/CODER_PROMPT.md`](../architect/CODER_PROMPT.md) hot · [`archive/CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) | TASKS, чат (только копипаст) |
 | Задача Designer | [`design/DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) hot · [`archive/DESIGNER_PROMPT_ARCHIVE.md`](../archive/DESIGNER_PROMPT_ARCHIVE.md) | LEAD_DESIGN архив |

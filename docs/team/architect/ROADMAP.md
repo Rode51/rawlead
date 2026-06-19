@@ -18,7 +18,7 @@ O236–O246 UX/Perf · O247 hotfix · tier smoke PASS · TG xlsx owner base copi
 
 | Волна | Что | Кто |
 |-------|-----|-----|
-| **2.5 · UI** | **O280** WP → Next `web/` на rawlead.ru (до ads) | Claude Code + @coder deploy/CORS · handoff [`WP_TO_NEXT_HANDOFF.md`](WP_TO_NEXT_HANDOFF.md) |
+| **2.5 · UI** | **O280** WP → Next `rawlead-next/` — **phase 1 ✅** home+lenta · phase 2 cabinet завтра | Claude Code + @coder deploy/CORS · [`WP_TO_NEXT_HANDOFF.md`](WP_TO_NEXT_HANDOFF.md) |
 | **1 · TG** | t2b sync · **O207** funnel proof · O188 join ~127 | @coder |
 | **2 · Концепция** | **O208** quiz-first · **O217** synthetic quiz pack | @lead-product → @coder |
 | **4 · L2** | **O200** full regen · **≥70% × 4 категории** | @coder |

@@ -295,23 +295,44 @@ def _youdo_profile_generation() -> str:
     return os.getenv("YOUDO_PROFILE_GENERATION", "").strip()
 
 
-def _youdo_ephemeral_first_slot1(*, slots_tried: int) -> bool:
-    """O268: cold goto on slot1 until session ok when persistent profile is on."""
+def _youdo_disk_profile_has_session(proxy_url: str) -> bool:
+    """O269: Camoufox user_data_dir with cookies = session (survives fetch_every_n skips).
+
+    Sticky worker reloads the same on-disk profile between cycles. Ephemeral-first (O268)
+    is only for empty/wiped profiles — one-shot subprocess cannot warm-reload.
+    """
+    if not youdo_persistent_profile_enabled():
+        return False
+    proxy = (proxy_url or "").strip()
+    if not proxy:
+        return False
+    return _youdo_profile_has_cookies(_youdo_persistent_profile_dir(proxy))
+
+
+def _youdo_ephemeral_first_slot1(*, slots_tried: int, proxy_url: str = "") -> bool:
+    """O268 cold goto on slot1 until session ok; O269 skips when disk profile has cookies."""
     if slots_tried != 1:
         return False
     if not (_youdo_is_camoufox() and youdo_persistent_profile_enabled()):
         return False
     if not youdo_sticky_after_ok_enabled():
         return True
+    if _youdo_disk_profile_has_session(proxy_url):
+        return False
     return not _youdo_session_listing_ok()
 
 
-def _youdo_should_use_sticky_listing(*, slots_tried: int, use_ephemeral: bool) -> bool:
+def _youdo_should_use_sticky_listing(
+    *,
+    slots_tried: int,
+    use_ephemeral: bool,
+    proxy_url: str = "",
+) -> bool:
     if not (_youdo_is_camoufox() and _youdo_sticky_session_enabled()):
         return False
     if youdo_ephemeral() or use_ephemeral:
         return False
-    if _youdo_ephemeral_first_slot1(slots_tried=slots_tried):
+    if _youdo_ephemeral_first_slot1(slots_tried=slots_tried, proxy_url=proxy_url):
         return False
     return True
 
@@ -693,7 +714,11 @@ def _fl_browser_antibot_fail(
     except Exception as ban_exc:
         logger.debug("fetch:fl browser ban skipped: %s", ban_exc)
     if fl_hard_reset_on_ban_enabled():
-        fl_hard_reset(reason=str(exc), storage=storage)
+        fl_hard_reset(
+            reason=str(exc),
+            storage=storage,
+            set_restart_source=not fl_listing_subprocess_enabled(),
+        )
 
 
 def _is_timeout_error(exc: BaseException) -> bool:
@@ -1974,7 +1999,7 @@ def cleanup_stale_youdo_browser_processes() -> int:
     import psutil
 
     user = getpass.getuser().casefold()
-    keep = _browser_process_tree()
+    keep = _browser_process_tree() | _youdo_sticky_pids_to_keep()
     killed = 0
     for proc in psutil.process_iter(["pid", "username", "name", "cmdline"]):
         try:
@@ -2238,6 +2263,62 @@ def _youdo_sticky_spawn_worker(*, proxy_url: str, user_agent: str) -> subprocess
     )
 
 
+def _youdo_sticky_start_stderr_drain(proc: subprocess.Popen[str]) -> None:
+    """Prevent sticky worker stderr pipe fill (O269)."""
+    if proc.stderr is None:
+        return
+
+    def _drain() -> None:
+        try:
+            for _ in proc.stderr:
+                pass
+        except Exception:
+            pass
+
+    threading.Thread(
+        target=_drain,
+        daemon=True,
+        name="youdo-sticky-stderr",
+    ).start()
+
+
+def _youdo_sticky_pids_to_keep() -> set[int]:
+    """PIDs that must survive cleanup_stale_youdo_browser_processes (O269)."""
+    pids: set[int] = set()
+    with _YOUDO_STICKY_LOCK:
+        proc = _YOUDO_STICKY_PROC
+        if proc is None or proc.poll() is not None:
+            return pids
+        pid = int(proc.pid or 0)
+        if pid <= 0:
+            return pids
+        pids.add(pid)
+        try:
+            import psutil
+
+            for child in psutil.Process(pid).children(recursive=True):
+                pids.add(int(child.pid))
+        except Exception:
+            pass
+    return pids
+
+
+def youdo_sticky_keepalive_ping() -> None:
+    """Keep warm sticky worker alive across fetch_every_n skip cycles (O269)."""
+    if not _youdo_sticky_session_enabled():
+        return
+    with _YOUDO_STICKY_LOCK:
+        proc = _YOUDO_STICKY_PROC
+        if proc is None or proc.poll() is not None:
+            return
+        if _YOUDO_STICKY_LAST_VALID <= 0:
+            return
+        try:
+            _youdo_sticky_send_json(proc, {"cmd": "ping"}, timeout_sec=10.0)
+        except Exception as exc:
+            logger.debug("fetch:youdo sticky_keepalive failed: %s", exc)
+
+
 def _fetch_youdo_sticky_listing(
     url: str,
     *,
@@ -2282,6 +2363,10 @@ def _fetch_youdo_sticky_listing(
                 warm = use_warm and _youdo_sticky_is_warm_unlocked(proxy_url=proxy_url)
                 proc = _YOUDO_STICKY_PROC
                 if proc is not None and proc.poll() is not None:
+                    logger.info(
+                        "fetch:youdo sticky_worker_died rc=%s — respawn",
+                        proc.returncode,
+                    )
                     _youdo_sticky_teardown_unlocked(log_trace=False)
                     proc = None
                     warm = False
@@ -2302,6 +2387,7 @@ def _fetch_youdo_sticky_listing(
                         proxy_url=proxy_url,
                         user_agent=user_agent,
                     )
+                    _youdo_sticky_start_stderr_drain(_YOUDO_STICKY_PROC)
                     _YOUDO_STICKY_PROXY = proxy_url
                     warm = False
                     proc = _YOUDO_STICKY_PROC
@@ -3568,6 +3654,7 @@ def _fetch_youdo_one_browser_slot(
     if _youdo_should_use_sticky_listing(
         slots_tried=slots_tried,
         use_ephemeral=use_ephemeral,
+        proxy_url=proxy_url,
     ):
         return _fetch_youdo_sticky_listing(
             url,
@@ -3581,7 +3668,10 @@ def _fetch_youdo_one_browser_slot(
         or use_ephemeral
         or (
             _youdo_is_camoufox()
-            and _youdo_ephemeral_first_slot1(slots_tried=slots_tried)
+            and _youdo_ephemeral_first_slot1(
+                slots_tried=slots_tried,
+                proxy_url=proxy_url,
+            )
         )
     )
     if use_ephemeral_listing:
@@ -3938,7 +4028,10 @@ def fetch_listing_html_browser_slots(
                     or use_ephemeral
                     or (
                         _youdo_is_camoufox()
-                        and _youdo_ephemeral_first_slot1(slots_tried=slots_tried)
+                        and _youdo_ephemeral_first_slot1(
+                            slots_tried=slots_tried,
+                            proxy_url=proxy_url,
+                        )
                     )
                 )
                 if (
@@ -3946,6 +4039,7 @@ def fetch_listing_html_browser_slots(
                     and _youdo_should_use_sticky_listing(
                         slots_tried=slots_tried,
                         use_ephemeral=use_ephemeral,
+                        proxy_url=proxy_url,
                     )
                 ):
                     html = _fetch_youdo_sticky_listing(

@@ -8,6 +8,22 @@
 
 ---
 
+## § 2026-06-19 — O280 Next cutover + O272 + Portfolio P289
+
+| Ticket | Сводка |
+|--------|--------|
+| **O280** | rawlead.ru → Next static · WP rollback `/var/www/rawlead.ru-wp` |
+| **O280-R3–R8** | auth modal · LoginPanel WP flow · fly scroll · Neon login incident → R7/R8 |
+| **O272** | `require_database_url` · site≠Neon · bot-poll restart |
+| **O282** | browse weights API |
+| **O281** | TG «Не моё» delete push |
+| **P289** | `portfolio/` → **rode51.ru** · certbot · rawlead `/portfolio/` 404 |
+| **O280-R9** | ⏳ owner: убрать «N лидов за 7 дней» · avatar header |
+
+Проблемы: `problems/2026-06-19-neon-db-audit.md` · `bot-auth-db-neon.md` · `next-login-wp-parity.md`
+
+---
+
 ## § 2026-06-15 — O221 quiz v2 + deploy
 
 | Ticket | Сводка |

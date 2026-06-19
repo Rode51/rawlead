@@ -45,6 +45,7 @@ flowchart LR
 | **`docs/design/wp/REFERENCE.md`** | Lead Designer | все design + Coder (ссылка) | Визуальный канон: цвета, типографика, компоненты |
 | **`docs/design/wp/feed-cabinet-mvp.md`** | Lead Designer | design + Coder | Flows `/lenta/` · `/cabinet/` |
 | **`docs/design/wp/wave-*-brief.md`** | Designer → Lead ревью | Coder (через CODER_PROMPT) | **Техспека волны** — единственный канон CSS/JS для Coder |
+| **`docs/migration/PAGES_INVENTORY.md`** | Lead Architect | Lead Designer, Designer (read) | Экраны **Next** (`rawlead-next/`) — функциональный канон |
 | **`DESIGN_SYSTEM.md`** | Lead Designer | Designer | Токены, принципы (все проекты) |
 | **`DESIGN_BRIEF.md`** | Designer | — | **Только пульт/desktop** — **не** WP-лендинг |
 
@@ -56,13 +57,13 @@ flowchart LR
 Владелец ↔ Lead Designer → LEAD_DESIGN_PROMPT (решения)
          → DESIGNER_PROMPT § активная ИЛИ docs/design/wp/wave-N-brief.md
          → Lead Architect → CODER_PROMPT § (ссылки, не копипаст ТЗ)
-         → @coder → wordpress/ (не design docs)
+         → @coder → wordpress/ / rawlead-next/ (не design docs)
 ```
 
 | Роль | Читает | Не читает |
 |------|--------|-----------|
 | **Lead Designer** | STATUS · LEAD_DESIGN_PROMPT · REFERENCE v5 · feed-cabinet-mvp | CODER_PROMPT целиком · архив § без нужды |
-| **Designer** | **DESIGNER_PROMPT § шапка + активная §** · REFERENCE · brief волны | LEAD_DESIGN_PROMPT · PRODUCT_VISION · архив § |
+| **Designer** | **DESIGNER_PROMPT** шапка · `feed-cabinet-mvp` §0.1 · `wave-o209-match-brief` · `PAGES_INVENTORY` | Skill Tree § archive · LEAD_DESIGN_PROMPT целиком · PRODUCT_VISION без задачи |
 | **Lead Architect** | DESIGNER_PROMPT § активная · STATUS · TASKS | правка design без Lead Designer |
 | **Coder** | **CODER_PROMPT §** · файлы из § «Файлы» | DESIGNER_PROMPT · LEAD_DESIGN_PROMPT · wave-brief (если не в CODER) |
 

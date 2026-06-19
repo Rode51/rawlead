@@ -312,7 +312,9 @@ RU node **может** обойти challenge; DC и другие RU сейча�
 
 **Coder deliverables (2026-06-18):** `exchange_browser_fetch.py` ephemeral-first + RU burst + profile wipe · `youdo_sticky_worker.py` no cookie→reload · `exchange_proxy.py` FL DC fallback · `tests/test_o268_youdo_recovery.py` · `deploy-o268-youdo-recovery-vps.py`.
 
-**Deploy ✅ Lead verify 2026-06-18:** VPS active · 4 DC `alive=4/4` · ephemeral path · **no 150s reload** · ingest **still 0** (1712b) · last ok **10:04**.
+**Deploy ✅ Lead verify 2026-06-18:** VPS active · 4 DC `alive=4/4` · ingest **14:26** `parsed=50`.
+
+**Golden baseline 2026-06-19:** стабильный ingest · backup profile+log → [`2026-06-19-youdo-o268-breakthrough.md`](2026-06-19-youdo-o268-breakthrough.md) · **откат сюда** при регрессе.
 
 ---
 

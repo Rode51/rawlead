@@ -10,6 +10,7 @@ import time
 import hashlib
 from collections import deque
 from contextlib import contextmanager, nullcontext
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -113,7 +114,10 @@ _CUSTOMER_II_TERM_RE = re.compile(
     rf"tensorflow|pytorch|langchain|искусственн\w+\s+интеллект",
     re.IGNORECASE,
 )
-_reply_validate_lead_ctx: tuple[str, str] = ("", "")
+_reply_validate_lead_ctx: ContextVar[tuple[str, str]] = ContextVar(
+    "_reply_validate_lead_ctx",
+    default=("", ""),
+)
 _FORBIDDEN_REPLY_GREETING_RE = re.compile(
     r"здравствуйте.*готов\s+реализовать|"
     r"готов\s+взяться|готов\s+реализовать|готов\s+заменить|"
@@ -527,8 +531,7 @@ def set_reply_validate_lead_context(
     description: str = "",
 ) -> None:
     """Контекст ТЗ для allowlist «ИИ»/«ИИ-бот» (regen повторно валидирует в том же потоке)."""
-    global _reply_validate_lead_ctx
-    _reply_validate_lead_ctx = (title.strip(), description.strip())
+    _reply_validate_lead_ctx.set((title.strip(), description.strip()))
 
 
 def _customer_ii_terms_in_lead(title: str, description: str) -> bool:
@@ -542,8 +545,9 @@ def _check_forbidden_reply_words(
     title: str = "",
     description: str = "",
 ) -> None:
-    t = title.strip() or _reply_validate_lead_ctx[0]
-    d = description.strip() or _reply_validate_lead_ctx[1]
+    ctx = _reply_validate_lead_ctx.get()
+    t = title.strip() or ctx[0]
+    d = description.strip() or ctx[1]
     if _FORBIDDEN_REPLY_ALWAYS_RE.search(draft):
         raise AiAnalyzeError("reply_draft: запрещённые слова (ИИ/Cursor/…)")
     if _FORBIDDEN_REPLY_AI_METHOD_RE.search(draft):
@@ -926,7 +930,7 @@ def _log_ai_failure(
     log_prefix: str,
     exc: BaseException,
 ) -> None:
-    if not errors or not log_prefix:
+    if errors is None or not log_prefix:
         return
     kind = _ai_error_kind(exc)
     detail = f"{type(exc).__name__}: {exc}".replace("\n", " ")[:160]
@@ -1686,13 +1690,32 @@ def _openrouter_chat(
                 if use_draft_proxy
                 else DIRECT_REQUESTS_PROXIES
             )
-            resp = requests.post(
-                _OPENROUTER_URL,
-                headers=headers,
-                json=body,
-                timeout=timeout_sec,
-                proxies=proxies,
-            )
+            try:
+                resp = requests.post(
+                    _OPENROUTER_URL,
+                    headers=headers,
+                    json=body,
+                    timeout=timeout_sec,
+                    proxies=proxies,
+                )
+            except (
+                requests.exceptions.ProxyError,
+                requests.exceptions.ConnectionError,
+            ) as exc:
+                if use_draft_proxy:
+                    logger.warning(
+                        "openrouter proxy failed (%s), direct fallback",
+                        type(exc).__name__,
+                    )
+                    resp = requests.post(
+                        _OPENROUTER_URL,
+                        headers=headers,
+                        json=body,
+                        timeout=timeout_sec,
+                        proxies=DIRECT_REQUESTS_PROXIES,
+                    )
+                else:
+                    raise
             last_status = resp.status_code
             if resp.status_code == 429 and use_draft_proxy and slot < slots - 1:
                 continue

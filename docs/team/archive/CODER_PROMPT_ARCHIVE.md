@@ -6,7 +6,11 @@
 
 ---
 
-# Перенесено из hot **2026-06-16** — doc hygiene trim
+# Перенесено из hot **2026-06-19** — O280-POST-CUTOVER (partial)
+
+Deploy prod CSS `2e677daf` · owner smoke **6 FAIL** → hot § **O280-POST-CUTOVER-R2**. Полное ТЗ первого прохода — git history / этот коммит.
+
+---
 
 Hot `CODER_PROMPT.md` сжат до ≤120 строк. Полные § O250/O250b/O250c/O250d/O253/O251 остаются ниже в этом архиве (grep по § id). Prod snapshot → [`PROD_FACTS.md`](../common/PROD_FACTS.md).
 

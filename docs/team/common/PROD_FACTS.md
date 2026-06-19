@@ -6,20 +6,20 @@
 
 > Детали задач → [`STATUS.md`](STATUS.md) · шаги владельца → [`FOR_YOU.md`](../../FOR_YOU.md)
 
-**Обновлено:** 2026-06-18 (O271 VPS Postgres cutover)
+**Обновлено:** 2026-06-19 (probe_prod_facts_vps --write)
 
 ## Database (O271)
 
 | | |
 |---|---|
 | **Prod `DATABASE_URL`** | **local Postgres** `127.0.0.1:5432/rawlead` |
-| **Neon** | **отключён** · URL в `NEON_DATABASE_URL` (backup only) |
-| **Post-migrate** | после смены URL — **restart** `rawlead-api` + `rawlead-bot-poll` + `rawlead-radar` |
+| **Neon** | **запрещён для site runtime** · URL только в `NEON_DATABASE_URL` (архив) · guard **§ O272** |
+| **Post-migrate** | после смены URL — **restart** `rawlead-api` + `rawlead-bot-poll` + `rawlead-radar` · проверить env в **процессе**, не только в файле |
 
 ---
 
 <!-- AUTO:VPS_PROBE:START -->
-**Probe:** 2026-06-17 11:07 UTC · `python scripts/probe_prod_facts_vps.py --write`
+**Probe:** 2026-06-19 13:34 UTC · `python scripts/probe_prod_facts_vps.py --write`
 
 | Unit | State |
 |------|-------|
@@ -29,10 +29,12 @@
 
 - **YOUDO_BROWSER:** `camoufox`
 - **RADAR_PROFILE:** `site`
-- **Theme prod `ver`:** `1.5.0`
-- **Last YouDo ok:** 2026-06-17 17:36:47 youdo:trace stage=fetch_end fresh=0 kind=ok new=0 parsed=50
+- **Theme prod `ver`:** `?`
+- **Last YouDo ok:** 2026-06-19 21:18:18 youdo:trace stage=fetch_end fresh=50 kind=ok new=43 parsed=50
 - **O254 code on VPS:** ✅ (`youdo_browser_teardown`)
 - **TG join v4 pending:** 101
+
+- **DB site units:** api=`unset` · bot-poll=`unset` · radar=`unset`
 
 <!-- AUTO:VPS_PROBE:END -->
 
@@ -51,7 +53,9 @@
 
 **YouDo recovery (O254):** `youdo_hard_reset()` + `youdo_browser_teardown()` · ops кнопка → restart `rawlead-radar` · auto при `YOUDO_HARD_RESET_FAILS=3`.
 
-**YouDo O262h:** ✅ deploy **2026-06-17** · outer wall ~750s · ingest watch · `youdo:ingest done=` smoke
+**YouDo O269 (2026-06-19):** sticky survival deploy ✅ · DC `194.226.236.204` · profile `youdo_*_g2` **не wipe** · watch `sticky_reload` / `warm=1` в логе.
+
+**YouDo O262h:** ✅ deploy **2026-06-17** · superseded by O268 baseline выше
 
 ---
 
@@ -68,12 +72,16 @@ Env: `RADAR_PROFILE=site` · SQLite `data/projects.db` · log `data/radar_site.l
 
 ---
 
-## WP theme
+## WP theme → Next (O280 cutover 2026-06-19)
 
-| | Версия |
-|---|--------|
-| **Repo (code)** | **1.19.20** (O237 Metrika + O253 JWT JS) |
-| **Prod** | проверять: `curl -s https://rawlead.ru/lenta/ \| grep ver=` |
+| | |
+|---|---|
+| **rawlead.ru** | **Next.js static** `rawlead-next/out` · deploy `deploy-web-rawlead-vps.py` |
+| **POST-CUTOVER R10** | ⏳ | Next header «Админка» → `/ops/` |
+| **POST-CUTOVER R9b** | ✅ **2026-06-19** | avatar dir `/opt/rawlead/data/avatars` · env + guard |
+| **POST-CUTOVER R9** | ✅ **2026-06-19** | лента без счётчика · avatar login path |
+| **WP rollback** | `/var/www/rawlead.ru-wp` (full copy pre-cutover) |
+| **Repo theme (legacy)** | **1.19.20** — не на корне домена |
 
 ---
 

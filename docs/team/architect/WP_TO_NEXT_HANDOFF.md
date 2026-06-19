@@ -2,7 +2,11 @@
 
 **Решение владельца (2026-06-18):** убрать **WordPress как UI** до рекламы · **Python API + радар не трогать** · визуал на **Next.js** (как `portfolio/`).
 
-**Кто пишет промпты:** `@lead-architect` · **кто кодит:** Claude Code в `web/` · **verify/deploy:** `@lead-architect` / `@coder`.
+**Кто пишет промпты:** `@lead-architect` · **кто кодит:** Claude Code в **`rawlead-next/`** · **verify/deploy:** `@lead-architect` / `@coder`.
+
+**Статус фаз (verify 2026-06-19):** phase 0–1 ✅ · cabinet **MVP** (parity gaps) · pricing ❌ · as-built [`O280_AS_BUILT.md`](../../migration/O280_AS_BUILT.md) § **Prod parity**
+
+**Пакет документации:** [`docs/migration/README.md`](../../migration/README.md) (PAGES · API · TOKENS · `rawlead-next/CLAUDE.md`).
 
 ---
 
@@ -20,11 +24,11 @@
 
 ## Read order (обязательно перед кодом)
 
-1. [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) — UX канон (quiz-first, NEO tokens)
+1. [`feed-cabinet-mvp.md`](../../design/wp/feed-cabinet-mvp.md) — UX behavior (quiz-first, tiers) — **не** визуальный brief
 2. [`KAK_ETO_RABOTAET.md`](../../KAK_ETO_RABOTAET.md) — auth, trial, pay
 3. `wordpress/rawlead-kadence-child/inc/rawlead-api.php` — маппинг REST → FastAPI
 4. `src/api_server.py` — источник истины `/v1/*` (если расхождение — API wins)
-5. [`DESIGN_SYSTEM.md`](../design/DESIGN_SYSTEM.md) § WP NEO-BRUTALIST — цвета/типо (можно освежить, не копировать portfolio terracotta)
+5. `wordpress/.../assets/js/rawlead-feed.js` — reference behavior
 6. [`PROD_FACTS.md`](../common/PROD_FACTS.md) — prod URLs, API
 
 ---
@@ -55,10 +59,12 @@ flowchart LR
 
 ---
 
-## Новый пакет: `web/`
+## Новый пакет: `rawlead-next/`
+
+> Имя папки: **`rawlead-next/`** (в старых § ниже может встречаться `web/` — то же самое).
 
 ```
-web/
+rawlead-next/
   CLAUDE.md              ← краткие правила (скопировать из § bootstrap)
   package.json
   next.config.mjs        ← output: 'export' ИЛИ standalone — см. § Deploy
@@ -146,10 +152,10 @@ Next **обязан** слушать `rawlead-tags-imported` и refetch tags + f
 
 ### Фаза 0 — scaffold (2–4 ч)
 
-- [ ] `npx create-next-app` в `web/` · TS · Tailwind · App Router
+- [ ] `npx create-next-app` в `rawlead-next/` · TS · Tailwind · App Router
 - [ ] `lib/api.ts` · smoke: `GET /v1/health` or public feed anon
-- [ ] Header + layout · NEO tokens (CSS variables из `rawlead.css` — выжимка, не весь файл)
-- [ ] `web/CLAUDE.md`
+- [ ] Minimal layout shell (nav links — см. `PAGES_INVENTORY`)
+- [ ] `rawlead-next/CLAUDE.md`
 
 ### Фаза 1 — лента + логин (день 1)
 
@@ -216,38 +222,39 @@ Nginx: `try_files` + SPA fallback как `deploy/nginx/labs.rawlead.ru.conf`.
 ## § bootstrap — копипаст в Claude Code
 
 ```text
-Bootstrap RawLead product UI — web/ (O280 WP→Next).
+Bootstrap RawLead product UI — rawlead-next/ (O280 WP→Next).
 
 Read FIRST (in order):
-- docs/team/architect/WP_TO_NEXT_HANDOFF.md (this file)
-- docs/design/wp/feed-cabinet-mvp.md
+- docs/migration/PAGES_INVENTORY.md
+- docs/migration/API_CONTRACTS.md
+- rawlead-next/CLAUDE.md
+- docs/team/architect/WP_TO_NEXT_HANDOFF.md
+- docs/design/wp/feed-cabinet-mvp.md (§0 + §0.1 behavior only)
 - wordpress/rawlead-kadence-child/assets/js/rawlead-feed.js (reference)
 - wordpress/rawlead-kadence-child/inc/rawlead-api.php (REST map)
 
-Goal: New Next.js 14 app in web/ — product face for rawlead.ru. Do NOT rewrite Python backend.
+Goal: New Next.js 14 app in rawlead-next/ — product face for rawlead.ru. Do NOT rewrite Python backend.
 
 Rules:
-- Create web/ only. Do not modify src/, wordpress/, portfolio/ except reading.
+- Create rawlead-next/ only. Do not modify src/, wordpress/, portfolio/ except reading.
 - Port behavior from WP JS; API is https://api.rawlead.ru/v1/ (see api_server.py).
 - JWT localStorage + Bearer + X-Rawlead-Access-Token rotation — match existing feed.js.
-- Quiz-first profile; no manual skill tree picker (see feed-cabinet-mvp §0.1).
+- Quiz-first profile; no manual skill tree as primary UX (see PAGES_INVENTORY prod snapshot + feed-cabinet-mvp §0.1).
 - Listen for rawlead-tags-imported event (O272).
-- NEO-BRUTALIST tokens from rawlead.css — extract variables, don't copy 4000 lines blind.
+- Strings/flows: port from PAGES_INVENTORY prod snapshot unless owner says otherwise in chat.
 
 Phase 0 only in this session:
-1. Scaffold web/ with TypeScript, Tailwind, App Router.
+1. Scaffold rawlead-next/ with TypeScript, Tailwind, App Router.
 2. lib/api.ts with health + anon feed fetch.
 3. app/lenta/page.tsx — minimal feed list (title, source, budget) proving API works.
-4. web/CLAUDE.md with read order + phase checklist.
+4. Update rawlead-next/CLAUDE.md as-built section.
 
 Stop and report. Wait for owner before cabinet/pricing/cutover.
-
-Skills: use frontend-design for UI passes; do not copy portfolio/Rode51 terracotta look — product has its own NEO spec.
 ```
 
 ---
 
-## § phase-1-lenta — следующая сессия
+## § phase-1-lenta — ✅ done 2026-06-19
 
 ```text
 O280 Phase 1 — full /lenta/ parity with rawlead-feed.js (MVP).
@@ -266,17 +273,34 @@ Tests: manual owner smoke checklist in handoff § Gate.
 Do not deploy until @lead-architect says cutover.
 ```
 
+**Lead verify:** ✅ см. [`O280_AS_BUILT.md`](../../migration/O280_AS_BUILT.md). Home `/` собран в той же сессии.
+
 ---
 
-## § phase-2-cabinet
+## § phase-2-cabinet — 🟡 fix parity
 
 ```text
-O280 Phase 2 — /cabinet/ inbox + draft.
+O280 Phase 2 — /cabinet/ prod parity fix.
 
-Read rawlead-cabinet.js + feed-cabinet-mvp.md § cabinet.
+READ FIRST (mandatory):
+- docs/migration/O280_AS_BUILT.md § «Prod-канон кабинета»
+- docs/migration/PAGES_INVENTORY.md §5
+- rawlead-next/CLAUDE.md § «/cabinet/ prod canon»
+- wordpress/.../rawlead-cabinet.js (renderSubscription, renderTags O219, renderNotificationSettings)
+- wordpress/.../page-cabinet.php
 
-Implement replies list, draft accordion, copy/delete, draft quota, profile read-only tags.
-Auth required — redirect anon to login flow.
+DO NOT use ?dev=free|paid mocks as design reference — they are wrong (skills, Free badge, Activate Trial).
+
+Fix rawlead-next/app/cabinet/page.tsx:
+1. REMOVE skills chips block («Твои навыки» + tag list).
+2. REMOVE «Активировать Trial» — trial starts on first TG login via API.
+3. Subscription UI: mirror rawlead-cabinet.js states (trial badge, hide price when active, pay CTA only when !effective_access).
+4. Keep: user bar, notifications (effective_access), inbox, load more, anon QR flow.
+5. Optional: keep ?dev=paid only for inbox UI testing — relabel or remove ?dev=free.
+
+Reference API: GET /v1/me/subscription after login — expect trial + effective_access for new user.
+
+npm run build · update O280_AS_BUILT § Next column.
 ```
 
 ---

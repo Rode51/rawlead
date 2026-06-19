@@ -447,4 +447,35 @@ sudo systemctl enable --now rawlead-purge-leads.timer
 
 ---
 
+## 11. O280 — Next.js cutover (rawlead.ru)
+
+**После** green `next_e2e.py` на `localhost:3001`:
+
+```bash
+# Build + upload static export (без nginx switch)
+.venv\Scripts\python.exe scripts\deploy-web-rawlead-vps.py --dry-upload
+
+# Full cutover: build · rsync · nginx Next static
+.venv\Scripts\python.exe scripts\deploy-web-rawlead-vps.py
+
+# Только nginx (если out/ уже на VPS)
+.venv\Scripts\python.exe scripts\deploy-web-rawlead-vps.py --skip-build --no-nginx
+.venv\Scripts\python.exe scripts\deploy-web-rawlead-vps.py --nginx-only
+```
+
+**CORS (dev gate):** в `.env.site` на VPS добавить `http://localhost:3001` и `http://127.0.0.1:3001` в `RADAR_CORS_ORIGINS` · restart `rawlead-api`.
+
+**Post-cutover smoke:**
+
+```bash
+.venv\Scripts\python.exe scripts\preprod_playwright\next_e2e.py --base-url https://rawlead.ru
+.venv\Scripts\python.exe scripts\preprod_playwright\quiz_e2e.py --base-url https://rawlead.ru --engine next
+```
+
+**Rollback WP:** `deploy/nginx/rawlead.ru.conf` — раскомментировать WP block · `root /var/www/rawlead.ru-wp` · `scripts/deploy-wp-theme-vps.py` · tag `backup/pre-wp-next-2026-06-18`.
+
+**Avatar cache (post-cutover):** `RAWLEAD_AVATAR_DIR=/opt/rawlead/data/avatars` в `.env.site` (не WP `wp-content`) · `mkdir -p /opt/rawlead/data/avatars && chown rawlead:rawlead` · deploy: `python scripts/deploy-o280-r9b-avatar-vps.py` · owner re-login → `GET /v1/me/avatar` **200**.
+
+---
+
 _Coder § P5 · L3 · B3 · 2026-05-28 · без IP/секретов в git_

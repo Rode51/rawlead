@@ -1,19 +1,18 @@
 # Для тебя
 
-## Сейчас (2026-06-16)
+## Сейчас (2026-06-19)
 
 | Что | Статус |
 |-----|--------|
-| **Push TG** | ✅ prod (O250d + O253) |
-| **Лента / кабинет** | ✅ theme **1.19.20** в repo · prod `ver=` проверить |
-| **YouDo ingest** | 🟡 deploy ✅ · crash ушёл · antibot-заглушка · жди 10–15 мин |
-| **Ops кнопка restart** | **O254b deploy ✅** → `/ops/` **Ctrl+Shift+R** → toast |
-| **TG join v4** | ✅ ~304 pending · фон |
-| **→ deploy** | O252 · quiz CTA (локально) |
-| **Metrika** | ✅ счётчик на prod · **→ цели в UI** (см. FOR_YOU § Метрика) |
-| **Portfolio** | **P0** mood+refs с нуля · `@lead-portfolio` · Claude Code = код: [`team/portfolio/README.md`](team/portfolio/README.md) · промпт skills: [`CLAUDE_CODE_HANDOFF.md`](team/portfolio/CLAUDE_CODE_HANDOFF.md) |
+| **rawlead.ru** | ✅ **Next.js** на prod (`rawlead-next/out`) · не WP |
+| **Локально** | `cd rawlead-next && npm run dev` → `:3001` |
+| **Вход / лента** | аватар ✅ · **черновик ИИ** — мёртвый OpenRouter proxy → mechanic P0 |
+| **Portfolio** | ✅ **https://rode51.ru** (P289) · код `portfolio/` · Lead: `@lead-portfolio` |
+| **БД prod** | local Postgres (O271) · Neon только архив · O272 guard |
+| **YouDo** | 🟡 camoufox · ops restart в `/ops/` |
+| **→ smoke** | Ctrl+Shift+R → лента без счётчика → перелогин → фото · **админка:** https://rawlead.ru/ops/ (кнопка в header — после R10) |
 
-**Prod snapshot для AI:** [`team/common/PROD_FACTS.md`](team/common/PROD_FACTS.md)
+**Prod snapshot:** [`team/common/PROD_FACTS.md`](team/common/PROD_FACTS.md) · **задачи:** [`team/common/TASKS.md`](team/common/TASKS.md)
 
 **Кнопка restart:** `https://rawlead.ru/ops/` в **Chrome/YaBrowser** (не Cursor) → **Ctrl+Shift+R** → Биржи → YouDo → «Перезапустить источник» → toast «YouDo: сброс…». Тишина — напиши Lead.
 
@@ -461,6 +460,22 @@ Baseline из лога (уже есть после deploy): `data/tg_funnel_audi
 5. **Отдельно:** regen **текстов отклика** (`regen_shared_reply_drafts.py`) — **не** ingest; идёт в другом чате.
 
 Канон: [`KAK_ETO_RABOTAET.md`](KAK_ETO_RABOTAET.md) · [`STATUS.md`](team/common/STATUS.md).
+
+---
+
+## MiMo Code — пробный аудит репо (backlog)
+
+**Что:** [MiMo Code](https://github.com/XiaomiMiMo/MiMo-Code) от Xiaomi — terminal-агент (как Claude Code), бесплатный канал MiMo-V2.5 на время. Запись от **12.06** — канон `OWNER_INTENT` § **MIMO-AUDIT**.
+
+**Зачем:** второй «широкий» аудит (парсеры, ИИ, Next) — альтернатива прогону на Gemini 2M (O38).
+
+**Когда:** после **O280 cutover** или на **копии** репо параллельно.
+
+**Безопасно:** копия **без** `.env` и сессий · MiMo Auto = код уходит на Xiaomi · или Custom Provider → OpenRouter.
+
+**Windows:** `npm install -g @mimo-ai/cli` · промпт старта — в `OWNER_INTENT` § MIMO-AUDIT · итог → `docs/problems/…-mimo-audit.md`.
+
+**Посты завышают:** не «∞ контекст», а ~1M tokens; v0.1.x сырая; бенчмарки — от Xiaomi.
 
 ---
 

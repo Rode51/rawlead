@@ -31,7 +31,7 @@
 | Источник профиля | Что пишется в Neon |
 |------------------|-------------------|
 | **Квиз** (first + retake) | `__quiz_niche:*` (primary/secondary) · liked tags с карточек · `cx_pref` |
-| **Поведение** | `weight_delta`: draft, expand, expand_no_reply, inbox_delete |
+| **Поведение** | `weight_delta`: draft, expand, inbox_delete |
 | ~~Ручной picker~~ | **deprecated** — не проектировать, не возвращать без отдельного решения |
 
 **Лимит 12:** **не нужен** — был guardrail для ручного picker («не выбери всё»). При quiz-first **обрезка до 12 — баг** (теряем сигнал). Код: снять `_USER_MAX_TAGS` / `MAX_USER_TAGS` → § **O230** в `CODER_PROMPT`.

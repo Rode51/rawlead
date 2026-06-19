@@ -1717,6 +1717,47 @@ Smoke: `/lenta/?lead=15146` → отклик **< 90s**. Хуже direct — unse
 
 ---
 
+## § MIMO-AUDIT — MiMo Code pilot (owner 2026-06-12 · уточнено 2026-06-19)
+
+**Что это:** [MiMo Code](https://github.com/XiaomiMiMo/MiMo-Code) — **terminal coding agent** (fork [OpenCode](https://github.com/anomalyco/opencode)), MIT · v0.1.1 · Xiaomi MiMo team · **не просто модель**, а оболочка с памятью, subagents, long-horizon loops.
+
+**Модель:** MiMo-V2.5 (MoE, заявлен **1M tokens** context) · канал **MiMo Auto** — бесплатно **ограниченное время**, без регистрации · трафик через **серверы Xiaomi** (не self-host модели).
+
+**Маркетинг vs факты (Lead):**
+
+| Обещание в постах | Реальность |
+|-------------------|------------|
+| «Безлимитный контекст / миллионы строк» | в доке **1M tokens** (~сотни K строк, не ∞) |
+| «Разносит Claude Code на 3 бенчах» | SWE-bench / Terminal Bench — **свои прогоны Xiaomi** · v0.1 · 499 open issues на GitHub |
+| «Полный опенсорс» | **CLI/harness** MIT ✅ · **веса MiMo-V2.5** — отдельно, free channel = облако |
+| «Без потерь данных» | persistent memory в агенте — **не** гарантия для prod secrets |
+
+**Зачем нам:** второй проход **полного аудита** (наследник **O38** Gemini 2M) — `src/` parsers · `ai_analyze` L1/L2 · `rawlead-next/` · docs drift · после Next cutover включить nginx/deploy.
+
+**Кто:** **владелец** pilot (отдельный терминал) · **не** замена Cursor/Coder в hot path · findings → `docs/problems/YYYY-MM-DD-mimo-audit.md` → Lead triage → `@coder` / `@mechanic`.
+
+**Когда:** **после O280 cutover** (или параллельно на **копии** репо, если не трогаешь hot Coder) · **не** блокирует M1 ads.
+
+**Безопасность (обязательно):**
+
+- клон/копия репо **без** `.env` / `.env.site` / сессий TG / VPS keys
+- **не** MiMo Auto на репо с secrets — или Custom Provider → свой OpenRouter (уже есть)
+- итог аудита — markdown в `docs/problems/`, не сырой лог с токенами в git
+
+**Установка (Windows):** `npm install -g @mimo-ai/cli` · [mimo.xiaomi.com/coder](https://mimo.xiaomi.com/coder) · WSL clipboard — см. README.
+
+**Промпт старта (копипаст в MiMo):** «Read `docs/README.md` → `PROJECT_MAP.md` → `ARCHITECTURE.md` → `src/ai_analyze.py` + parsers. Report: AI P0/P1, parser stability, docs drift vs prod, Next `rawlead-next/` risks. Format like `problems/2026-05-29-gemini-full-audit.md`. No code changes.»
+
+**Сравнение с текущим стеком:**
+
+| | Cursor + Coder | Mechanic Gemini 2M | MiMo Code |
+|--|----------------|-------------------|-----------|
+| Роль | плановые фичи | инциденты | **разовый wide audit** |
+| Контекст | чат + rules | ~2M OR | harness + 1M claim |
+| Секреты | `.cursorignore` | тикет | **owner: чистая копия** |
+
+---
+
 ## Журнал (хронология, кратко)
 
 | Дата | Мысль / запрос | Kуда ушло |
@@ -2136,7 +2177,7 @@ _Заменено решением v1.1 B+C выше._
 | 2026-06-12 | **Avatar broken** | фото в шапке кабинета | O185 t3 |
 | 2026-06-12 | **YouDo again broken** | закрыть навсегда | O185 t6 + Mechanic |
 | 2026-06-12 | **O174c trial smoke ✅** | owner **1 ₽** → Premium в `/cabinet/` · Neon trial до **15.06** · payment **#6 succeeded** | **O174d** ⏸ |
-| 2026-06-12 | **MiMo Code (Xiaomi)** | облачный coding agent — **попробовать позже**, после стабилизации RawLead | backlog research |
+| 2026-06-12 | **MiMo Code (Xiaomi)** | terminal agent (fork OpenCode) + MiMo-V2.5 · **аудит репо** как альтернатива O38/Gemini · см. § **MIMO-AUDIT** · **после O280 cutover** или параллельно на копии без secrets | backlog → owner pilot |
 | 2026-06-11 | **O174 defer cancel/autopay** | красная «Отменить» + recurring **после первых пользователей** | **O174d** backlog |
 | 2026-06-11 | **Webhook ЛК ЮKassa** | URL ✅ · events `payment.succeeded` + `payment.canceled` · backend live POST 200 | owner retest pay |
 | 2026-06-11 | **`.cursorignore`** | нет в repo · ~8.9 GB `desktop/src-tauri/target` · → Coder t0 | token hygiene |

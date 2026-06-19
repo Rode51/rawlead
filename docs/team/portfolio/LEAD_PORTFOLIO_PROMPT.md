@@ -42,7 +42,7 @@
 
 | p3 Mobile 390px | отложено | ⏸ |
 
-| p4 Deploy **rode51.ru** (было labs.rawlead.ru) | owner DNS + @coder nginx/BASE_URL | ⏳ owner: Beget DNS → [`RODE51_BEGET_DNS.md`](../../ops/RODE51_BEGET_DNS.md) |
+| p4 Deploy **rode51.ru** (было labs.rawlead.ru) | owner DNS + @coder nginx/BASE_URL | ⏳ deploy после DNS → [`RODE51_BEGET_DNS.md`](../../ops/RODE51_BEGET_DNS.md) · скрипт `deploy-portfolio-rode51-vps.py` |
 
 
 

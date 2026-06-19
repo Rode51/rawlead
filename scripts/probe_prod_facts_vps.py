@@ -34,6 +34,22 @@ echo '=== o254 marker ==='
 grep -c 'youdo_browser_teardown' /opt/rawlead/src/exchange_browser_fetch.py 2>/dev/null || echo 0
 echo '=== tg join pending ==='
 grep -c ',pending,' /opt/rawlead/docs/ops/TG_JOIN_QUEUE_v4.csv 2>/dev/null || echo 0
+echo '=== db site units ==='
+for u in rawlead-api rawlead-bot-poll rawlead-radar; do
+  PID=$(systemctl show "$u" -p MainPID --value 2>/dev/null || echo 0)
+  if [ -z "$PID" ] || [ "$PID" = "0" ]; then
+    echo "$u unset"
+    continue
+  fi
+  DB=$(tr '\\0' '\\n' < /proc/$PID/environ 2>/dev/null | grep '^DATABASE_URL=' | head -1 || true)
+  if echo "$DB" | grep -qi neon; then
+    echo "$u FAIL_neon"
+  elif [ -n "$DB" ]; then
+    echo "$u local"
+  else
+    echo "$u unset"
+  fi
+done
 """
 
 
@@ -63,12 +79,23 @@ def _parse_remote(text: str) -> dict[str, str]:
             out["o254_marker"] = line
         elif section == "tg join pending":
             out["tg_join_pending"] = line
+        elif section == "db site units":
+            if " " in line:
+                unit, kind = line.split(None, 1)
+                out[f"db_{unit}"] = kind
     return out
 
 
 def build_probe_block(data: dict[str, str]) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     o254 = int(data.get("o254_marker") or "0") >= 1
+    db_api = data.get("db_rawlead-api", "?")
+    db_poll = data.get("db_rawlead-bot-poll", "?")
+    db_radar = data.get("db_rawlead-radar", "?")
+    db_neon_fail = any(
+        "FAIL_neon" in (data.get(k) or "")
+        for k in ("db_rawlead-api", "db_rawlead-bot-poll", "db_rawlead-radar")
+    )
     lines = [
         MARKER_START,
         f"**Probe:** {now} · `python scripts/probe_prod_facts_vps.py --write`",
@@ -85,6 +112,9 @@ def build_probe_block(data: dict[str, str]) -> str:
         f"- **Last YouDo ok:** {data.get('youdo_last_ok', '—')}",
         f"- **O254 code on VPS:** {'✅' if o254 else '❌'} (`youdo_browser_teardown`)",
         f"- **TG join v4 pending:** {data.get('tg_join_pending', '?')}",
+        "",
+        f"- **DB site units:** api=`{db_api}` · bot-poll=`{db_poll}` · radar=`{db_radar}`"
+        + (" · **❌ FAIL_neon**" if db_neon_fail else ""),
         "",
         MARKER_END,
     ]

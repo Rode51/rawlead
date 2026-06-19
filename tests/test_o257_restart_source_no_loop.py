@@ -157,3 +157,21 @@ def test_soft_antibot_not_triggered_with_bans(tmp_path: Path) -> None:
 
     assert result is False
     mock_reset.assert_not_called()
+
+
+def test_fl_browser_antibot_fail_no_restart_source_when_subprocess() -> None:
+    with patch("exchange_browser_fetch.fl_hard_reset_on_ban_enabled", return_value=True), \
+         patch("exchange_browser_fetch.fl_listing_subprocess_enabled", return_value=True), \
+         patch("exchange_browser_fetch.fl_hard_reset") as mock_reset, \
+         patch("exchange_proxy._ban_url"), \
+         patch("exchange_proxy._urls_for_source", return_value=("fl", "fl", [])):
+        from exchange_browser_fetch import HtmlFetchError, _fl_browser_antibot_fail
+
+        _fl_browser_antibot_fail(
+            "http://user:pass@1.2.3.4:8000",
+            HtmlFetchError("antibot"),
+            storage=MagicMock(),
+        )
+
+    mock_reset.assert_called_once()
+    assert mock_reset.call_args.kwargs.get("set_restart_source") is False

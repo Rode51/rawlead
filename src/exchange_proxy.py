@@ -1282,9 +1282,13 @@ class ExchangeFetchSession:
             _invalidate_browser_slot_for_ban(self.source, banned_url)
             if self.source in ("fl", _FL_RES_BAN_SOURCE) and _fl_hard_reset_on_ban_enabled():
                 try:
-                    from exchange_browser_fetch import fl_hard_reset
+                    from exchange_browser_fetch import fl_hard_reset, fl_listing_subprocess_enabled
 
-                    fl_hard_reset(reason=reason, storage=_storage())
+                    fl_hard_reset(
+                        reason=reason,
+                        storage=_storage(),
+                        set_restart_source=not fl_listing_subprocess_enabled(),
+                    )
                 except Exception as exc:
                     logger.warning("fetch:fl hard_reset on failover failed: %s", exc)
                 return False
