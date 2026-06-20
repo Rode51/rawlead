@@ -13,7 +13,6 @@ SOURCE_PCHYOL = "pchyol"
 SOURCE_TELEGRAM = "telegram"
 SOURCE_VC_RU = "vc_ru"
 SOURCE_FREELANCEHUNT = "freelancehunt"
-SOURCE_HABR_FREELANCE = "habr_freelance"
 SOURCE_HABR_CAREER = "habr_career"
 
 
