@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import psycopg
 
+from config import require_database_url
 from match_push import merge_chat_id_on_login
 
 logger = logging.getLogger(__name__)
@@ -19,10 +20,7 @@ BOT_AUTH_PREFIX = "auth_"
 
 
 def _db_url() -> str:
-    url = os.getenv("DATABASE_URL", "").strip()
-    if not url:
-        raise RuntimeError("DATABASE_URL not set")
-    return url
+    return require_database_url()
 
 
 def cabinet_base_url() -> str:

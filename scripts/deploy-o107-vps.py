@@ -33,9 +33,9 @@ def _apply_neon_migration() -> str:
     ssh.upload(local_sql, "/opt/rawlead/sql/020_trial_subscription.sql")
     _, out, _ = ssh.run(
         "set -a && source /opt/rawlead/.env.site 2>/dev/null; set +a; "
-        "DB_URL=\"${DATABASE_URL:-$NEON_DATABASE_URL}\"; "
-        "psql \"$DB_URL\" -f /opt/rawlead/sql/020_trial_subscription.sql && "
-        "psql \"$DB_URL\" -c \"\\d subscriptions\" 2>/dev/null | grep trial_ && echo 'NEON-020 OK'",
+        'if [ -z "$DATABASE_URL" ]; then echo "SKIP: DATABASE_URL missing in .env.site"; exit 0; fi; '
+        "psql \"$DATABASE_URL\" -f /opt/rawlead/sql/020_trial_subscription.sql && "
+        "psql \"$DATABASE_URL\" -c \"\\d subscriptions\" 2>/dev/null | grep trial_ && echo 'NEON-020 OK'",
         check=False,
     )
     return (out or "").strip()

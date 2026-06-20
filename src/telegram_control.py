@@ -557,6 +557,28 @@ def _handle_bot_login_link(
     return True
 
 
+_BOT_AUTH_FAIL_RU: dict[str, str] = {
+    "session expired": (
+        "Сессия входа истекла. Вернитесь на сайт и нажмите «Войти через Telegram» снова."
+    ),
+    "session consumed": "Эта ссылка уже использована. Получите новый QR на сайте.",
+    "session not found": "Ссылка входа недействительна. Получите новый QR на сайте.",
+    "session bound to another user": (
+        "Сессия привязана к другому аккаунту. Начните вход заново на сайте."
+    ),
+    "db error": (
+        "Ошибка сервера при входе. Попробуйте через минуту или напишите в поддержку."
+    ),
+    "empty token": "Ошибка входа. Получите новый QR на сайте.",
+}
+_BOT_AUTH_FAIL_DEFAULT = "Не удалось подтвердить вход. Вернитесь на сайт и попробуйте снова."
+
+
+def _bot_auth_fail_message(err: str) -> str:
+    key = (err or "").strip().casefold()
+    return _BOT_AUTH_FAIL_RU.get(key, _BOT_AUTH_FAIL_DEFAULT)
+
+
 def _handle_bot_auth_start(
     cfg: Config,
     message: dict,
@@ -583,10 +605,18 @@ def _handle_bot_auth_start(
         )
     except Exception as exc:
         errors.append(f"bot_auth:err {type(exc).__name__}:{str(exc)[:80]}")
+        try:
+            _send_to_chat(cfg, chat_id, _bot_auth_fail_message("db error"))
+        except TelegramControlError:
+            pass
         return True
 
     if not ok:
         errors.append(f"bot_auth:fail {err[:80]}")
+        try:
+            _send_to_chat(cfg, chat_id, _bot_auth_fail_message(err))
+        except TelegramControlError:
+            pass
         return True
 
     upsert_subscriber_chat_id(

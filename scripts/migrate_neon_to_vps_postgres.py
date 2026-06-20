@@ -4,6 +4,7 @@
 Run on VPS as root (install) or rawlead (schema only):
   python scripts/migrate_neon_to_vps_postgres.py --apply
   python scripts/migrate_neon_to_vps_postgres.py --apply --backfill-leads --backfill-limit 500
+  python scripts/migrate_neon_to_vps_postgres.py --scrub-root-env
 """
 from __future__ import annotations
 
@@ -196,17 +197,52 @@ def backfill_leads(limit: int) -> int:
     return subprocess.run(cmd, cwd=str(_ROOT), check=False).returncode
 
 
+_ENV_ROOT = Path(os.environ.get("RAWLEAD_ENV_ROOT", "/opt/rawlead/.env"))
+
+
+def scrub_root_env() -> None:
+    """O272: comment DATABASE_URL in root .env — Neon stays in NEON_DATABASE_URL only."""
+    path = _ENV_ROOT
+    if not path.is_file():
+        print(f"scrub: {path} missing — skip")
+        return
+    lines = path.read_text(encoding="utf-8").splitlines()
+    out: list[str] = []
+    changed = False
+    for raw in lines:
+        if raw.startswith("DATABASE_URL="):
+            out.append(f"# O272 scrubbed: {raw}")
+            changed = True
+        else:
+            out.append(raw)
+    if changed:
+        path.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
+        print(f"scrub: commented DATABASE_URL in {path}")
+    else:
+        print(f"scrub: no active DATABASE_URL in {path}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true", help="install + schema + owner + cutover")
     parser.add_argument("--schema-only", action="store_true", help="apply sql to DATABASE_URL")
+    parser.add_argument(
+        "--scrub-root-env",
+        action="store_true",
+        help="comment DATABASE_URL in /opt/rawlead/.env (Neon → NEON_DATABASE_URL only)",
+    )
     parser.add_argument("--backfill-leads", action="store_true")
     parser.add_argument("--backfill-limit", type=int, default=500)
     parser.add_argument("--db-user", default="rawlead")
     parser.add_argument("--db-name", default="rawlead")
     args = parser.parse_args()
 
-    if not args.apply and not args.schema_only:
+    if args.scrub_root_env:
+        scrub_root_env()
+        if not args.apply and not args.schema_only:
+            return 0
+
+    if not args.apply and not args.schema_only and not args.scrub_root_env:
         parser.print_help()
         return 0
 

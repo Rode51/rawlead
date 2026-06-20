@@ -116,6 +116,22 @@ def _prune_draft_window(q: deque[float], now: float) -> None:
         q.popleft()
 
 
+def preprod_e2e_user_ids() -> frozenset[str]:
+    """UUIDs allowed to reset in-memory draft quota (E2E gate). Public acc1 in PREPROD_ACCOUNTS.md."""
+    raw = os.environ.get("PREPROD_E2E_USER_IDS", "").strip()
+    if raw:
+        return frozenset(x.strip() for x in raw.split(",") if x.strip())
+    return frozenset({"7a83dbd8-ab41-4350-a183-38370d5b5c1c"})
+
+
+def reset_draft_quota_for_user(user_id: str) -> dict[str, int]:
+    """Clear rolling draft + warm counters for E2E (in-memory only)."""
+    with _draft_lock:
+        _draft_attempts.pop(user_id, None)
+    _warm_attempts.pop(user_id, None)
+    return draft_quota_for_user(user_id)
+
+
 def draft_quota_for_user(user_id: str) -> dict[str, int]:
     """O247: rolling 1h draft quota snapshot (read-only)."""
     limit = draft_hourly_limit()
@@ -1040,7 +1056,7 @@ def handle_tg_nope_callback(
     callback_query: dict[str, Any],
     errors: list[str],
 ) -> bool:
-    """O265: callback nope:{lead_id} → push_nope weight on lead tags."""
+    """O265/O281: callback nope:{lead_id} → push_nope weight + delete push message."""
     data = str(callback_query.get("data") or "").strip()
     m = _NOPE_CALLBACK_RE.match(data)
     if not m:
@@ -1050,6 +1066,10 @@ def handle_tg_nope_callback(
     from_user = callback_query.get("from") or {}
     tg_user_id = from_user.get("id")
     callback_id = callback_query.get("id")
+    message = callback_query.get("message") or {}
+    chat = message.get("chat") or {}
+    chat_id = chat.get("id")
+    message_id = message.get("message_id")
 
     if tg_user_id is None:
         errors.append(f"tg:push:nope:skip lead={lead_id} missing from")
@@ -1083,6 +1103,8 @@ def handle_tg_nope_callback(
     _apply_tag_weight_event_for_lead(user_id, lead_id, "push_nope")
     logger.info("tg:push:nope lead=%s user=%s", lead_id, _uid8(user_id))
     errors.append(f"tg:push:nope lead={lead_id} user={_uid8(user_id)}")
+    if chat_id is not None and message_id is not None:
+        _delete_message(cfg, int(chat_id), int(message_id))
     return True
 
 
@@ -1241,6 +1263,50 @@ def _log_draft_mute(
         msg += f" {detail[:120]}"
     err.append(msg)
     logger.info(msg)
+
+
+def _delete_message(
+    cfg: Config,
+    chat_id: int,
+    message_id: int,
+) -> None:
+    """O281: remove push card from TG chat (best-effort; warn-only on failure)."""
+    proxies = telegram_requests_proxies(cfg)
+    api_url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/deleteMessage"
+    try:
+        session = requests.Session()
+        session.trust_env = False
+        resp = session.post(
+            api_url,
+            data={"chat_id": str(chat_id), "message_id": str(message_id)},
+            timeout=10.0,
+            proxies=proxies,
+        )
+        if resp.status_code != 200:
+            msg = resp.text[:200] if resp.text else f"HTTP {resp.status_code}"
+            logger.warning(
+                "tg:push:deleteMessage fail chat=%s msg=%s: %s",
+                chat_id,
+                message_id,
+                msg,
+            )
+            return
+        body = resp.json()
+        if not body.get("ok", False):
+            desc = str(body.get("description") or body)[:200]
+            logger.warning(
+                "tg:push:deleteMessage fail chat=%s msg=%s: %s",
+                chat_id,
+                message_id,
+                desc,
+            )
+    except requests.RequestException as exc:
+        logger.warning(
+            "tg:push:deleteMessage err chat=%s msg=%s: %s",
+            chat_id,
+            message_id,
+            exc,
+        )
 
 
 def _answer_callback_query(

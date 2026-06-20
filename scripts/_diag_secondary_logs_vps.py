@@ -26,7 +26,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv('/opt/rawlead/.env.site', override=True)
 import psycopg
-url = os.environ.get('NEON_DATABASE_URL') or os.environ.get('DATABASE_URL')
+url = os.environ.get('DATABASE_URL')
 if not url:
     print('no DATABASE_URL')
 else:

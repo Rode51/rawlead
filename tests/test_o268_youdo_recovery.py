@@ -17,6 +17,7 @@ from exchange_browser_fetch import (  # noqa: E402
     _fetch_youdo_listing_dc_first,
     _fetch_youdo_one_browser_slot,
     _wipe_youdo_persistent_profiles,
+    _youdo_disk_profile_has_session,
     _youdo_ephemeral_first_slot1,
     _youdo_goto_wait_until,
     _youdo_persistent_profile_dir,
@@ -62,18 +63,58 @@ def test_ephemeral_first_slot1_when_persistent_without_session_ok() -> None:
         clear=False,
     ):
         with patch("exchange_browser_fetch._youdo_is_camoufox", return_value=True):
-            assert _youdo_ephemeral_first_slot1(slots_tried=1) is True
-            assert _youdo_should_use_sticky_listing(
-                slots_tried=1,
-                use_ephemeral=False,
-            ) is False
+            with patch(
+                "exchange_browser_fetch._youdo_disk_profile_has_session",
+                return_value=False,
+            ):
+                assert _youdo_ephemeral_first_slot1(slots_tried=1, proxy_url=_PROXY) is True
+                assert _youdo_should_use_sticky_listing(
+                    slots_tried=1,
+                    use_ephemeral=False,
+                    proxy_url=_PROXY,
+                ) is False
+
+
+def test_disk_profile_session_skips_ephemeral_first() -> None:
+    with patch.dict(
+        os.environ,
+        {
+            "YOUDO_PERSISTENT_PROFILE": "1",
+            "YOUDO_STICKY_AFTER_OK": "1",
+        },
+        clear=False,
+    ):
+        with patch("exchange_browser_fetch._youdo_is_camoufox", return_value=True):
+            with patch(
+                "exchange_browser_fetch._youdo_disk_profile_has_session",
+                return_value=True,
+            ):
+                assert _youdo_ephemeral_first_slot1(slots_tried=1, proxy_url=_PROXY) is False
+                assert _youdo_should_use_sticky_listing(
+                    slots_tried=1,
+                    use_ephemeral=False,
+                    proxy_url=_PROXY,
+                ) is True
+
+
+def test_disk_profile_has_session_checks_cookies(tmp_path: Path) -> None:
+    profile = tmp_path / "youdo_hint_g2"
+    profile.mkdir()
+    with patch.dict(os.environ, {"YOUDO_PERSISTENT_PROFILE": "1"}, clear=False):
+        with patch(
+            "exchange_browser_fetch._youdo_persistent_profile_dir",
+            return_value=profile,
+        ):
+            assert _youdo_disk_profile_has_session(_PROXY) is False
+            (profile / "cookies.sqlite").write_bytes(b"x" * 600)
+            assert _youdo_disk_profile_has_session(_PROXY) is True
 
 
 @patch("exchange_browser_fetch._on_playwright_thread", return_value=True)
 @patch("exchange_browser_fetch._youdo_is_camoufox", return_value=True)
 @patch("exchange_browser_fetch._fetch_youdo_ephemeral")
 @patch("exchange_browser_fetch._fetch_youdo_sticky_listing")
-def test_slot1_ephemeral_when_persistent_on(
+def test_slot1_ephemeral_when_persistent_on_no_disk_session(
     mock_sticky: MagicMock,
     mock_ephemeral: MagicMock,
     _mock_cf: MagicMock,
@@ -90,16 +131,57 @@ def test_slot1_ephemeral_when_persistent_on(
         },
         clear=False,
     ):
-        html = _fetch_youdo_one_browser_slot(
-            _LISTING,
-            user_agent="Mozilla/5.0",
-            timeout_sec=60.0,
-            proxy_url=_PROXY,
-            slots_tried=1,
-        )
+        with patch(
+            "exchange_browser_fetch._youdo_disk_profile_has_session",
+            return_value=False,
+        ):
+            html = _fetch_youdo_one_browser_slot(
+                _LISTING,
+                user_agent="Mozilla/5.0",
+                timeout_sec=60.0,
+                proxy_url=_PROXY,
+                slots_tried=1,
+            )
     assert html == _BIG_HTML
     mock_ephemeral.assert_called_once()
     mock_sticky.assert_not_called()
+
+
+@patch("exchange_browser_fetch._on_playwright_thread", return_value=True)
+@patch("exchange_browser_fetch._youdo_is_camoufox", return_value=True)
+@patch("exchange_browser_fetch._fetch_youdo_ephemeral")
+@patch("exchange_browser_fetch._fetch_youdo_sticky_listing")
+def test_slot1_sticky_when_disk_profile_has_session(
+    mock_sticky: MagicMock,
+    mock_ephemeral: MagicMock,
+    _mock_cf: MagicMock,
+    _mock_pw: MagicMock,
+) -> None:
+    mock_sticky.return_value = _BIG_HTML
+    with patch.dict(
+        os.environ,
+        {
+            "YOUDO_STICKY_SESSION": "1",
+            "YOUDO_PERSISTENT_PROFILE": "1",
+            "YOUDO_STICKY_AFTER_OK": "1",
+            "YOUDO_EPHEMERAL": "0",
+        },
+        clear=False,
+    ):
+        with patch(
+            "exchange_browser_fetch._youdo_disk_profile_has_session",
+            return_value=True,
+        ):
+            html = _fetch_youdo_one_browser_slot(
+                _LISTING,
+                user_agent="Mozilla/5.0",
+                timeout_sec=60.0,
+                proxy_url=_PROXY,
+                slots_tried=1,
+            )
+    assert html == _BIG_HTML
+    mock_sticky.assert_called_once()
+    mock_ephemeral.assert_not_called()
 
 
 @patch("exchange_browser_fetch._on_playwright_thread", return_value=True)

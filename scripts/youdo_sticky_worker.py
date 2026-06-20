@@ -153,6 +153,9 @@ async def _session_loop(*, proxy_url: str, user_agent: str) -> int:
                 if cmd == "teardown":
                     _emit({"stage": "sticky_teardown", "ok": 1})
                     break
+                if cmd == "ping":
+                    _emit({"stage": "sticky_ping", "ok": 1})
+                    continue
                 url = str(req.get("url") or "").strip()
                 tier = str(req.get("tier") or "dc").strip() or "dc"
                 timeout_sec = float(req.get("timeout") or 150.0)

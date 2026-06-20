@@ -84,13 +84,17 @@ def test_slot1_ephemeral_when_persistent_on_o268(
         },
         clear=False,
     ):
-        _fetch_youdo_one_browser_slot(
-            _LISTING,
-            user_agent="Mozilla/5.0",
-            timeout_sec=60.0,
-            proxy_url=_PROXY,
-            slots_tried=1,
-        )
+        with patch(
+            "exchange_browser_fetch._youdo_disk_profile_has_session",
+            return_value=False,
+        ):
+            _fetch_youdo_one_browser_slot(
+                _LISTING,
+                user_agent="Mozilla/5.0",
+                timeout_sec=60.0,
+                proxy_url=_PROXY,
+                slots_tried=1,
+            )
     mock_ephemeral.assert_called_once()
     mock_sticky.assert_not_called()
 

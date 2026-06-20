@@ -97,10 +97,10 @@ def _apply_neon_migration() -> str:
     ssh.upload(local_sql, "/opt/rawlead/sql/021_yookassa_payments.sql")
     _, out, _ = ssh.run(
         "set -a && source /opt/rawlead/.env.site 2>/dev/null; set +a; "
-        "DB_URL=\"${DATABASE_URL:-$NEON_DATABASE_URL}\"; "
+        'if [ -z "$DATABASE_URL" ]; then echo "SKIP: DATABASE_URL missing in .env.site"; exit 0; fi; '
         "/opt/rawlead/.venv/bin/python - <<'PY'\n"
         "import os, pathlib, psycopg\n"
-        "url = os.environ.get('DATABASE_URL') or os.environ.get('NEON_DATABASE_URL') or ''\n"
+        "url = os.environ.get('DATABASE_URL') or ''\n"
         "sql = pathlib.Path('/opt/rawlead/sql/021_yookassa_payments.sql').read_text(encoding='utf-8')\n"
         "with psycopg.connect(url) as conn:\n"
         "    with conn.cursor() as cur:\n"

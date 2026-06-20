@@ -22,7 +22,9 @@ print("feed_sources", sorted(public_feed_sources()))
 print("youdo_public", is_public_feed_source("youdo"))
 print("FEED_VISIBILITY_DAYS", FEED_VISIBILITY_DAYS)
 
-dsn = os.environ.get("DATABASE_URL") or os.environ.get("NEON_DATABASE_URL")
+dsn = os.environ.get("DATABASE_URL")
+if not dsn:
+    raise SystemExit("DATABASE_URL missing in .env.site")
 import psycopg
 with psycopg.connect(dsn) as conn:
     with conn.cursor() as cur:

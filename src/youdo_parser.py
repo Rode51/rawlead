@@ -434,6 +434,12 @@ def _log_youdo_fetch_every_n_skip(cfg: Config) -> None:
         log_exchange_trace("youdo", stage="fetch_every_n_skip")
     except Exception:
         pass
+    try:
+        from exchange_browser_fetch import youdo_sticky_keepalive_ping
+
+        youdo_sticky_keepalive_ping()
+    except Exception:
+        pass
 
 
 def _storage_for_cfg(cfg: Config):

@@ -134,7 +134,7 @@ class TestO220FeedDraftJs(unittest.TestCase):
 
     def test_theme_bump(self) -> None:
         php = _FUNCTIONS.read_text(encoding="utf-8")
-        self.assertIn("RAWLEAD_CHILD_VERSION', '1.19.13'", php)
+        self.assertIn("RAWLEAD_CHILD_VERSION', '1.19.21'", php)
 
     def test_o203_glow_preserved(self) -> None:
         self.assertIn("@keyframes rl-draft-glow", self.css)
@@ -160,7 +160,7 @@ class TestO220CheckoutProbe(unittest.TestCase):
             (None, None, None, None, None),
             None,
         ]
-        result = create_checkout(cfg, cur, "00000000-0000-4000-8000-000000000001", "trial")
+        result = create_checkout(cfg, cur, "00000000-0000-4000-8000-000000000001", "subscription")
         url = result["confirmation_url"]
         self.assertTrue(url.startswith("https://"))
         self.assertTrue(_checkout_hosts_ok(url), msg=url)
@@ -175,7 +175,7 @@ class TestO220CheckoutProbe(unittest.TestCase):
             None,
         ]
         with self.assertRaises(CheckoutError) as ctx:
-            create_checkout(cfg, cur, "00000000-0000-4000-8000-000000000001", "trial")
+            create_checkout(cfg, cur, "00000000-0000-4000-8000-000000000001", "subscription")
         self.assertEqual(ctx.exception.code, "gateway_error")
 
 

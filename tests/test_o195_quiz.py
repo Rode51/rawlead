@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from src import api_server  # noqa: E402
 from src.api_server import (  # noqa: E402
     _apply_tag_weight_event,
+    _resolve_user_id,
     _upsert_imported_user_tags,
     app,
 )
@@ -152,14 +153,6 @@ class TestWeightDelta(unittest.TestCase):
         sql = cur.execute.call_args_list[0][0][0]
         self.assertIn("interaction_count", sql)
 
-    def test_apply_expand_no_reply_delta(self) -> None:
-        cur = MagicMock()
-        user_id = "00000000-0000-0000-0000-000000000099"
-        n = _apply_tag_weight_event(cur, user_id, "expand_no_reply", ["python", "fastapi"])
-        self.assertEqual(n, 2)
-        params = cur.execute.call_args_list[0][0][1]
-        self.assertEqual(params[2], 0.0)
-
     def test_weight_delta_endpoint(self) -> None:
         user_id = "00000000-0000-0000-0000-000000000099"
         token = issue_access_token(user_id, tg_user_id=5151)
@@ -180,25 +173,22 @@ class TestWeightDelta(unittest.TestCase):
         self.assertEqual(resp.json()["updated"], 1)
         apply.assert_called_once()
 
-    def test_weight_delta_expand_no_reply_endpoint(self) -> None:
+    def test_weight_delta_rejects_expand_no_reply(self) -> None:
         user_id = "00000000-0000-0000-0000-000000000099"
         token = issue_access_token(user_id, tg_user_id=5151)
-        with patch.object(api_server, "psycopg") as mock_pg:
-            conn = MagicMock()
-            cur = MagicMock()
-            mock_pg.connect.return_value.__enter__.return_value = conn
-            conn.cursor.return_value.__enter__.return_value = cur
-            with patch.object(api_server, "_apply_tag_weight_event", return_value=2) as apply:
-                with patch("pg_storage._ensure_user_tags_columns"):
-                    client = TestClient(app)
-                    resp = client.post(
-                        "/v1/me/tags/weight_delta",
-                        headers={"Authorization": f"Bearer {token}"},
-                        json={"event": "expand_no_reply", "tags": ["python", "fastapi"]},
-                    )
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["updated"], 2)
-        apply.assert_called_once_with(cur, user_id, "expand_no_reply", ["python", "fastapi"])
+        app.dependency_overrides[_resolve_user_id] = lambda: user_id
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/v1/me/tags/weight_delta",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"event": "expand_no_reply", "tags": ["python", "fastapi"]},
+            )
+        finally:
+            app.dependency_overrides.clear()
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("event must be one of", resp.json()["detail"])
+        self.assertNotIn("expand_no_reply", resp.json()["detail"])
 
 
 if __name__ == "__main__":

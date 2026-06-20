@@ -164,6 +164,41 @@ def load_radar_env(*, merge_root_env: bool = True) -> str:
     return profile
 
 
+def database_url_kind(url: str | None = None) -> str:
+    """O272: local | neon | unset — for startup logs (no secrets)."""
+    if url is None:
+        u = (os.environ.get("DATABASE_URL") or "").strip()
+    else:
+        u = url.strip()
+    if not u:
+        return "unset"
+    if "neon.tech" in u.lower():
+        return "neon"
+    return "local"
+
+
+def assert_site_not_neon(url: str) -> None:
+    """Site prod must never open TCP to Neon (quota / split-brain with local PG)."""
+    if radar_profile() != "site":
+        return
+    u = (url or "").strip()
+    if u and "neon.tech" in u.lower():
+        raise RuntimeError(
+            "site profile must not use Neon DATABASE_URL — use local Postgres "
+            "(127.0.0.1). Keep Neon in NEON_DATABASE_URL only."
+        )
+
+
+def require_database_url() -> str:
+    """load_radar_env → load_config.database_url → site≠neon guard."""
+    load_radar_env()
+    url = load_config().database_url.strip()
+    if not url:
+        raise RuntimeError("DATABASE_URL not set")
+    assert_site_not_neon(url)
+    return url
+
+
 def radar_tg_enabled() -> bool:
     """Telethon/tg_main: site=1, legacy=0 (биржи + бот без acc)."""
     load_radar_env()

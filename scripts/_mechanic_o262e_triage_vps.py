@@ -69,7 +69,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv("/opt/rawlead/.env.site")
 load_dotenv("/opt/rawlead/.env")
-dsn = os.environ.get("DATABASE_URL") or os.environ.get("NEON_DATABASE_URL")
+dsn = os.environ.get("DATABASE_URL")
 if not dsn:
     print("no DATABASE_URL")
 else:

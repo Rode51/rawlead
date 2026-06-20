@@ -971,7 +971,13 @@ def main() -> None:
     pg = pg_storage_from_config(cfg)
     word_filter = default_listing_filter()
     interval_sec = max(1, cfg.poll_interval_minutes * 60)
-    _echo(f"=== RawLead [{cfg.radar_profile}] ({radar_timestamp()}, Иркутск) ===")
+    from config import database_url_kind, require_database_url
+
+    try:
+        db_kind = database_url_kind(require_database_url())
+    except Exception:
+        db_kind = database_url_kind()
+    _echo(f"=== RawLead [{cfg.radar_profile}] ({radar_timestamp()}, Иркутск) db={db_kind} ===")
     _echo(f"Лог: {cfg.radar_log_path.resolve()}")
     _echo(
         f"Профиль: {cfg.radar_profile} | ИИ: "

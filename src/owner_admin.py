@@ -1063,8 +1063,12 @@ def _cycle_hint(last_at: str | None, fl_dl: int, kw_dl: int) -> str:
 
 
 def _ingest_metrics_snapshot() -> dict[str, dict[str, int | float | str]]:
-    url = os.environ.get("DATABASE_URL", "").strip()
-    if not url:
+    from config import load_radar_env, require_database_url
+
+    try:
+        load_radar_env()
+        url = require_database_url()
+    except Exception:
         return {}
     out: dict[str, dict[str, int | float | str]] = {}
     try:
@@ -1207,12 +1211,12 @@ def _exchange_ops_rows(
     rows: list[dict[str, Any]] = []
     lead_counts: dict[str, dict[str, int]] = {}
     try:
-        from config import load_config
+        from config import load_radar_env, require_database_url
         from ops_funnel import _lead_counts_by_source
 
-        db_url = (load_config().database_url or os.environ.get("DATABASE_URL", "")).strip()
-        if db_url:
-            lead_counts = _lead_counts_by_source(db_url)
+        load_radar_env()
+        db_url = require_database_url()
+        lead_counts = _lead_counts_by_source(db_url)
     except Exception:
         lead_counts = {}
 
@@ -1956,18 +1960,16 @@ def _run_delist_batch_ops() -> tuple[bool, str]:
     sqlite = _resolve_sqlite_path()
     if sqlite is None:
         return False, "SQLite not found for delist"
-    db_url = os.environ.get("DATABASE_URL", "").strip()
-    if not db_url:
-        return False, "DATABASE_URL not configured"
     saved_profile = os.environ.get("RADAR_PROFILE")
     try:
         os.environ["RADAR_PROFILE"] = "site"
-        from config import load_config, load_radar_env
+        from config import load_config, load_radar_env, require_database_url
         from delist_checker import run_delist_batch, save_delist_run
         from pg_storage import NeonLeadStorage
 
         load_radar_env()
         cfg = load_config()
+        db_url = require_database_url()
         pg = NeonLeadStorage(cfg.database_url or db_url)
         if not pg.enabled:
             return False, "Neon not available"
@@ -2542,7 +2544,10 @@ def ops_html(
     if data is not None:
         updated = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
         header_meta = f'<p class="sub" id="rl-ops-updated">Обновлено {updated}</p>'
-        db_url = database_url.strip() or os.environ.get("DATABASE_URL", "").strip()
+        from config import load_radar_env, require_database_url
+
+        load_radar_env()
+        db_url = database_url.strip() or require_database_url()
         funnel = data.get("funnel") or fetch_ops_funnel(db_url)
         tg = data.get("tg") or fetch_ops_tg()
         script = _ops_script_block(base)

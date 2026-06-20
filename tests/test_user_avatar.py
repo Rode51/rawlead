@@ -13,10 +13,12 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
 from user_avatar import (  # noqa: E402
+    avatar_dir,
     avatar_public_url,
     cache_user_avatar,
     ensure_avatar_cached,
     read_avatar_bytes,
+    reset_avatar_dir_cache,
 )
 
 
@@ -30,6 +32,16 @@ class TestUserAvatar(unittest.TestCase):
         self._tmpdir.cleanup()
         os.environ.pop("RAWLEAD_AVATAR_DIR", None)
         os.environ.pop("RAWLEAD_AVATAR_PUBLIC_BASE", None)
+        reset_avatar_dir_cache()
+
+    def test_wp_content_unwritable_falls_back_to_default(self) -> None:
+        os.environ["RAWLEAD_AVATAR_DIR"] = (
+            "/var/www/rawlead.ru/wp-content/uploads/rawlead-avatars"
+        )
+        reset_avatar_dir_cache()
+        with patch("user_avatar._wp_content_path_unwritable", return_value=True):
+            resolved = avatar_dir()
+        self.assertEqual(resolved, Path("/opt/rawlead/data/avatars"))
 
     def test_cache_accepts_octet_stream_jpeg(self) -> None:
         uid = "00000000-0000-0000-0000-000000000077"

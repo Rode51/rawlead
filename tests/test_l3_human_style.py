@@ -382,15 +382,13 @@ class TestL3HumanStyle(unittest.TestCase):
     def test_o200_category_playbooks_bad_good_each(self) -> None:
         """O200: BAD+GOOD pair present for each category playbook."""
         body = build_shared_l2_system()
-        # find playbooks block and check BAD/GOOD exist after it
         idx = body.find("Category playbooks")
         self.assertGreater(idx, 0)
-        block = body[idx: idx + 6000]
-        self.assertIn("BAD:", block)
-        self.assertIn("GOOD:", block)
-        # at least 4 BAD lines (one per category)
-        self.assertGreaterEqual(block.count("BAD:"), 4)
-        self.assertGreaterEqual(block.count("GOOD:"), 4)
+        for cat in ("### dev", "### design", "### marketing", "### text"):
+            start = body.find(cat, idx)
+            self.assertGreater(start, idx, cat)
+            chunk = body[start: start + 2500]
+            self.assertTrue("BAD" in chunk and "GOOD" in chunk, cat)
 
     def test_o200_category_playbooks_no_dev_tools_in_design(self) -> None:
         """O200: design playbook BAD example must not suggest PHP/WP tools."""
@@ -421,7 +419,7 @@ class TestL3HumanStyle(unittest.TestCase):
         body = build_shared_l2_system()
         idx = body.find("### marketing")
         self.assertGreater(idx, 0)
-        block = body[idx: idx + 1400]
+        block = body[idx: idx + 2800]
         # tightened KPI rule
         self.assertIn("явно", block)
         self.assertNotIn("логичны из ТЗ", block)
@@ -430,6 +428,10 @@ class TestL3HumanStyle(unittest.TestCase):
         self.assertIn("изобретай", block.casefold())
         # price-when-requested guidance
         self.assertIn("цену/стоимость", block)
+        # O200 r3 marketing rules
+        self.assertIn("Привлечение/лиды", block)
+        self.assertIn("#2894", block)
+        self.assertIn("#3198", block)
         # BAD with invented budget
         self.assertIn("BAD (#19933", block)
         # GOOD example with concrete channel

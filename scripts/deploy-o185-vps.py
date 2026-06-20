@@ -95,8 +95,7 @@ def _apply_neon_migrations() -> str:
         _, out, err = ssh.run(
             "DB_URL=$(grep '^DATABASE_URL=' /opt/rawlead/.env.site 2>/dev/null | head -1 | cut -d= -f2-) && "
             "[ -z \"$DB_URL\" ] && DB_URL=$(grep '^DATABASE_URL=' /opt/rawlead/.env 2>/dev/null | head -1 | cut -d= -f2-); "
-            "[ -z \"$DB_URL\" ] && DB_URL=$(grep '^NEON_DATABASE_URL=' /opt/rawlead/.env.site 2>/dev/null | head -1 | cut -d= -f2-); "
-            'if [ -z "$DB_URL" ]; then echo "NEON SKIP: DATABASE_URL missing"; exit 0; fi; '
+            'if [ -z "$DB_URL" ]; then echo "SKIP: DATABASE_URL missing"; exit 0; fi; '
             'export DATABASE_URL="$DB_URL"; '
             "/opt/rawlead/.venv/bin/python - <<'PY'\n"
             "import os, pathlib, psycopg\n"

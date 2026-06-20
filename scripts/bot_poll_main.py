@@ -13,9 +13,11 @@ sys.path.insert(0, str(_ROOT / "src"))
 from bot_poll import try_poll_commands  # noqa: E402
 from config import (  # noqa: E402
     apply_profile_argv,
+    database_url_kind,
     load_config,
     load_radar_env,
     radar_timestamp,
+    require_database_url,
 )
 from storage import storage_from_config  # noqa: E402
 from telegram_control import ensure_bot_polling_mode  # noqa: E402
@@ -36,8 +38,13 @@ def main() -> int:
     storage = storage_from_config(cfg)
     log_path = cfg.radar_log_path
 
+    try:
+        db_kind = database_url_kind(require_database_url())
+    except Exception:
+        db_kind = database_url_kind()
+
     print(
-        f"=== bot-poll {radar_timestamp()} profile={cfg.radar_profile} ===",
+        f"=== bot-poll {radar_timestamp()} profile={cfg.radar_profile} db={db_kind} ===",
         flush=True,
     )
 

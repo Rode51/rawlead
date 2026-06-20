@@ -372,9 +372,15 @@ def _stratified_sample(
     since_params: list[Any] | None = None,
     source_like_sql: str = "",
     source_like_params: list[Any] | None = None,
+    require_reply_draft: bool = True,
 ) -> list[dict]:
     since_params = since_params or []
     source_like_params = source_like_params or []
+    draft_sql = (
+        "AND COALESCE(NULLIF(TRIM(reply_draft), ''), '') <> ''"
+        if require_reply_draft
+        else ""
+    )
     sql = f"""
         SELECT {_SELECT_COLS}
         FROM leads
@@ -382,7 +388,7 @@ def _stratified_sample(
           {src_sql}
           {source_like_sql}
           {since_sql}
-          AND COALESCE(NULLIF(TRIM(reply_draft), ''), '') <> ''
+          {draft_sql}
         ORDER BY id DESC
         LIMIT %s
     """

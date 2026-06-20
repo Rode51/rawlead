@@ -37,7 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
-from src.config import load_config, load_radar_env
+from src.config import database_url_kind, load_config, load_radar_env, require_database_url
 
 from src.lead_category import (
     category_for_listing,
@@ -115,6 +115,8 @@ from src.match_push import (
     draft_quota_for_user,
     draft_rate_limit_retry_after,
     merge_chat_id_on_login,
+    preprod_e2e_user_ids,
+    reset_draft_quota_for_user,
 )
 from src.reply_draft_strip import strip_reply_draft_price_deadline
 from src.tools_catalog import normalize_tools_required, vendor_lock_tools
@@ -216,20 +218,15 @@ def _feed_where_sql(*, alias: str = "", apply_delay: bool = False) -> tuple[str,
 
 
 def _db_url() -> str:
-    url = os.getenv("DATABASE_URL", "").strip()
-    if not url:
-        raise RuntimeError("DATABASE_URL not set")
-    return url
+    return require_database_url()
 
 
 def _db_connection_mode() -> str:
-    """O131: pooler vs direct — for startup log only (no secrets)."""
-    url = os.getenv("DATABASE_URL", "").strip().lower()
-    if not url:
-        return "unset"
-    if "pooler" in url or ":6543" in url:
-        return "pooler"
-    return "direct"
+    """O272: local | neon | unset — startup log only (no secrets)."""
+    try:
+        return database_url_kind(require_database_url())
+    except Exception:
+        return database_url_kind()
 
 
 _DB_POOL: Any = None
@@ -1277,7 +1274,7 @@ def _try_auto_start_trial_on_login(
     owner_id = _owner_telegram_id()
     if owner_id is not None and tg_user_id == owner_id:
         return
-    plan, is_active, active_until, paused_until, trial_used_at = fetch_subscription_row(
+    plan, is_active, active_until, paused_until, trial_used_at, _paid = fetch_subscription_row(
         cur, user_id
     )
     if plan in ("owner", "beta"):
@@ -1395,7 +1392,7 @@ def _try_user_from_bearer(authorization: str) -> str | None:
 
 
 def _user_effective_access(cur: Any, user_id: str) -> bool:
-    plan, is_active, active_until, paused_until, trial_used_at = _ensure_subscription(
+    plan, is_active, active_until, paused_until, trial_used_at, _paid = _ensure_subscription(
         cur, user_id
     )
     payload = _subscription_payload(
@@ -1527,7 +1524,6 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
     username = (payload.username or "").strip() or None
     first_name = (payload.first_name or "").strip() or None
     photo_url = (payload.photo_url or "").strip() or None
-    avatar_url: str | None = None
 
     try:
         with psycopg.connect(_db_url()) as conn:
@@ -1542,14 +1538,15 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
                 _grant_owner_beta_if_match(cur, user_id, int(payload.id))
                 _try_auto_start_trial_on_login(cur, user_id, int(payload.id))
                 merge_chat_id_on_login(cur, tg_user_id=int(payload.id))
-                from user_avatar import sync_avatar_on_login
+                from user_avatar import avatar_api_fields, sync_avatar_on_login
 
-                avatar_url = sync_avatar_on_login(
+                sync_avatar_on_login(
                     cur,
                     user_id,
                     photo_url,
                     int(payload.id),
                 )
+                av = avatar_api_fields(user_id)
             conn.commit()
     except Exception as exc:
         logger.error("auth_telegram: %s", exc)
@@ -1564,8 +1561,8 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
         "username": username,
         "first_name": first_name,
         "photo_url": None,
-        "avatar_url": avatar_url,
-        "has_avatar": bool(avatar_url),
+        "avatar_url": av["avatar_url"],
+        "has_avatar": av["has_avatar"],
     }
 
 
@@ -1596,7 +1593,7 @@ def _complete_bot_auth(auth_token: str) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="auth_token required")
     token_hash = _hash_bot_auth_token(token)
     now = datetime.now(timezone.utc)
-    avatar_url: str | None = None
+    av: dict[str, bool | None] = {"avatar_url": None, "has_avatar": False}
     try:
         with psycopg.connect(_db_url()) as conn:
             with conn.cursor() as cur:
@@ -1642,14 +1639,15 @@ def _complete_bot_auth(auth_token: str) -> dict[str, Any]:
                 _grant_owner_beta_if_match(cur, user_id, int(tg_user_id))
                 _try_auto_start_trial_on_login(cur, user_id, int(tg_user_id))
                 merge_chat_id_on_login(cur, tg_user_id=int(tg_user_id))
-                from user_avatar import sync_avatar_on_login
+                from user_avatar import avatar_api_fields, sync_avatar_on_login
 
-                avatar_url = sync_avatar_on_login(
+                sync_avatar_on_login(
                     cur,
                     user_id,
                     (tg_photo_url or "").strip() or None,
                     int(tg_user_id),
                 )
+                av = avatar_api_fields(user_id)
                 cur.execute(
                     """
                     UPDATE auth_bot_sessions
@@ -1668,7 +1666,6 @@ def _complete_bot_auth(auth_token: str) -> dict[str, Any]:
     access = issue_access_token(user_id, tg_user_id=int(tg_user_id))
     username = (tg_username or "").strip() or None
     first_name = (tg_first_name or "").strip() or None
-    photo_url = (tg_photo_url or "").strip() or None
     return {
         "access_token": access,
         "token_type": "bearer",
@@ -1677,8 +1674,8 @@ def _complete_bot_auth(auth_token: str) -> dict[str, Any]:
         "username": username,
         "first_name": first_name,
         "photo_url": None,
-        "avatar_url": avatar_url,
-        "has_avatar": bool(avatar_url),
+        "avatar_url": av["avatar_url"],
+        "has_avatar": av["has_avatar"],
     }
 
 
@@ -2011,7 +2008,7 @@ def get_lead(
 @app.get("/v1/me")
 def me_profile(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     """Profile + cached avatar URL (file on disk, not Neon blob)."""
-    from user_avatar import avatar_public_url, ensure_avatar_cached
+    from user_avatar import avatar_api_fields, ensure_avatar_cached
 
     try:
         with psycopg.connect(_db_url()) as conn:
@@ -2036,7 +2033,7 @@ def me_profile(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     tg_user_id, tg_username, tg_first_name = row
     username = (tg_username or "").strip() or None
     first_name = (tg_first_name or "").strip() or None
-    avatar_url = avatar_public_url(user_id)
+    av = avatar_api_fields(user_id)
     can_ops_admin = False
     try:
         with psycopg.connect(_db_url()) as conn:
@@ -2051,8 +2048,8 @@ def me_profile(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
         "username": username,
         "first_name": first_name,
         "photo_url": None,
-        "avatar_url": avatar_url,
-        "has_avatar": bool(avatar_url),
+        "avatar_url": av["avatar_url"],
+        "has_avatar": av["has_avatar"],
         "can_ops_admin": can_ops_admin,
     }
 
@@ -2126,7 +2123,6 @@ _WEIGHT_EVENT_SPECS: dict[str, tuple[float, int, bool]] = {
     "push_nope": (-1.0, 1, True),
     "reply_delete": (-3.0, -2, False),
     "inbox_delete": (-0.5, 0, False),
-    "expand_no_reply": (-0.05, 0, False),
 }
 
 
@@ -2682,6 +2678,14 @@ def me_draft_quota(user_id: str = Depends(_resolve_user_id)) -> Any:
     return draft_quota_for_user(user_id)
 
 
+@app.post("/v1/me/draft/quota/reset")
+def me_draft_quota_reset(user_id: str = Depends(_resolve_user_id)) -> Any:
+    """O280: reset in-memory draft quota for preprod E2E test users only."""
+    if user_id not in preprod_e2e_user_ids():
+        raise HTTPException(status_code=403, detail="draft quota reset not allowed")
+    return reset_draft_quota_for_user(user_id)
+
+
 @app.post("/v1/me/leads/{lead_id}/draft")
 def me_lead_draft(
     lead_id: int,
@@ -2869,15 +2873,22 @@ def _as_utc(dt: datetime | None) -> datetime | None:
 
 def _ensure_subscription(
     cur: Any, user_id: str
-) -> tuple[str, bool, datetime | None, datetime | None, datetime | None]:
+) -> tuple[str, bool, datetime | None, datetime | None, datetime | None, datetime | None]:
     cur.execute("SELECT 1 FROM users WHERE id = %s::uuid", (user_id,))
     if not cur.fetchone():
         raise HTTPException(status_code=401, detail="session_stale")
-    plan, is_active, active_until, paused_until, trial_used_at = fetch_subscription_row(
-        cur, user_id
+    plan, is_active, active_until, paused_until, trial_used_at, paid_active_until = (
+        fetch_subscription_row(cur, user_id)
     )
-    if plan != "free" or is_active or active_until or paused_until or trial_used_at:
-        return plan, is_active, active_until, paused_until, trial_used_at
+    if (
+        plan != "free"
+        or is_active
+        or active_until
+        or paused_until
+        or trial_used_at
+        or paid_active_until
+    ):
+        return plan, is_active, active_until, paused_until, trial_used_at, paid_active_until
 
     cur.execute(
         """
@@ -2896,6 +2907,7 @@ def _subscription_payload(
     active_until: datetime | None,
     paused_until: datetime | None,
     trial_used_at: datetime | None = None,
+    paid_active_until: datetime | None = None,
     *,
     auto_renew: bool | None = None,
     has_payment_method: bool | None = None,
@@ -2945,6 +2957,13 @@ def _subscription_payload(
             now=now,
         )
     )
+    pu = _as_utc(paid_active_until)
+    if pu is not None and pu > now:
+        payload["prepaid_active_until"] = pu.isoformat()
+        payload["has_prepaid"] = True
+    else:
+        payload["has_prepaid"] = False
+        payload["prepaid_active_until"] = None
     if auto_renew is not None:
         payload["auto_renew"] = auto_renew
     if has_payment_method is not None:
@@ -2959,7 +2978,7 @@ def _subscription_payload(
 
 def _me_subscription_payload(cur: Any, user_id: str) -> dict[str, Any]:
     expire_stale_trials(cur)
-    plan, is_active, active_until, paused_until, trial_used_at = _ensure_subscription(
+    plan, is_active, active_until, paused_until, trial_used_at, _paid = _ensure_subscription(
         cur, user_id
     )
     if paused_until is not None and paused_until <= _utc_now():
@@ -2973,8 +2992,8 @@ def _me_subscription_payload(cur: Any, user_id: str) -> dict[str, Any]:
             (user_id,),
         )
         paused_until = None
-    plan, is_active, active_until, paused_until, trial_used_at = fetch_subscription_row(
-        cur, user_id
+    plan, is_active, active_until, paused_until, trial_used_at, paid_active_until = (
+        fetch_subscription_row(cur, user_id)
     )
     billing = fetch_subscription_billing_fields(cur, user_id)
     return _subscription_payload(
@@ -2983,6 +3002,7 @@ def _me_subscription_payload(cur: Any, user_id: str) -> dict[str, Any]:
         active_until,
         paused_until,
         trial_used_at,
+        paid_active_until,
         auto_renew=billing["auto_renew"],
         has_payment_method=billing["has_payment_method"],
         renew_canceled_at=billing["renew_canceled_at"],
@@ -3005,18 +3025,16 @@ def me_subscription(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
 
 
 @app.post("/v1/me/subscription/trial-start")
-def me_subscription_trial_start(
-    user_id: str = Depends(_resolve_user_id),
-) -> dict[str, Any]:
-    """Legacy alias — trial is now 1 ₽ via YooKassa checkout."""
-    return me_subscription_checkout(
-        SubscriptionCheckoutPayload(kind="trial"),
-        user_id=user_id,
+def me_subscription_trial_start() -> dict[str, Any]:
+    """Removed: trial is granted automatically on first login (O219)."""
+    raise HTTPException(
+        status_code=410,
+        detail="Trial выдаётся автоматически при первом входе. Для Premium используйте checkout subscription.",
     )
 
 
 class SubscriptionCheckoutPayload(BaseModel):
-    kind: Literal["trial", "subscription"] = "subscription"
+    kind: Literal["subscription"] = "subscription"
 
 
 @app.post("/v1/me/subscription/checkout")
@@ -3035,7 +3053,7 @@ def me_subscription_checkout(
                 conn.commit()
                 return result
     except CheckoutError as exc:
-        code = 409 if exc.code in ("trial_already_used", "already_premium") else 400
+        code = 409 if exc.code in ("already_premium", "already_prepaid") else 400
         raise HTTPException(status_code=code, detail=exc.detail) from exc
     except HTTPException:
         raise

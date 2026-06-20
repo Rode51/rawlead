@@ -16,6 +16,8 @@ _DEFAULT_DIR = "/opt/rawlead/data/avatars"
 _PUBLIC_BASE = "https://rawlead.ru/wp-content/uploads/rawlead-avatars"
 _UA = "RawLead/1.0 (+https://rawlead.ru)"
 
+_resolved_avatar_dir: Path | None = None
+
 
 def _looks_like_image(data: bytes) -> bool:
     if len(data) < 12:
@@ -29,9 +31,42 @@ def _looks_like_image(data: bytes) -> bool:
     return False
 
 
+def _wp_content_path_unwritable(path: Path) -> bool:
+    if "wp-content" not in path.parts:
+        return False
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".rawlead_write_probe"
+        probe.write_bytes(b"1")
+        probe.unlink(missing_ok=True)
+        return False
+    except OSError:
+        return True
+
+
 def avatar_dir() -> Path:
+    global _resolved_avatar_dir
+    if _resolved_avatar_dir is not None:
+        return _resolved_avatar_dir
+
     raw = (os.getenv("RAWLEAD_AVATAR_DIR") or _DEFAULT_DIR).strip()
-    return Path(raw)
+    chosen = Path(raw)
+    if _wp_content_path_unwritable(chosen):
+        logger.warning(
+            "RAWLEAD_AVATAR_DIR=%s not writable (wp-content post-cutover); using %s",
+            raw,
+            _DEFAULT_DIR,
+        )
+        chosen = Path(_DEFAULT_DIR)
+    _resolved_avatar_dir = chosen
+    return chosen
+
+
+def reset_avatar_dir_cache() -> None:
+    """Test helper — clear memoized avatar_dir()."""
+    global _resolved_avatar_dir
+    _resolved_avatar_dir = None
 
 
 def avatar_path(user_id: str) -> Path:
@@ -68,8 +103,8 @@ def cache_user_avatar(user_id: str, photo_url: str | None) -> bool:
             return False
         dest.write_bytes(body)
         return True
-    except Exception as exc:
-        logger.warning("avatar cache failed user=%s: %s", user_id, exc)
+    except Exception:
+        logger.warning("avatar cache failed user_id=%s", user_id)
         return False
 
 
@@ -154,6 +189,16 @@ def ensure_avatar_cached(cur: Any, user_id: str) -> bool:
         return False
     clear_neon_photo_url(cur, user_id)
     return True
+
+
+def avatar_api_fields(user_id: str) -> dict[str, bool | None]:
+    """API profile JSON — cached file → has_avatar, no broken WP uploads URL."""
+    if avatar_path(user_id).is_file():
+        return {"avatar_url": None, "has_avatar": True}
+    url = avatar_public_url(user_id)
+    if url and "/wp-content/uploads/" in url:
+        return {"avatar_url": None, "has_avatar": False}
+    return {"avatar_url": url, "has_avatar": bool(url)}
 
 
 def sync_avatar_on_login(

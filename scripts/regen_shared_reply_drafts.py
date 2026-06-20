@@ -197,6 +197,7 @@ def fetch_regen_candidates(
         pool_size=3000,
         since_sql=since_sql,
         since_params=since_params,
+        require_reply_draft=False,
     )
     out: list[dict[str, Any]] = []
     for lead in pool:

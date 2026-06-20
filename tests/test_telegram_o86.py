@@ -46,7 +46,7 @@ class TestTelegramO86(unittest.TestCase):
         "bot_auth.authorize_bot_auth_session",
         return_value=(False, "", "session expired"),
     )
-    def test_bot_auth_fail_muted(self, _auth: MagicMock, send: MagicMock) -> None:
+    def test_bot_auth_fail_notifies_user(self, _auth: MagicMock, send: MagicMock) -> None:
         cfg = _cfg()
         errors: list[str] = []
         message = {"from": {"id": 42}, "chat": {"id": 42}}
@@ -59,7 +59,8 @@ class TestTelegramO86(unittest.TestCase):
             errors=errors,
         )
         self.assertTrue(handled)
-        send.assert_not_called()
+        send.assert_called_once()
+        self.assertIn("истекла", send.call_args[0][2].casefold())
         self.assertTrue(any("bot_auth:fail" in e for e in errors))
 
     @patch.object(tc, "_send_to_chat")
