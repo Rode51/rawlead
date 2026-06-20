@@ -1032,7 +1032,6 @@
   var subPriceEl = document.getElementById("rl-cabinet-sub-price");
   var subDetailEl = document.getElementById("rl-cabinet-sub-detail");
   var subPayEl = document.getElementById("rl-cabinet-sub-pay");
-  var subTrialEl = document.getElementById("rl-cabinet-sub-trial");
   var subNoteEl = document.getElementById("rl-cabinet-sub-note");
   var trialBadgeEl = document.getElementById("rl-cabinet-trial-badge");
   var quizRetakeEl = document.getElementById("rl-cabinet-quiz-retake");
@@ -1187,9 +1186,6 @@
           });
         }
       }
-      if (subTrialEl) {
-        subTrialEl.hidden = true;
-      }
       if (subPayEl) {
         subPayEl.hidden = true;
       }
@@ -1301,25 +1297,6 @@
       }
     }
 
-    if (subTrialEl) {
-      var hideTrial =
-        isOwner ||
-        status === "active" ||
-        status === "beta" ||
-        status === "trial" ||
-        isTrial ||
-        !!data.effective_access ||
-        !!data.is_trial ||
-        (data.plan && data.plan !== "free" && data.is_active);
-      var showTrialCta =
-        status === "free" &&
-        !data.trial_used &&
-        !hideTrial;
-      subTrialEl.hidden = !showTrialCta;
-      subTrialEl.disabled = false;
-      subTrialEl.classList.remove("is-disabled");
-    }
-
     if (subPayEl) {
       if (isOwner) {
         subPayEl.hidden = true;
@@ -1341,11 +1318,7 @@
       } else if (status === "free") {
         subPayEl.hidden = false;
         setSubButton(subPayEl, "Подключить Premium →", "subscription");
-        if (subTrialEl && !subTrialEl.hidden) {
-          setSubActionClass(subPayEl, "secondary");
-        } else {
-          setSubActionClass(subPayEl, "primary");
-        }
+        setSubActionClass(subPayEl, "primary");
       } else {
         subPayEl.hidden = true;
         setSubActionClass(subPayEl, "");
@@ -1353,7 +1326,7 @@
     }
 
     if (subNoteEl) {
-      if (status === "free" && !data.trial_used) {
+      if (status === "free") {
         subNoteEl.hidden = false;
         subNoteEl.textContent =
           "Оплата картой или СБП через ЮKassa.";
@@ -1501,16 +1474,9 @@
       });
   }
 
-  if (subTrialEl) {
-    subTrialEl.addEventListener("click", function () {
-      startCheckout("trial", subTrialEl);
-    });
-  }
-
   if (subPayEl) {
     subPayEl.addEventListener("click", function () {
-      var kind = subPayEl.dataset.checkoutKind || "subscription";
-      startCheckout(kind, subPayEl);
+      startCheckout("subscription", subPayEl);
     });
   }
 
@@ -1524,14 +1490,13 @@
   function maybeStartCheckoutFromUrl() {
     var params = new URLSearchParams(window.location.search || "");
     var kind = params.get("checkout");
-    if (!kind || (kind !== "trial" && kind !== "subscription") || !getToken()) {
+    if (!kind || kind !== "subscription" || !getToken()) {
       return;
     }
     if (window.history && window.history.replaceState) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-    var trigger = kind === "trial" ? subTrialEl : subPayEl;
-    startCheckout(kind, trigger);
+    startCheckout("subscription", subPayEl);
   }
 
   function hasPushAccess(sub) {

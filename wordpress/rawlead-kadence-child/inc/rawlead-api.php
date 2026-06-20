@@ -1843,35 +1843,6 @@ add_action('rest_api_init', static function (): void {
 
     ]);
 
-    register_rest_route('rawlead/v1', '/me/subscription/trial-start', [
-        [
-            'methods'             => 'POST',
-            'permission_callback' => '__return_true',
-            'callback'            => static function (WP_REST_Request $request): WP_REST_Response|WP_Error {
-                if (rawlead_api_bearer_from_request($request) === '') {
-                    return new WP_Error('rawlead_auth', 'Login required', ['status' => 401]);
-                }
-                $url = rawlead_api_base_url() . '/v1/me/subscription/trial-start';
-                $response = wp_remote_post($url, [
-                    'timeout' => 20,
-                    'headers' => rawlead_api_user_headers($request, false),
-                    'body'    => '{}',
-                ]);
-                if (is_wp_error($response)) {
-                    return $response;
-                }
-                $code = (int) wp_remote_retrieve_response_code($response);
-                $raw = wp_remote_retrieve_body($response);
-                $data = json_decode($raw, true);
-                if ($code < 200 || $code >= 300) {
-                    $detail = is_array($data) && isset($data['detail']) ? (string) $data['detail'] : $raw;
-                    return new WP_Error('rawlead_api_http', $detail ?: 'API error', ['status' => $code]);
-                }
-                return new WP_REST_Response(is_array($data) ? $data : [], 200);
-            },
-        ],
-    ]);
-
     register_rest_route('rawlead/v1', '/me/subscription/checkout', [
         [
             'methods'             => 'POST',

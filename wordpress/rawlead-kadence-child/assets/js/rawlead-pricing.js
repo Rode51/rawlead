@@ -3,7 +3,6 @@
 
   var cfg = window.rawleadPricing || {};
   var subBtn = document.getElementById("rl-price-checkout-sub");
-  var trialBtn = document.getElementById("rl-price-checkout-trial");
   var noteEl = document.getElementById("rl-price-checkout-note");
 
   var TOKEN_KEY = "rawlead_access_token";
@@ -41,20 +40,20 @@
     }
   }
 
-  function redirectToLogin(kind) {
+  function redirectToLogin() {
     fireCheckoutGoal();
     var cabinet = cfg.cabinetUrl || "/cabinet/";
     var sep = cabinet.indexOf("?") >= 0 ? "&" : "?";
-    window.location.href = cabinet + sep + "checkout=" + encodeURIComponent(kind || "subscription");
+    window.location.href = cabinet + sep + "checkout=subscription";
   }
 
-  function startCheckout(kind, triggerEl) {
+  function startCheckout(triggerEl) {
     if (!cfg.restCheckout) {
       setNote("Оплата временно недоступна", true);
       return Promise.resolve(null);
     }
     if (!getToken()) {
-      redirectToLogin(kind);
+      redirectToLogin();
       return Promise.resolve(null);
     }
     if (triggerEl) {
@@ -68,7 +67,7 @@
       method: "POST",
       credentials: "same-origin",
       headers: headers,
-      body: JSON.stringify({ kind: kind || "subscription" }),
+      body: JSON.stringify({ kind: "subscription" }),
     })
       .then(function (res) {
         return res.json().then(function (data) {
@@ -99,43 +98,9 @@
       });
   }
 
-  function loadSubscriptionHints() {
-    if (!cfg.restSubscription || !getToken() || !trialBtn) {
-      return;
-    }
-    fetch(cfg.restSubscription, {
-      credentials: "same-origin",
-      headers: authHeaders(),
-    })
-      .then(function (res) {
-        if (!res.ok) {
-          return null;
-        }
-        return res.json();
-      })
-      .then(function (data) {
-        if (!data) {
-          return;
-        }
-        var used = !!data.trial_used;
-        var hasAccess = !!data.effective_access;
-        if (used || hasAccess || data.status === "trial") {
-          trialBtn.hidden = true;
-        }
-      })
-      .catch(function () {});
-  }
-
   if (subBtn) {
     subBtn.addEventListener("click", function () {
-      startCheckout("subscription", subBtn);
+      startCheckout(subBtn);
     });
   }
-  if (trialBtn) {
-    trialBtn.addEventListener("click", function () {
-      startCheckout("trial", trialBtn);
-    });
-  }
-
-  loadSubscriptionHints();
 })();

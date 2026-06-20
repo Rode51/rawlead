@@ -77,9 +77,6 @@ $rawlead_cabinet_login_url = rawlead_cabinet_login_url();
 			<p class="rl-cabinet-sub__price" id="rl-cabinet-sub-price"><?php esc_html_e('790 ₽/мес · первые 3 дня бесплатно', 'rawlead-kadence-child'); ?></p>
 			<p class="rl-cabinet-sub__detail" id="rl-cabinet-sub-detail"></p>
 			<div class="rl-cabinet-sub__actions">
-				<button type="button" class="rl-btn rl-btn--primary rl-cabinet-sub__trial" id="rl-cabinet-sub-trial" hidden>
-					<?php esc_html_e('Активировать Trial бесплатно →', 'rawlead-kadence-child'); ?>
-				</button>
 				<button type="button" class="rl-btn rl-btn--primary rl-cabinet-sub__pay" id="rl-cabinet-sub-pay" hidden>
 					<?php esc_html_e('Подключить Premium →', 'rawlead-kadence-child'); ?>
 				</button>
