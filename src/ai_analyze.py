@@ -145,7 +145,10 @@ _REPLY_DRAFT_CLICHE_RE = re.compile(
 _REPLY_DRAFT_VAGUE_RE = re.compile(
     r"предлагаю\s+создать\s+несколько(?!\s+\w+\s+концепц)|"
     r"обсудить\s+детали(?!\s*\?)|глубокий\s+аудит\s+без|"
-    r"ваш\s+креатив\s+за\s+основу|определить\s+приоритет",
+    r"ваш\s+креатив\s+за\s+основу|определить\s+приоритет|"
+    r"готов\s+начать(?!\s+[а-яё]{4,})|готов\s+приступить|готов\s+взять|"
+    r"всё\s+понятно|все\s+понятно|требования\s+понятн|задача\s+понятн|"
+    r"как\s+вы\s+указали|всё\s+как\s+вы|указали\s+в\s+требованиях",
     re.IGNORECASE,
 )
 # O144: RFP guard — ТЗ просит идеи, но отклик отфутболивает «пришлите ссылки»
@@ -505,12 +508,13 @@ def _validate_money(money: str, budget_text: str) -> str:
     low = m.casefold()
     if "на бирже" not in low:
         on_site = (budget_text or "").strip()
-        m = f"На бирже: {on_site} | {m}"
+        m = f"На бирже: {on_site} | {m}" if m else f"На бирже: {on_site}"
         low = m.casefold()
     if "рынок" not in low:
-        raise AiAnalyzeError("money: нет части «Рынок»")
+        m = f"{m} | Рынок: —"
+        low = m.casefold()
     if "старт отклика" not in low:
-        raise AiAnalyzeError("money: нет части «Старт отклика»")
+        m = f"{m} | Старт отклика: —"
     return m
 
 
@@ -895,8 +899,6 @@ def _parse_premium_analysis(
     analysis = _parse_analysis(payload, budget_text=budget_text)
     if lite is not None and lite.is_take_verdict():
         n_tools = len(analysis.tools_required)
-        if n_tools < 2:
-            raise AiAnalyzeError("L2: tools_required — минимум 2 пункта")
         if n_tools > 8:
             raise AiAnalyzeError("L2: tools_required — максимум 8 пунктов")
         if not (analysis.reply_draft or "").strip():
@@ -1020,6 +1022,177 @@ def _shared_draft_too_vague(
     trunc = _reply_draft_false_truncation_reason(draft, description)
     if trunc:
         return f"vague:{trunc}"
+    return None
+
+
+_SHARED_DRAFT_THIN_RE = re.compile(
+    r"готов\s+начать|готов\s+приступить|готов\s+присоединиться|готов\s+взять|"
+    r"всё\s+понятно|все\s+понятно|требования\s+понятн|задача\s+понятн|"
+    r"как\s+вы\s+указали|всё\s+как\s+вы|указали\s+в\s+требованиях",
+    re.I,
+)
+_DRAFT_OWN_PRICE_RE = re.compile(
+    r"(?:стоимост|цена)\s*(?:съёмк|работ|услуг)?\s*[—\-–:]?\s*\d|"
+    r"\d[\d\s\u00a0]{1,7}\s*₽|"
+    r"^\s*\d+\.\s+[^.\n]{0,80}(?:₽|руб)",
+    re.I | re.M,
+)
+_DRAFT_FAQ_ANSWER_RE = re.compile(
+    r"по\s+вашим\s+вопросам|"
+    r"^\s*\d+\.\s+(?:стоимост|цена|примеры)",
+    re.I | re.M,
+)
+_READY_VAGUE_OPENER_RE = re.compile(
+    r"здравствуйте!\s+готов\s+(?:размест|выполнить\s+визуальные|приступить\s+к\s+заполнению)",
+    re.I,
+)
+_TZ_ASKS_PRICE_RE = re.compile(
+    r"цен[ауы]|стоимост|бюджет|сколько\s+стоит|ваш[аи]?\s+цен",
+    re.I,
+)
+_DRAFT_MENTIONS_PRICE_RE = re.compile(
+    r"бюджет|стоимост|цен[ауы]|₽|руб\.?",
+    re.I,
+)
+_TZ_ASKS_DEADLINE_RE = re.compile(
+    r"срок|дедлайн|к\s+какому\s+(числу|дате)|когда\s+(нужн|сдать|готов)",
+    re.I,
+)
+_DRAFT_MENTIONS_DEADLINE_RE = re.compile(
+    r"срок|дедлайн|к\s+какой\s+дат|когда\s+(нужн|сдать)",
+    re.I,
+)
+_TZ_ANCHOR_STOP = frozenset(
+    "и в на по с для из к у о а я вы мы он она это как что при без или же бы ли "
+    "вам вас ваш вашей вашего здравствуйте пожалуйста нужно требуется заказ задача "
+    "работа проект сделать выполнить разработать создать настроить".split()
+)
+
+# Slug → phrases that count as «named in draft» (judge + send_ready retry).
+_TOOL_MENTION_PHRASES: dict[str, tuple[str, ...]] = {
+    "figma": ("figma", "фигма"),
+    "photoshop": ("photoshop", "фотошоп"),
+    "illustrator": ("illustrator", "иллюстратор"),
+    "wordpress_dev": ("wordpress", "вордпресс", "elementor", "woocommerce"),
+    "telegram_bot_dev": ("telegram", "телеграм", "aiogram", "telebot", "telethon", "бот"),
+    "telegram": ("telegram", "телеграм", "aiogram", "telebot"),
+    "python": ("python", "питон", "fastapi", "django", "flask"),
+    "php": ("php",),
+    "javascript": ("javascript", " js", "react", "vue", "node.js", "nodejs"),
+    "google_apps_script": ("google apps script", "apps script", "gas"),
+    "google_sheets_api": ("google sheets", "sheets api", "google таблиц"),
+    "seo": ("seo", "сео", "yoast", "rank math"),
+    "excel": ("excel",),
+    "powerpoint": ("powerpoint", "ppt"),
+    "mysql": ("mysql",),
+    "postgresql": ("postgresql", "postgres"),
+    "elementor": ("elementor",),
+    "after_effects": ("after effects",),
+    "premiere_pro": ("premiere",),
+    "rhino": ("rhino", "рино"),
+    "web_scraping": ("парс", "scraping", "scraper", "парсер"),
+    "html_css": ("html", "css", "вёрст", "верст"),
+    "smm": ("smm", "смм", "вконтакт", "vk", "дзен"),
+    "email_marketing": ("email", "рассыл", "spf", "dkim"),
+    "blender": ("blender",),
+    "cinema_4d": ("cinema 4d", "c4d"),
+    "woocommerce": ("woocommerce",),
+    "tilda": ("tilda", "тильда"),
+}
+
+
+def _tool_readable_label(slug: str) -> str:
+    key = (slug or "").strip().casefold().replace("-", "_")
+    labels = {
+        "wordpress_dev": "WordPress",
+        "telegram_bot_dev": "Telegram-бот (aiogram/Telegram)",
+        "google_apps_script": "Google Apps Script",
+        "google_sheets_api": "Google Sheets API",
+        "web_scraping": "парсинг (Python)",
+        "html_css": "HTML/CSS",
+        "after_effects": "After Effects",
+        "premiere_pro": "Premiere Pro",
+        "cinema_4d": "Cinema 4D",
+        "email_marketing": "email-рассылка",
+    }
+    if key in labels:
+        return labels[key]
+    return key.replace("_", " ").title() if key else slug
+
+
+def _tool_mentioned_in_draft(tool_slug: str, draft: str) -> bool:
+    key = (tool_slug or "").strip().casefold().replace("-", "_")
+    if not key:
+        return False
+    low = (draft or "").casefold()
+    phrases = _TOOL_MENTION_PHRASES.get(key)
+    if phrases:
+        if any(p in low for p in phrases):
+            return True
+    slug = key.replace("_", " ")
+    if slug in low:
+        return True
+    parts = [p for p in slug.split() if len(p) > 2]
+    return any(p in low for p in parts)
+
+
+def _tz_anchor_hits(description: str, draft: str) -> int:
+    """Distinctive TZ tokens (≥5 chars) found in draft — send_ready ≥2 for voluminous TZ."""
+    desc = (description or "").casefold()
+    low = (draft or "").casefold()
+    tokens: set[str] = set()
+    for w in re.findall(r"[а-яёa-z0-9]{5,}", desc):
+        if w not in _TZ_ANCHOR_STOP:
+            tokens.add(w)
+    if not tokens:
+        return 0
+    return sum(1 for t in tokens if t in low)
+
+
+def _shared_draft_send_ready_reason(
+    draft: str,
+    *,
+    description: str = "",
+    tools_required: list[str] | None = None,
+) -> str | None:
+    """G3-POLISH: retry thin shared L2 drafts before returning."""
+    text = (draft or "").strip()
+    desc = (description or "").strip()
+    desc_len = len(desc)
+    if not text:
+        return "send_ready:empty"
+    n = _count_sentences(text)
+    if n < 3:
+        return f"send_ready:too_few_sentences={n}"
+    if desc_len >= 120 and n < 4:
+        return f"send_ready:too_few_sentences={n}"
+    if _SHARED_DRAFT_THIN_RE.search(text):
+        return "send_ready:thin_closer"
+    if _DRAFT_OWN_PRICE_RE.search(text):
+        return "send_ready:own_price"
+    if _DRAFT_FAQ_ANSWER_RE.search(text):
+        return "send_ready:faq_format"
+    if _READY_VAGUE_OPENER_RE.search(text) and _tz_anchor_hits(desc, text) < 2:
+        return "send_ready:ready_opener"
+    tools = [str(t).strip() for t in (tools_required or []) if str(t).strip()]
+    if tools:
+        named = sum(1 for t in tools if _tool_mentioned_in_draft(t, text))
+        need_named = len(tools) if len(tools) <= 3 else max(2, len(tools) - 1)
+        if named < need_named:
+            return "send_ready:tools_undernamed"
+    if desc_len >= 150:
+        anchors = _tz_anchor_hits(desc, text)
+        has_po_tz = "по тз" in text.casefold()
+        if anchors < 2 and not has_po_tz and "?" not in text:
+            return "send_ready:tz_anchors_low"
+    elif desc_len >= 200 and "по тз" not in text.casefold() and "?" not in text:
+        return "send_ready:no_tz_anchor"
+    if _TZ_ASKS_PRICE_RE.search(desc) and "?" not in text:
+        if not _DRAFT_MENTIONS_PRICE_RE.search(text):
+            return "send_ready:price_question_missing"
+    if _TZ_ASKS_DEADLINE_RE.search(desc) and "?" not in text:
+        if not _DRAFT_MENTIONS_DEADLINE_RE.search(text):
+            return "send_ready:deadline_question_missing"
     return None
 
 
@@ -1532,9 +1705,12 @@ def _shared_reply_system(*, cabinet: bool, seed: int = 0) -> str:
         )
     return (
         base
-        + "\n\nКонтекст: task_summary, Описание заказа; tools_required — справочно, не подменяй стек из текста."
-        + "\n**tools_required в отклике:** перечисли **все** релевантные инструменты из списка по имени "
-        "(Photoshop + Illustrator → оба; JavaScript + Figma → оба). Не упоминай только один из пары."
+        + "\n\nКонтекст: task_summary, Описание заказа; tools_required — сверка перед ответом."
+        + "\n**tools_required (FAIL если пропустишь):** каждый инструмент из user-message — **отдельным "
+        "словом в теле отклика** (не только в уме). Photoshop + Illustrator → оба в тексте; "
+        "Figma + JavaScript → оба; WordPress + PHP → оба."
+        + "\n**Якоря ТЗ:** минимум **2** конкретики из «Описание заказа» (цифра, платформа, объект, "
+        "функция) — иначе judge «шаблон»."
         + "\n**Обрыв ТЗ:** если блок «Описание заказа» **без** пометки «[Описание обрезано…]» — "
         "не пиши что фраза/текст обрывается и не спрашивай про «неполное ТЗ». "
         "Завершённые предложения в блоке считай полными."
@@ -2062,7 +2238,7 @@ def analyze_premium(
                 lite=lite,
             )
             note_ai_l2_call()
-            if lite is not None and result.tools_required:
+            if lite is not None:
                 from tools_catalog import finalize_tools_for_lead
 
                 clean_tools = finalize_tools_for_lead(
@@ -2077,19 +2253,34 @@ def analyze_premium(
                     snippet=desc,
                     task_summary=lite.task_summary,
                 )
-                if clean_tools != result.tools_required:
-                    result = AiAnalysis(
-                        verdict=result.verdict,
-                        work_summary=result.work_summary,
-                        difficulty=result.difficulty,
-                        approach=result.approach,
-                        time_for_client=result.time_for_client,
-                        money=result.money,
-                        reply_draft=result.reply_draft,
-                        risks=result.risks,
-                        lead_tags=result.lead_tags,
-                        tools_required=clean_tools,
+                if len(clean_tools) < 2:
+                    fallback_tools = analyze_lead_tools(
+                        cfg,
+                        title=title,
+                        budget_text=budget_text,
+                        description=description,
+                        lite=lite,
+                        log_prefix=log_prefix,
                     )
+                    if fallback_tools and len(fallback_tools) >= 2:
+                        clean_tools = fallback_tools
+                if lite.is_take_verdict():
+                    if len(clean_tools) < 2:
+                        raise AiAnalyzeError("L2: tools_required — минимум 2 пункта")
+                    if not (result.reply_draft or "").strip():
+                        raise AiAnalyzeError("L2: пустой reply_draft")
+                result = AiAnalysis(
+                    verdict=result.verdict,
+                    work_summary=result.work_summary,
+                    difficulty=result.difficulty,
+                    approach=result.approach,
+                    time_for_client=result.time_for_client,
+                    money=result.money,
+                    reply_draft=result.reply_draft,
+                    risks=result.risks,
+                    lead_tags=result.lead_tags or lite.lead_tags,
+                    tools_required=clean_tools,
+                )
             return result
         except (
             AiAnalyzeError,
@@ -2259,7 +2450,17 @@ def _build_shared_reply_user(
     tools_required: list[str],
     description: str = "",
 ) -> str:
-    tools_line = ", ".join(t.strip() for t in tools_required if str(t).strip())
+    tools_clean = [t.strip() for t in tools_required if str(t).strip()]
+    tools_line = ", ".join(tools_clean)
+    tools_checklist = ""
+    if tools_clean:
+        named = "\n".join(
+            f"- {_tool_readable_label(t)} (slug: {t}) — **обязательно в тексте reply_draft**"
+            for t in tools_clean[:5]
+        )
+        tools_checklist = (
+            f"Чеклист инструментов (каждый пункт — слово в отклике, не пропускай):\n{named}\n\n"
+        )
     desc, snippet_truncated = _shared_snippet_for_l2(description)
     trunc_note = (
         "\n[Описание обрезано — оценивай по видимой части; не выдумывай обрыв "
@@ -2284,9 +2485,10 @@ def _build_shared_reply_user(
         f"{body_block}"
         f"{attach_hint}"
         f"{hints}"
-        f"Инструменты (tools_required — **назови каждый релевантный** в reply_draft по имени): "
-        f"{tools_line or 'не указаны'}\n\n"
-        "Верни JSON: reply_draft — универсальное сопроводительное письмо от первого лица."
+        f"{tools_checklist}"
+        f"Инструменты (tools_required): {tools_line or 'не указаны'}\n\n"
+        "Верни JSON: reply_draft — 4+ предложений при объёмном Описании; "
+        "2+ якоря из Описания; все tools выше по имени в тексте; без «готов начать»/«всё понятно»."
     )
 
 
@@ -2382,15 +2584,37 @@ def analyze_shared_reply_draft(
                 raise AiAnalyzeError(f"reply_draft: {vague}")
             last_draft = draft
             smell = reply_ai_smell_reason(draft)
-            if smell and attempt < attempts - 1:
-                retry_reason = smell
-                outcome = "retry_smell"
-                time.sleep(
-                    _SHARED_DRAFT_BACKOFF_SEC[
-                        min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)
-                    ]
-                )
-                continue
+            if smell:
+                if attempt < attempts - 1:
+                    retry_reason = smell
+                    outcome = "retry_smell"
+                    time.sleep(
+                        _SHARED_DRAFT_BACKOFF_SEC[
+                            min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)
+                        ]
+                    )
+                    continue
+                last_draft = None
+                last_exc = AiAnalyzeError(f"reply_draft: {smell}")
+                outcome = "fail_smell"
+                break
+            send_ready = _shared_draft_send_ready_reason(
+                draft, description=description, tools_required=tools
+            )
+            if send_ready:
+                if attempt < attempts - 1:
+                    retry_reason = send_ready
+                    outcome = "retry_send_ready"
+                    time.sleep(
+                        _SHARED_DRAFT_BACKOFF_SEC[
+                            min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)
+                        ]
+                    )
+                    continue
+                last_draft = None
+                last_exc = AiAnalyzeError(f"reply_draft: {send_ready}")
+                outcome = "fail_send_ready"
+                break
             from tz_attachments import reply_attachment_claim_reason
 
             attach_reason = reply_attachment_claim_reason(draft, description)

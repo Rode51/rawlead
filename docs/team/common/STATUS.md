@@ -4,61 +4,69 @@
 
 **Очередь:** [`TASKS.md`](TASKS.md) · **Coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md)
 
-**Next:** **M1 wave 1** · owner smoke · UX-audit rerun (Next) · **portfolio P2** deploy после commit
+**Next:** **G6** L3 judge uniquify (@coder)
+
+**G5 ✅ (2026-06-20):** `preprod_ai_matrix.py --profile site` · **12/12 L1+L2** · `s1_pass: true` · 4×category ≥3 · empty_reply_draft **0** · fix L2 tools/money в `ai_analyze.py`
+
+**G4-fix ✅ (2026-06-20):** desktop J1–J9,J5,J6,J8,J11 **10/10** · mobile J10 **1/1** · gate `preprod_ux_journey.json` **11/11** · `j5_draft_ok: true` · `critical_count: 0` · harness J5 = n16 parity (no reload между drafts)
+
+**draft_as_is-L2 ✅ (Lead 2026-06-20):** avg **4.0** · vendor-lock **0** · ux_audit **0 critical 24/24** · G0 pytest ✅
 
 ---
 
-## Portfolio (rode51.ru)
+## PRE-ADS-GATE ⏳ (блокер M1 wave 1)
+
+| Шаг | Прогон | Кто | Статус |
+|-----|--------|-----|--------|
+| G0 | pytest smoke | @coder | ✅ **30 passed**, 1 skipped (Lead 2026-06-20) |
+| G1 | Next E2E 24/24 | @coder | ✅ **24/24** (2026-06-20 · n5/n17 draftable lead id) |
+| G2 | Playwright smoke 5/5 | @coder | ✅ **5/5** `s2_pass` (2026-06-20 · Next selectors) |
+| G3 | UX audit 0 critical | @coder | ✅ **0 critical** · U1–U12 **24/24** (2026-06-20) |
+| G4 | UX journey J1–J11 | @coder | ✅ **11/11** · `j5_draft_ok` · 0 critical (2026-06-20 · desktop+mobile gate) |
+| G5 | AI matrix S1 | @coder | ✅ **12/12** · `s1_pass` (2026-06-20) |
+| G6 | L3 judge uniquify | @coder | ⏳ **сейчас** · L2 ✅ 2026-06-18 |
+| G7a | Load quick smoke | @coder | ⏳ |
+| G7b | Load **full** 50 VU + draft×20 | @coder | ⏳ после G7a |
+| G-SEC | Security regression | @coder | ⏳ pytest ✅ · S-1/S-2 ручные · MiMo M0 **P0=0** |
+| M0–M4 | **MiMo** audit + skills | owner | **M0** ✅ gsec-delta · **M1** ✅ post-g1-e2e · M2–M4 ⏳ |
+| G8 | Radar 2–4 цикла | owner | ⏳ |
+| G9 | S5–S6-b ручная | owner | ⏳ |
+| G10 | anon квиз→TG→% | owner | ⏳ |
+
+§ команды → [`CODER_PROMPT`](../architect/CODER_PROMPT.md) · runbook → [`PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md)
+
+**G4 сдача (Lead ✅ 2026-06-20):** `ux_journey.py` Next dual-path · desktop J1–J9,J5,J6,J8,J11 + mobile J10 · `data/preprod_ux_journey.json` **11/11** · `j5_draft_ok: true` · leads 13353+13221 · 0 critical
+
+**G3 сдача:** `scripts/preprod_playwright/ux_audit.py` — Next/WP dual-path (`next_ui`) · benign 404/Metrika console · артефакты `data/preprod_ux_audit.json` + `data/preprod_ux_audit_human.md`
+
+**draft_as_is-L2 сдача (2026-06-20):** `src/ai_analyze.py` (`_shared_reply_system` · `_build_shared_reply_user` · `_shared_draft_send_ready_reason` · tool aliases · fail on last send_ready) · `src/l3_human_style.py` · deploy `scripts/deploy-o200-l2-vps.py` · `ux_audit.py --base-url https://rawlead.ru` (без `--skip-llm`) → avg **4.0** · vendor-lock **0** · **24/24** · critical **0**
+
+**G2 сдача:** `scripts/preprod_playwright/smoke.py` — dual Next/WP селекторы · артефакт `data/preprod_playwright_report.json`
+
+**Sign-off M1:** все G0–G10 ✅ → Lead → посевы
+
+## O280 Feed UX ✅ (owner accept 2026-06-20)
 
 | | |
 |---|---|
-| **Prod** | https://rode51.ru — **P1** (Hero→Process) ✅ |
-| **Локально** | P2 WIP: WhyMe, FAQ, `/en`, polish — **не задеплоено** |
-| **Канон** | [`LEAD_PORTFOLIO_PROMPT.md`](../portfolio/LEAD_PORTFOLIO_PROMPT.md) |
+| **R1** | «открыть ссылку» · жёлтый **Отклик ✓** · draft при раскрытии · выделение текста |
+| **R2** | Квота **справа** над «Кабинет →»: `Осталось N откликов` · при лимите `· лимит обновится через M мин` |
+| **Deploy** | `deploy-web-rawlead-vps.py` · owner smoke ✅ |
 
-## O200 L2 judge ✅ (2026-06-18)
+Файлы: `LoginPanel.tsx` · `lenta/page.tsx` · `FeedCard.tsx` · `globals.css`
 
-| | |
-|---|---|
-| **Прогон** | `data/preprod_o200_judge.json` + `_human.md` · 79 лидов · judge Claude Sonnet 4 |
-| **Owner bar** | send ≥70% × 4 категории — **PASS** (80–90% по cat) |
-| **Auto vault** | draft 92.4% (порог 95%) · tools auto 60.8% — **не блокер** · backlog tools extraction |
+## O116 Support ✅ · M1-bot ✅ · PRE-ADS W1 ✅ (2026-06-20)
+
+FAB↔TG↔reply в боте · bot ▶️ Старт + UTM · API pool + webhook digest + draft feed gate.
 
 ---
 
-## O280-E2E-NEXT ✅ (2026-06-20)
-
-| | |
-|---|---|
-| **Harness** | `scripts/preprod_playwright/next_e2e.py` n1–n25 · `tests/test_o280_next_e2e.py` |
-| **Prod gate** | `data/preprod_next_e2e.json` + `preprod_next_e2e_human.md` |
-| **Gate run** | **24/24** (2026-06-20 04:14 UTC) |
-| **Draft fix** | API `POST /v1/me/draft/quota/reset` (preprod user) · harness reset before n5/n16/n17 · deploy `deploy-o280-draft-quota-reset-vps.py` |
-| **Как проверить** | `.venv\Scripts\python.exe scripts\preprod_playwright\next_e2e.py --base-url https://rawlead.ru --gate-all` · `pytest tests/test_o280_next_e2e.py -q` |
-
----
-
-## Billing + DB (Lead verify 2026-06-19)
-
-| | |
-|---|---|
-| **Prod DB** | `.env.site` → `127.0.0.1:5432/rawlead` · Neon только `NEON_DATABASE_URL` |
-| **ЮKassa keys** | в `.env.site` ✅ |
-| **Smoke price** | `PAY_PREMIUM_RUB=790` ✅ (owner smoke 5 ₽ завершён 2026-06-19) |
-| **Next** | O285 no trial checkout · O284 billing CTA ✅ |
-
-
----
-
-## Draft — proxy (2026-06-19)
-
-Owner поднял **38.154.16.60:8000** · probe: OR через proxy **200** ✅ · **→ retry** черновик на ленте/TG
-
----
-
-## Index
+## Index (детали в архиве / PROD_FACTS)
 
 | Блок | Где |
 |------|-----|
-| O280 R9–R9b | archive § 2026-06-19 |
-| R10 admin | `CODER_PROMPT` § O280-R10 |
+| O280-E2E gate | `data/preprod_next_e2e_human.md` |
+| O200 L2 judge | `data/preprod_o200_judge_human.md` |
+| Portfolio rode51 P2 | [`PROD_FACTS`](PROD_FACTS.md) |
+| Billing O283/O284 | archive · PROD_FACTS |
+| Repo audit A7–A12 | [`TASKS`](TASKS.md) § аудит |
