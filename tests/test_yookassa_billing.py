@@ -93,22 +93,12 @@ class TestYookassaAvailable(unittest.TestCase):
         self.assertFalse(yookassa_available(_cfg(yookassa_secret_key="")))
 
 
-class TestTrialGate(unittest.TestCase):
-    def test_trial_rejects_used(self) -> None:
-        cur = MagicMock()
-        with patch(
-            "yookassa_billing.fetch_subscription_row",
-            return_value=("free", False, None, None, object()),
-        ):
-            with self.assertRaises(CheckoutError) as ctx:
-                validate_checkout(cur, "00000000-0000-0000-0000-000000000099", "trial")
-        self.assertEqual(ctx.exception.code, "trial_already_used")
-
+class TestCheckoutGate(unittest.TestCase):
     def test_subscription_rejects_active_premium(self) -> None:
         cur = MagicMock()
         with patch(
             "yookassa_billing.fetch_subscription_row",
-            return_value=("agent", True, object(), None, None),
+            return_value=("agent", True, object(), None, None, None),
         ):
             with patch("yookassa_billing.has_active_premium", return_value=True):
                 with self.assertRaises(CheckoutError) as ctx:
@@ -120,9 +110,21 @@ class TestTrialGate(unittest.TestCase):
         until = datetime.now(timezone.utc) + timedelta(days=2)
         with patch(
             "yookassa_billing.fetch_subscription_row",
-            return_value=("trial", True, until, None, datetime.now(timezone.utc)),
+            return_value=("trial", True, until, None, datetime.now(timezone.utc), None),
         ):
             validate_checkout(cur, "00000000-0000-0000-0000-000000000099", "subscription")
+
+    def test_subscription_rejects_prepaid_during_trial(self) -> None:
+        cur = MagicMock()
+        until = datetime.now(timezone.utc) + timedelta(days=2)
+        prepaid = until + timedelta(days=30)
+        with patch(
+            "yookassa_billing.fetch_subscription_row",
+            return_value=("trial", True, until, None, datetime.now(timezone.utc), prepaid),
+        ):
+            with self.assertRaises(CheckoutError) as ctx:
+                validate_checkout(cur, "00000000-0000-0000-0000-000000000099", "subscription")
+        self.assertEqual(ctx.exception.code, "already_prepaid")
 
 
 class TestWebhookIdempotency(unittest.TestCase):

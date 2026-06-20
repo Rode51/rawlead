@@ -131,10 +131,12 @@ def subscription_extra_fields(
     }
 
 
-def fetch_subscription_row(cur: Any, user_id: str) -> tuple[str, bool, datetime | None, datetime | None, datetime | None]:
+def fetch_subscription_row(
+    cur: Any, user_id: str
+) -> tuple[str, bool, datetime | None, datetime | None, datetime | None, datetime | None]:
     cur.execute(
         """
-        SELECT plan, is_active, active_until, paused_until, trial_used_at
+        SELECT plan, is_active, active_until, paused_until, trial_used_at, paid_active_until
         FROM subscriptions
         WHERE user_id = %s::uuid
         """,
@@ -142,13 +144,14 @@ def fetch_subscription_row(cur: Any, user_id: str) -> tuple[str, bool, datetime 
     )
     row = cur.fetchone()
     if not row:
-        return "free", False, None, None, None
+        return "free", False, None, None, None, None
     return (
         row[0],
         bool(row[1]),
         as_utc(row[2]),
         as_utc(row[3]),
         as_utc(row[4]),
+        as_utc(row[5]) if len(row) > 5 else None,
     )
 
 
@@ -157,13 +160,27 @@ def expire_stale_trials(cur: Any, *, now: datetime | None = None) -> int:
     cur.execute(
         """
         UPDATE subscriptions
-        SET plan = 'free', is_active = FALSE, active_until = NULL
+        SET plan = 'agent',
+            is_active = TRUE,
+            active_until = paid_active_until,
+            paid_active_until = NULL
+        WHERE plan = 'trial' AND is_active = TRUE
+          AND active_until IS NOT NULL AND active_until <= %s
+          AND paid_active_until IS NOT NULL AND paid_active_until > %s
+        """,
+        (ref, ref),
+    )
+    promoted = int(cur.rowcount or 0)
+    cur.execute(
+        """
+        UPDATE subscriptions
+        SET plan = 'free', is_active = FALSE, active_until = NULL, paid_active_until = NULL
         WHERE plan = 'trial' AND is_active = TRUE
           AND active_until IS NOT NULL AND active_until <= %s
         """,
         (ref,),
     )
-    return int(cur.rowcount or 0)
+    return promoted + int(cur.rowcount or 0)
 
 
 class TrialStartError(Exception):
@@ -176,7 +193,7 @@ class TrialStartError(Exception):
 def start_trial(cur: Any, user_id: str, *, now: datetime | None = None) -> datetime:
     ref = now or utc_now()
     until = ref + timedelta(days=TRIAL_DAYS)
-    plan, is_active, active_until, paused_until, trial_used_at = fetch_subscription_row(
+    plan, is_active, active_until, paused_until, trial_used_at, _paid_until = fetch_subscription_row(
         cur, user_id
     )
     if trial_used_at is not None:

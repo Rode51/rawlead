@@ -83,7 +83,7 @@ class TestTrialHelpers(unittest.TestCase):
         now = datetime(2026, 6, 1, tzinfo=timezone.utc)
         with patch(
             "src.trial_subscription.fetch_subscription_row",
-            return_value=("free", False, None, None, now),
+            return_value=("free", False, None, None, now, None),
         ):
             with self.assertRaises(TrialStartError) as ctx:
                 start_trial(cur, "00000000-0000-0000-0000-000000000099", now=now)
@@ -91,41 +91,18 @@ class TestTrialHelpers(unittest.TestCase):
 
     def test_expire_stale_trials_updates(self) -> None:
         cur = MagicMock()
-        cur.rowcount = 2
+        cur.rowcount = 1
         n = expire_stale_trials(cur)
         self.assertEqual(n, 2)
-        cur.execute.assert_called_once()
+        self.assertEqual(cur.execute.call_count, 2)
 
 
 class TestTrialApi(unittest.TestCase):
-    def test_trial_start_returns_checkout(self) -> None:
-        user_id = "00000000-0000-0000-0000-000000000088"
-        token = issue_access_token(user_id, tg_user_id=88001)
-
-        with patch.object(api_server, "psycopg") as mock_pg:
-            conn = MagicMock()
-            cur = MagicMock()
-            mock_pg.connect.return_value.__enter__.return_value = conn
-            conn.cursor.return_value.__enter__.return_value = cur
-            with patch.object(api_server, "expire_stale_trials"):
-                with patch.object(
-                    api_server,
-                    "create_checkout",
-                    return_value={
-                        "payment_id": "pay-test",
-                        "confirmation_url": "https://yookassa.ru/checkout",
-                    },
-                ):
-                    with patch.object(api_server, "yookassa_available", return_value=True):
-                        client = TestClient(app)
-                        resp = client.post(
-                            "/v1/me/subscription/trial-start",
-                            headers={"Authorization": f"Bearer {token}"},
-                        )
-        self.assertEqual(resp.status_code, 200)
-        body = resp.json()
-        self.assertEqual(body["payment_id"], "pay-test")
-        self.assertIn("yookassa.ru", body["confirmation_url"])
+    def test_trial_start_gone(self) -> None:
+        client = TestClient(app)
+        resp = client.post("/v1/me/subscription/trial-start")
+        self.assertEqual(resp.status_code, 410)
+        self.assertIn("автоматически", resp.json()["detail"])
 
 
 class TestAutoTrialOnLogin(unittest.TestCase):
@@ -136,7 +113,7 @@ class TestAutoTrialOnLogin(unittest.TestCase):
             with patch.object(
                 api_server,
                 "fetch_subscription_row",
-                return_value=("free", False, None, None, None),
+                return_value=("free", False, None, None, None, None),
             ):
                 with patch.object(api_server, "has_active_premium", return_value=False):
                     with patch.object(api_server, "start_trial") as mock_start:
@@ -161,7 +138,7 @@ class TestAutoTrialOnLogin(unittest.TestCase):
             with patch.object(
                 api_server,
                 "fetch_subscription_row",
-                return_value=("free", False, None, None, now),
+                return_value=("free", False, None, None, now, None),
             ):
                 with patch.object(api_server, "start_trial") as mock_start:
                     api_server._try_auto_start_trial_on_login(cur, user_id, 78001)

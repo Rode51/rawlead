@@ -1,4 +1,4 @@
-"""O174b: YooKassa checkout, webhook, trial 1 ₽, subscription 790 ₽, auto-renewal."""
+"""O174b: YooKassa checkout, webhook, subscription 790 ₽, auto-renewal."""
 
 from __future__ import annotations
 
@@ -26,10 +26,11 @@ from trial_subscription import (
 
 logger = logging.getLogger(__name__)
 
-PaymentKind = Literal["trial", "subscription", "renewal"]
+CheckoutKind = Literal["subscription"]
+PaymentKind = Literal["subscription", "renewal"]
+LegacyPaymentKind = Literal["trial", "subscription", "renewal"]
 
 _YOOKASSA_API = "https://api.yookassa.ru/v3/payments"
-_TRIAL_RUB = 1
 
 
 class CheckoutError(Exception):
@@ -132,16 +133,12 @@ def _api_request(
     return data
 
 
-def _price_for_kind(cfg: Config, kind: PaymentKind) -> int:
-    if kind == "trial":
-        return _TRIAL_RUB
+def _price_for_kind(cfg: Config, kind: PaymentKind | LegacyPaymentKind) -> int:
     return max(1, int(cfg.pay_premium_rub))
 
 
-def _description_for_kind(kind: PaymentKind) -> str:
-    if kind == "trial":
-        return f"RawLead Premium — trial {_TRIAL_RUB} ₽ / {TRIAL_DAYS} дня"
-    return "RawLead Premium — подписка 790 ₽ / мес"
+def _description_for_kind(cfg: Config, kind: PaymentKind | LegacyPaymentKind) -> str:
+    return f"RawLead Premium — подписка {max(1, int(cfg.pay_premium_rub))} ₽ / мес"
 
 
 def _is_active_trial(
@@ -161,29 +158,31 @@ def _is_active_trial(
 def validate_checkout(
     cur: Any,
     user_id: str,
-    kind: PaymentKind,
+    kind: CheckoutKind,
     *,
     now: datetime | None = None,
 ) -> None:
     ref = now or datetime.now(timezone.utc)
-    plan, is_active, active_until, paused_until, trial_used_at = fetch_subscription_row(
+    plan, is_active, active_until, paused_until, _trial_used_at, paid_until = fetch_subscription_row(
         cur, user_id
     )
     on_trial = _is_active_trial(plan, is_active, active_until, now=ref)
-    if kind == "subscription" and on_trial:
+    if on_trial:
+        pu = paid_until if paid_until and paid_until.tzinfo else (
+            paid_until.replace(tzinfo=timezone.utc) if paid_until else None
+        )
+        if pu is not None and pu > ref:
+            raise CheckoutError("already_prepaid", "Premium уже оплачен — начнётся после trial")
         return
     if has_active_premium(plan, is_active, active_until, paused_until, now=ref):
         raise CheckoutError("already_premium", "Уже есть активный Premium")
-    if kind == "trial":
-        if trial_used_at is not None:
-            raise CheckoutError("trial_already_used", "Trial уже использован")
 
 
 def create_checkout(
     cfg: Config,
     cur: Any,
     user_id: str,
-    kind: PaymentKind,
+    kind: CheckoutKind = "subscription",
 ) -> dict[str, str]:
     if not yookassa_available(cfg):
         raise CheckoutError("not_configured", "Оплата временно недоступна")
@@ -196,10 +195,10 @@ def create_checkout(
             "type": "redirect",
             "return_url": _return_url(cfg),
         },
-        "description": _description_for_kind(kind),
+        "description": _description_for_kind(cfg, kind),
         "metadata": {"user_id": user_id, "kind": kind},
     }
-    if cfg.yookassa_save_payment_method and kind in ("trial", "subscription"):
+    if cfg.yookassa_save_payment_method and kind == "subscription":
         payload["save_payment_method"] = True
     payment = _api_request(
         cfg,
@@ -391,7 +390,28 @@ def _activate_subscription(
     days: int,
     payment_method_id: str | None,
 ) -> None:
-    until = datetime.now(timezone.utc) + timedelta(days=max(1, days))
+    ref = datetime.now(timezone.utc)
+    plan, is_active, active_until, _paused, _trial_used, _paid = fetch_subscription_row(
+        cur, user_id
+    )
+    if _is_active_trial(plan, is_active, active_until, now=ref):
+        trial_end = active_until if active_until and active_until.tzinfo else (
+            active_until.replace(tzinfo=timezone.utc) if active_until else ref
+        )
+        paid_until = trial_end + timedelta(days=max(1, days))
+        cur.execute(
+            """
+            UPDATE subscriptions
+            SET paid_active_until = %s,
+                yookassa_payment_method_id = COALESCE(%s, yookassa_payment_method_id),
+                auto_renew = TRUE
+            WHERE user_id = %s::uuid
+            """,
+            (paid_until, payment_method_id, user_id),
+        )
+        return
+
+    until = ref + timedelta(days=max(1, days))
     cur.execute(
         """
         UPDATE subscriptions
@@ -580,7 +600,7 @@ def _create_autopayment(
         "amount": {"value": _amount_str(amount_rub), "currency": "RUB"},
         "capture": True,
         "payment_method_id": payment_method_id,
-        "description": _description_for_kind("subscription"),
+        "description": _description_for_kind(cfg, "subscription"),
         "metadata": {"user_id": user_id, "kind": kind},
     }
     try:
