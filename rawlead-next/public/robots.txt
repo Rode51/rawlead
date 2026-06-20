@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /cabinet/
+Disallow: /api/
+Disallow: /ops/
+
+Sitemap: https://rawlead.ru/sitemap.xml

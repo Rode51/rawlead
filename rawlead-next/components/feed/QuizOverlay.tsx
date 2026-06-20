@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { quizApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import type { QuizCard } from '@/lib/types'
+import type { QuizCard, HistoryEntry } from '@/lib/types'
+import type { QuizGuestProfile } from '@/lib/quiz-guest'
+import { SOURCE_COLOR, SOURCE_LABEL } from '@/lib/utils'
+import { notifyQuizComplete, normalizeQuizProfile, writeQuizCompleted } from '@/lib/quiz-guest'
+import { metrikaGoal } from '@/lib/metrika'
+import QuizCategoryBars from './QuizCategoryBars'
 
 interface Props {
   onClose: () => void
@@ -12,34 +17,22 @@ interface Props {
 
 type QuizStep = 'intro' | 'quiz' | 'done' | 'error'
 
-interface HistoryItem {
-  card_id: string
-  action: 'like' | 'skip'
-  tags: string[]
-}
-
-const COMPLETED_KEY = 'rawlead_quiz_completed_v1'
-const SESSION_KEY = 'rawlead_quiz_session'
-
 export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
   const auth = useAuth()
   const [step, setStep] = useState<QuizStep>('intro')
   const [card, setCard] = useState<QuizCard | null>(null)
-  const [history, setHistory] = useState<HistoryItem[]>([])
+  const [history, setHistory] = useState<HistoryEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [importing, setImporting] = useState(false)
+  const [completedProfile, setCompletedProfile] = useState<QuizGuestProfile | null>(null)
 
-  const persistCompleted = useCallback((profile: { tags: Record<string, number>; niches: string[] }) => {
-    try {
-      localStorage.setItem(COMPLETED_KEY, JSON.stringify({ profile, saved_at: Date.now() }))
-      localStorage.removeItem(SESSION_KEY)
-    } catch { /* ignore */ }
-  }, [])
+  const isAnon = auth.status !== 'auth'
 
   async function startQuiz() {
     setLoading(true)
     setErrorMsg('')
+    metrikaGoal('quiz_start')
     try {
       const res = await quizApi.start()
       if (res.done || !res.card) {
@@ -57,12 +50,16 @@ export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
     }
   }
 
-  async function finishQuiz(profile: { tags: Record<string, number>; niches: string[] }) {
-    persistCompleted(profile)
+  const finishQuiz = useCallback(async (profileRaw: QuizGuestProfile) => {
+    const profile = normalizeQuizProfile(profileRaw) ?? profileRaw
+    writeQuizCompleted(profile)
+    setCompletedProfile(profile)
+    notifyQuizComplete()
+
     if (auth.status === 'auth') {
       setImporting(true)
       try {
-        await quizApi.importTags(profile.tags, profile.niches)
+        await quizApi.importTags(profile.tags, profile.niches, profile.cx_pref ?? 1.0)
         window.dispatchEvent(new CustomEvent('rawlead-tags-imported'))
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('rawlead_user_tags_rev', String(Date.now()))
@@ -75,14 +72,15 @@ export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
       }
     }
     setStep('done')
-  }
+  }, [auth])
 
   async function answer(action: 'like' | 'skip') {
     if (!card || loading) return
-    const newHistory: HistoryItem[] = [...history, {
+    const newHistory: HistoryEntry[] = [...history, {
       card_id: card.id,
-      action,
-      tags: action === 'like' ? card.tags : [],
+      liked: action === 'like',
+      tags: card.tags ?? [],
+      complexity: card.complexity,
     }]
     setHistory(newHistory)
     setLoading(true)
@@ -90,8 +88,13 @@ export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
       const res = await quizApi.next(newHistory)
       if (res.done && res.profile) {
         await finishQuiz(res.profile)
+      } else if (res.done) {
+        setStep('done')
       } else if (res.card) {
         setCard(res.card)
+      } else {
+        setStep('error')
+        setErrorMsg('Не удалось загрузить следующую карточку')
       }
     } catch {
       setErrorMsg('Ошибка — попробуй снова')
@@ -105,7 +108,13 @@ export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
     setCard(null)
     setHistory([])
     setErrorMsg('')
+    setCompletedProfile(null)
     void startQuiz()
+  }
+
+  function handleLoginCta() {
+    onClose()
+    onLoginNeeded()
   }
 
   return (
@@ -138,7 +147,7 @@ export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
           {step === 'intro' && (
             <div id="rl-quiz-intro" data-testid="quiz-intro" className="flex flex-col gap-6">
               <div>
-                <h2 className="font-black text-[22px] text-[#111010] leading-tight mb-2">
+                <h2 className="font-display font-black text-[22px] text-[#111010] leading-tight mb-2">
                   Ответь на карточки — лента найдёт твои заказы
                 </h2>
                 <p className="text-[14px] text-[#6B6B6B]">
@@ -158,23 +167,66 @@ export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
           )}
 
           {step === 'quiz' && card && (
-            <div id="rl-quiz-play" data-testid="quiz-play" className="flex flex-col gap-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-[#6B6B6B]">Суть задания</p>
-              <div id="rl-quiz-card" data-testid="quiz-card">
-                <h3 id="rl-quiz-card-title" className="font-black text-[18px] text-[#111010] leading-snug mb-2">{card.title}</h3>
-                {card.body && (
+            <div
+              id="rl-quiz-play"
+              data-testid="quiz-play"
+              className="rl-quiz-feed-card rl-quiz-card flex flex-col gap-3"
+            >
+              {card.source && (
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-flex items-center gap-[5px] text-[11px] font-bold uppercase tracking-wide px-2 py-[3px] leading-none"
+                    style={{
+                      color: SOURCE_COLOR[card.source] ?? '#6B6B6B',
+                      background: (SOURCE_COLOR[card.source] ?? '#6B6B6B') + '15',
+                      border: `1.5px solid ${(SOURCE_COLOR[card.source] ?? '#6B6B6B')}55`,
+                    }}
+                  >
+                    <span
+                      style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: SOURCE_COLOR[card.source] ?? '#6B6B6B' }}
+                    />
+                    {SOURCE_LABEL[card.source] ?? card.source}
+                  </span>
+                </div>
+              )}
+
+              <h3
+                id="rl-quiz-card-title"
+                className="font-display font-black text-[#111010] leading-snug"
+                style={{ fontSize: '1.0625rem', letterSpacing: '-0.025em' }}
+              >
+                {card.title}
+              </h3>
+
+              {card.budget_text && (
+                <p className="text-[15px] font-bold leading-none text-[#111010]">
+                  {card.budget_text}
+                </p>
+              )}
+
+              {card.body && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#525252] mb-1">
+                    Суть задания
+                  </p>
                   <p className="text-[14px] text-[#1A1918] leading-relaxed">{card.body}</p>
-                )}
-              </div>
+                </div>
+              )}
+
               {card.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {card.tags.map(tag => (
-                    <span key={tag} className="text-[11px] font-semibold px-2 py-0.5 bg-[#F5F5F0] text-[#525252]">
+                    <span
+                      key={tag}
+                      className="text-[10px] font-semibold px-2 py-0.5 leading-snug"
+                      style={{ background: '#EEEDEA', color: '#6B6B6B' }}
+                    >
                       #{tag}
                     </span>
                   ))}
                 </div>
               )}
+
               <div className="flex gap-3 pt-2">
                 <button
                   id="rl-quiz-nope"
@@ -203,34 +255,86 @@ export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
           )}
 
           {step === 'done' && (
-            <div id="rl-quiz-result" data-testid="quiz-result" className="flex flex-col gap-6 text-center">
-              <div className="text-[40px]">✦</div>
-              <div>
-                <h2 className="font-black text-[20px] text-[#111010] mb-2">
-                  {importing ? 'Сохраняем профиль…' : 'Лента настроена'}
-                </h2>
-                {!importing && (
-                  <p className="text-[14px] text-[#6B6B6B]">
-                    Теперь ты видишь % совместимости на каждом заказе
-                  </p>
-                )}
-              </div>
-              {!importing && (
-                <div className="flex flex-col gap-3">
+            <div id="rl-quiz-result" data-testid="quiz-result" className="flex flex-col gap-5">
+              {isAnon ? (
+                <>
+                  <div>
+                    <h2 className="font-display font-black text-[20px] text-[#111010] mb-2 leading-tight">
+                      {completedProfile?.niches?.length
+                        ? 'Готово. Вот что мы узнали:'
+                        : 'Пока не нашли конкретного профиля — посмотри весь поток'}
+                    </h2>
+                    {completedProfile && completedProfile.niches?.length > 0 && (
+                      <QuizCategoryBars profile={completedProfile} />
+                    )}
+                    <p className="text-[14px] text-[#525252] leading-relaxed mt-2">
+                      Лента уже настраивается. Войди — сохраним профиль и откроем персональную ленту.
+                    </p>
+                  </div>
+
                   <button
-                    data-testid="quiz-retake"
-                    id="rl-quiz-retake-completed"
-                    onClick={handleRetake}
-                    className="h-12 px-6 font-black text-[13px] uppercase tracking-wider text-[#111010] bg-white border-2 border-[#111010]"
+                    type="button"
+                    data-testid="quiz-login-cta"
+                    onClick={handleLoginCta}
+                    className="w-full flex items-center justify-center gap-2 h-12 px-4 font-bold text-[13px] text-[#111010] bg-[#FACC15] border-2 border-[#111010] hover:bg-[#FDE047] transition-colors"
+                    style={{ boxShadow: '3px 3px 0 #111010' }}
                   >
-                    Пройти ещё раз
+                    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                      <path fill="currentColor" d="M9.04 15.314l-.376 5.302c.538 0 .77-.231 1.049-.508l2.518-2.418 5.217 3.823c.957.527 1.637.251 1.898-.885l3.438-16.08.001-.001c.305-1.423-.514-1.98-1.447-1.634L1.12 9.775c-1.392.541-1.369 1.317-.236 1.667l4.913 1.533L18.9 5.48c.595-.394 1.136-.176.691.218"/>
+                    </svg>
+                    3 дня Premium бесплатно — автоматически при входе
                   </button>
-                  <button
-                    onClick={onClose}
-                    className="h-12 px-6 font-black text-[13px] uppercase tracking-wider text-white bg-[#111010] border-2 border-[#111010]"
-                  >
-                    Смотреть ленту →
-                  </button>
+
+                  <div className="flex flex-col gap-3 items-center">
+                    <button
+                      type="button"
+                      data-testid="quiz-retake"
+                      id="rl-quiz-retake-completed"
+                      onClick={handleRetake}
+                      className="text-[13px] font-semibold text-[#6B6B6B] hover:text-[#111010] underline hover:no-underline"
+                    >
+                      Пройти ещё раз
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="text-[13px] text-[#6B6B6B] hover:text-[#111010] underline hover:no-underline"
+                    >
+                      Смотреть без входа →
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-6 text-center">
+                  <div className="text-[40px]">✦</div>
+                  <div>
+                    <h2 className="font-display font-black text-[20px] text-[#111010] mb-2">
+                      {importing ? 'Сохраняем профиль…' : 'Лента настроена'}
+                    </h2>
+                    {!importing && (
+                      <p className="text-[14px] text-[#6B6B6B]">
+                        Теперь ты видишь % совместимости на каждом заказе
+                      </p>
+                    )}
+                  </div>
+                  {!importing && (
+                    <div className="flex flex-col gap-3">
+                      <button
+                        data-testid="quiz-retake"
+                        id="rl-quiz-retake-completed"
+                        onClick={handleRetake}
+                        className="h-12 px-6 font-black text-[13px] uppercase tracking-wider text-[#111010] bg-white border-2 border-[#111010]"
+                      >
+                        Пройти ещё раз
+                      </button>
+                      <button
+                        onClick={onClose}
+                        className="h-12 px-6 font-black text-[13px] uppercase tracking-wider text-white bg-[#111010] border-2 border-[#111010]"
+                      >
+                        Смотреть ленту →
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -1,15 +1,21 @@
 import type { Metadata } from 'next'
+import FaqJsonLd from '@/components/seo/FaqJsonLd'
+import { pageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = {
-  title: 'Частые вопросы — RawLead',
-  description: 'Ответы на частые вопросы о RawLead: как начать, как работает ИИ-подбор, что такое Premium и Trial.',
-  openGraph: {
+  ...pageMetadata({
     title: 'Частые вопросы — RawLead',
-    description: 'Ответы на частые вопросы о RawLead.',
-    url: 'https://rawlead.ru/faq/',
-  },
+    description:
+      'Ответы на частые вопросы о RawLead: как начать, как работает ИИ-подбор, что такое Premium и Trial.',
+    path: '/faq/',
+  }),
 }
 
 export default function FaqLayout({ children }: { children: React.ReactNode }) {
-  return children
+  return (
+    <>
+      <FaqJsonLd />
+      {children}
+    </>
+  )
 }

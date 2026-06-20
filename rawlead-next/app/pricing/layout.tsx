@@ -1,15 +1,21 @@
 import type { Metadata } from 'next'
+import PricingJsonLd from '@/components/seo/PricingJsonLd'
+import { pageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = {
-  title: 'Тарифы — RawLead',
-  description: 'RawLead Premium — 790 ₽/мес. Первые 3 дня бесплатно, автоматически при первом входе. Без автосписания.',
-  openGraph: {
+  ...pageMetadata({
     title: 'Тарифы — RawLead',
-    description: '790 ₽/мес · 3 дня Trial бесплатно · без автосписания.',
-    url: 'https://rawlead.ru/pricing/',
-  },
+    description:
+      'RawLead Premium — 790 ₽/мес. Первые 3 дня бесплатно, автоматически при первом входе. Без автосписания.',
+    path: '/pricing/',
+  }),
 }
 
 export default function PricingLayout({ children }: { children: React.ReactNode }) {
-  return children
+  return (
+    <>
+      <PricingJsonLd />
+      {children}
+    </>
+  )
 }

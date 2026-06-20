@@ -1,10 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
 import { useAuthModal } from '@/lib/auth-modal-context'
-import { meApi } from '@/lib/api'
+import { meApi, CheckoutApiError } from '@/lib/api'
+import { getSubscriptionPayState } from '@/lib/subscription-cta'
+import { metrikaGoal } from '@/lib/metrika'
+import SubscriptionPayCta from '@/components/subscription/SubscriptionPayCta'
 
 const BULLETS = [
   'Уникальный черновик отклика — ИИ пишет под тебя, ты отправляешь сам',
@@ -17,29 +20,42 @@ export default function PricingPage() {
   const auth = useAuth()
   const { openLogin } = useAuthModal()
   const [loading, setLoading] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
-  const isPaid = auth.subscription?.effective_access ?? false
-  const trialUsed = !!auth.subscription?.trial_used_at
+  const pay = getSubscriptionPayState(auth.subscription)
+
+  useEffect(() => {
+    if (auth.status !== 'auth') return
+    void (async () => {
+      try {
+        await meApi.confirmSubscription()
+      } catch {
+        // no pending payment
+      }
+      await auth.refreshSubscription()
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.status])
 
   async function handleCheckout() {
     if (loading) return
-    // Redirect to cabinet for login first if anon
     if (auth.status === 'anon') {
       openLogin()
       return
     }
+    setCheckoutError(null)
     setLoading(true)
+    metrikaGoal('pay_click')
     try {
-      const kind = !trialUsed ? 'trial' : 'subscription'
-      const { confirmation_url } = await meApi.checkout(kind)
-      if (confirmation_url) {
-        window.location.href = confirmation_url
-      } else {
-        await auth.refreshSubscription()
-        setLoading(false)
-      }
-    } catch {
+      const { confirmation_url } = await meApi.checkout()
+      window.location.href = confirmation_url
+    } catch (err) {
       setLoading(false)
+      setCheckoutError(
+        err instanceof CheckoutApiError
+          ? err.detail
+          : 'Не удалось открыть оплату. Попробуй ещё раз.',
+      )
     }
   }
 
@@ -84,7 +100,7 @@ export default function PricingPage() {
             >
               RawLead Premium
             </h3>
-            {isPaid && (
+            {pay.hasPremiumAccess && (
               <span
                 style={{ fontSize: '0.7rem', fontWeight: 700, padding: '4px 10px', background: '#FACC15', border: '1.5px solid #111010' }}
               >
@@ -122,31 +138,25 @@ export default function PricingPage() {
             ))}
           </ul>
 
-          {/* CTA buttons */}
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {!isPaid ? (
-              <button
+          {/* CTA */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div style={{ marginTop: 0 }}>
+              <SubscriptionPayCta
                 id="rl-price-checkout-sub"
-                data-testid="pricing-checkout"
-                onClick={handleCheckout}
-                disabled={loading}
-                className="font-bold text-[13px] uppercase tracking-widest"
-                style={{
-                  padding: '14px 28px',
-                  background: '#FACC15', border: '2px solid #111010',
-                  boxShadow: '4px 4px 0 #111010',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.7 : 1,
-                }}
-              >
-                {loading ? 'Переходим…' : 'Оформить Premium →'}
-              </button>
-            ) : (
+                testId="pricing-checkout"
+                subscription={auth.subscription}
+                loading={loading}
+                error={checkoutError}
+                onCheckout={handleCheckout}
+              />
+            </div>
+
+            {!pay.showPayButton && pay.showPremiumActive ? null : (
               <Link
                 href="/cabinet/"
                 className="rl-cta-white font-bold text-[13px] uppercase tracking-widest transition-colors duration-150"
                 style={{
-                  display: 'inline-block', padding: '14px 28px',
+                  display: 'inline-block', padding: '14px 28px', marginTop: 16,
                   background: '#FFF', border: '2px solid #111010',
                   boxShadow: '4px 4px 0 #111010',
                   textDecoration: 'none', color: '#111010',
@@ -162,7 +172,7 @@ export default function PricingPage() {
                 display: 'inline-flex', alignItems: 'center',
                 fontSize: '0.875rem', fontWeight: 600,
                 color: '#525252', textDecoration: 'underline',
-                padding: '14px 4px',
+                padding: '14px 4px', marginTop: 16,
               }}
             >
               Смотреть ленту →

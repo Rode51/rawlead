@@ -1,0 +1,56 @@
+{
+  "mode": "simulate",
+  "personas": [
+    {
+      "persona": "browse",
+      "label_ru": "Листание без отклика (15 раскрытий)",
+      "judges": [
+        {
+          "id": "B1",
+          "label": "max(tag.weight) ≤ 10.0",
+          "pass": true,
+          "value": 4.0
+        },
+        {
+          "id": "B2",
+          "label": "≥ 12/20 с keyword_match > 0",
+          "pass": true,
+          "value": 15
+        },
+        {
+          "id": "B3",
+          "label": "≥ 4 лида primary-ниши в top-10",
+          "pass": true,
+          "value": 10,
+          "primary": "dev"
+        },
+        {
+          "id": "B4",
+          "label": "browse: primary-тег ≥ после квиза",
+          "pass": true,
+          "baseline": 4.0,
+          "after": 4.0
+        },
+        {
+          "id": "B5",
+          "label": "browse: avg keyword_match top-5 primary ≥ baseline (0 допуска)",
+          "pass": true,
+          "baseline_avg": 95.0,
+          "after_avg": 95.0
+        }
+      ],
+      "note": "DB unavailable — synthetic feed only"
+    }
+  ],
+  "global_judges": [
+    {
+      "id": "B8",
+      "label": "O225: draft чужой ниши не ломает text-floor",
+      "pass": true,
+      "keyword_match": 20,
+      "floor": 20
+    }
+  ],
+  "generated_at": "2026-06-19T06:52:53.313397+00:00",
+  "api_url": null
+}

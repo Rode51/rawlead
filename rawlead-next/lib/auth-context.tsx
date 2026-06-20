@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { clearToken, getToken, meApi } from './api'
 import { completeAuthAfterToken } from './auth-session'
+import { mergeGuestSkillsAfterAuth } from './guest-skills'
 import { readUserMeta, saveUserMeta } from './user-meta'
 import type { SubscriptionStatus, UserProfile } from './types'
 
@@ -102,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const bootEpoch = sessionEpochRef.current
 
     completeAuthAfterToken()
-      .then(({ profile: prof, subscription: sub }) => {
+      .then(async ({ profile: prof, subscription: sub }) => {
         if (cancelled || sessionEpochRef.current !== bootEpoch) {
           if (process.env.NODE_ENV !== 'production' && sessionEpochRef.current !== bootEpoch) {
             console.info('[auth] bootstrap then skipped, epoch', bootEpoch, '→', sessionEpochRef.current)
@@ -112,6 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(prof)
         setSubscription(sub)
         setStatus('auth')
+        await mergeGuestSkillsAfterAuth()
         return meApi.tags()
       })
       .then(tagsData => {

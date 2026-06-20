@@ -1,0 +1,257 @@
+{
+  "generated_at": "2026-06-20T04:14:21.857512+00:00",
+  "base_url": "https://rawlead.ru",
+  "pass": true,
+  "desktop": {
+    "generated_at": "2026-06-20T04:14:17.196051+00:00",
+    "base_url": "https://rawlead.ru",
+    "viewport": "desktop",
+    "scenarios_total": 23,
+    "scenarios_pass": 23,
+    "pass": true,
+    "has_preprod_token": true,
+    "has_monica_token": true,
+    "results": [
+      {
+        "id": "n5",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 6011,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n16",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 44556,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n17",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 6589,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n1",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 5296,
+        "error": null,
+        "screenshot": null,
+        "steps": [
+          "home loaded",
+          "footer route /faq/ ok",
+          "footer route /how/ ok",
+          "footer route /contact/ ok",
+          "footer route / ok"
+        ]
+      },
+      {
+        "id": "n2",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 8355,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n3",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 3142,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n6",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 5534,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n7",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 14478,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n25",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 9341,
+        "error": null,
+        "screenshot": null,
+        "steps": [
+          "anon funnel: result → promo → login modal ok"
+        ]
+      },
+      {
+        "id": "n8",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 2931,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n9",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 2290,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n10",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 1966,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n11",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 5242,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n12",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 1423,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n13",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 1471,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n14",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 2935,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n15",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 3970,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n18",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 4127,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n19",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 5429,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n21",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 12276,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n22",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 10068,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n23",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 4191,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      },
+      {
+        "id": "n24",
+        "viewport": "desktop",
+        "pass": true,
+        "ms": 1926,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      }
+    ],
+    "artifacts_dir": "data\\preprod_next_e2e"
+  },
+  "mobile": {
+    "generated_at": "2026-06-20T04:14:21.857512+00:00",
+    "base_url": "https://rawlead.ru",
+    "viewport": "mobile",
+    "scenarios_total": 1,
+    "scenarios_pass": 1,
+    "pass": true,
+    "has_preprod_token": true,
+    "has_monica_token": true,
+    "results": [
+      {
+        "id": "n20",
+        "viewport": "mobile",
+        "pass": true,
+        "ms": 4284,
+        "error": null,
+        "screenshot": null,
+        "steps": []
+      }
+    ],
+    "artifacts_dir": "data\\preprod_next_e2e"
+  },
+  "scenarios_total": 24,
+  "scenarios_pass": 24
+}

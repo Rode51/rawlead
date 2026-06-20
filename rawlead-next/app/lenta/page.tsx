@@ -22,6 +22,24 @@ import FilterBar from '@/components/feed/FilterBar'
 import AnonStrip from '@/components/feed/AnonStrip'
 import FeedCard from '@/components/feed/FeedCard'
 import QuizOverlay from '@/components/feed/QuizOverlay'
+import QuizPromoCard from '@/components/feed/QuizPromoCard'
+import { hasAnonQuizCompleted } from '@/lib/quiz-guest'
+
+function openQuiz(setShowQuiz: (v: boolean) => void) {
+  setShowQuiz(true)
+  if (typeof window !== 'undefined') {
+    const base = window.location.pathname + window.location.search
+    window.history.replaceState(null, '', `${base}#quiz`)
+  }
+}
+
+function closeQuiz(setShowQuiz: (v: boolean) => void) {
+  setShowQuiz(false)
+  if (typeof window !== 'undefined' && window.location.hash === '#quiz') {
+    const base = window.location.pathname + window.location.search
+    window.history.replaceState(null, '', base)
+  }
+}
 
 const LIMIT = 20
 const FETCH_TIMEOUT_MS = 5000
@@ -60,6 +78,7 @@ export default function LentaPage() {
   const [sort, setSort] = useState<'time' | 'match'>('time')
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [showQuiz, setShowQuiz] = useState(false)
+  const [anonQuizDone, setAnonQuizDone] = useState(false)
   const loadFeed = useCallback(async (reset: boolean, currentOffset: number) => {
     const isReset = reset
     if (isReset) {
@@ -129,9 +148,26 @@ export default function LentaPage() {
   }, [auth.status, category, source, sort, loadFeed])
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash === '#quiz') {
-      setShowQuiz(true)
+    setAnonQuizDone(hasAnonQuizCompleted())
+    function onQuizComplete() {
+      setAnonQuizDone(true)
     }
+    window.addEventListener('rawlead-quiz-complete', onQuizComplete)
+    return () => window.removeEventListener('rawlead-quiz-complete', onQuizComplete)
+  }, [])
+
+  useEffect(() => {
+    function syncQuizFromHash() {
+      if (typeof window !== 'undefined' && window.location.hash === '#quiz') {
+        setShowQuiz(true)
+      }
+    }
+    syncQuizFromHash()
+    window.addEventListener('hashchange', syncQuizFromHash)
+    return () => window.removeEventListener('hashchange', syncQuizFromHash)
+  }, [])
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const focusRaw = params.get('lead') || params.get('id') || ''
     const focusId = parseInt(focusRaw, 10)
@@ -174,7 +210,7 @@ export default function LentaPage() {
       />
 
       {auth.feedTier === 'anon' && !loading && (
-        <AnonStrip onLoginClick={openLogin} />
+        <AnonStrip onLoginClick={openLogin} quizCompleted={anonQuizDone} />
       )}
 
       <main
@@ -222,6 +258,13 @@ export default function LentaPage() {
             </div>
           ) : (
             <div id="rl-feed-list" data-testid="feed-list" className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+              {auth.feedTier === 'anon' && (
+                <QuizPromoCard
+                  quizCompleted={anonQuizDone}
+                  onQuizClick={() => openQuiz(setShowQuiz)}
+                  onLoginClick={openLogin}
+                />
+              )}
               {items.map((item, idx) => (
                 <FeedCard
                   key={item.id}
@@ -230,8 +273,9 @@ export default function LentaPage() {
                   hasUserSkills={auth.hasUserSkills}
                   isExpanded={expandedId === item.id}
                   onToggle={() => handleToggle(item.id)}
-                  onQuizClick={() => setShowQuiz(true)}
+                  onQuizClick={() => openQuiz(setShowQuiz)}
                   onLoginClick={openLogin}
+                  anonQuizDone={anonQuizDone}
                   index={idx}
                 />
               ))}
@@ -268,8 +312,8 @@ export default function LentaPage() {
 
       {showQuiz && (
         <QuizOverlay
-          onClose={() => setShowQuiz(false)}
-          onLoginNeeded={() => { setShowQuiz(false); openLogin() }}
+          onClose={() => closeQuiz(setShowQuiz)}
+          onLoginNeeded={() => { closeQuiz(setShowQuiz); openLogin() }}
         />
       )}
     </>

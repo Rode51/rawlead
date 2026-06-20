@@ -9,6 +9,7 @@ interface Props {
   hasUserSkills: boolean
   onQuizClick: () => void
   onLoginClick: () => void
+  anonQuizDone?: boolean
 }
 
 const LOCK_SVG = (
@@ -39,7 +40,7 @@ function Bar({ pct, color }: { pct: number; color: string }) {
   )
 }
 
-export default function MatchBar({ item, feedTier, hasUserSkills, onQuizClick, onLoginClick }: Props) {
+export default function MatchBar({ item, feedTier, hasUserSkills, onQuizClick, onLoginClick, anonQuizDone = false }: Props) {
   const km = item.keyword_match
   const hasLeadTags = !!(item.lead_tags?.length)
 
@@ -49,16 +50,15 @@ export default function MatchBar({ item, feedTier, hasUserSkills, onQuizClick, o
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#9B9B97]" title="Процент совпадения заказа с вашим профилем">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[#9B9B97]" title="Пройдите квиз — увидите % совпадения">
             Совместимость
           </span>
           <button
-            onClick={onLoginClick}
-            className="flex items-center gap-1 text-[11px] font-bold text-[#6B6B6B] hover:text-[#111010] transition-colors"
-            title="Войдите через Telegram — увидите % совпадения"
+            onClick={anonQuizDone ? onLoginClick : onQuizClick}
+            className="text-[11px] font-bold text-[#111010] hover:underline transition-colors text-right"
+            title={anonQuizDone ? 'Войдите — откроем персональную ленту с % совпадения' : 'Ответьте на карточки — ИИ подберёт заказы под ваш стек'}
           >
-            {LOCK_SVG}
-            <span>Войди и увидишь</span>
+            {anonQuizDone ? 'Войти — персональная лента →' : 'Настроить ленту →'}
           </button>
         </div>
         <Bar pct={0} color="#D4D4D0" />

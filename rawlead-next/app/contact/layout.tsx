@@ -1,13 +1,12 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = {
-  title: 'Контакт — RawLead',
-  description: 'Написать напрямую — @rcnn43 в Telegram.',
-  openGraph: {
+  ...pageMetadata({
     title: 'Контакт — RawLead',
     description: 'Написать напрямую — @rcnn43 в Telegram.',
-    url: 'https://rawlead.ru/contact/',
-  },
+    path: '/contact/',
+  }),
 }
 
 export default function ContactLayout({ children }: { children: React.ReactNode }) {

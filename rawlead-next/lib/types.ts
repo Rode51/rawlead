@@ -97,7 +97,10 @@ export interface SubscriptionStatus {
   status: string
   effective_access: boolean
   yookassa_available: boolean
-  trial_used_at: string | null
+  trial_used?: boolean
+  trial_used_at?: string | null
+  has_prepaid?: boolean
+  prepaid_active_until?: string | null
 }
 
 export interface SiteStats {
@@ -111,6 +114,17 @@ export interface QuizCard {
   title: string
   body: string
   tags: string[]
+  source?: string
+  category?: string
+  budget_text?: string
+  complexity?: number
+}
+
+export interface HistoryEntry {
+  card_id: string
+  liked: boolean
+  tags: string[]
+  complexity?: number
 }
 
 export interface QuizNextResponse {

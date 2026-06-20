@@ -18,6 +18,9 @@ import {
   removePendingDraft,
   notifyInboxRefresh,
 } from '@/lib/pending-drafts'
+import SubscriptionPayCta from '@/components/subscription/SubscriptionPayCta'
+import { CheckoutApiError } from '@/lib/api'
+import { metrikaGoal } from '@/lib/metrika'
 
 // ─── Dev mocks (localhost only) ────────────────────────────────────────────────
 
@@ -142,6 +145,7 @@ function CabinetInner() {
 
   // Checkout
   const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   // Derived
   const isDevMode = devParam === 'paid'
@@ -149,6 +153,20 @@ function CabinetInner() {
   const subscription: SubscriptionStatus | null = isDevMode ? DEV_SUB_PAID : auth.subscription
   const isPaid = subscription?.effective_access ?? false
   const isAuth = isDevMode || auth.status === 'auth'
+
+  // Confirm subscription after YooKassa return (WP parity)
+  useEffect(() => {
+    if (!isAuth || isDevMode) return
+    void (async () => {
+      try {
+        await meApi.confirmSubscription()
+      } catch {
+        // no pending payment — ignore
+      }
+      await auth.refreshSubscription()
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuth, isDevMode])
 
   // Load notification settings on mount (paid auth, not dev)
   useEffect(() => {
@@ -268,18 +286,19 @@ function CabinetInner() {
 
   async function handleCheckout() {
     if (!subscription || checkoutLoading) return
+    setCheckoutError(null)
     setCheckoutLoading(true)
+    metrikaGoal('pay_click')
     try {
-      const kind = !subscription.trial_used_at ? 'trial' : 'subscription'
-      const { confirmation_url } = await meApi.checkout(kind)
-      if (confirmation_url) {
-        window.location.href = confirmation_url
-      } else {
-        await auth.refreshSubscription()
-        setCheckoutLoading(false)
-      }
-    } catch {
+      const { confirmation_url } = await meApi.checkout()
+      window.location.href = confirmation_url
+    } catch (err) {
       setCheckoutLoading(false)
+      setCheckoutError(
+        err instanceof CheckoutApiError
+          ? err.detail
+          : 'Не удалось открыть оплату. Попробуй ещё раз.',
+      )
     }
   }
 
@@ -344,9 +363,6 @@ function CabinetInner() {
     : 'Нет доступа'
   const subBadgeBg = subscription?.effective_access ? '#FACC15' : '#F5F5F0'
   const subBadgeColor = subscription?.effective_access ? '#111010' : '#525252'
-
-  const showCheckout = !subscription?.effective_access
-  const checkoutLabel = 'Подключить Premium →'
 
   const THRESHOLDS: Array<{ val: 60 | 80 | 100; label: string }> = [
     { val: 60, label: 'Все подходящие (60%+)' },
@@ -415,7 +431,11 @@ function CabinetInner() {
               {subBadgeText}
             </span>
           </div>
-          {subscription?.effective_access && subscription.active_until ? (
+          {subscription?.has_prepaid && subscription.prepaid_active_until ? (
+            <p style={{ fontSize: '0.875rem', color: '#525252' }}>
+              Premium оплачен · начнётся {formatUntil(subscription.prepaid_active_until)}
+            </p>
+          ) : subscription?.effective_access && subscription.active_until ? (
             <p style={{ fontSize: '0.875rem', color: '#525252' }}>
               Premium активен до {formatUntil(subscription.active_until)}
             </p>
@@ -424,22 +444,12 @@ function CabinetInner() {
               790 ₽/мес · первые 3 дня бесплатно
             </p>
           )}
-          {showCheckout && (
-            <button
-              onClick={handleCheckout}
-              disabled={checkoutLoading}
-              className="font-bold text-[13px] uppercase tracking-widest"
-              style={{
-                marginTop: 16, padding: '12px 24px',
-                background: '#FACC15', border: '2px solid #111010',
-                boxShadow: '3px 3px 0 #111010',
-                cursor: checkoutLoading ? 'not-allowed' : 'pointer',
-                opacity: checkoutLoading ? 0.7 : 1,
-              }}
-            >
-              {checkoutLoading ? 'Переходим…' : checkoutLabel}
-            </button>
-          )}
+          <SubscriptionPayCta
+            subscription={subscription}
+            loading={checkoutLoading}
+            error={checkoutError}
+            onCheckout={handleCheckout}
+          />
         </div>
 
         {/* 3. Notifications (paid only) */}

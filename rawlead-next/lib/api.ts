@@ -10,8 +10,10 @@ import type {
   SubscriptionStatus,
   SiteStats,
   QuizNextResponse,
+  HistoryEntry,
   NotificationSettings,
 } from './types'
+import { normalizeQuizResponse } from './quiz-normalize'
 
 const BASE = 'https://api.rawlead.ru/v1'
 const MIN_ACCESS_TOKEN_LEN = 20
@@ -94,6 +96,38 @@ export class DraftApiError extends Error {
     if (extra?.retryAfterSec != null) this.retryAfterSec = extra.retryAfterSec
     if (extra?.draft_retry_after_sec != null) this.draft_retry_after_sec = extra.draft_retry_after_sec
   }
+}
+
+export class CheckoutApiError extends Error {
+  status: number
+  detail: string
+
+  constructor(status: number, detail: string) {
+    super(detail)
+    this.name = 'CheckoutApiError'
+    this.status = status
+    this.detail = detail
+  }
+}
+
+export class QuizApiError extends Error {
+  status: number
+  detail: string
+
+  constructor(status: number, detail: string) {
+    super(detail)
+    this.name = 'QuizApiError'
+    this.status = status
+    this.detail = detail
+  }
+}
+
+function parseApiDetail(data: unknown): string {
+  if (!data || typeof data !== 'object') return ''
+  const row = data as Record<string, unknown>
+  if (typeof row.detail === 'string') return row.detail
+  if (typeof row.message === 'string') return row.message
+  return ''
 }
 
 function parseDraftApiError(res: Response, data: Record<string, unknown>): DraftApiError {
@@ -264,11 +298,27 @@ export const meApi = {
     apiFetch<DraftResponse>(`/me/leads/${leadId}/draft`),
   createDraft: (leadId: number, opts?: { onPoll?: (data: DraftResponse) => void }) =>
     createDraftAndPoll(leadId, opts),
-  checkout: (kind: 'trial' | 'subscription') =>
-    apiFetch<{ confirmation_url: string }>('/me/subscription/checkout', {
-      method: 'POST',
-      body: JSON.stringify({ kind }),
-    }),
+  checkout: async () => {
+    const { res, data } = await rawFetch<{ confirmation_url?: string }>(
+      '/me/subscription/checkout',
+      { method: 'POST', body: JSON.stringify({ kind: 'subscription' }) },
+    )
+    if (!res.ok) {
+      throw new CheckoutApiError(
+        res.status,
+        parseApiDetail(data) || 'Не удалось открыть оплату',
+      )
+    }
+    if (!data.confirmation_url) {
+      throw new CheckoutApiError(res.status, 'Не удалось получить ссылку на оплату')
+    }
+    return { confirmation_url: data.confirmation_url }
+  },
+  confirmSubscription: () =>
+    apiFetch<{ status: string; subscription?: SubscriptionStatus }>(
+      '/me/subscription/confirm',
+      { method: 'POST', body: '{}' },
+    ),
 }
 
 export const notifApi = {
@@ -281,12 +331,19 @@ export const notifApi = {
 }
 
 export const quizApi = {
-  start: () => apiFetch<QuizNextResponse>('/quiz/start'),
-  next: (history: Array<{ card_id: string; action: 'like' | 'skip'; tags: string[] }>) =>
-    apiFetch<QuizNextResponse>('/quiz/next', {
+  start: async () => {
+    const { res, data } = await rawFetch<QuizNextResponse>('/quiz/start')
+    if (!res.ok) throw new QuizApiError(res.status, parseApiDetail(data) || 'Не удалось загрузить квиз')
+    return normalizeQuizResponse(data)
+  },
+  next: async (history: HistoryEntry[]) => {
+    const { res, data } = await rawFetch<QuizNextResponse>('/quiz/next', {
       method: 'POST',
       body: JSON.stringify({ history }),
-    }),
+    })
+    if (!res.ok) throw new QuizApiError(res.status, parseApiDetail(data) || 'Ошибка квиза')
+    return normalizeQuizResponse(data)
+  },
   importTags: (tags: Record<string, number>, niches: string[], cx_pref = 1.0) =>
     apiFetch<{ ok: boolean; imported: number }>('/me/tags/import', {
       method: 'POST',

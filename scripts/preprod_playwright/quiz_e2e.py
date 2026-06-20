@@ -350,11 +350,26 @@ def main() -> int:
     parser.add_argument("--viewport", choices=("desktop", "mobile"), default="desktop")
     parser.add_argument("--ids", help="Comma-separated j1..j7")
     parser.add_argument(
+        "--engine",
+        choices=("wp", "next"),
+        default="wp",
+        help="wp = WordPress theme selectors; next = rawlead-next",
+    )
+    parser.add_argument(
         "--output-json",
         type=Path,
         default=_ARTIFACT_JSON,
     )
     args = parser.parse_args()
+
+    if args.engine == "next":
+        import next_ui as engine_ui  # noqa: E402
+
+        global feed_ui, quiz_ui
+        feed_ui = engine_ui
+        quiz_ui = engine_ui
+        if args.base_url == "https://rawlead.ru":
+            args.base_url = "http://localhost:3001"
 
     try:
         ids = _resolve_ids(args.viewport, args.ids)

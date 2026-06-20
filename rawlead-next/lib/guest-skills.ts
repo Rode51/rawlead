@@ -1,7 +1,7 @@
 import { meApi, quizApi } from './api'
+import { readQuizCompleted } from './quiz-guest'
 
 const GUEST_SKILLS_KEYS = ['rawlead_lenta_skills', 'rawlead_guest_skills'] as const
-const QUIZ_COMPLETED_KEY = 'rawlead_quiz_completed_v1'
 
 function readGuestSkillTags(): string[] {
   const tags: string[] = []
@@ -26,17 +26,11 @@ function readGuestSkillTags(): string[] {
 }
 
 function readQuizCompletedProfile(): { tags: Record<string, number>; niches: string[] } | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = localStorage.getItem(QUIZ_COMPLETED_KEY)
-    if (!raw) return null
-    const data = JSON.parse(raw) as { profile?: { tags?: Record<string, number>; niches?: string[] } }
-    const profile = data?.profile
-    if (!profile?.tags || typeof profile.tags !== 'object') return null
-    if (!Object.keys(profile.tags).length) return null
-    return { tags: profile.tags, niches: Array.isArray(profile.niches) ? profile.niches : [] }
-  } catch {
-    return null
+  const snap = readQuizCompleted()
+  if (!snap?.profile) return null
+  return {
+    tags: snap.profile.tags,
+    niches: Array.isArray(snap.profile.niches) ? snap.profile.niches : [],
   }
 }
 

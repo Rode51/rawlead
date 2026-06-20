@@ -5,12 +5,14 @@ import { AuthModalProvider } from '@/lib/auth-modal-context'
 import SmoothScroll from '@/components/ui/SmoothScroll'
 import SupportButton from '@/components/ui/SupportButton'
 import DraftToast from '@/components/ui/DraftToast'
+import MetrikaGoals from '@/components/analytics/MetrikaGoals'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <AuthModalProvider>
         <SmoothScroll>{children}</SmoothScroll>
+        <MetrikaGoals />
         <SupportButton />
         <DraftToast />
       </AuthModalProvider>

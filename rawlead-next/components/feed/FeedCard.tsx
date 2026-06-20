@@ -21,6 +21,7 @@ interface Props {
   onToggle: () => void
   onQuizClick: () => void
   onLoginClick: () => void
+  anonQuizDone?: boolean
   index?: number
 }
 
@@ -38,6 +39,7 @@ export default function FeedCard({
   onToggle,
   onQuizClick,
   onLoginClick,
+  anonQuizDone = false,
   index = 0,
 }: Props) {
   const cardRef = useRef<HTMLElement>(null)
@@ -97,7 +99,11 @@ export default function FeedCard({
   function handleReplyClick(e: React.MouseEvent) {
     e.stopPropagation()
     if (feedTier === 'anon') {
-      onLoginClick()
+      if (anonQuizDone) {
+        onLoginClick()
+      } else {
+        onQuizClick()
+      }
       return
     }
     if (feedTier === 'expired_trial') {
@@ -172,7 +178,7 @@ export default function FeedCard({
   const isExpiredTrial = feedTier === 'expired_trial'
   const isPremium = feedTier === 'premium'
   const ctaLabel = isAnon
-    ? 'Настроить ленту →'
+    ? (anonQuizDone ? 'Войти — персональная лента →' : 'Настроить ленту →')
     : isExpiredTrial
     ? 'Premium — черновики и персонализация →'
     : feedTier === 'free' && freePremiumStep
@@ -277,6 +283,7 @@ export default function FeedCard({
             hasUserSkills={hasUserSkills}
             onQuizClick={onQuizClick}
             onLoginClick={onLoginClick}
+            anonQuizDone={anonQuizDone}
           />
         </div>
 
