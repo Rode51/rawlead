@@ -3,16 +3,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParallax } from '../hooks/useParallax'
 
-const BODY = 'Больше делаю, меньше обещаю'
-const FULL = BODY + '.'
+const DEFAULT = 'Больше делаю, меньше обещаю.'
 
-export default function Tagline() {
+interface Props { text?: string }
+
+export default function Tagline({ text = DEFAULT }: Props) {
   const sectionRef = useRef<HTMLElement>(null)
   const timer      = useRef<ReturnType<typeof setTimeout>>()
   const [active, setActive] = useState(false)
   const [count,  setCount]  = useState(0)
 
   const { ref: pRef, offset } = useParallax(0.12)
+
+  const full = text.endsWith('.') ? text : text + '.'
 
   useEffect(() => {
     const el = sectionRef.current
@@ -33,14 +36,14 @@ export default function Tagline() {
     const tick = () => {
       i++
       setCount(i)
-      if (i < FULL.length) timer.current = setTimeout(tick, 38)
+      if (i < full.length) timer.current = setTimeout(tick, 38)
     }
     timer.current = setTimeout(tick, 120)
     return () => clearTimeout(timer.current)
   }, [active])
 
-  const displayed = FULL.slice(0, count)
-  const done      = count >= FULL.length
+  const displayed = full.slice(0, count)
+  const done      = count >= full.length
   const showDot   = displayed.endsWith('.')
   const bodyPart  = showDot ? displayed.slice(0, -1) : displayed
 

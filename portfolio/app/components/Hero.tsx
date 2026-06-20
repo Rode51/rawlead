@@ -5,20 +5,43 @@ import ScrambleTitle from './ScrambleTitle'
 import Ticker from './Ticker'
 import Typewriter from './Typewriter'
 
-const ROLE  = 'РАЗРАБОТКА · АВТОМАТИЗАЦИЯ · ИНТЕГРАЦИИ'
-const LINE1 = 'Строю боты, парсеры и веб-сервисы.'
-const LINE2 = 'Пишу, деплою, поддерживаю — без посредников.'
+interface HeroContent {
+  role: string
+  line1: string
+  line2: string
+  cta: string
+  available: string
+}
+
+interface Props {
+  content?: HeroContent
+  ticker?: string
+  locale?: 'ru' | 'en'
+}
+
+const DEFAULT: HeroContent = {
+  role:      'FULL-STACK РАЗРАБОТЧИК · БОТЫ · ПАРСЕРЫ · АВТОМАТИЗАЦИЯ · САЙТЫ',
+  line1:     'Строю боты, парсеры, сайты и автоматизацию.',
+  line2:     'Пишу, деплою, поддерживаю — без посредников.',
+  cta:       '→ Написать в Telegram',
+  available: 'ДОСТУПЕН ДЛЯ ПРОЕКТОВ',
+}
 
 const SPEED       = 18
-const LINE2_DELAY = LINE1.length * SPEED + 250
-const CTA_DELAY   = LINE2_DELAY + LINE2.length * SPEED + 400
+const getLine2Delay = (line1: string) => line1.length * SPEED + 250
+const getCtaDelay   = (line1: string, line2: string) =>
+  getLine2Delay(line1) + line2.length * SPEED + 400
 
-export default function Hero() {
+export default function Hero({ content, ticker, locale = 'ru' }: Props) {
+  const c = content ?? DEFAULT
+
+  const LINE2_DELAY = getLine2Delay(c.line1)
+  const CTA_DELAY   = getCtaDelay(c.line1, c.line2)
+
   const [scrollY, setScrollY] = useState(0)
   const [ready,   setReady]   = useState(false)
   const [ctaShow, setCtaShow] = useState(false)
 
-  // Called by ScrambleTitle exactly when last letter locks in
   const handleScrambleDone = () => {
     setReady(true)
     setTimeout(() => setCtaShow(true), CTA_DELAY)
@@ -33,24 +56,46 @@ export default function Hero() {
   return (
     <section id="hero" className="relative flex flex-col min-h-svh bg-void overflow-hidden">
 
-      {/* Availability badge — top right */}
+      {/* Top-right: availability + lang toggle */}
       <div
-        className="absolute top-8 right-10 lg:right-20 flex items-center gap-2"
+        className="absolute top-8 right-10 lg:right-20 flex items-center gap-5"
         style={{ opacity: ready ? 1 : 0, transition: 'opacity 0.6s ease' }}
       >
-        <span className="relative flex h-2 w-2">
-          <span
-            className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60"
-            style={{ background: '#4ade80' }}
-          />
-          <span
-            className="relative inline-flex rounded-full h-2 w-2"
-            style={{ background: '#22c55e' }}
-          />
-        </span>
-        <span className="font-mono text-muted" style={{ fontSize: '10px', letterSpacing: '0.16em' }}>
-          ДОСТУПЕН ДЛЯ ПРОЕКТОВ
-        </span>
+        {/* Lang toggle */}
+        <div className="flex items-center gap-2 font-mono" style={{ fontSize: '10px', letterSpacing: '0.14em' }}>
+          <a
+            href="/"
+            className="transition-colors duration-200"
+            style={{ color: locale === 'ru' ? '#e8e8e8' : '#555555' }}
+          >
+            RU
+          </a>
+          <span className="text-muted opacity-40">/</span>
+          <a
+            href="/en"
+            className="transition-colors duration-200"
+            style={{ color: locale === 'en' ? '#e8e8e8' : '#555555' }}
+          >
+            EN
+          </a>
+        </div>
+
+        {/* Availability badge */}
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span
+              className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60"
+              style={{ background: '#4ade80' }}
+            />
+            <span
+              className="relative inline-flex rounded-full h-2 w-2"
+              style={{ background: '#22c55e' }}
+            />
+          </span>
+          <span className="font-mono text-muted" style={{ fontSize: '10px', letterSpacing: '0.16em' }}>
+            {c.available}
+          </span>
+        </div>
       </div>
 
       {/* Main content */}
@@ -63,15 +108,15 @@ export default function Hero() {
       >
         <ScrambleTitle onDone={handleScrambleDone} />
 
-        {/* Role — typewriter after scramble */}
+        {/* Role */}
         <p
           className="font-mono text-muted"
           style={{ fontSize: 'clamp(10px, 1vw, 14px)', letterSpacing: '0.22em', minHeight: '1em' }}
         >
-          <Typewriter text={ROLE} active={ready} speed={22} delay={0} />
+          <Typewriter text={c.role} active={ready} speed={22} delay={0} />
         </p>
 
-        {/* Value prop — two lines, staggered */}
+        {/* Value prop */}
         <p
           className="font-mono text-snow"
           style={{
@@ -82,16 +127,16 @@ export default function Hero() {
             minHeight: '2.5em',
           }}
         >
-          <Typewriter text={LINE1} active={ready} speed={SPEED} delay={0} />
+          <Typewriter text={c.line1} active={ready} speed={SPEED} delay={0} />
           {ready && (
             <>
               <br />
-              <Typewriter text={LINE2} active={ready} speed={SPEED} delay={LINE2_DELAY} />
+              <Typewriter text={c.line2} active={ready} speed={SPEED} delay={LINE2_DELAY} />
             </>
           )}
         </p>
 
-        {/* CTA — appears after text is done */}
+        {/* CTA */}
         <a
           href="https://t.me/rcnn43"
           target="_blank"
@@ -105,13 +150,13 @@ export default function Hero() {
             transition: 'opacity 0.6s ease, transform 0.6s ease',
           }}
         >
-          → Написать в Telegram
+          {c.cta}
         </a>
       </div>
 
-      {/* Ticker — bottom */}
+      {/* Ticker */}
       <div className="mt-auto">
-        <Ticker />
+        <Ticker text={ticker} />
       </div>
 
     </section>

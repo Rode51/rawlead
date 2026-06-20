@@ -2,25 +2,21 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-const STEPS = [
-  {
-    num: '01',
-    title: 'Описываешь задачу',
-    body: 'В Telegram или голосом. Без брифов и технических заданий — просто расскажи что нужно сделать и зачем.',
-  },
-  {
-    num: '02',
-    title: 'Согласовываем решение',
-    body: 'Я предлагаю что конкретно делаем, сколько займёт и что получишь на выходе. Никаких сюрпризов в процессе.',
-  },
-  {
-    num: '03',
-    title: 'Принимаешь результат',
-    body: 'Оплата после — когда убедился что всё работает как надо. Сдаю с документацией и остаюсь на связи.',
-  },
+const DEFAULT_STEPS = [
+  { num: '01', title: 'Рассказываешь задачу',  body: 'Без брифов и ТЗ. Напиши в Telegram что нужно и зачем — разберёмся в деталях вместе.' },
+  { num: '02', title: 'Получаешь план',         body: 'Что делаю, сколько займёт, что получишь на выходе. Называю цену до начала — без сюрпризов.' },
+  { num: '03', title: 'Забираешь результат',    body: 'Оплата после проверки — убеждаешься что работает, потом платишь. Деплой, документация, поддержка.' },
 ]
+const DEFAULT_NOTE = 'Обычно от первого сообщения до готового бота или лендинга — 3–5 дней.'
 
-export default function Process() {
+interface ProcessStep { num: string; title: string; body: string }
+interface ProcessContent { label: string; steps: ProcessStep[]; note: string }
+interface Props { content?: ProcessContent }
+
+export default function Process({ content }: Props) {
+  const label = content?.label ?? '/ КАК РАБОТАЕМ'
+  const steps = content?.steps ?? DEFAULT_STEPS
+  const note  = content?.note  ?? DEFAULT_NOTE
   const ref = useRef<HTMLElement>(null)
   const [visible, setVisible] = useState(false)
 
@@ -44,13 +40,13 @@ export default function Process() {
       {/* Label */}
       <div className="mb-12">
         <span className="font-mono text-muted" style={{ fontSize: '11px', letterSpacing: '0.18em' }}>
-          / КАК РАБОТАЕМ
+          {label}
         </span>
       </div>
 
       {/* Steps */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 border-l border-t border-edge">
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <div
             key={s.num}
             className="border-r border-b border-edge"
@@ -113,7 +109,7 @@ export default function Process() {
           transition: 'opacity 0.6s 500ms ease',
         }}
       >
-        Обычно от первого сообщения до результата — меньше недели.
+        {note}
       </p>
     </section>
   )

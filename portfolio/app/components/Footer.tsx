@@ -2,7 +2,31 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-export default function Footer() {
+interface FooterContent {
+  label: string
+  headline: string
+  sub1: string
+  sub2: string
+  cta: string
+  handle: string
+  city: string
+}
+
+interface Props { content?: FooterContent; locale?: 'ru' | 'en' }
+
+const DEFAULT: FooterContent = {
+  label:    '/ СВЯЗАТЬСЯ',
+  headline: 'Есть задача',
+  sub1:     'Расскажи задачу в Telegram — отвечу за 24ч.',
+  sub2:     'Фиксированная цена, без сюрпризов.',
+  cta:      '→ Написать в Telegram',
+  handle:   '@rcnn43',
+  city:     'МОСКВА',
+}
+
+export default function Footer({ content, locale = 'ru' }: Props) {
+  const c = content ?? DEFAULT
+
   const ref = useRef<HTMLElement>(null)
   const [visible, setVisible] = useState(false)
 
@@ -31,7 +55,7 @@ export default function Footer() {
             className="font-mono text-muted mb-4"
             style={{ fontSize: '11px', letterSpacing: '0.18em' }}
           >
-            / СВЯЗАТЬСЯ
+            {c.label}
           </p>
           <h2
             className="font-display font-black text-snow"
@@ -44,7 +68,7 @@ export default function Footer() {
               transition: 'opacity 0.7s ease, transform 0.7s ease',
             }}
           >
-            Есть задача<span className="text-amber">?</span>
+            {c.headline}<span className="text-amber">?</span>
           </h2>
           <p
             className="font-mono text-muted mt-8"
@@ -58,8 +82,8 @@ export default function Footer() {
               transition: 'opacity 0.7s 150ms ease, transform 0.7s 150ms ease',
             }}
           >
-            Напишите — расскажите что нужно сделать.<br />
-            Отвечу быстро, без воды.
+            {c.sub1}<br />
+            {c.sub2}
           </p>
         </div>
 
@@ -79,14 +103,14 @@ export default function Footer() {
             className="inline-flex items-center gap-3 font-mono font-medium bg-amber text-void px-8 py-4 hover:opacity-90 transition-opacity"
             style={{ fontSize: 'clamp(12px, 1vw, 15px)', letterSpacing: '0.08em' }}
           >
-            → Написать в Telegram
+            {c.cta}
           </a>
 
           <p
             className="font-mono text-muted text-right"
             style={{ fontSize: '10px', letterSpacing: '0.12em' }}
           >
-            @rcnn43
+            {c.handle}
           </p>
         </div>
 
@@ -103,9 +127,12 @@ export default function Footer() {
         <span className="font-mono text-muted" style={{ fontSize: '10px', letterSpacing: '0.12em' }}>
           RODE51 · 2026
         </span>
-        <span className="font-mono text-muted" style={{ fontSize: '10px', letterSpacing: '0.12em' }}>
-          МОСКВА
-        </span>
+
+        <div className="flex items-center gap-2 font-mono" style={{ fontSize: '10px', letterSpacing: '0.14em' }}>
+          <a href="/" style={{ color: locale === 'ru' ? '#e8e8e8' : '#555555' }}>RU</a>
+          <span style={{ color: '#555555', opacity: 0.4 }}>/</span>
+          <a href="/en" style={{ color: locale === 'en' ? '#e8e8e8' : '#555555' }}>EN</a>
+        </div>
       </div>
 
     </footer>

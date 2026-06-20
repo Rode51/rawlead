@@ -1,82 +1,82 @@
 'use client'
 
-import { useRef, useState, useCallback, type ReactNode } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import TerminalLog from './TerminalLog'
 import Typewriter from './Typewriter'
 
-interface CaseData {
-  number: string
+interface CaseContent {
   title: string
   preview: string
   stack: string[]
   body: string
-  extra?: ReactNode
 }
 
-const CASES: CaseData[] = [
-  {
-    number: '01',
-    title: 'ПАРСЕР',
-    preview: '7 площадок · ~50с цикл',
-    stack: [
-      '7 площадок одновременно',
-      'обход антибот-защит',
-      'цикл обновления ~50 сек',
-      'дедупликация и фильтрация',
-    ],
-    body: 'Система сама мониторит FL.ru, Kwork, YouDo и Telegram-каналы — без твоего участия. Новый заказ появляется в ленте через секунды после публикации. Ручной поиск больше не нужен.',
-    extra: <TerminalLog />,
-  },
-  {
-    number: '02',
-    title: 'AI-ФИЛЬТР',
-    preview: '3 уровня · черновик на матч',
-    stack: [
-      'три уровня анализа',
-      'совместимость по навыкам',
-      'черновик отклика на каждый матч',
-      'качество контролирует ИИ-судья',
-    ],
-    body: 'ИИ читает каждый заказ и оценивает насколько он подходит под твой стек. При совпадении — готовит черновик отклика: не шаблон, а текст под конкретный запрос. Ты тратишь минуту вместо пятнадцати.',
-  },
-  {
-    number: '03',
-    title: 'TG-БОТЫ',
-    preview: 'вход без форм · алерты',
-    stack: [
-      'вход через Telegram — без форм',
-      'уведомление при новом матче',
-      'алерт если система встала',
-      'работает 24/7',
-    ],
-    body: 'Авторизация — один клик через Telegram, никаких паролей. Новый подходящий заказ — мгновенное уведомление в мессенджер. Если система вдруг остановится — приходит алерт, не молчит.',
-  },
-  {
-    number: '04',
-    title: 'ИНТЕРФЕЙС',
-    preview: 'лента · кабинет · % совместимости',
-    stack: [
-      'открытая лента без регистрации',
-      'личный кабинет с откликами',
-      'настройка навыков по нишам',
-      'сортировка по совместимости %',
-    ],
-    body: 'Открытая лента с сортировкой заказов по проценту совместимости со стеком — можно смотреть без регистрации. В кабинете: история откликов, настройка навыков по 4 нишам, профиль из Telegram.',
-  },
-]
+interface Metric { val: string; label: string }
 
-const TECH = [
-  'Python', 'FastAPI', 'Playwright', 'OpenRouter',
-  'Telegram Bot API', 'WordPress', 'Neon Postgres', 'Tauri',
-]
+interface ProjectsContent {
+  label: string
+  subtitle: string
+  desc: string
+  metrics: Metric[]
+  inProd: string
+  whatInside: string
+  open: string
+  close: string
+  cases: CaseContent[]
+}
 
-const DESC = 'RawLead следит за биржами вместо тебя: собирает заказы, сортирует по совместимости стека и готовит черновик отклика на каждый подходящий лид. Запущен, работает, обрабатывает заказы в реальном времени.'
+interface Props { content?: ProjectsContent }
 
-export default function Projects() {
+const DEFAULT: ProjectsContent = {
+  label:    '/ ПРОЕКТЫ',
+  subtitle: 'Находит заказы. Пишет отклики. Работает сам.',
+  desc:     'RawLead следит за биржами вместо тебя: собирает заказы, сортирует по совместимости стека и готовит черновик отклика на каждый подходящий лид. Запущен, работает, обрабатывает заказы в реальном времени.',
+  metrics: [
+    { val: '7',    label: 'площадок' },
+    { val: '~50с', label: 'до появления в ленте' },
+    { val: '3',    label: 'слоя ИИ-анализа' },
+    { val: '24/7', label: 'на проде' },
+  ],
+  inProd:      '/ В ПРОДЕ',
+  whatInside:  '— ЧТО ВНУТРИ',
+  open:        '→ ОТКРЫТЬ',
+  close:       '× ЗАКРЫТЬ',
+  cases: [
+    {
+      title:   'ПАРСЕР',
+      preview: '7 площадок · ~50с цикл',
+      stack:   ['7 площадок одновременно', 'обход антибот-защит', 'цикл обновления ~50 сек', 'дедупликация и фильтрация'],
+      body:    'Система сама мониторит FL.ru, Kwork, YouDo и Telegram-каналы — без твоего участия. Новый заказ появляется в ленте через секунды после публикации. Ручной поиск больше не нужен.',
+    },
+    {
+      title:   'AI-ФИЛЬТР',
+      preview: '3 уровня · черновик на матч',
+      stack:   ['три уровня анализа', 'совместимость по навыкам', 'черновик отклика на каждый матч', 'качество контролирует ИИ-судья'],
+      body:    'ИИ читает каждый заказ и оценивает насколько он подходит под твой стек. При совпадении — готовит черновик отклика: не шаблон, а текст под конкретный запрос. Ты тратишь минуту вместо пятнадцати.',
+    },
+    {
+      title:   'TG-БОТЫ',
+      preview: 'вход без форм · алерты',
+      stack:   ['вход через Telegram — без форм', 'уведомление при новом матче', 'алерт если система встала', 'работает 24/7'],
+      body:    'Авторизация — один клик через Telegram, никаких паролей. Новый подходящий заказ — мгновенное уведомление в мессенджер. Если система вдруг остановится — приходит алерт, не молчит.',
+    },
+    {
+      title:   'ИНТЕРФЕЙС',
+      preview: 'лента · кабинет · % совместимости',
+      stack:   ['открытая лента без регистрации', 'личный кабинет с откликами', 'настройка навыков по нишам', 'сортировка по совместимости %'],
+      body:    'Открытая лента с сортировкой заказов по проценту совместимости со стеком — можно смотреть без регистрации. В кабинете: история откликов, настройка навыков по 4 нишам, профиль из Telegram.',
+    },
+  ],
+}
+
+const TECH = ['Python', 'FastAPI', 'Playwright', 'OpenRouter', 'Telegram Bot API', 'WordPress', 'Neon Postgres', 'Tauri']
+
+export default function Projects({ content }: Props) {
+  const c = content ?? DEFAULT
+
   const [projectOpen, setProjectOpen] = useState(false)
   const [activeCase,  setActiveCase]  = useState<number | null>(null)
 
-  // ── Drag state (refs = no re-renders during drag) ──
   const railRef     = useRef<HTMLDivElement>(null)
   const isDragging  = useRef(false)
   const startX      = useRef(0)
@@ -117,10 +117,8 @@ export default function Projects() {
   }, [])
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging.current || !railRef.current) return
-    const dx = e.touches[0].pageX - startX.current
-    dragDelta.current = Math.abs(dx)
-    railRef.current.scrollLeft = startScroll.current - dx
+    if (!isDragging.current) return
+    dragDelta.current = Math.abs(e.touches[0].pageX - startX.current)
   }, [])
 
   const onTouchEnd = useCallback(() => {
@@ -137,7 +135,7 @@ export default function Projects() {
     if (projectOpen) setActiveCase(null)
   }
 
-  const active = activeCase !== null ? CASES[activeCase] : null
+  const activeCase_ = activeCase !== null ? c.cases[activeCase] : null
 
   return (
     <section id="projects" className="border-t border-edge px-10 lg:px-20 py-20 lg:py-32">
@@ -145,7 +143,7 @@ export default function Projects() {
       {/* Section label */}
       <div className="mb-10">
         <span className="font-mono text-muted" style={{ fontSize: '11px', letterSpacing: '0.18em' }}>
-          / ПРОЕКТЫ
+          {c.label}
         </span>
       </div>
 
@@ -159,7 +157,7 @@ export default function Projects() {
       >
         {/* ─ Card header ─ */}
         <button onClick={toggleProject} className="w-full text-left">
-          <div className="p-8 lg:p-14 flex items-start justify-between gap-8">
+          <div className="p-8 lg:p-14 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 lg:gap-8">
             <div>
               <h2
                 className="font-display font-black transition-colors duration-300"
@@ -176,16 +174,16 @@ export default function Projects() {
                 className="font-mono text-muted mt-4"
                 style={{ fontSize: 'clamp(11px, 0.9vw, 13px)', letterSpacing: '0.1em' }}
               >
-                Находит заказы. Пишет отклики. Работает сам.
+                {c.subtitle}
               </p>
             </div>
-            <div className="flex flex-col items-end gap-3 pt-1 flex-shrink-0">
+            <div className="flex flex-row justify-between items-center lg:flex-col lg:items-end gap-3 lg:pt-1 flex-shrink-0">
               <span className="font-mono text-muted" style={{ fontSize: '10px', letterSpacing: '0.15em' }}>2025</span>
               <span
                 className="font-mono transition-colors duration-300"
                 style={{ fontSize: '11px', letterSpacing: '0.12em', color: projectOpen ? '#F5A623' : '#444' }}
               >
-                {projectOpen ? '× ЗАКРЫТЬ' : '→ ОТКРЫТЬ'}
+                {projectOpen ? c.close : c.open}
               </span>
             </div>
           </div>
@@ -204,17 +202,12 @@ export default function Projects() {
               <div className="p-8 lg:p-14">
                 <p className="font-mono text-snow leading-relaxed"
                   style={{ fontSize: 'clamp(12px, 1.1vw, 15px)', maxWidth: '600px', minHeight: '4em' }}>
-                  <Typewriter text={DESC} active={projectOpen} delay={200} speed={18} />
+                  <Typewriter text={c.desc} active={projectOpen} delay={200} speed={18} />
                 </p>
 
                 {/* Metrics */}
                 <div className="flex flex-wrap gap-8 mt-10">
-                  {[
-                    ['7',    'площадок'],
-                    ['~50с', 'до появления в ленте'],
-                    ['3',    'слоя ИИ-анализа'],
-                    ['24/7', 'на проде'],
-                  ].map(([val, label]) => (
+                  {c.metrics.map(({ val, label }) => (
                     <div key={label} className="flex flex-col gap-1">
                       <span className="font-display font-black text-amber"
                         style={{ fontSize: 'clamp(22px, 2.8vw, 38px)', lineHeight: 1, letterSpacing: '-0.02em' }}>
@@ -245,6 +238,34 @@ export default function Projects() {
                     rawlead.ru <span style={{ fontSize: '10px', opacity: 0.7 }}>↗</span>
                   </a>
                 </div>
+
+                {/* Demo video */}
+                <div className="mt-12">
+                  <span className="font-mono text-muted block mb-5" style={{ fontSize: '10px', letterSpacing: '0.18em' }}>
+                    {c.inProd}
+                  </span>
+                  <div
+                    className="border border-edge overflow-hidden"
+                    style={{ maxWidth: 640, background: '#0a0a0a' }}
+                  >
+                    <div className="border-b border-edge px-3 py-2 flex items-center gap-2" style={{ background: '#111' }}>
+                      {[0,1,2].map(j => (
+                        <div key={j} style={{ width: 7, height: 7, borderRadius: '50%', background: '#2a2a2a' }} />
+                      ))}
+                      <span className="font-mono text-muted ml-2" style={{ fontSize: '9px', letterSpacing: '0.1em' }}>
+                        rawlead.ru
+                      </span>
+                    </div>
+                    <video
+                      src="/rawlead-demo.mp4"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      style={{ width: '100%', display: 'block' }}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* ─ Cases horizontal rail ─ */}
@@ -253,7 +274,7 @@ export default function Projects() {
                 {/* Rail header */}
                 <div className="px-8 lg:px-14 py-5 flex items-center justify-between">
                   <span className="font-mono text-muted" style={{ fontSize: '11px', letterSpacing: '0.15em' }}>
-                    <Typewriter text="— ЧТО ВНУТРИ" active={projectOpen} delay={800} speed={40} />
+                    <Typewriter text={c.whatInside} active={projectOpen} delay={800} speed={40} />
                   </span>
                   <span
                     className="font-mono text-muted transition-opacity duration-700"
@@ -273,6 +294,8 @@ export default function Projects() {
                     scrollbarWidth: 'none',
                     cursor: grabbing ? 'grabbing' : 'grab',
                     msOverflowStyle: 'none',
+                    WebkitOverflowScrolling: 'touch',
+                    touchAction: 'pan-x',
                   }}
                   onMouseDown={onMouseDown}
                   onMouseMove={onMouseMove}
@@ -282,7 +305,7 @@ export default function Projects() {
                   onTouchMove={onTouchMove}
                   onTouchEnd={onTouchEnd}
                 >
-                  {CASES.map((c, i) => (
+                  {c.cases.map((cs, i) => (
                     <div
                       key={i}
                       onClick={() => handleCardClick(i)}
@@ -297,7 +320,6 @@ export default function Projects() {
                         background: activeCase === i ? 'rgba(245,166,35,0.03)' : 'transparent',
                       }}
                     >
-                      {/* Number */}
                       <span
                         className="font-display font-black block"
                         style={{
@@ -309,35 +331,33 @@ export default function Projects() {
                           userSelect: 'none',
                         }}
                       >
-                        {c.number}
+                        {String(i + 1).padStart(2, '0')}
                       </span>
 
-                      {/* Title */}
                       <div className="mt-auto pt-6">
                         <h3
-                          className="font-display font-black"
+                          className="font-mono font-semibold"
                           style={{
-                            fontSize: 'clamp(28px, 4vw, 58px)',
-                            lineHeight: 0.92,
-                            letterSpacing: '-0.025em',
+                            fontSize: 'clamp(11px, 1.1vw, 14px)',
+                            letterSpacing: '0.22em',
+                            lineHeight: 1.3,
                             color: activeCase === i ? '#F5A623' : '#e8e8e8',
                             transition: 'color 0.35s ease',
                             userSelect: 'none',
                           }}
                         >
-                          {c.title}
+                          {cs.title}
                         </h3>
                         <p
                           className="font-mono text-muted mt-3"
                           style={{ fontSize: '10px', letterSpacing: '0.1em', userSelect: 'none' }}
                         >
-                          {c.preview}
+                          {cs.preview}
                         </p>
                       </div>
                     </div>
                   ))}
 
-                  {/* Trailing spacer so last card isn't flush right */}
                   <div className="flex-shrink-0" style={{ width: 'clamp(24px, 3vw, 48px)' }} />
                 </div>
 
@@ -348,14 +368,14 @@ export default function Projects() {
                   transition: 'grid-template-rows 0.55s cubic-bezier(0.22,1,0.36,1)',
                 }}>
                   <div style={{ overflow: 'hidden' }}>
-                    {active && (
+                    {activeCase_ && (
                       <div
                         className="border-t border-edge grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-8 lg:gap-20"
                         style={{ padding: 'clamp(24px, 4vw, 56px)' }}
                       >
                         {/* Stack */}
                         <div className="flex flex-col gap-3">
-                          {active.stack.map((tag, j) => (
+                          {activeCase_.stack.map((tag, j) => (
                             <span
                               key={j}
                               className="font-mono text-muted"
@@ -381,13 +401,13 @@ export default function Projects() {
                           >
                             <Typewriter
                               key={activeCase}
-                              text={active.body}
+                              text={activeCase_.body}
                               active={activeCase !== null}
                               delay={100}
                               speed={15}
                             />
                           </p>
-                          {active.extra}
+                          {activeCase === 0 && <TerminalLog />}
                         </div>
                       </div>
                     )}

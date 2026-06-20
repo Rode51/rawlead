@@ -51,10 +51,11 @@ export default function ScrambleTitle({ onDone }: Props) {
     halfW: [] as number[],  // collision half-width per letter
   })
 
-  // ── Scramble — 5 s, ~0.85 s per letter ─────────────────────────
+  // ── Scramble — 5 s desktop / 2.5 s mobile ──────────────────────
   useEffect(() => {
+    const isMobile = window.matchMedia('(pointer: coarse)').matches
     let frame = 0
-    const totalFrames = 300   // 300 ÷ 60fps ≈ 5 s
+    const totalFrames = isMobile ? 150 : 300
     let raf: number
 
     const tick = () => {
@@ -163,6 +164,20 @@ export default function ScrambleTitle({ onDone }: Props) {
       mouseRef.current = { x: e.clientX, y: e.clientY }
     }
 
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0]
+      mouseRef.current = { x: t.clientX, y: t.clientY }
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      const t = e.touches[0]
+      mouseRef.current = { x: t.clientX, y: t.clientY }
+    }
+
+    const onTouchEnd = () => {
+      mouseRef.current = { x: -9999, y: -9999 }
+    }
+
     const onResize = () => {
       phys.current.ready = false
       requestAnimationFrame(initPhysics)
@@ -172,21 +187,27 @@ export default function ScrambleTitle({ onDone }: Props) {
     const cacheRaf = requestAnimationFrame(initPhysics)
     rafRef.current  = requestAnimationFrame(loop)
 
-    window.addEventListener('mousemove', onMove,   { passive: true })
-    window.addEventListener('resize',    onResize,  { passive: true })
+    window.addEventListener('mousemove',  onMove,       { passive: true })
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchmove',  onTouchMove,  { passive: true })
+    window.addEventListener('touchend',   onTouchEnd,   { passive: true })
+    window.addEventListener('resize',     onResize,     { passive: true })
 
     return () => {
       cancelAnimationFrame(cacheRaf)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('resize',    onResize)
+      window.removeEventListener('mousemove',  onMove)
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchmove',  onTouchMove)
+      window.removeEventListener('touchend',   onTouchEnd)
+      window.removeEventListener('resize',     onResize)
     }
   }, [scrambleDone])
 
   return (
     <h1
       className="font-display font-black leading-[0.82] text-snow"
-      style={{ fontSize: 'clamp(60px, 24vw, 520px)', letterSpacing: '-0.02em' }}
+      style={{ fontSize: 'clamp(60px, 24vw, 520px)', letterSpacing: '-0.02em', userSelect: 'none' }}
       aria-label={TITLE}
     >
       {scrambleDone

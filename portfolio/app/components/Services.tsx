@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 const SERVICES = [
   {
     title: 'БОТ',
-    body: 'Telegram-бот под задачу — уведомления, очереди, приём заявок без приложения',
+    body: 'Telegram-бот для приёма заявок — без приложения и форм, работает 24/7',
     icon: (
       <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
         <rect x="7" y="11" width="22" height="18" rx="3" />
@@ -21,7 +21,7 @@ const SERVICES = [
   },
   {
     title: 'ПАРСЕР',
-    body: 'Собираю данные с любых сайтов — включая те, где стоит защита',
+    body: 'Мониторю сайты и площадки — новые заказы или цены сразу в Telegram',
     icon: (
       <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
         <circle cx="15" cy="15" r="8" />
@@ -33,7 +33,7 @@ const SERVICES = [
   },
   {
     title: 'АВТОМАТИЗАЦИЯ',
-    body: 'Убираю ручной труд — скрипты, воркеры, расписания вместо человека',
+    body: 'Убираю ручной труд — скрипт работает вместо человека по расписанию',
     icon: (
       <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
         <path d="M18 6 A12 12 0 1 1 6 18" />
@@ -44,7 +44,7 @@ const SERVICES = [
   },
   {
     title: 'ИНТЕГРАЦИЯ',
-    body: 'Соединяю сервисы между собой — API, вебхуки, базы данных, внешние источники',
+    body: 'Соединяю CRM, Telegram, Sheets — данные текут между сервисами сами',
     icon: (
       <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
         <rect x="2"  y="13" width="10" height="10" rx="2" />
@@ -54,11 +54,45 @@ const SERVICES = [
       </svg>
     ),
   },
+  {
+    title: 'ЛЕНДИНГ',
+    body: 'Лендинг за 3–5 дней — форма, аналитика, деплой на твой домен',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="6" y="3" width="24" height="30" rx="2" />
+        <line x1="11" y1="10" x2="25" y2="10" />
+        <line x1="11" y1="15" x2="25" y2="15" strokeOpacity="0.45" />
+        <line x1="11" y1="20" x2="19" y2="20" strokeOpacity="0.45" />
+        <rect x="11" y="25" width="14" height="5" rx="1.5" />
+      </svg>
+    ),
+  },
+  {
+    title: 'САЙТ',
+    body: 'Сайт от дизайна до продакшена — Next.js, TypeScript, SEO-ready',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="6" width="30" height="24" rx="2" />
+        <line x1="3" y1="13" x2="33" y2="13" />
+        <circle cx="8" cy="9.5" r="1.2" fill="currentColor" stroke="none" opacity="0.45" />
+        <circle cx="12.5" cy="9.5" r="1.2" fill="currentColor" stroke="none" opacity="0.45" />
+        <line x1="10" y1="20" x2="26" y2="20" strokeOpacity="0.4" />
+        <line x1="10" y1="24" x2="20" y2="24" strokeOpacity="0.4" />
+      </svg>
+    ),
+  },
 ]
 
-export default function Services() {
+interface ContentItem { title: string; body: string }
+interface ServicesContent { label: string; items: ContentItem[] }
+interface Props { content?: ServicesContent }
+
+export default function Services({ content }: Props) {
   const ref = useRef<HTMLElement>(null)
   const [visible, setVisible] = useState(false)
+
+  const label = content?.label ?? '/ ЧТО ДЕЛАЮ'
+  const items = content?.items
 
   useEffect(() => {
     const el = ref.current
@@ -80,12 +114,12 @@ export default function Services() {
       {/* Label */}
       <div className="mb-12">
         <span className="font-mono text-muted" style={{ fontSize: '11px', letterSpacing: '0.18em' }}>
-          / ЧТО ДЕЛАЮ
+          {label}
         </span>
       </div>
 
       {/* Cards grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 border-l border-t border-edge">
+      <div className="grid grid-cols-2 lg:grid-cols-3 border-l border-t border-edge">
         {SERVICES.map((s, i) => (
           <div
             key={s.title}
@@ -117,7 +151,7 @@ export default function Services() {
                   letterSpacing: '-0.02em',
                 }}
               >
-                {s.title}
+                {items ? items[i]?.title : s.title}
               </h3>
 
               {/* Body */}
@@ -129,7 +163,7 @@ export default function Services() {
                   lineHeight: 1.7,
                 }}
               >
-                {s.body}
+                {items ? items[i]?.body : s.body}
               </p>
             </div>
           </div>

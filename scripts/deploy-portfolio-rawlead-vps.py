@@ -31,6 +31,43 @@ _PORTFOLIO_LOCATIONS = f"""
 """
 
 
+def _remove_nginx_portfolio() -> None:
+    block = _PORTFOLIO_LOCATIONS.strip()
+    patch = (
+        f"python3 - <<'PY'\n"
+        f"from pathlib import Path\n"
+        f"conf = Path('{_NGINX_CONF}')\n"
+        f"text = conf.read_text(encoding='utf-8')\n"
+        f"block = '''{block}'''\n"
+        f"if block not in text:\n"
+        f"    print('nginx: portfolio block not found (already removed?)')\n"
+        f"else:\n"
+        f"    conf.write_text(text.replace(block + '\\n\\n', ''), encoding='utf-8')\n"
+        f"    print('removed portfolio nginx block')\n"
+        f"PY"
+    )
+    ssh.run(patch)
+    ssh.run("nginx -t && systemctl reload nginx")
+    print("nginx: portfolio location removed")
+
+
+def _remove_web_root() -> None:
+    ssh.run(f"rm -rf {_REMOTE_WEB}")
+    print(f"removed {_REMOTE_WEB}")
+
+
+def _verify_removed() -> None:
+    _, out, _ = ssh.run(
+        "curl -fsSI -m 15 https://rawlead.ru/portfolio/ 2>/dev/null | head -3 || echo CURL_FAIL",
+        check=False,
+    )
+    print((out or "").strip())
+    if "404" in (out or "") or "301" in (out or "") or "302" in (out or ""):
+        print("VERIFY OK: /portfolio/ no longer served as static")
+    else:
+        print("VERIFY WARN: unexpected response for /portfolio/")
+
+
 def _npm_cmd() -> str:
     return "npm.cmd" if os.name == "nt" else "npm"
 
@@ -105,6 +142,15 @@ def _verify() -> None:
 
 
 def main() -> int:
+    if "--remove" in sys.argv:
+        print("=== remove rawlead.ru/portfolio/ ===")
+        _remove_nginx_portfolio()
+        _remove_web_root()
+        print("=== verify removal ===")
+        _verify_removed()
+        print("REMOVE OK: rawlead.ru/portfolio/ disabled")
+        return 0
+
     skip_build = "--skip-build" in sys.argv
     nginx_only = "--nginx-only" in sys.argv
 

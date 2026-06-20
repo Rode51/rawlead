@@ -20,7 +20,7 @@ const barlowCondensed = Barlow_Condensed({
   display: "swap",
 });
 
-const BASE_URL = 'https://rawlead.ru/portfolio'
+const BASE_URL = 'https://rode51.ru'
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
