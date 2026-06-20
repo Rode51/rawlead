@@ -6,15 +6,25 @@
 
 > Детали задач → [`STATUS.md`](STATUS.md) · шаги владельца → [`FOR_YOU.md`](../../FOR_YOU.md)
 
-**Обновлено:** 2026-06-19 (probe_prod_facts_vps --write)
+**Обновлено:** 2026-06-19 (Lead verify billing + DB on VPS)
 
 ## Database (O271)
 
 | | |
 |---|---|
-| **Prod `DATABASE_URL`** | **local Postgres** `127.0.0.1:5432/rawlead` |
-| **Neon** | **запрещён для site runtime** · URL только в `NEON_DATABASE_URL` (архив) · guard **§ O272** |
-| **Post-migrate** | после смены URL — **restart** `rawlead-api` + `rawlead-bot-poll` + `rawlead-radar` · проверить env в **процессе**, не только в файле |
+| **Prod `DATABASE_URL`** | **local Postgres** `127.0.0.1:5432/rawlead` (`.env.site` L13, verify 2026-06-19) |
+| **Neon** | **только** `NEON_DATABASE_URL` в `.env.site` (архив) · **не** в `DATABASE_URL` · guard **§ O272** |
+| **Post-migrate** | после смены URL — **restart** `rawlead-api` + `rawlead-bot-poll` + `rawlead-radar` |
+
+## Billing (O174 / O284)
+
+| | |
+|---|---|
+| **ЮKassa keys** | `.env.site` (3 vars) · **не** в корневом `.env` |
+| **Checkout API** | `POST api.rawlead.ru/v1/me/subscription/checkout` |
+| **Webhook** | `POST api.rawlead.ru/v1/webhooks/yookassa` (owner: ЮKassa ЛК) |
+| **Return URL** | `https://rawlead.ru/cabinet/` (default) |
+| **Next gap** | нет `POST /v1/me/subscription/confirm` на return → § **O284** |
 
 ---
 

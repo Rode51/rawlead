@@ -1,5 +1,7 @@
 # Промпт для Deep Research — список TG-чатов с заказами
 
+> **DEPRECATED (audit A6, 2026-06-20):** результат уже в [`../ops/SOURCES_POOLS.md`](../ops/SOURCES_POOLS.md) + `TG_JOIN_QUEUE_v4.csv`.
+
 _Архив · перенесено из `docs/ops/` · результат класть в [`../ops/SOURCES_POOLS.md`](../ops/SOURCES_POOLS.md)._
 
 Скопируй блок ниже в Gemini / ChatGPT (режим «глубокое исследование»).  

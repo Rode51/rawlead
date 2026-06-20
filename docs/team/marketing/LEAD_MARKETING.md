@@ -27,6 +27,8 @@
 | Файл | Кто пишет |
 |------|-----------|
 | **`LEAD_MARKETING_PROMPT.md`** | Lead Marketing |
+| **`M1_CAMPAIGN_SEO_PLAN.md`** | Lead Marketing — чеклист M1 + SEO (параллельные треки) |
+| **`MIMO_CAMPAIGN_BRIEF.md`** | Lead Marketing — промпт для MiMo v2 |
 | **`PRODUCT_VISION.md`** | Lead Product — **read-only** |
 | **`PRE_LAUNCH_MARKETING.md`** | ops checklist — дополняем фактами кампании |
 | **`OWNER_INTENT.md`** | Lead Architect — решения владельца (бюджет, soft launch) |

@@ -5,19 +5,23 @@ alwaysApply: false
 
 # Lead Designer
 
-**RawLead** — фриланс-агрегатор (FL, Kwork, TG) + ИИ. **Prod:** [rawlead.ru](https://rawlead.ru) · theme **v1.9.0** · NEO-BRUTALIST.
+**RawLead** — фриланс-агрегатор (FL, Kwork, TG) + ИИ. **Prod:** [rawlead.ru](https://rawlead.ru) · WP theme **1.19.20** · NEO-BRUTALIST · **→ Next:** `rawlead-next/` (визуал TBD owner+Claude).
 
-| Поверхность | URL | Канон UI |
+| Поверхность | URL | Канон UX |
 |-------------|-----|----------|
-| Лента | **`/lenta/`** | [`feed-cabinet-mvp.md`](docs/design/wp/feed-cabinet-mvp.md) |
-| Кабинет | **`/cabinet/`** | там же |
+| Лента | **`/lenta/`** | [`feed-cabinet-mvp.md`](docs/design/wp/feed-cabinet-mvp.md) **§0.1 quiz-first** |
+| Кабинет | **`/cabinet/`** | там же · inbox откликов, **нет** manual skills |
+| Квиз | **`/quiz/`** + overlay на ленте | [`wave-o209-match-brief.md`](docs/design/wp/wave-o209-match-brief.md) |
 | Лендинг | `/`, `/how/`, `/pricing/` | [`REFERENCE.md`](docs/design/wp/REFERENCE.md) **v5** |
+| Next migration | `rawlead-next/` | [`PAGES_INVENTORY.md`](docs/migration/PAGES_INVENTORY.md) |
 
-**Не путать:** API `/v1/feed` ≠ страница **`/lenta/`**.
+**Не путать:** API `/v1/feed` ≠ страница **`/lenta/`** · **`/portfolio/`** = Rode51 (не product UI).
+
+**⛔ Deprecated UI:** Skill Tree · «Выбрано N/12» · ручной picker — owner 2026-06-15.
 
 Ты — **Head of Design**. **Только `docs/`** (дизайн-отдел). Код — **@coder** через **@lead-architect**.
 
-**Регламент и карта файлов (обязательно):** [`docs/team/design/LEAD_DESIGN.md`](docs/team/design/LEAD_DESIGN.md) § «Один активный план».
+**Регламент:** [`docs/team/design/LEAD_DESIGN.md`](docs/team/design/LEAD_DESIGN.md) § «Один активный план».
 
 ---
 
@@ -33,32 +37,32 @@ alwaysApply: false
 |---|------|
 | A1 | [`docs/README.md`](docs/README.md) |
 | A2 | [`docs/team/common/PROJECT_MAP.md`](docs/team/common/PROJECT_MAP.md) § «Агентам» |
-| A3 | [`docs/team/product/PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md) **v0.11** |
+| A3 | [`docs/team/product/PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md) **v0.12** |
 | A4 | [`docs/KAK_ETO_RABOTAET.md`](docs/KAK_ETO_RABOTAET.md) |
 | A5 | [`docs/team/architect/OWNER_INTENT.md`](docs/team/architect/OWNER_INTENT.md) |
 
-#### B. UI на prod
+#### B. UI на prod / Next
 
 | # | Файл |
 |---|------|
 | B1 | [`docs/team/common/STATUS.md`](docs/team/common/STATUS.md) |
-| B2 | [`docs/design/wp/REFERENCE.md`](docs/design/wp/REFERENCE.md) **v5** |
-| B3 | [`docs/design/wp/feed-cabinet-mvp.md`](docs/design/wp/feed-cabinet-mvp.md) |
-| B4 | [`docs/team/design/DESIGN_SYSTEM.md`](docs/team/design/DESIGN_SYSTEM.md) |
-| B5 | [`docs/team/product/LEAD_PRODUCT_PROMPT.md`](docs/team/product/LEAD_PRODUCT_PROMPT.md) § PRE-LAUNCH-UX |
+| B2 | [`docs/design/wp/feed-cabinet-mvp.md`](docs/design/wp/feed-cabinet-mvp.md) **§0.1** |
+| B3 | [`docs/design/wp/wave-o209-match-brief.md`](docs/design/wp/wave-o209-match-brief.md) |
+| B4 | [`docs/migration/PAGES_INVENTORY.md`](docs/migration/PAGES_INVENTORY.md) |
+| B5 | [`docs/design/wp/REFERENCE.md`](docs/design/wp/REFERENCE.md) **v5** (WP reference) |
 
-**Не читать по умолчанию:** `DESIGNER_PROMPT` архив § · `CODER_PROMPT` целиком.
+**Не читать по умолчанию:** `DESIGNER_PROMPT` archive · Skill Tree § в старых brief · `CODER_PROMPT` целиком.
 
 #### C. Твоя зона
 
 | # | Файл |
 |---|------|
-| C1 | [`docs/team/design/LEAD_DESIGN.md`](docs/team/design/LEAD_DESIGN.md) — **регламент** |
-| C2 | [`docs/team/design/LEAD_DESIGN_PROMPT.md`](docs/team/design/LEAD_DESIGN_PROMPT.md) — **активный план** |
+| C1 | [`docs/team/design/LEAD_DESIGN.md`](docs/team/design/LEAD_DESIGN.md) |
+| C2 | [`docs/team/design/LEAD_DESIGN_PROMPT.md`](docs/team/design/LEAD_DESIGN_PROMPT.md) |
 | C3 | [`docs/team/common/TASKS.md`](docs/team/common/TASKS.md) |
-| C4 | [`docs/team/common/DOCS_ARCHITECTURE.md`](docs/team/common/DOCS_ARCHITECTURE.md) |
+| C4 | [`docs/team/design/DESIGN_SYSTEM.md`](docs/team/design/DESIGN_SYSTEM.md) |
 
-**Handoff в код:** спека в `docs/design/wp/wave-*-brief.md` или `DESIGNER_PROMPT` § активная → **@lead-architect** → `CODER_PROMPT` (ссылки, не копипаст ТЗ).
+**Handoff в код:** `docs/design/wp/wave-*-brief.md` или `DESIGNER_PROMPT` § активная → **@lead-architect** → `CODER_PROMPT`.
 
 ---
 
@@ -81,9 +85,9 @@ alwaysApply: false
 | Пишешь | Не пишешь |
 |--------|-----------|
 | `LEAD_DESIGN_PROMPT.md` — решения | `CODER_PROMPT.md` (Lead Architect) |
-| `DESIGNER_PROMPT.md` — § **одна активная** | `wordpress/`, `src/` |
+| `DESIGNER_PROMPT.md` — § **одна активная** | `wordpress/`, `src/`, `rawlead-next/` |
 | `docs/design/wp/REFERENCE.md`, `wave-*-brief.md` | `TASKS.md` без Lead Architect |
-| `DESIGN_SYSTEM.md` | Дубль CSS-спеки в двух файлах |
+| `DESIGN_SYSTEM.md` | Skill Tree / manual picker specs |
 
 ## На «сделай в коде»
 

@@ -1,8 +1,28 @@
-﻿.venv/
-desktop/src-tauri/target/
+﻿# Secrets — never index
+.env
+.env.*
+!.env.example
+*.session
+*.session-journal
+mcp.pool.json
+scripts/backup.config.json
+*credentials*.txt
+wp-vps-credentials.txt
+*.pem
+id_rsa
+id_ed25519
+
+# Local runtime
 data/
+
+# Heavy / noise
+.venv/
+desktop/src-tauri/target/
+rawlead-next/.next/
+rawlead-next/out/
 .playwright-mcp/
 **/node_modules/
+MagicMock/
 audit_*.png
 o105_*.png
 rawlead_*.png

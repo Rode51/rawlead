@@ -10,11 +10,11 @@
 
 
 
-## → Now: P2 — polish pass (desktop 1440)
+## → Now: P2 — polish + контент (desktop 1440)
 
 
 
-**P1 v1 desktop — owner sign-off 2026-06-18.** Секции собраны · `npm run build` ✅ static export.
+**P1 v1 desktop — owner sign-off 2026-06-18.** **Prod:** https://rode51.ru — P1 live (Lead verify fetch 2026-06-20).
 
 
 
@@ -22,27 +22,41 @@
 
 |---|-------------|-----|--------|
 
-| p1 Hero + scramble physics | Claude Code | ✅ |
+| p1 Hero + scramble physics | Claude Code | ✅ prod |
 
-| p1 Tagline typewriter | Claude Code | ✅ |
+| p1 Tagline typewriter | Claude Code | ✅ prod |
 
-| p1 Services (4 карточки) | Claude Code | ✅ |
+| p1 Services (4 карточки) | Claude Code | ✅ prod → **6** в WIP |
 
-| p1 Projects / RawLead (4 кейса + terminal) | Claude Code | ✅ |
+| p1 Projects / RawLead (4 кейса + terminal) | Claude Code | ✅ prod |
 
-| p1 Process (3 шага) | Claude Code | ✅ |
+| p1 Process (3 шага) | Claude Code | ✅ prod |
 
-| p1 Footer CTA | Claude Code | ✅ |
+| p1 Footer CTA | Claude Code | ✅ prod |
 
-| p1 SEO metadata | Claude Code | ✅ |
+| p1 SEO metadata | Claude Code | ✅ prod (⚠️ `metadataBase` ещё `rawlead.ru/portfolio` — fix в WIP) |
 
-| p2 **Polish pass** — единый ритм, motion, cleanup | Claude Code | ⏳ |
+| **p2 WhyMe** (`/ ПОЧЕМУ Я`, 4 карточки) | Claude Code | ✅ локально · **не на prod** |
 
-| p2 Удалить мёртвый код + `.tmp.*` | Claude Code | ⏳ |
+| **p2 FAQ** (accordion 4 вопроса) | Claude Code | ✅ локально · **не на prod** |
+
+| **p2 EN** `/en` + `lib/content/{ru,en}.ts` | Claude Code | ✅ `npm run build` 6 static pages · **не на prod** |
+
+| p2 Polish Hero/Footer/Services/Projects | Claude Code | ⏳ WIP uncommitted |
+
+| p2 Удалить мёртвый код + `.tmp.*` | Claude Code | ⏳ `Cases.tsx`, `CaseSection.tsx`, … ещё в repo |
 
 | p3 Mobile 390px | отложено | ⏸ |
 
-| p4 Deploy **rode51.ru** (было labs.rawlead.ru) | owner DNS + @coder nginx/BASE_URL | ⏳ deploy после DNS → [`RODE51_BEGET_DNS.md`](../../ops/RODE51_BEGET_DNS.md) · скрипт `deploy-portfolio-rode51-vps.py` |
+| p4 Deploy **rode51.ru** | owner «задеплой» + @lead-architect | ✅ P1 · **повторный deploy** после P2 merge |
+
+
+
+**Lead verify 2026-06-20:** `portfolio/` build ✅ (`/` + `/en` static). Prod HTML — без WhyMe/FAQ (старая сборка). Diff ~13 файлов + `lib/content/` — **не в git**, не на VPS.
+
+
+
+**До deploy P2:** поправить `layout.tsx` → `metadataBase: https://rode51.ru` · owner desktop 1440 скрин · `@lead-architect` → `deploy-portfolio-rode51-vps.py`.
 
 
 
@@ -107,19 +121,15 @@
 
 
 ```
-
 Hero          — RODE51 scramble + typewriter + badge + ticker
-
 Tagline       — «Больше делаю, меньше обещаю.»
-
-Services      — БОТ / ПАРСЕР / АВТОМАТИЗАЦИЯ / ИНТЕГРАЦИЯ
-
-Projects      — RAWLEAD accordion → 4 кейса rail + TerminalLog в ПАРСЕР
-
+Services      — 6 карточек (WIP: +ЛЕНДИНГ, +САЙТ)
+WhyMe         — 4 причины (fixed price, оплата после, remote, поддержка)  [P2 WIP]
+Projects      — RAWLEAD accordion → 4 кейса rail + TerminalLog
 Process       — 3 шага для FL-клиента
-
+FAQ           — 4 вопроса accordion  [P2 WIP]
 Footer        — «Есть задача?» + @rcnn43
-
+/en           — EN mirror (content из lib/content/en.ts)  [P2 WIP]
 ```
 
 
@@ -163,6 +173,7 @@ Rode51 — инженер с живым prod. Тёмный editorial + terminal.
 | 2026-06-18 | RawLead = 4 кейса внутри одного проекта (не 4 фейковых продукта) |
 
 | 2026-06-18 | **P1 v1 desktop принят** → P2 polish |
+| 2026-06-20 | P2 WIP: WhyMe + FAQ + `/en` + 6 services · build ✅ · prod ещё P1 · metadataBase fix pending |
 
 
 

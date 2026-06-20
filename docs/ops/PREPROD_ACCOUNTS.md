@@ -23,14 +23,30 @@
 |-----|------------|
 | `RAWLEAD_PREPROD_ACCESS_TOKEN` | Bearer JWT **acc1 test user** в Neon — обязателен для O37c |
 
-### Способ 1 — mint (рекомендуется, § O37c-a)
+### Способ 1 — mint на VPS (рекомендуется после O271)
+
+Локальный `.env` с Neon **не нужен**. На VPS уже prod Postgres:
 
 ```powershell
 cd C:\Users\hramo\uisness
-.venv\Scripts\python.exe scripts\preprod_mint_token.py --account acc1 --write-env-site
+.venv\Scripts\python.exe scripts\_owner_sync_preprod_token.py
 ```
 
-Скрипт: Telethon acc1 → Neon user → `plan=agent` active → запись в `.env.site`.
+Скрипт: mint на VPS (Telethon acc1 + prod DB) → копирует `RAWLEAD_PREPROD_ACCESS_TOKEN` в **локальный** `.env.site` → smoke `api /v1/me`.
+
+### Способ 1b — mint локально (нужен SSH-туннель к VPS Postgres)
+
+```powershell
+ssh -i C:\Users\hramo\.ssh\id_rawlead_vps -L 15432:127.0.0.1:5432 root@62.113.103.231 -N
+```
+
+В `.env.site`: `DATABASE_URL=postgresql://rawlead:...@127.0.0.1:15432/rawlead?sslmode=disable` · затем `preprod_mint_token.py --account acc1 --write-env-site`.
+
+### Способ 1c — mint локально (legacy, только если Neon ожил)
+
+```powershell
+.venv\Scripts\python.exe scripts\preprod_mint_token.py --account acc1 --write-env-site
+```
 
 **Проверка:** `user_id` в stdout **≠** owner `164786fe-b979-4bfa-a9dc-42416465f503` — иначе acc1 = ваш личный TG, нужен другой `.session`.
 
@@ -64,7 +80,7 @@ cd C:\Users\hramo\uisness
 | Поле | Значение |
 |------|----------|
 | `tg_user_id` | `8233488286` (acc1 Telethon) |
-| `user_id` (uuid) | `895912a1-ffb6-46fb-be7e-4e051f2ff8c1` |
+| `user_id` (uuid) | `7a83dbd8-ab41-4350-a183-38370d5b5c1c` (VPS Postgres 2026-06-19) |
 | Owner uuid (не использовать) | `164786fe-b979-4bfa-a9dc-42416465f503` |
 
 ---

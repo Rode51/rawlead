@@ -1,16 +1,33 @@
 # Для тебя
 
-## Сейчас (2026-06-19)
+## Сейчас (2026-06-20)
 
 | Что | Статус |
 |-----|--------|
-| **rawlead.ru** | ✅ **Next.js** на prod (`rawlead-next/out`) · не WP |
-| **Локально** | `cd rawlead-next && npm run dev` → `:3001` |
-| **Вход / лента** | аватар ✅ · **черновик ИИ** — мёртвый OpenRouter proxy → mechanic P0 |
-| **Portfolio** | ✅ **https://rode51.ru** (P289) · код `portfolio/` · Lead: `@lead-portfolio` |
-| **БД prod** | local Postgres (O271) · Neon только архив · O272 guard |
-| **YouDo** | 🟡 camoufox · ops restart в `/ops/` |
-| **→ smoke** | Ctrl+Shift+R → лента без счётчика → перелогин → фото · **админка:** https://rawlead.ru/ops/ (кнопка в header — после R10) |
+| **rawlead.ru** | ✅ **Next.js** на prod · E2E gate **24/24** (2026-06-20) |
+| **O200 judge** | ✅ owner bar (70%×4 cat) · прогон 2026-06-18 · `data/preprod_o200_judge_human.md` |
+| **→ M1** | волна 1 посевы · [`M1_CAMPAIGN_SEO_PLAN.md`](team/marketing/M1_CAMPAIGN_SEO_PLAN.md) |
+| **→ smoke** | anon квиз → TG → % в ленте (15 мин, твои руки) |
+| **Оплата** | ЮKassa keys в `.env.site` · confirm webhook owner |
+| **Portfolio** | ✅ **https://rode51.ru** (P1) · P2 WhyMe/FAQ/EN — локально, deploy после commit |
+| **БД prod** | VPS Postgres (O271) · Neon архив |
+| **YouDo** | 🟡 camoufox · `/ops/` restart |
+| **Админка** | https://rawlead.ru/ops/ |
+
+---
+
+## `.env` и аудит — что делать тебе
+
+**Коротко: если `.env` только на твоём ПК и никогда не светился — ротировать ничего не нужно.**
+
+| Вопрос | Ответ |
+|--------|--------|
+| **В git?** | Нет — `.gitignore` + `.cursorignore` + MiMo deny ✅ |
+| **Зачем тогда «критично» в аудите?** | Файл **на диске** всё равно читаем: бэкап в облако, скрин, вставка в чат AI, чужой доступ к ПК |
+| **Что делать сейчас** | 1) Не копировать `.env` в чат/TG/Git · 2) Бэкап — локально, не OneDrive ([`BACKUP.md`](ops/BACKUP.md)) · 3) Не просить AI «прочитай .env» |
+| **Когда менять пароли** | Только если **утечка**: случайно закоммитил, отправил в чат, скрин с паролем, взлом ПК. Тогда по очереди: VPS → Neon → TG BotFather → OPS → прокси |
+| **Проверка «был ли в git»** | `git log -- .env` — пусто = никогда не коммитился ✅ |
+| **A1 Lead 2026-06-20** | Проект **не** в OneDrive (`C:\Users\hramo\uisness`) · бэкап → `D:\Backups\uisness\2026-06-18_2348` (`.env` внутри) · **не** облако ✅ |
 
 **Prod snapshot:** [`team/common/PROD_FACTS.md`](team/common/PROD_FACTS.md) · **задачи:** [`team/common/TASKS.md`](team/common/TASKS.md)
 
@@ -463,19 +480,21 @@ Baseline из лога (уже есть после deploy): `data/tg_funnel_audi
 
 ---
 
-## MiMo Code — пробный аудит репо (backlog)
+## MiMo Code — только аудит (read-only)
 
-**Что:** [MiMo Code](https://github.com/XiaomiMiMo/MiMo-Code) от Xiaomi — terminal-агент (как Claude Code), бесплатный канал MiMo-V2.5 на время. Запись от **12.06** — канон `OWNER_INTENT` § **MIMO-AUDIT**.
+**С 2026-06-20:** MiMo **не правит код** и **не создаёт** маркетинг-планы. Только отчёт в `docs/problems/` → `@lead-architect`.
 
-**Зачем:** второй «широкий» аудит (парсеры, ИИ, Next) — альтернатива прогону на Gemini 2M (O38).
+| Файл | Зачем |
+|------|--------|
+| [`.mimocode/MIMO_RULES.md`](../.mimocode/MIMO_RULES.md) | правила + стартовый промпт |
+| [`.mimocode/mimocode.jsonc`](../.mimocode/mimocode.jsonc) | deny edit везде кроме `docs/problems/**` |
+| `~/.codex/CLAUDE.md` § RawLead | глобальное напоминание |
 
-**Когда:** после **O280 cutover** или на **копии** репо параллельно.
+**Проверка:** `mimo` в корне `uisness` → «создай файл в src/» → **deny** · «прочитай .env» → **deny**.
 
-**Безопасно:** копия **без** `.env` и сессий · MiMo Auto = код уходит на Xiaomi · или Custom Provider → OpenRouter.
+**Инцидент 2026-06-20:** MiMo насоздавал лишние docs — откат `git checkout` · дальше только через Lead.
 
-**Windows:** `npm install -g @mimo-ai/cli` · промпт старта — в `OWNER_INTENT` § MIMO-AUDIT · итог → `docs/problems/…-mimo-audit.md`.
-
-**Посты завышают:** не «∞ контекст», а ~1M tokens; v0.1.x сырая; бенчмарки — от Xiaomi.
+Канон triage: `OWNER_INTENT` § MIMO-AUDIT · `docs/problems/*-mimo-*.md`.
 
 ---
 

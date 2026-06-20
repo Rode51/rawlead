@@ -60,17 +60,18 @@ O236–O246 UX/Perf · O247 hotfix · tier smoke PASS · TG xlsx owner base copi
 
 ---
 
-## O72e gate (aggregate ✅ · **O200** per-category ⏳)
+## O72e / O200 gate (2026-06-18 full run)
 
 | Слой | Gate | Факт |
 |------|------|------|
-| L2 | send ≥70% overall | **71.8%** ✅ |
-| L2 | **send ≥70% × 4 cat** | **⏳ O200** · owner gate **70%** (не 60%) |
-| L2 | combined ≥4.0 | **4.28** ✅ |
-| L1 | usable ≥70% | **83.1%** ✅ |
-| L3 | smoke | **92%** ✅ |
+| L2 LLM judge (owner) | send ≥70% × 4 cat | **✅** dev 90% · design/mkt/text 80% · [`preprod_o200_judge_human.md`](../../data/preprod_o200_judge_human.md) |
+| L2 LLM judge overall | send ≥70% | **82.5%** ✅ |
+| L2 combined | ≥4.0 | **4.25** ✅ |
+| Auto vault (строже) | draft ≥95% · auto ≥85% | **🟡** 92.4% / 60.8% · в основном `tools:empty` (не блокер M1) |
+| L1 | usable ≥70% | **83.1%** ✅ (aggregate) |
+| O280 E2E Next | 24/24 | **✅** 2026-06-20 |
 
-Детали: [`OWNER_INTENT.md`](OWNER_INTENT.md) · § **O200** `CODER_PROMPT`
+Артефакт: `data/preprod_o200_judge.json` · pilot r5 (70 лидов) был зелёнее — full 79 лидов строже по auto-tools.
 
 ---
 

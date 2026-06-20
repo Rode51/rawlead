@@ -1,6 +1,6 @@
 # Lead Marketing — hot queue
 
-**→ Now:** § **M1-TG-TEST-V0** — тест-кампания TG · РФ · фрилансеры · budget ≤5k ₽
+**→ Now:** § **M1-TG-TEST-V0** + чеклист **[`M1_CAMPAIGN_SEO_PLAN.md`](M1_CAMPAIGN_SEO_PLAN.md)** (реклама 3 волны + SEO P0–P2 · параллельно с тестами)
 
 Prod snapshot → [`PROD_FACTS.md`](../common/PROD_FACTS.md) · product → [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md)
 
@@ -10,7 +10,10 @@ Prod snapshot → [`PROD_FACTS.md`](../common/PROD_FACTS.md) · product → [`PR
 
 | § | Status |
 |---|--------|
-| **M1** TG test v0 | ⏳ planning |
+| **M1** TG test v0 | 🟡 prep → волна 1 |
+| **M1+SEO** чеклист | 📋 [`M1_CAMPAIGN_SEO_PLAN.md`](M1_CAMPAIGN_SEO_PLAN.md) |
+| **M1 посевы** | 📋 [`M1_SEEDING_CHECKLIST.md`](M1_SEEDING_CHECKLIST.md) |
+| **MiMo v2 бриф** | [`MIMO_CAMPAIGN_BRIEF.md`](MIMO_CAMPAIGN_BRIEF.md) |
 
 ---
 
@@ -430,7 +433,27 @@ https://t.me/rawlead_bot?start=m1_chat
 
 ---
 
-## Handoff template
+### Handoff deploy Metrika+SEO → @lead-architect (owner 2026-06-19)
+
+**Триггер:** «задеплой» · код в `rawlead-next/` (Метрика 109860210 + SEO P0).
+
+**Блокер билда:** `lib/quiz-guest.ts:57` — `[...new Set(niches)]` → `Array.from(new Set(niches))` (1 строка, @coder если architect не правит).
+
+**Deploy:**
+```powershell
+python scripts/deploy-web-rawlead-vps.py
+```
+
+**Verify prod:**
+- `curl -s https://rawlead.ru/robots.txt` — Sitemap + Disallow cabinet
+- `curl -s https://rawlead.ru/sitemap.xml` — 6 URL
+- view-source `rawlead.ru` — `ym(109860210`
+- Метрика онлайн 1 посетитель
+
+Чеклист: [`M1_CAMPAIGN_SEO_PLAN.md`](M1_CAMPAIGN_SEO_PLAN.md)
+
+---
+
 
 ```text
 @lead-marketing

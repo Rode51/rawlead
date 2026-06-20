@@ -52,7 +52,7 @@
 
 **Регламент docs (каноны, без дублей):** [`DOCS_ARCHITECTURE.md`](DOCS_ARCHITECTURE.md)
 
-**Визуально (для тебя):** [`PROJECT_MAP_VISUAL.md`](PROJECT_MAP_VISUAL.md) · PNG: [`../../design/rawlead/project-map-owner.png`](../../design/rawlead/project-map-owner.png)
+**Визуально (для тебя):** mermaid ниже в § «Процессы на ПК» · PNG: [`../../design/rawlead/project-map-owner.png`](../../design/rawlead/project-map-owner.png) · redirect: [`PROJECT_MAP_VISUAL.md`](PROJECT_MAP_VISUAL.md)
 
 ## Папки `docs/team/`
 
