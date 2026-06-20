@@ -90,3 +90,7 @@ audit_*.png
 o105_*.png
 rawlead_*.png
 scripts/_tmp_*.py
+
+# A12: debug dumps
+scripts/_*.out
+scripts/_*.html

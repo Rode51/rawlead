@@ -6,6 +6,30 @@
 
 ---
 
+# Перенесено из hot **2026-06-20** — A12-SCRIPTS-JUNK ✅
+
+11 junk files удалены из `scripts/` (4×`.out`, html, txt, 4×`_tmp_*.py`) · `.gitignore` +`scripts/_*.out`/`_*.html` · **KEEP** `_tmp_o170_delist_tg_ads.py`. Lead verify: disk ok · в git diff были **чужие** правки `deploy-o*`/`bot_poll` — не в A12 commit.
+
+---
+
+# Перенесено из hot **2026-06-20** — A8-SQL-RENUMBER ✅
+
+`023_prepaid_subscription.sql` → `025_prepaid_subscription.sql` · refs `deploy-o283-prepaid-vps.py`, `set_subscription_state.py` · `023_user_tags_active` без изменений.
+
+---
+
+# Перенесено из hot **2026-06-20** — A7-DEAD-CODE ✅
+
+Удалён `src/habr_freelance_parser.py` · константа `SOURCE_HABR_FREELANCE` из `listing.py`. `process_guard` / `cursor_proxy_relay` не трогали. Lead verify: import `listing`+`main` ok.
+
+---
+
+# Перенесено из hot **2026-06-19** — O286-QUIZ-NEXT ✅ deploy
+
+`liked` payload · `QuizApiError` · feed-card UI · **anon funnel** (login CTA, localStorage, merge on TG login). Owner deploy 2026-06-19.
+
+---
+
 # Перенесено из hot **2026-06-19** — O280-POST-CUTOVER (partial)
 
 Deploy prod CSS `2e677daf` · owner smoke **6 FAIL** → hot § **O280-POST-CUTOVER-R2**. Полное ТЗ первого прохода — git history / этот коммит.
