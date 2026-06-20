@@ -86,6 +86,8 @@ wordpress/rawlead-kadence-child/node_modules/
 
 # O251 local-only artifacts (probes, MCP dumps, audit PNGs)
 .playwright-mcp/
+MagicMock/
+127.0.0.1
 audit_*.png
 o105_*.png
 rawlead_*.png

@@ -1,0 +1,146 @@
+{
+  // RawLead MiMo v3 — НЕТ глобальных instructions (audit lockdown только у audit-агента)
+  // coder: explicit tools + scripts/** allow · last-match-wins для deny
+  "$schema": "https://mimo.xiaomi.com//config.json",
+
+  "default_agent": "audit",
+
+  "agent": {
+    "plan": {
+      "disable": true
+    },
+
+    "audit": {
+      "description": "Read-only audit → docs/problems/ only",
+      "mode": "primary",
+      "prompt": "{file:./MIMO_RULES.md}",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      },
+      "permission": {
+        "edit": {
+          "*": "deny",
+          "docs/problems/**": "ask"
+        },
+        "bash": {
+          "*": "deny",
+          "rg *": "allow",
+          "grep *": "allow",
+          "find *": "allow",
+          "ls*": "allow",
+          "dir *": "allow",
+          "git status*": "allow",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "git branch*": "allow"
+        }
+      }
+    },
+
+    "coder": {
+      "description": "Coder — § Lead; hygiene scripts/ delete OK",
+      "mode": "primary",
+      "prompt": "{file:./MIMO_CODER.md}",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "permission": {
+        "edit": {
+          "*": "allow",
+          "scripts/**": "allow",
+          "scripts/_*": "allow",
+          "scripts/*.out": "allow",
+          "scripts/*.html": "allow",
+          "scripts/*.txt": "allow",
+          "src/**": "allow",
+          "tests/**": "allow",
+          "sql/**": "allow",
+          ".gitignore": "allow",
+          "docs/team/common/STATUS.md": "allow",
+          "docs/team/marketing/M1_*.md": "allow",
+          ".env": "deny",
+          ".env.*": "deny",
+          "data/**": "deny",
+          "**/*.session": "deny",
+          "**/mcp.pool.json": "deny",
+          "scripts/backup.config.json": "deny",
+          ".cursor/**": "deny",
+          ".mimocode/**": "deny",
+          "docs/team/architect/CODER_PROMPT.md": "deny",
+          "docs/team/architect/OWNER_INTENT.md": "deny",
+          "docs/team/architect/ROADMAP.md": "deny",
+          "docs/team/common/TASKS.md": "deny",
+          "docs/team/marketing/MIMO_*.md": "deny"
+        },
+        "bash": {
+          "*": "allow",
+          "rm scripts/*": "allow",
+          "rm -f scripts/*": "allow",
+          "rm -rf scripts/_*": "allow",
+          "del scripts\\*": "allow",
+          "del /f scripts\\*": "allow",
+          "Remove-Item scripts/*": "allow",
+          "Remove-Item -Force scripts/*": "allow",
+          "Remove-Item -Path scripts/*": "allow",
+          "pip *": "deny",
+          "pip3 *": "deny",
+          "python -m pip*": "deny",
+          "python scripts/deploy-*": "deny",
+          "git commit*": "deny",
+          "git push*": "deny",
+          "git add*": "deny",
+          "cat .env*": "deny",
+          "type .env*": "deny",
+          "Get-Content .env*": "deny",
+          "systemctl *": "deny"
+        },
+        "read": {
+          "*": "allow",
+          ".env": "deny",
+          ".env.*": "deny",
+          "data/**": "deny",
+          "**/*.session": "deny"
+        }
+      }
+    }
+  },
+
+  "watcher": {
+    "ignore": [
+      ".venv/**",
+      "**/node_modules/**",
+      "rawlead-next/.next/**",
+      "rawlead-next/out/**",
+      "portfolio/.next/**",
+      "desktop/src-tauri/target/**",
+      "data/**",
+      ".playwright-mcp/**",
+      "MagicMock/**",
+      "**/*.session",
+      "**/*.session-journal",
+      "audit_*.png",
+      "o105_*.png",
+      "rawlead_*.png"
+    ]
+  },
+
+  "permission": {
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "data/**": "deny",
+      "**/*.session": "deny",
+      "**/mcp.pool.json": "deny",
+      "scripts/backup.config.json": "deny"
+    },
+    "webfetch": "ask",
+    "doom_loop": "ask",
+    "external_directory": "ask"
+  }
+}
