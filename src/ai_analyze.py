@@ -2694,7 +2694,7 @@ def rephrase_reply_draft_per_user(
     errors: list[str] | None = None,
     log_prefix: str = "",
     model_override: str = "",
-    max_attempts: int = 4,
+    max_attempts: int = 6,
 ) -> str | None:
     """O99: per-user uniquify — human FL voice, anti-copypaste + ai_smell guard."""
     if not cfg.ai_active or cfg.ai_provider != "openrouter":
@@ -2704,6 +2704,8 @@ def rephrase_reply_draft_per_user(
         return None
     from l3_human_style import (
         build_uniquify_system,
+        l3_opener_too_similar,
+        l3_structure_variant,
         l3_too_similar,
         reply_ai_smell_reason,
         reply_retry_user_suffix,
@@ -2714,22 +2716,28 @@ def rephrase_reply_draft_per_user(
     model = (model_override or rephrase_reply_draft_per_user_model(cfg)).strip()
     if not model:
         return None
-    user_base = (
-        f"user_id={user_id}\n"
-        f"lead_id={lead_id}\n"
-        f"variation_seed={seed}\n\n"
-        f"base_reply_draft:\n{base}\n\n"
-        "Верни только JSON с полем reply_draft."
-    )
     last_exc: BaseException | None = None
     retry_reason: str | None = None
     last_draft: str | None = None
     attempts = max(1, int(max_attempts))
     for attempt in range(attempts):
-        user = user_base
+        structure_idx = (seed + attempt) % 3
+        struct_label, struct_instruction = l3_structure_variant(structure_idx)
+        user = (
+            f"user_id={user_id}\n"
+            f"lead_id={lead_id}\n"
+            f"variation_seed={seed}\n"
+            f"structure_variant={structure_idx} ({struct_label})\n"
+            f"ОБЯЗАТЕЛЬНЫЙ каркас: {struct_instruction}\n\n"
+            f"base_reply_draft:\n{base}\n\n"
+            "Верни только JSON с полем reply_draft."
+        )
         if retry_reason and attempt > 0:
             user += reply_retry_user_suffix(
-                reason=retry_reason, attempt=attempt, layer="L3"
+                reason=retry_reason,
+                attempt=attempt,
+                layer="L3",
+                next_structure_idx=structure_idx,
             )
         t_http = time.monotonic()
         outcome = "fail"
@@ -2744,12 +2752,14 @@ def rephrase_reply_draft_per_user(
                     {
                         "role": "system",
                         "content": build_uniquify_system(
-                            voice_hint=voice_hint(seed + attempt)
+                            voice_hint=voice_hint(seed + attempt),
+                            structure_label=struct_label,
+                            structure_instruction=struct_instruction,
                         ),
                     },
                     {"role": "user", "content": user},
                 ],
-                "temperature": min(0.5, 0.38 + attempt * 0.08),
+                "temperature": min(0.62, 0.48 + attempt * 0.05),
                 "response_format": {"type": "json_object"},
             }
             proxy_urls = openrouter_proxy_urls()
@@ -2796,6 +2806,10 @@ def rephrase_reply_draft_per_user(
             if l3_too_similar(base, draft) and attempt < attempts - 1:
                 retry_reason = "similar"
                 outcome = "retry_similar"
+                continue
+            if l3_opener_too_similar(base, draft) and attempt < attempts - 1:
+                retry_reason = "similar"
+                outcome = "retry_opener"
                 continue
             outcome = "ok"
             note_ai_l2_call()

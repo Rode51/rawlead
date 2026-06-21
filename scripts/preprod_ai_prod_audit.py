@@ -1545,7 +1545,15 @@ def main() -> int:
     cfg = load_config()
     db_url = (cfg.database_url or "").strip()
     if not db_url:
-        print("DATABASE_URL не задан — нужен Neon (.env.site)", file=sys.stderr)
+        print("DATABASE_URL не задан — нужен VPS Postgres (.env.site)", file=sys.stderr)
+        return 2
+    if "neon.tech" in db_url.lower():
+        print(
+            "DATABASE_URL указывает на Neon (архив). Prod БД — Postgres на VPS.\n"
+            "  → docs/ops/PREPROD_ACCOUNTS.md § 1b (SSH tunnel :15432)\n"
+            "  → или scripts/_owner_sync_preprod_token.py + audit на VPS",
+            file=sys.stderr,
+        )
         return 2
 
     owner_ids = [int(x.strip()) for x in args.lead_ids.split(",") if x.strip().isdigit()]

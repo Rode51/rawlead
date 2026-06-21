@@ -2,40 +2,29 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { FeedTier } from '@/lib/auth-context'
-
-const SOURCES = [
-  { slug: 'fl',           label: 'FL.ru',        color: '#00A65A' },
-  { slug: 'kwork',        label: 'Kwork',        color: '#EA580C' },
-  { slug: 'youdo',        label: 'YouDo',        color: '#2563EB' },
-  { slug: 'tg',           label: 'Telegram',     color: '#0088CC' },
-  { slug: 'freelance_ru', label: 'Freelance.ru', color: '#7C3AED' },
-  { slug: 'freelancejob', label: 'FreelanceJob', color: '#059669' },
-  { slug: 'pchyol',       label: 'Пчёл.нет',    color: '#D97706' },
-]
+import { SOURCE_OPTIONS, formatSourcePill, toggleSourceSelection } from '@/lib/feed-filters'
 
 interface Props {
-  source: string
+  sources: string[]
   sort: 'time' | 'match'
   feedTier: FeedTier
-  onApply: (source: string, sort: 'time' | 'match') => void
+  onApply: (sources: string[], sort: 'time' | 'match') => void
   onClose: () => void
 }
 
-export default function FilterDropdown({ source, sort, feedTier, onApply, onClose }: Props) {
-  const [draftSrc, setDraftSrc] = useState(source)
+export default function FilterDropdown({ sources, sort, feedTier, onApply, onClose }: Props) {
+  const [draftSrcs, setDraftSrcs] = useState(sources)
   const [draftSort, setDraftSort] = useState(sort)
-  const [srcOpen, setSrcOpen] = useState(!!source)
+  const [srcOpen, setSrcOpen] = useState(sources.length > 0)
   const [visible, setVisible] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const isPremium = feedTier === 'premium'
 
-  // Animate in
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true))
     return () => cancelAnimationFrame(id)
   }, [])
 
-  // Close on outside click or Escape
   useEffect(() => {
     function onDown(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose()
@@ -52,17 +41,17 @@ export default function FilterDropdown({ source, sort, feedTier, onApply, onClos
   }, [onClose])
 
   function handleApply() {
-    onApply(draftSrc, draftSort)
+    onApply(draftSrcs, draftSort)
     onClose()
   }
 
   function handleReset() {
-    onApply('', 'time')
+    onApply([], 'time')
     onClose()
   }
 
-  const hasChanges = draftSrc !== source || draftSort !== sort
-  const hasAny = draftSrc !== '' || draftSort !== 'time'
+  const hasChanges = draftSrcs.join(',') !== sources.join(',') || draftSort !== sort
+  const hasAny = draftSrcs.length > 0 || draftSort !== 'time'
 
   return (
     <div
@@ -85,7 +74,6 @@ export default function FilterDropdown({ source, sort, feedTier, onApply, onClos
     >
       <div style={{ padding: '14px 14px 0' }}>
 
-        {/* Sort */}
         <p className="text-[10px] font-black uppercase tracking-widest text-[#9B9B97] mb-2">
           Сортировка{!isPremium && <span className="ml-1">🔒</span>}
         </p>
@@ -110,7 +98,6 @@ export default function FilterDropdown({ source, sort, feedTier, onApply, onClos
           })}
         </div>
 
-        {/* Source — accordion */}
         <button
           type="button"
           onClick={() => setSrcOpen(o => !o)}
@@ -118,12 +105,12 @@ export default function FilterDropdown({ source, sort, feedTier, onApply, onClos
         >
           <span className="text-[10px] font-black uppercase tracking-widest text-[#9B9B97] flex items-center gap-2">
             Биржа
-            {draftSrc && (
+            {draftSrcs.length > 0 && (
               <span
-                className="text-[9px] font-black px-1.5 py-0.5 leading-none"
+                className="text-[9px] font-black px-1.5 py-0.5 leading-none normal-case"
                 style={{ background: '#111010', color: '#fff' }}
               >
-                {SOURCES.find(s => s.slug === draftSrc)?.label}
+                {formatSourcePill(draftSrcs)}
               </span>
             )}
           </span>
@@ -145,12 +132,13 @@ export default function FilterDropdown({ source, sort, feedTier, onApply, onClos
         >
           <div style={{ overflow: 'hidden' }}>
             <div className="flex flex-col gap-1 pt-2 pb-1">
-              {SOURCES.map(src => {
-                const active = draftSrc === src.slug
+              {SOURCE_OPTIONS.map(src => {
+                const active = draftSrcs.includes(src.slug)
                 return (
                   <button
                     key={src.slug}
-                    onClick={() => setDraftSrc(active ? '' : src.slug)}
+                    onClick={() => setDraftSrcs(prev => toggleSourceSelection(prev, src.slug))}
+                    data-testid={`dropdown-src-${src.slug}`}
                     className="w-full h-8 text-[12px] font-bold border-2 border-[#111010] flex items-center gap-2 px-3 transition-all duration-100 text-left"
                     style={{
                       background: active ? '#111010' : '#fff',
@@ -173,7 +161,6 @@ export default function FilterDropdown({ source, sort, feedTier, onApply, onClos
         </div>
       </div>
 
-      {/* Actions */}
       <div
         className="flex gap-2"
         style={{ padding: '10px 14px 14px', borderTop: '1px solid #EAEAE6', marginTop: 10 }}

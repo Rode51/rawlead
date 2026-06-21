@@ -248,20 +248,28 @@ export const feedApi = {
   list: (params?: {
     offset?: number
     limit?: number
+    /** Comma-separated category slugs, e.g. dev,design */
     category?: string
+    categories?: string[]
     sort?: string
     skills?: string
     min_match?: number
+    /** Comma-separated source keys, e.g. fl,youdo */
     source?: string
+    sources?: string[]
   }) => {
     const q = new URLSearchParams()
     if (params?.offset) q.set('offset', String(params.offset))
     if (params?.limit) q.set('limit', String(params.limit))
-    if (params?.category) q.set('category', params.category)
+    const categoryParam = params?.category
+      ?? (params?.categories?.length ? params.categories.join(',') : undefined)
+    if (categoryParam) q.set('category', categoryParam)
     if (params?.sort) q.set('sort', params.sort)
     if (params?.skills) q.set('skills', params.skills)
     if (params?.min_match) q.set('min_match', String(params.min_match))
-    if (params?.source) q.set('source', params.source)
+    const sourceParam = params?.source
+      ?? (params?.sources?.length ? params.sources.join(',') : undefined)
+    if (sourceParam) q.set('source', sourceParam)
     const qs = q.toString()
     return apiFetch<FeedResponse>(`/feed${qs ? '?' + qs : ''}`)
   },

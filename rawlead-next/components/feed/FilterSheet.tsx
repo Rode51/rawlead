@@ -2,47 +2,39 @@
 
 import { useEffect, useState } from 'react'
 import type { FeedTier } from '@/lib/auth-context'
+import {
+  CATEGORY_OPTIONS,
+  SOURCE_OPTIONS,
+  formatCategoryPill,
+  formatSourcePill,
+  toggleCategorySelection,
+  toggleSourceSelection,
+} from '@/lib/feed-filters'
 
-const CATEGORIES = [
-  { slug: '', label: 'Все' },
-  { slug: 'dev', label: 'Разработка' },
-  { slug: 'design', label: 'Дизайн' },
-  { slug: 'marketing', label: 'Маркетинг' },
-  { slug: 'text', label: 'Тексты' },
-]
-
-const SOURCES = [
-  { slug: 'fl',            label: 'FL.ru',        color: '#00A65A' },
-  { slug: 'kwork',         label: 'Kwork',        color: '#EA580C' },
-  { slug: 'youdo',         label: 'YouDo',        color: '#2563EB' },
-  { slug: 'tg',            label: 'Telegram',     color: '#0088CC' },
-  { slug: 'freelance_ru',  label: 'Freelance.ru', color: '#7C3AED' },
-  { slug: 'freelancejob',  label: 'FreelanceJob', color: '#059669' },
-  { slug: 'pchyol',        label: 'Пчёл.нет',    color: '#D97706' },
-]
+const ALL_CATEGORY = { slug: '', label: 'Все' }
 
 interface Props {
-  category: string
-  source: string
+  categories: string[]
+  sources: string[]
   sort: 'time' | 'match'
   feedTier: FeedTier
-  onApply: (category: string, source: string, sort: 'time' | 'match') => void
+  onApply: (categories: string[], sources: string[], sort: 'time' | 'match') => void
   onClose: () => void
 }
 
 export default function FilterSheet({
-  category,
-  source,
+  categories,
+  sources,
   sort,
   feedTier,
   onApply,
   onClose,
 }: Props) {
   const [visible, setVisible] = useState(false)
-  const [draftCat, setDraftCat] = useState(category)
-  const [draftSrc, setDraftSrc] = useState(source)
+  const [draftCats, setDraftCats] = useState(categories)
+  const [draftSrcs, setDraftSrcs] = useState(sources)
   const [draftSort, setDraftSort] = useState(sort)
-  const [srcOpen, setSrcOpen] = useState(!!source) // open if already has active source
+  const [srcOpen, setSrcOpen] = useState(sources.length > 0)
   const isPremium = feedTier === 'premium'
 
   useEffect(() => {
@@ -56,22 +48,31 @@ export default function FilterSheet({
   }
 
   function handleApply() {
-    onApply(draftCat, draftSrc, draftSort)
+    onApply(draftCats, draftSrcs, draftSort)
     dismiss()
   }
 
   function handleReset() {
-    onApply('', '', 'time')
+    onApply([], [], 'time')
     dismiss()
   }
 
   const hasChanges =
-    draftCat !== category || draftSrc !== source || draftSort !== sort
-  const hasAnyFilter = draftCat !== '' || draftSrc !== '' || draftSort !== 'time'
+    draftCats.join(',') !== categories.join(',')
+    || draftSrcs.join(',') !== sources.join(',')
+    || draftSort !== sort
+  const hasAnyFilter = draftCats.length > 0 || draftSrcs.length > 0 || draftSort !== 'time'
+
+  function handleCategoryClick(slug: string) {
+    if (!slug) {
+      setDraftCats([])
+      return
+    }
+    setDraftCats(prev => toggleCategorySelection(prev, slug))
+  }
 
   return (
     <div className="fixed inset-0" style={{ zIndex: 500 }} id="rl-feed-sheet" data-testid="feed-filter-sheet">
-      {/* Overlay */}
       <div
         className="absolute inset-0"
         style={{
@@ -83,7 +84,6 @@ export default function FilterSheet({
         aria-hidden="true"
       />
 
-      {/* Panel */}
       <div
         className="rl-feed-sheet__panel absolute left-0 right-0 bottom-0 bg-white flex flex-col"
         style={{
@@ -97,12 +97,10 @@ export default function FilterSheet({
         aria-label="Фильтры"
         data-testid="feed-sheet-panel"
       >
-        {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div style={{ width: 40, height: 4, background: '#DADAD6', borderRadius: 2 }} />
         </div>
 
-        {/* Head */}
         <div
           className="flex items-center justify-between flex-shrink-0"
           style={{ padding: '10px 16px 12px', borderBottom: '1px solid #EAEAE6' }}
@@ -117,21 +115,26 @@ export default function FilterSheet({
           </button>
         </div>
 
-        {/* Body */}
         <div className="overflow-y-auto flex-1" style={{ padding: '20px 16px' }}>
 
-          {/* Category */}
           <div className="mb-6">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#9B9B97] mb-3">
               Категория
+              {draftCats.length > 0 && (
+                <span className="ml-2 normal-case tracking-normal font-semibold text-[#111010]">
+                  {formatCategoryPill(draftCats)}
+                </span>
+              )}
             </p>
             <div className="grid grid-cols-2 gap-2">
-              {CATEGORIES.map(cat => {
-                const active = draftCat === cat.slug
+              {[ALL_CATEGORY, ...CATEGORY_OPTIONS].map(cat => {
+                const active = cat.slug
+                  ? draftCats.includes(cat.slug)
+                  : draftCats.length === 0
                 return (
                   <button
-                    key={cat.slug}
-                    onClick={() => setDraftCat(active ? '' : cat.slug)}
+                    key={cat.slug || 'all'}
+                    onClick={() => handleCategoryClick(cat.slug)}
                     data-testid={`sheet-cat-${cat.slug || 'all'}`}
                     className="h-11 text-[13px] font-bold border-2 border-[#111010] transition-all duration-100 active:scale-[0.97]"
                     style={{
@@ -147,7 +150,6 @@ export default function FilterSheet({
             </div>
           </div>
 
-          {/* Source — accordion */}
           <div className="mb-6">
             <button
               type="button"
@@ -156,12 +158,12 @@ export default function FilterSheet({
             >
               <span className="text-[10px] font-black uppercase tracking-widest text-[#9B9B97] flex items-center gap-2">
                 Биржа
-                {draftSrc && (
+                {draftSrcs.length > 0 && (
                   <span
-                    className="text-[9px] font-black px-1.5 py-0.5 leading-none"
+                    className="text-[9px] font-black px-1.5 py-0.5 leading-none normal-case"
                     style={{ background: '#111010', color: '#fff' }}
                   >
-                    {SOURCES.find(s => s.slug === draftSrc)?.label}
+                    {formatSourcePill(draftSrcs)}
                   </span>
                 )}
               </span>
@@ -183,12 +185,13 @@ export default function FilterSheet({
             >
               <div style={{ overflow: 'hidden' }}>
                 <div className="grid grid-cols-2 gap-2 pt-3">
-                  {SOURCES.map(src => {
-                    const active = draftSrc === src.slug
+                  {SOURCE_OPTIONS.map(src => {
+                    const active = draftSrcs.includes(src.slug)
                     return (
                       <button
                         key={src.slug}
-                        onClick={() => setDraftSrc(active ? '' : src.slug)}
+                        onClick={() => setDraftSrcs(prev => toggleSourceSelection(prev, src.slug))}
+                        data-testid={`sheet-src-${src.slug}`}
                         className="h-10 text-[12px] font-bold border-2 border-[#111010] flex items-center gap-2 px-3 transition-all duration-100 active:scale-[0.97]"
                         style={{
                           background: active ? '#111010' : '#fff',
@@ -214,7 +217,6 @@ export default function FilterSheet({
             </div>
           </div>
 
-          {/* Sort */}
           <div className="mb-2">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#9B9B97] mb-3">
               Сортировка{!isPremium && <span className="ml-1 text-[12px]">🔒</span>}
@@ -243,7 +245,6 @@ export default function FilterSheet({
           </div>
         </div>
 
-        {/* Actions */}
         <div
           className="flex-shrink-0 flex gap-2"
           style={{

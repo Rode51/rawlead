@@ -2,67 +2,66 @@
 
 import { useState } from 'react'
 import type { FeedTier } from '@/lib/auth-context'
+import {
+  CATEGORY_OPTIONS,
+  formatCategoryPill,
+  formatSourcePill,
+  toggleCategorySelection,
+} from '@/lib/feed-filters'
 import FilterSheet from './FilterSheet'
 import FilterDropdown from './FilterDropdown'
 
-const CATEGORIES = [
-  { slug: '', label: 'Все' },
-  { slug: 'dev', label: 'Разработка' },
-  { slug: 'design', label: 'Дизайн' },
-  { slug: 'marketing', label: 'Маркетинг' },
-  { slug: 'text', label: 'Тексты' },
-]
-
-const CATEGORY_LABEL: Record<string, string> = {
-  dev: 'Разработка', design: 'Дизайн', marketing: 'Маркетинг', text: 'Тексты',
-}
-
-const SOURCE_LABEL: Record<string, string> = {
-  fl: 'FL.ru', kwork: 'Kwork', youdo: 'YouDo', tg: 'Telegram',
-  freelance_ru: 'Freelance.ru', freelancejob: 'FreelanceJob', pchyol: 'Пчёл.нет',
-}
+const ALL_CATEGORY = { slug: '', label: 'Все' }
 
 interface Props {
-  category: string
-  source: string
+  categories: string[]
+  sources: string[]
   sort: 'time' | 'match'
   feedTier: FeedTier
-  onCategoryChange: (cat: string) => void
-  onSourceChange: (src: string) => void
+  onCategoriesChange: (cats: string[]) => void
+  onSourcesChange: (srcs: string[]) => void
   onSortChange: (sort: 'time' | 'match') => void
 }
 
 export default function FilterBar({
-  category,
-  source,
+  categories,
+  sources,
   sort,
   feedTier,
-  onCategoryChange,
-  onSourceChange,
+  onCategoriesChange,
+  onSourcesChange,
   onSortChange,
 }: Props) {
-  const [showSheet, setShowSheet] = useState(false)    // mobile
-  const [showDropdown, setShowDropdown] = useState(false) // desktop
-  const isPremium = feedTier === 'premium'
-  const hasFilter = category !== '' || source !== '' || sort !== 'time'
+  const [showSheet, setShowSheet] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const hasFilter = categories.length > 0 || sources.length > 0 || sort !== 'time'
 
-  // Build pill text for mobile
+  const categoryPill = formatCategoryPill(categories)
+  const sourcePill = formatSourcePill(sources)
   const pillParts = [
-    category ? CATEGORY_LABEL[category] : '',
-    source ? SOURCE_LABEL[source] : '',
+    categoryPill,
+    sourcePill,
     sort === 'match' ? 'По совм.' : '',
   ].filter(Boolean)
-  const pillText = pillParts.length ? pillParts.join(' · ') : ''
+  const pillText = pillParts.join(' · ')
 
-  function handleSheetApply(cat: string, src: string, srt: 'time' | 'match') {
-    onCategoryChange(cat)
-    onSourceChange(src)
+  function handleSheetApply(cats: string[], srcs: string[], srt: 'time' | 'match') {
+    onCategoriesChange(cats)
+    onSourcesChange(srcs)
     onSortChange(srt)
   }
 
-  function handleDropdownApply(src: string, srt: 'time' | 'match') {
-    onSourceChange(src)
+  function handleDropdownApply(srcs: string[], srt: 'time' | 'match') {
+    onSourcesChange(srcs)
     onSortChange(srt)
+  }
+
+  function handleCategoryClick(slug: string) {
+    if (!slug) {
+      onCategoriesChange([])
+      return
+    }
+    onCategoriesChange(toggleCategorySelection(categories, slug))
   }
 
   return (
@@ -73,7 +72,6 @@ export default function FilterBar({
       >
         <div className="max-w-feed mx-auto px-4 sm:px-6 h-[52px] flex items-center gap-3">
 
-          {/* ── MOBILE: trigger + active pill ── */}
           <div className="flex sm:hidden items-center gap-2 flex-1 min-w-0">
             <button
               onClick={() => setShowSheet(true)}
@@ -101,16 +99,16 @@ export default function FilterBar({
             )}
           </div>
 
-          {/* ── DESKTOP: category chips + фильтр button ── */}
           <div className="hidden sm:flex items-center gap-3 flex-1 min-w-0">
-            {/* Category chips */}
             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide shrink-0">
-              {CATEGORIES.map(cat => {
-                const active = category === cat.slug
+              {[ALL_CATEGORY, ...CATEGORY_OPTIONS].map(cat => {
+                const active = cat.slug
+                  ? categories.includes(cat.slug)
+                  : categories.length === 0
                 return (
                   <button
-                    key={cat.slug}
-                    onClick={() => onCategoryChange(cat.slug)}
+                    key={cat.slug || 'all'}
+                    onClick={() => handleCategoryClick(cat.slug)}
                     data-testid={`feed-cat-${cat.slug || 'all'}`}
                     className="shrink-0 h-8 px-3 text-[12px] font-bold border-2 border-[#111010] transition-all duration-100 whitespace-nowrap"
                     style={{
@@ -124,17 +122,18 @@ export default function FilterBar({
               })}
             </div>
 
-            {/* Divider */}
             <div className="shrink-0 h-5 w-px bg-[#D4D4D0]" />
 
-            {/* Фильтр ▾ — opens dropdown */}
             <div className="flex items-center gap-2 shrink-0 ml-auto" style={{ position: 'relative' }}>
-              {(source || sort !== 'time') && (
+              {(sources.length > 0 || sort !== 'time') && (
                 <span
                   className="text-[11px] font-semibold px-2 py-1 leading-none whitespace-nowrap"
                   style={{ background: '#EEEDEA', color: '#111010' }}
                 >
-                  {[source ? SOURCE_LABEL[source] : '', sort === 'match' ? 'По совм.' : ''].filter(Boolean).join(' · ')}
+                  {[
+                    sources.length ? formatSourcePill(sources) : '',
+                    sort === 'match' ? 'По совм.' : '',
+                  ].filter(Boolean).join(' · ')}
                 </span>
               )}
               <button
@@ -143,9 +142,9 @@ export default function FilterBar({
                 id="rl-feed-sort-dd"
                 className="inline-flex items-center gap-1 h-8 px-3 text-[12px] font-bold border-2 border-[#111010] shrink-0 transition-all duration-100 whitespace-nowrap"
                 style={{
-                  background: (source !== '' || sort !== 'time') ? '#111010' : '#fff',
-                  color: (source !== '' || sort !== 'time') ? '#fff' : '#111010',
-                  boxShadow: (source !== '' || sort !== 'time') ? '2px 2px 0 #E8A020' : '2px 2px 0 #D4D4D0',
+                  background: (sources.length > 0 || sort !== 'time') ? '#111010' : '#fff',
+                  color: (sources.length > 0 || sort !== 'time') ? '#fff' : '#111010',
+                  boxShadow: (sources.length > 0 || sort !== 'time') ? '2px 2px 0 #E8A020' : '2px 2px 0 #D4D4D0',
                 }}
               >
                 Фильтр
@@ -158,7 +157,7 @@ export default function FilterBar({
 
               {showDropdown && (
                 <FilterDropdown
-                  source={source}
+                  sources={sources}
                   sort={sort}
                   feedTier={feedTier}
                   onApply={handleDropdownApply}
@@ -173,8 +172,8 @@ export default function FilterBar({
 
       {showSheet && (
         <FilterSheet
-          category={category}
-          source={source}
+          categories={categories}
+          sources={sources}
           sort={sort}
           feedTier={feedTier}
           onApply={handleSheetApply}

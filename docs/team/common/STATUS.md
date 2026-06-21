@@ -4,9 +4,15 @@
 
 **Очередь:** [`TASKS.md`](TASKS.md) · **Coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md)
 
-**Next:** **G6** L3 judge uniquify (@coder)
+**Next:** G7a tier/tz — SSH tunnel `:15432` + mint trial/free · deploy lead_pipeline если не на VPS · **YouDo watch**
 
-**G5 ✅ (2026-06-20):** `preprod_ai_matrix.py --profile site` · **12/12 L1+L2** · `s1_pass: true` · 4×category ≥3 · empty_reply_draft **0** · fix L2 tools/money в `ai_analyze.py`
+**Parser probe 2026-06-21 ~13:37 UTC:** FL/Kwork/YouDo listing **ok** · YouDo antibot `html_len=1701` burst 13:33–13:35 · pchyol proxy fail · neon legacy IPv6 noise · см. `PROD_FACTS` AUTO
+
+**G6 ✅ (2026-06-21):** `preprod_ai_prod_audit_judge.md` **Accept L3: ✅ PASS** · 2026-06-20T18:24Z · uniq **3.04** · combined **4.19** · send **68%** · leak **0%** · L3 v4 `l3_opener_too_similar` + deploy VPS
+
+**YOUDO-T14878013 ✅ (2026-06-21):** lead #8256 delist `youdo_detail_mismatch` · `lead_pipeline` — всегда fetch YouDo detail · [`problems/2026-06-20-youdo-t14878013-mismatch.md`](../problems/2026-06-20-youdo-t14878013-mismatch.md)
+
+**FEED-MULTI-FILTER ✅ (2026-06-21):** multi category/source chips · `feed-filters.ts` · `FilterBar`/`FilterSheet`/`FilterDropdown` · `lenta/page.tsx` · `api.ts`
 
 **G4-fix ✅ (2026-06-20):** desktop J1–J9,J5,J6,J8,J11 **10/10** · mobile J10 **1/1** · gate `preprod_ux_journey.json` **11/11** · `j5_draft_ok: true` · `critical_count: 0` · harness J5 = n16 parity (no reload между drafts)
 
@@ -24,8 +30,8 @@
 | G3 | UX audit 0 critical | @coder | ✅ **0 critical** · U1–U12 **24/24** (2026-06-20) |
 | G4 | UX journey J1–J11 | @coder | ✅ **11/11** · `j5_draft_ok` · 0 critical (2026-06-20 · desktop+mobile gate) |
 | G5 | AI matrix S1 | @coder | ✅ **12/12** · `s1_pass` (2026-06-20) |
-| G6 | L3 judge uniquify | @coder | ⏳ **сейчас** · L2 ✅ 2026-06-18 |
-| G7a | Load quick smoke | @coder | ⏳ |
+| G6 | L3 judge uniquify | @coder | ✅ **PASS** uniq 3.04 (2026-06-21) |
+| G7a | Load quick smoke | @coder | ⏳ load **PASS** p95 1781ms · tier/tz/l2 **FAIL** без tunnel (2026-06-21) |
 | G7b | Load **full** 50 VU + draft×20 | @coder | ⏳ после G7a |
 | G-SEC | Security regression | @coder | ⏳ pytest ✅ · S-1/S-2 ручные · MiMo M0 **P0=0** |
 | M0–M4 | **MiMo** audit + skills | owner | **M0** ✅ gsec-delta · **M1** ✅ post-g1-e2e · M2–M4 ⏳ |

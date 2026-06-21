@@ -13,6 +13,7 @@ from l3_human_style import (  # noqa: E402
     build_shared_l2_system,
     build_uniquify_system,
     l3_ai_smell_reason,
+    l3_opener_too_similar,
     l3_too_similar,
     l3_voice_hint,
     reply_retry_user_suffix,
@@ -45,6 +46,16 @@ class TestL3HumanStyle(unittest.TestCase):
             "Подскажите, бэкенд уже на Python или с нуля?"
         )
         self.assertFalse(l3_too_similar(shared, personal))
+
+    def test_opener_too_similar_po_tzu(self) -> None:
+        shared = "Здравствуйте! По ТЗ вижу, что нужен лендинг для дверей."
+        personal = "Здравствуйте! По ТЗ вижу лендинг под продажу дверей в Беларуси."
+        self.assertTrue(l3_opener_too_similar(shared, personal))
+
+    def test_opener_different_ok(self) -> None:
+        shared = "Здравствуйте! По ТЗ вижу, что нужен лендинг."
+        personal = "Здравствуйте! Коротко: лендинг под двери с фокусом на замер."
+        self.assertFalse(l3_opener_too_similar(shared, personal))
 
     def test_ai_smell_detects_hard_phrases(self) -> None:
         self.assertIsNotNone(
@@ -324,11 +335,31 @@ class TestL3HumanStyle(unittest.TestCase):
         self.assertIn("план→шаги→вопрос", body)
         self.assertNotIn("личного опыта или кейса", body)
 
+    def test_l3_structure_variant_cycles(self) -> None:
+        from l3_human_style import l3_structure_variant
+
+        self.assertEqual(l3_structure_variant(0)[0], "A")
+        self.assertEqual(l3_structure_variant(1)[0], "B")
+        self.assertEqual(l3_structure_variant(2)[0], "C")
+        self.assertEqual(l3_structure_variant(3)[0], "A")
+
+    def test_build_uniquify_mandatory_structure_block(self) -> None:
+        body = build_uniquify_system(
+            voice_hint="тест",
+            structure_label="B",
+            structure_instruction="вопрос первым",
+        )
+        self.assertIn("ОБЯЗАТЕЛЬНО", body)
+        self.assertIn("вопрос первым", body)
+        self.assertIn("seed", body)
+
     def test_o128_retry_suffix_no_experience_hint(self) -> None:
         """O128: retry suffix «similar» не предлагает «начни с опыта»."""
-        suffix = reply_retry_user_suffix(reason="similar", attempt=1, layer="L3")
+        suffix = reply_retry_user_suffix(
+            reason="similar", attempt=1, layer="L3", next_structure_idx=1
+        )
         self.assertNotIn("начни с опыта", suffix)
-        self.assertIn("план→шаги→вопрос", suffix)
+        self.assertIn("каркас B", suffix)
 
     def test_o128_8752_good_no_stack_pref(self) -> None:
         """O128: GOOD #8752 (нет TG) — без «предпочтение по стеку»."""

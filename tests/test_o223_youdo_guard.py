@@ -54,6 +54,34 @@ def test_physical_lite_hidden_no_tags() -> None:
     assert "wordpress" not in lite.task_summary.casefold()
 
 
+def test_youdo_long_listing_snippet_still_fetches_detail() -> None:
+    """O223+: long listing snippet must not skip detail fetch (t14878013 class)."""
+    from unittest.mock import MagicMock, patch
+
+    from lead_pipeline import _resolve_ingest_body
+
+    project = ListingProject(
+        project_id=14878013,
+        title="Закрытый парсинг",
+        budget_text="400",
+        url="https://youdo.com/t14878013",
+        published_at="",
+        listing_snippet="x" * 350,
+        source=SOURCE_YOUDO,
+    )
+    cfg = MagicMock()
+    errors: list[str] = []
+    with patch("lead_pipeline._youdo_detail_fetch_enabled", return_value=True):
+        with patch(
+            "lead_pipeline.fetch_project_detail",
+            return_value=("detail text " * 20, "<html></html>", True),
+        ) as mock_fetch:
+            body, _, detail_ok = _resolve_ingest_body(project, cfg, errors)
+            mock_fetch.assert_called_once()
+            assert detail_ok is True
+            assert "detail text" in body
+
+
 def test_youdo_detail_short_skips_l1() -> None:
     project = ListingProject(
         project_id=14857148,

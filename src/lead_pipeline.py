@@ -88,8 +88,6 @@ def _resolve_ingest_body(
         if source == SOURCE_YOUDO:
             if not _youdo_detail_fetch_enabled():
                 return base, None, None
-            if len(base) >= _youdo_detail_min_chars():
-                return base, None, None
         text, html, ok = fetch_project_detail(
             source,
             project.url,
