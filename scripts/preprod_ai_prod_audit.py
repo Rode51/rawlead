@@ -461,8 +461,24 @@ def audit_lead(lead: dict[str, Any]) -> dict[str, Any]:
     elif audit_l2 and verdict == "мимо" and reply_draft:
         warns.append("warn:reply_draft_nonempty_for_mimo")
 
-    if audit_tools and tools:
-        locked = vendor_lock_tools(tools)
+    if audit_tools:
+        from ai_analyze import _effective_tools_for_audit
+        from tools_catalog import map_tool_to_generic
+
+        stored_tools = lead["tools_required"]
+        tools = _effective_tools_for_audit(
+            stored_tools,
+            title=lead["title"],
+            description=lead["body"],
+            task_summary=task_summary,
+            lead_tags=lead.get("lead_tags") or [],
+        )
+        lock_src = lead.get("tools_required_raw")
+        if lock_src is None:
+            lock_src = stored_tools
+        locked = vendor_lock_tools(
+            lock_src if isinstance(lock_src, (list, tuple)) else _parse_tools_raw(lock_src)
+        )
         if locked:
             fails.append(f"tools:vendor_lock:{','.join(locked[:5])}")
 
@@ -474,7 +490,11 @@ def audit_lead(lead: dict[str, Any]) -> dict[str, Any]:
         if len(tools) != len(set(t.lower() for t in tools)):
             fails.append("tools:duplicates")
 
-        invalid_tools = [t for t in tools if not is_known_tool(t)]
+        invalid_tools = [
+            str(t).strip()
+            for t in stored_tools
+            if str(t).strip() and not is_known_tool(map_tool_to_generic(str(t).strip()))
+        ]
         if invalid_tools:
             fails.append(f"tools:not_in_catalog:{','.join(invalid_tools[:5])}")
 

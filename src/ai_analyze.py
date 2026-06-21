@@ -661,6 +661,42 @@ _TAKE_VERDICTS_CF = frozenset({"брать", "брат", "take", "ok"})
 _MAYBE_VERDICTS_CF = frozenset({"сомнительно", "maybe"})
 
 
+def _effective_tools_for_audit(
+    tools_required: list[str] | tuple[str, ...] | None,
+    *,
+    title: str = "",
+    description: str = "",
+    task_summary: str = "",
+    lead_tags: list[str] | tuple[str, ...] | None = None,
+) -> list[str]:
+    """Resolve stored tools via catalog finalize + TZ sanitize (G7b min_2)."""
+    from tools_catalog import finalize_tools_for_lead
+
+    seeds: list[str] = [str(t).strip() for t in (tools_required or []) if str(t).strip()]
+    if not seeds:
+        seeds = [str(t).strip() for t in (lead_tags or []) if str(t).strip()]
+    resolved = finalize_tools_for_lead(
+        seeds,
+        title=title,
+        snippet=description,
+        task_summary=task_summary,
+    )
+    resolved = sanitize_tools_for_tz(
+        resolved,
+        title=title,
+        snippet=description,
+        task_summary=task_summary,
+    )
+    if len(resolved) < 2:
+        resolved = finalize_tools_for_lead(
+            resolved,
+            title=title,
+            snippet=description,
+            task_summary=task_summary,
+        )
+    return [str(t).strip() for t in resolved if str(t).strip()]
+
+
 def validate_stored_l2_draft(
     *,
     verdict: str,
@@ -668,6 +704,8 @@ def validate_stored_l2_draft(
     tools_required: list[str] | tuple[str, ...] | None = None,
     title: str = "",
     description: str = "",
+    task_summary: str = "",
+    lead_tags: list[str] | tuple[str, ...] | None = None,
 ) -> list[str]:
     """O168: auto-audit stored L2 (forbidden words · tools min_2) — fail codes, empty = pass."""
     fails: list[str] = []
@@ -675,7 +713,17 @@ def validate_stored_l2_draft(
     if v in ("мимо", "пропустить", "skip"):
         return fails
     draft = (reply_draft or "").strip()
-    tools = [str(t).strip() for t in (tools_required or []) if str(t).strip()]
+    tools = (
+        _effective_tools_for_audit(
+            tools_required,
+            title=title,
+            description=description,
+            task_summary=task_summary,
+            lead_tags=lead_tags,
+        )
+        if draft
+        else [str(t).strip() for t in (tools_required or []) if str(t).strip()]
+    )
     if v in _TAKE_VERDICTS_CF:
         if not draft:
             fails.append("L2:empty_reply_draft")
@@ -696,7 +744,7 @@ def validate_stored_l2_draft(
                 )
             except AiAnalyzeError as exc:
                 fails.append(f"L2:{exc}")
-    if draft and tools:
+    if draft:
         if len(tools) < 2:
             fails.append("tools:min_2_required")
         elif len(tools) > 8:
@@ -767,6 +815,10 @@ def sanitize_tools_for_tz(
         if not py_ok:
             drop("python")
         ensure("wordpress_dev", "php", "elementor")
+    elif wp_stack:
+        if not py_ok:
+            drop("python")
+        ensure("wordpress_dev", "php")
 
     email_mkt = any(
         m in hay

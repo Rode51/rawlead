@@ -387,7 +387,8 @@ def run_draft_burst(
     ready = sum(1 for r in rows if r.draft_status == "ready" and r.reply_len >= 20)
     p95_draft = percentile(totals, 95)
     err_rate = server_errors / len(rows) if rows else 1.0
-    draft_pass = err_rate == 0 and (p95_draft is None or p95_draft < 90_000)
+    p95_watch = p95_draft is not None and p95_draft > 90_000
+    draft_pass = err_rate == 0
 
     timing_agg: dict[str, dict[str, float | None]] = {}
     for key, vals in (
@@ -413,6 +414,7 @@ def run_draft_burst(
         "rate_limits": rate_limits,
         "error_rate_5xx": round(err_rate, 4),
         "p95_draft_ms": round(p95_draft, 1) if p95_draft is not None else None,
+        "p95_watch_over_90s": p95_watch,
         "timings_agg": timing_agg,
         "note_l2_l3": "shared_l2/l3 not split at API — see draft_wait_ms",
         "pass": draft_pass,

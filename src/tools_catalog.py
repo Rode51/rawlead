@@ -174,7 +174,7 @@ _TZ_TOOL_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bcinema\s*4d\b", re.I), "cinema_4d"),
     (re.compile(r"\bpython\b|\bпитон\b|\bpy\b(?!\w)", re.I), "python"),
     (re.compile(r"\bphp\b|\blaravel\b", re.I), "php"),
-    (re.compile(r"\bwordpress\b|\bwp\b|\bвордпресс\b|\belementor\b|\bwoocommerce\b", re.I), "wordpress_dev"),
+    (re.compile(r"\bword\s*press\b|\bwordpress\b|\bwp\b|\bвордпресс\b|\belementor\b|\bwoocommerce\b", re.I), "wordpress_dev"),
     (re.compile(r"\bjavascript\b|\breact\b|\bvue\b|\bnode\.?js\b", re.I), "javascript"),
     (re.compile(r"\bgoogle\s+apps\s+script\b|\bapps\s+script\b", re.I), "google_apps_script"),
     (re.compile(r"\brhino\b|\bрино\b", re.I), "rhino"),
@@ -189,6 +189,9 @@ _TZ_TOOL_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bexcel\b|\bcsv\b", re.I), "excel"),
     (re.compile(r"\bblender\b", re.I), "blender"),
     (re.compile(r"\bselenium\b", re.I), "selenium"),
+    (re.compile(r"\bchrome\b|расширен\w*\s+для\s+browser", re.I), "javascript"),
+    (re.compile(r"политик\w*\s+конфиденциальн|privacy\s+policy|пользовательск\w+\s+соглашен", re.I), "text_editor"),
+    (re.compile(r"\bugc\b|контент[\s-]?маркетинг", re.I), "content_marketing"),
     (re.compile(r"\bton\b|\bnft\b|\bblockchain\b", re.I), "blockchain"),
 )
 
@@ -228,18 +231,18 @@ def normalize_tool_key(raw: str) -> str:
 
 
 def _resolve_tool_slug(key: str) -> str:
-    """Alias → vendor map → canonical_tag → passthrough."""
+    """Alias → vendor map → KNOWN_TOOLS → canonical_tag → passthrough."""
     k = normalize_tool_key(key)
     if not k:
         return ""
     if k in _TOOL_ALIAS_MAP:
         k = _TOOL_ALIAS_MAP[k]
     k = _VENDOR_TOOL_MAP.get(k, k)
+    if k in KNOWN_TOOLS:
+        return k
     canon = resolve_canonical_tag(k)
     if canon and canon in CANONICAL_TAGS:
         return canon
-    if k in KNOWN_TOOLS:
-        return k
     return k
 
 
@@ -284,6 +287,43 @@ def normalize_tools_required(raw: Any, *, limit: int = 8) -> tuple[str, ...]:
     return tuple(out)
 
 
+# G7b: when L2 returns a single slug, pair with a canonical stack companion (audit min_2).
+_TOOL_COMPANIONS: dict[str, tuple[str, ...]] = {
+    "telegram_bot_dev": ("python", "javascript"),
+    "telegram": ("python",),
+    "wordpress_dev": ("php", "javascript"),
+    "seo": ("javascript", "excel"),
+    "figma": ("javascript",),
+    "php": ("javascript",),
+    "python": ("postgresql",),
+    "photoshop": ("illustrator",),
+    "illustrator": ("photoshop",),
+    "google_apps_script": ("javascript",),
+    "google_sheets_api": ("javascript", "google_apps_script"),
+    "elementor": ("wordpress_dev", "php"),
+    "web_scraping": ("python",),
+    "email_marketing": ("javascript",),
+    "after_effects": ("premiere_pro",),
+    "blender": ("cinema_4d",),
+    "javascript": ("html_css",),
+    "content_marketing": ("smm",),
+    "smm": ("content_marketing",),
+    "text_editor": ("word_processor",),
+    "consulting": ("text_editor",),
+}
+
+
+def _append_companion_tools(out: list[str], *, limit: int) -> None:
+    if len(out) != 1:
+        return
+    for companion in _TOOL_COMPANIONS.get(out[0], ()):
+        extra = normalize_tools_required([companion], limit=1)
+        if extra and extra[0] not in out:
+            out.append(extra[0])
+        if len(out) >= 2:
+            break
+
+
 def finalize_tools_for_lead(
     tools: tuple[str, ...] | list[str],
     *,
@@ -310,6 +350,8 @@ def finalize_tools_for_lead(
                     out.append(extra[0])
             if len(out) >= 2:
                 break
+    if len(out) < 2:
+        _append_companion_tools(out, limit=limit)
     return normalize_tools_required(out, limit=limit)
 
 

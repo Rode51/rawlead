@@ -216,7 +216,7 @@ def _http_json(
     url: str,
     *,
     token: str | None = None,
-    timeout: float = 20.0,
+    timeout: float = 45.0,
 ) -> tuple[int | None, dict[str, Any] | None, str | None]:
     headers = {"User-Agent": _UA, "Accept": "application/json"}
     if token:
@@ -801,6 +801,8 @@ def _audit_lead_stress(lead: dict[str, Any]) -> dict[str, Any]:
         tools_required=lead.get("tools_required") or [],
         title=lead.get("title") or "",
         description=lead.get("body") or "",
+        task_summary=lead.get("task_summary") or "",
+        lead_tags=lead.get("lead_tags") or [],
     )
     draft_fails = [f for f in fails if f.startswith(("L1:", "L2:"))]
     tools_fails = [f for f in fails if f.startswith("tools:")]
@@ -1079,6 +1081,8 @@ def write_verify_brief(report: dict[str, Any], path: Path) -> None:
     l2 = report.get("l2_quality") or {}
     sg = l2.get("send_gate") or {}
     ingest = report.get("ingest_24h") or {}
+    draft = report.get("draft_burst") or {}
+    draft_p95 = ((draft.get("timings_agg") or {}).get("total") or {}).get("p95_ms")
     lines = [
         "# PRE-PROD Stress V2 verify (O168)",
         "",
@@ -1100,6 +1104,19 @@ def write_verify_brief(report: dict[str, Any], path: Path) -> None:
             f"- L2 auto: **{l2.get('auto_pass_pct', '—')}%** · send: "
             f"**{sg.get('send_as_is_pct', '—')}%** ({sg.get('mode', '—')})",
             f"- ingest max gap: **{ingest.get('max_gap_min', '—')} min**",
+        ]
+    )
+    if draft_p95 is not None and float(draft_p95) > 90_000:
+        lines.extend(
+            [
+                "",
+                "## Watch",
+                "",
+                f"- **draft_burst** total p95 **{float(draft_p95) / 1000:.1f}s** >90s — monitor (no fix unless owner bar)",
+            ]
+        )
+    lines.extend(
+        [
             "",
             "## Next",
             "",

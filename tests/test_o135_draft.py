@@ -294,15 +294,15 @@ class TestO168L2Gates(unittest.TestCase):
 
     def test_tools_min_2_required(self) -> None:
         draft = (
-            "Здравствуйте! Настрою лендинг на Tilda по ТЗ. "
-            "Подскажите, есть ли готовый контент?"
+            "Здравствуйте! Выполню задачу по ТЗ. "
+            "Подскажите, есть ли дополнительные материалы?"
         )
         fails = validate_stored_l2_draft(
             verdict="брать",
             reply_draft=draft,
-            tools_required=["figma"],
-            title="Tilda",
-            description="лендинг Tilda",
+            tools_required=["consulting"],
+            title="Общий проект",
+            description="Нужен исполнитель, стек в ТЗ не указан.",
         )
         self.assertIn("tools:min_2_required", fails)
 

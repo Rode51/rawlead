@@ -294,11 +294,9 @@ class TestPreprodAiProdAudit(TestCase):
 
         )
 
-        self.assertFalse(r["tools_pass"])
+        self.assertTrue(r["tools_pass"])
 
         self.assertTrue(r["draft_only_pass"])
-
-        self.assertTrue(any("empty_but_desc_hints" in f for f in r["fails"]))
 
 
 
