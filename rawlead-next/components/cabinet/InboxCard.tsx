@@ -144,6 +144,20 @@ export default function InboxCard({ item, onDelete }: Props) {
             </p>
           )}
 
+          {item.url && (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="inbox-exchange-link"
+              className="text-[12px] font-semibold underline underline-offset-2 transition-colors hover:text-[#111010]"
+              style={{ color: '#9B9B97', display: 'inline-block', marginBottom: 16 }}
+              onClick={e => e.stopPropagation()}
+            >
+              Читать на бирже ↗
+            </a>
+          )}
+
           <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={handleCopy}

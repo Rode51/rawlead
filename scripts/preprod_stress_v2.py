@@ -65,6 +65,14 @@ _L2_AUDIT_CANDIDATES = (
     _ROOT / "data" / "preprod_ai_prod_audit.json",
     _ROOT / "data" / "preprod_ai_prod_audit_o162_post.json",
 )
+_PREPROD_ACC1_USER_ID = "7a83dbd8-ab41-4350-a183-38370d5b5c1c"
+_PREPROD_ACC1_DEV_TAGS = {
+    "python": 4.0,
+    "fastapi": 3.8,
+    "django": 3.5,
+    "api_integration": 3.0,
+    "web_scraping": 2.8,
+}
 
 
 def percentile(values: list[float], pct: float) -> float | None:
@@ -288,6 +296,35 @@ def _mint_token(account: str, plan: str, env_key: str, *, force: bool = False) -
         return "", f"mint_fail:{proc.stderr.strip()[:200]}"
     token = _env_token(env_key)
     return token, f"mint:{account}:{plan}"
+
+
+def _ensure_preprod_acc1_dev_tags(db_url: str) -> dict[str, Any]:
+    """skills_mismatch leaves acc1 on yii2-only — restore dev profile for J5/J6."""
+    if not db_url.strip():
+        return {"skipped": True, "reason": "no DATABASE_URL"}
+    import psycopg
+
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    from api_server import _replace_quiz_import_user_tags
+
+    with psycopg.connect(db_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT tag FROM user_tags WHERE user_id = %s::uuid ORDER BY tag",
+                (_PREPROD_ACC1_USER_ID,),
+            )
+            before = [r[0] for r in cur.fetchall()]
+            needs_restore = before == ["yii2"] or not any(
+                t in before for t in ("python", "fastapi", "django")
+            )
+            if not needs_restore:
+                return {"restored": False, "tags": before}
+            imported = _replace_quiz_import_user_tags(
+                cur, _PREPROD_ACC1_USER_ID, dict(_PREPROD_ACC1_DEV_TAGS), ["dev"]
+            )
+            conn.commit()
+            return {"restored": True, "imported": imported, "before": before}
 
 
 def _set_trial_subscription(user_id: str, db_url: str) -> None:
@@ -1177,6 +1214,21 @@ def run_stress_v2(
         stages = _RAMP_QUICK if quick else _RAMP_FULL
         report["load"] = run_load_ramp(api_url=api_url, stages=stages)
 
+    if skip_tz:
+        report["tz"] = {"skipped": True, "pass": True}
+    else:
+        report["tz"] = check_tz_leads(api_url, db_url=db_url or None, limit=5 if not quick else 3)
+
+    # Journey before draft_burst — burst exhausts /draft rate limit (J5/J6 429).
+    if skip_journey:
+        report["ux_journey"] = {"skipped": True, "pass": True}
+    elif not premium_token:
+        report["ux_journey"] = {"skipped": True, "reason": "no premium token", "pass": False}
+    else:
+        if db_url:
+            report["preprod_acc1_tags"] = _ensure_preprod_acc1_dev_tags(db_url)
+        report["ux_journey"] = run_ux_journey(base_url, token=premium_token)
+
     if skip_draft:
         report["draft_burst"] = {"skipped": True, "pass": True}
     elif not premium_token:
@@ -1193,18 +1245,6 @@ def run_stress_v2(
             max_leads=DRAFT_BURST_MAX if not quick else min(5, DRAFT_BURST_MAX),
             concurrency=3 if quick else 4,
         )
-
-    if skip_tz:
-        report["tz"] = {"skipped": True, "pass": True}
-    else:
-        report["tz"] = check_tz_leads(api_url, db_url=db_url or None, limit=5 if not quick else 3)
-
-    if skip_journey:
-        report["ux_journey"] = {"skipped": True, "pass": True}
-    elif not premium_token:
-        report["ux_journey"] = {"skipped": True, "reason": "no premium token", "pass": False}
-    else:
-        report["ux_journey"] = run_ux_journey(base_url, token=premium_token)
 
     if skip_skills:
         report["skills_mismatch"] = {"skipped": True, "pass": True}

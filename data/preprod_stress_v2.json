@@ -1,25 +1,11 @@
 {
-  "generated_at": "2026-06-21T06:08:22.434695+00:00",
+  "generated_at": "2026-06-21T09:52:46.338922+00:00",
   "base_url": "https://rawlead.ru",
   "api_url": "https://api.rawlead.ru",
-  "mode": "quick",
+  "mode": "full",
   "tier_plan_check": {
-    "pass": false,
-    "issues": [
-      {
-        "tier": "free",
-        "error": "plan_mismatch",
-        "expected_plan": "free",
-        "actual_plan": null,
-        "source": "env:RAWLEAD_PREPROD_FREE_TOKEN"
-      },
-      {
-        "tier": "trial",
-        "error": "no_token",
-        "expected_plan": "trial",
-        "source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN"
-      }
-    ]
+    "pass": true,
+    "issues": []
   },
   "tiers": {
     "anon": {
@@ -28,15 +14,11 @@
     },
     "free": {
       "source": "env:RAWLEAD_PREPROD_FREE_TOKEN",
-      "ok": false,
-      "plan_mismatch": {
-        "expected": "free",
-        "actual": null
-      }
+      "ok": true
     },
     "trial": {
       "source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN",
-      "ok": false
+      "ok": true
     },
     "premium": {
       "source": "env:RAWLEAD_PREPROD_ACCESS_TOKEN",
@@ -48,7 +30,7 @@
       {
         "tier": "anon",
         "feed_status": 200,
-        "feed_ms": 530.9,
+        "feed_ms": 543.6,
         "items": 5,
         "token_source": "none",
         "subscription_status": null,
@@ -61,36 +43,33 @@
       {
         "tier": "free",
         "feed_status": 200,
-        "feed_ms": 535.9,
+        "feed_ms": 729.8,
         "items": 5,
         "token_source": "env:RAWLEAD_PREPROD_FREE_TOKEN",
-        "subscription_status": null,
-        "plan": null,
+        "subscription_status": "free",
+        "plan": "free",
         "expected_plan": "free",
-        "plan_ok": false,
-        "error": {
-          "expected": "free",
-          "actual": null
-        },
-        "pass": false
+        "plan_ok": true,
+        "error": null,
+        "pass": true
       },
       {
         "tier": "trial",
         "feed_status": 200,
-        "feed_ms": 562.9,
+        "feed_ms": 651.9,
         "items": 5,
         "token_source": "env:RAWLEAD_PREPROD_TRIAL_TOKEN",
-        "subscription_status": null,
-        "plan": null,
+        "subscription_status": "trial",
+        "plan": "trial",
         "expected_plan": "trial",
-        "plan_ok": false,
-        "error": "tier_not_ready",
-        "pass": false
+        "plan_ok": true,
+        "error": null,
+        "pass": true
       },
       {
         "tier": "premium",
         "feed_status": 200,
-        "feed_ms": 669.7,
+        "feed_ms": 643.5,
         "items": 5,
         "token_source": "env:RAWLEAD_PREPROD_ACCESS_TOKEN",
         "subscription_status": "active",
@@ -101,225 +80,626 @@
         "pass": true
       }
     ],
-    "pass": false
+    "pass": true
   },
   "load": {
-    "generated_at": "2026-06-21T06:11:29.036655+00:00",
+    "generated_at": "2026-06-21T10:02:54.288055+00:00",
     "api_url": "https://api.rawlead.ru",
     "mode": "ramp",
     "stages": [
       {
-        "generated_at": "2026-06-21T06:08:57.580720+00:00",
+        "generated_at": "2026-06-21T09:54:52.804033+00:00",
         "api_url": "https://api.rawlead.ru",
         "workers": 10,
-        "duration_sec": 30,
-        "requests_total": 437,
-        "feed_requests": 146,
+        "duration_sec": 120,
+        "requests_total": 1939,
+        "feed_requests": 647,
         "errors_count": 0,
         "error_rate": 0.0,
-        "p50_feed_ms": 687.5,
-        "p95_feed_ms": 960.5,
-        "p99_feed_ms": 1567.3,
-        "p50_all_ms": 572.1,
-        "p95_all_ms": 851.3,
+        "p50_feed_ms": 648.8,
+        "p95_feed_ms": 696.5,
+        "p99_feed_ms": 782.7,
+        "p50_all_ms": 536.0,
+        "p95_all_ms": 673.8,
         "s3_pass": true,
         "sample_errors": []
       },
       {
-        "generated_at": "2026-06-21T06:09:58.335488+00:00",
+        "generated_at": "2026-06-21T09:57:53.506840+00:00",
         "api_url": "https://api.rawlead.ru",
         "workers": 30,
-        "duration_sec": 60,
-        "requests_total": 2413,
-        "feed_requests": 809,
+        "duration_sec": 180,
+        "requests_total": 7500,
+        "feed_requests": 2500,
         "errors_count": 0,
         "error_rate": 0.0,
-        "p50_feed_ms": 728.3,
-        "p95_feed_ms": 1177.3,
-        "p99_feed_ms": 1734.2,
-        "p50_all_ms": 636.6,
-        "p95_all_ms": 969.9,
+        "p50_feed_ms": 731.7,
+        "p95_feed_ms": 848.5,
+        "p99_feed_ms": 958.5,
+        "p50_all_ms": 642.2,
+        "p95_all_ms": 801.3,
         "s3_pass": true,
         "sample_errors": []
       },
       {
-        "generated_at": "2026-06-21T06:11:29.034602+00:00",
+        "generated_at": "2026-06-21T10:02:54.283368+00:00",
         "api_url": "https://api.rawlead.ru",
         "workers": 50,
-        "duration_sec": 90,
-        "requests_total": 5107,
-        "feed_requests": 1706,
+        "duration_sec": 300,
+        "requests_total": 16724,
+        "feed_requests": 5578,
         "errors_count": 0,
         "error_rate": 0.0,
-        "p50_feed_ms": 825.1,
-        "p95_feed_ms": 1139.2,
-        "p99_feed_ms": 2080.5,
-        "p50_all_ms": 752.1,
-        "p95_all_ms": 1054.6,
+        "p50_feed_ms": 859.5,
+        "p95_feed_ms": 1101.0,
+        "p99_feed_ms": 1273.8,
+        "p50_all_ms": 793.5,
+        "p95_all_ms": 1035.5,
         "s3_pass": true,
         "sample_errors": []
       }
     ],
     "workers_peak": 50,
-    "duration_total_sec": 180,
-    "requests_total": 7957,
-    "p95_feed_ms": 1139.2,
-    "p99_feed_ms": 2080.5,
+    "duration_total_sec": 600,
+    "requests_total": 26163,
+    "p95_feed_ms": 1101.0,
+    "p99_feed_ms": 1273.8,
     "error_rate_max": 0.0,
     "s3_pass": true,
     "sample_errors": [],
     "s3_pre_note": "Neon pooler recommended before 50 VU; see PREPROD_STRESS_RUN § S3-pre"
   },
+  "tz": {
+    "lead_ids": [
+      16597,
+      16588,
+      16546,
+      16141,
+      13963
+    ],
+    "rows": [
+      {
+        "lead_id": 16597,
+        "status": 200,
+        "tz_fetch_ms": 506.8,
+        "body_chars": 2971,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      },
+      {
+        "lead_id": 16588,
+        "status": 200,
+        "tz_fetch_ms": 477.5,
+        "body_chars": 1385,
+        "extracted": false,
+        "pass": false,
+        "error": null
+      },
+      {
+        "lead_id": 16546,
+        "status": 200,
+        "tz_fetch_ms": 481.6,
+        "body_chars": 653,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      },
+      {
+        "lead_id": 16141,
+        "status": 200,
+        "tz_fetch_ms": 530.5,
+        "body_chars": 3070,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      },
+      {
+        "lead_id": 13963,
+        "status": 200,
+        "tz_fetch_ms": 535.7,
+        "body_chars": 5585,
+        "extracted": true,
+        "pass": true,
+        "error": null
+      }
+    ],
+    "ok_extracted": 4,
+    "required_ok": 4,
+    "pass": true
+  },
+  "preprod_acc1_tags": {
+    "restored": true,
+    "imported": 6,
+    "before": [
+      "yii2"
+    ]
+  },
+  "ux_journey": {
+    "cmd": [
+      "C:\\Users\\hramo\\uisness\\.venv\\Scripts\\python.exe",
+      "C:\\Users\\hramo\\uisness\\scripts\\preprod_playwright\\ux_journey.py",
+      "--base-url",
+      "https://rawlead.ru",
+      "--browser",
+      "chromium",
+      "--output-json",
+      "C:\\Users\\hramo\\uisness\\data\\preprod_ux_journey_stress.json",
+      "--output-md",
+      "C:\\Users\\hramo\\uisness\\data\\preprod_ux_journey_stress.md"
+    ],
+    "exit_code": 0,
+    "duration_sec": 119.0,
+    "stdout_tail": "ing link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\",\n        \"[warning] The resource https://mc.yandex.ru/watch/109860210 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\"\n      ],\n      \"network_failures\": []\n    },\n    {\n      \"id\": \"J6\",\n      \"title\": \"Draft collapse\",\n      \"pass\": true,\n      \"ms\": 25379,\n      \"error\": null,\n      \"screenshots\": {\n        \"before\": \"data\\\\preprod_ux_journey\\\\J6_before.png\",\n        \"after\": \"data\\\\preprod_ux_journey\\\\J6_after.png\"\n      },\n      \"console_errors\": [\n        \"[warning] The resource https://mc.yandex.ru/watch/109860210 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\"\n      ],\n      \"network_failures\": []\n    },\n    {\n      \"id\": \"J8\",\n      \"title\": \"Р›Рљ logged\",\n      \"pass\": true,\n      \"ms\": 746,\n      \"error\": null,\n      \"screenshots\": {\n        \"before\": \"data\\\\preprod_ux_journey\\\\J8_before.png\",\n        \"after\": \"data\\\\preprod_ux_journey\\\\J8_after.png\"\n      },\n      \"console_errors\": [],\n      \"network_failures\": []\n    },\n    {\n      \"id\": \"J11\",\n      \"title\": \"FAB support\",\n      \"pass\": true,\n      \"ms\": 2295,\n      \"error\": null,\n      \"screenshots\": {\n        \"before\": \"data\\\\preprod_ux_journey\\\\J11_before.png\",\n        \"after\": \"data\\\\preprod_ux_journey\\\\J11_after.png\"\n      },\n      \"console_errors\": [],\n      \"network_failures\": []\n    }\n  ],\n  \"findings\": [\n    {\n      \"severity\": \"info\",\n      \"journey\": \"J5\",\n      \"message\": \"draft 1/2 OK (lead 16497)\"\n    },\n    {\n      \"severity\": \"info\",\n      \"journey\": \"J5\",\n      \"message\": \"draft 2/2 OK (lead 15959)\"\n    }\n  ],\n  \"artifacts_dir\": \"data\\\\preprod_ux_journey\"\n}\n",
+    "stderr_tail": "",
+    "pass": true,
+    "critical_count": 0,
+    "journeys_pass": 10,
+    "journeys_total": 10,
+    "artifacts": {
+      "json": "C:\\Users\\hramo\\uisness\\data\\preprod_ux_journey_stress.json",
+      "md": "C:\\Users\\hramo\\uisness\\data\\preprod_ux_journey_stress.md"
+    }
+  },
   "draft_burst": {
-    "generated_at": "2026-06-21T06:12:03.827219+00:00",
+    "generated_at": "2026-06-21T10:05:35.943151+00:00",
     "api_url": "https://api.rawlead.ru",
-    "max_leads": 5,
-    "concurrency": 3,
-    "attempted": 5,
-    "ready": 5,
+    "max_leads": 20,
+    "concurrency": 4,
+    "attempted": 20,
+    "ready": 3,
     "server_errors": 0,
-    "rate_limits": 0,
+    "rate_limits": 17,
     "error_rate_5xx": 0.0,
-    "p95_draft_ms": 34002.6,
+    "p95_draft_ms": 21870.3,
+    "p95_watch_over_90s": false,
     "timings_agg": {
       "feed": {
-        "p50_ms": 937.8,
-        "p95_ms": 971.2
+        "p50_ms": 947.5,
+        "p95_ms": 1163.2
       },
       "expand": {
-        "p50_ms": 675.9,
-        "p95_ms": 707.4
+        "p50_ms": 581.1,
+        "p95_ms": 738.5
       },
       "tools": {
         "p50_ms": 0,
         "p95_ms": 0
       },
       "draft_wait": {
-        "p50_ms": 974.1,
-        "p95_ms": 14834.4
+        "p50_ms": 543.1,
+        "p95_ms": 9535.0
       },
       "total": {
-        "p50_ms": 2621.6,
-        "p95_ms": 34002.6
+        "p50_ms": 2053.5,
+        "p95_ms": 21870.3
       }
     },
     "note_l2_l3": "shared_l2/l3 not split at API — see draft_wait_ms",
     "pass": true,
     "rows": [
       {
-        "lead_id": 15680,
+        "lead_id": 16688,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 1162.5,
+          "expand_ms": 722.3,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 658.8,
+          "total_ms": 2544.3
+        }
+      },
+      {
+        "lead_id": 16686,
         "http_status": 200,
         "draft_status": "ready",
         "error": null,
-        "reply_len": 419,
+        "reply_len": 488,
         "tools_count": 0,
         "rate_limited": false,
         "server_error": false,
         "smell": null,
         "timings": {
-          "feed_ms": 971.2,
-          "expand_ms": 675.9,
+          "feed_ms": 1088.8,
+          "expand_ms": 628.2,
           "tools_ms": 0.0,
           "shared_l2_ms": null,
           "l3_ms": null,
-          "draft_wait_ms": 974.1,
-          "total_ms": 2621.6
+          "draft_wait_ms": 829.3,
+          "total_ms": 2546.7
         }
       },
       {
-        "lead_id": 15678,
-        "http_status": 200,
-        "draft_status": "ready",
-        "error": null,
-        "reply_len": 409,
+        "lead_id": 16684,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
         "tools_count": 0,
-        "rate_limited": false,
+        "rate_limited": true,
         "server_error": false,
         "smell": null,
         "timings": {
-          "feed_ms": 947.7,
-          "expand_ms": 679.0,
+          "feed_ms": 927.8,
+          "expand_ms": 537.8,
           "tools_ms": 0.0,
           "shared_l2_ms": null,
           "l3_ms": null,
-          "draft_wait_ms": 1002.1,
-          "total_ms": 2629.3
+          "draft_wait_ms": 515.0,
+          "total_ms": 1981.4
         }
       },
       {
-        "lead_id": 15597,
-        "http_status": 200,
-        "draft_status": "ready",
-        "error": null,
-        "reply_len": 288,
+        "lead_id": 16683,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
         "tools_count": 0,
-        "rate_limited": false,
+        "rate_limited": true,
         "server_error": false,
         "smell": null,
         "timings": {
-          "feed_ms": 855.9,
-          "expand_ms": 639.0,
+          "feed_ms": 978.2,
+          "expand_ms": 540.2,
           "tools_ms": 0.0,
           "shared_l2_ms": null,
           "l3_ms": null,
-          "draft_wait_ms": 927.4,
-          "total_ms": 2422.7
+          "draft_wait_ms": 574.4,
+          "total_ms": 2093.6
         }
       },
       {
-        "lead_id": 15639,
-        "http_status": 200,
-        "draft_status": "ready",
-        "error": null,
-        "reply_len": 362,
+        "lead_id": 16682,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
         "tools_count": 0,
-        "rate_limited": false,
+        "rate_limited": true,
         "server_error": false,
         "smell": null,
         "timings": {
-          "feed_ms": 851.7,
-          "expand_ms": 707.4,
+          "feed_ms": 823.7,
+          "expand_ms": 536.1,
           "tools_ms": 0.0,
           "shared_l2_ms": null,
           "l3_ms": null,
-          "draft_wait_ms": 904.7,
-          "total_ms": 2464.5
+          "draft_wait_ms": 517.0,
+          "total_ms": 1878.0
         }
       },
       {
-        "lead_id": 15761,
+        "lead_id": 16680,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 817.5,
+          "expand_ms": 545.0,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 525.9,
+          "total_ms": 1889.2
+        }
+      },
+      {
+        "lead_id": 16679,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 818.1,
+          "expand_ms": 554.9,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 543.1,
+          "total_ms": 1917.0
+        }
+      },
+      {
+        "lead_id": 16678,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 841.2,
+          "expand_ms": 570.0,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 514.9,
+          "total_ms": 1927.6
+        }
+      },
+      {
+        "lead_id": 16677,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 1236.2,
+          "expand_ms": 735.3,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 619.4,
+          "total_ms": 2591.9
+        }
+      },
+      {
+        "lead_id": 16633,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 1154.8,
+          "expand_ms": 668.0,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 623.9,
+          "total_ms": 2447.5
+        }
+      },
+      {
+        "lead_id": 16605,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 957.8,
+          "expand_ms": 575.5,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 514.9,
+          "total_ms": 2049.1
+        }
+      },
+      {
+        "lead_id": 16597,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 991.6,
+          "expand_ms": 588.8,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 510.2,
+          "total_ms": 2091.5
+        }
+      },
+      {
+        "lead_id": 16588,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 871.7,
+          "expand_ms": 639.9,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 549.9,
+          "total_ms": 2062.5
+        }
+      },
+      {
+        "lead_id": 16561,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 830.3,
+          "expand_ms": 634.0,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 576.0,
+          "total_ms": 2041.1
+        }
+      },
+      {
+        "lead_id": 16546,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 884.8,
+          "expand_ms": 555.5,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 521.2,
+          "total_ms": 1962.6
+        }
+      },
+      {
+        "lead_id": 16533,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 858.3,
+          "expand_ms": 578.0,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 514.3,
+          "total_ms": 1951.4
+        }
+      },
+      {
+        "lead_id": 16523,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 943.3,
+          "expand_ms": 562.1,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 541.8,
+          "total_ms": 2048.2
+        }
+      },
+      {
+        "lead_id": 16522,
+        "http_status": 429,
+        "draft_status": "rate_limit",
+        "error": "Too Many Requests",
+        "reply_len": 0,
+        "tools_count": 0,
+        "rate_limited": true,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 947.5,
+          "expand_ms": 581.1,
+          "tools_ms": 0.0,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 523.8,
+          "total_ms": 2053.5
+        }
+      },
+      {
+        "lead_id": 16689,
         "http_status": 404,
         "draft_status": "ready",
         "error": null,
-        "reply_len": 310,
+        "reply_len": 375,
         "tools_count": 0,
         "rate_limited": false,
         "server_error": false,
         "smell": null,
         "timings": {
-          "feed_ms": 937.8,
-          "expand_ms": 619.1,
+          "feed_ms": 1163.2,
+          "expand_ms": 738.5,
           "tools_ms": 0.0,
           "shared_l2_ms": null,
           "l3_ms": null,
-          "draft_wait_ms": 14834.4,
-          "total_ms": 34002.6
+          "draft_wait_ms": 9535.0,
+          "total_ms": 21870.3
+        }
+      },
+      {
+        "lead_id": 16685,
+        "http_status": 404,
+        "draft_status": "ready",
+        "error": null,
+        "reply_len": 398,
+        "tools_count": 2,
+        "rate_limited": false,
+        "server_error": false,
+        "smell": null,
+        "timings": {
+          "feed_ms": 1093.7,
+          "expand_ms": 755.8,
+          "tools_ms": 5253.7,
+          "shared_l2_ms": null,
+          "l3_ms": null,
+          "draft_wait_ms": 15010.5,
+          "total_ms": 35313.7
         }
       }
     ]
   },
-  "tz": {
-    "pass": false,
-    "error": "db: connection timeout expired",
-    "rows": []
-  },
-  "ux_journey": {
-    "skipped": true,
-    "pass": true
-  },
   "skills_mismatch": {
-    "skipped": true,
-    "pass": true
+    "cmd": [
+      "C:\\Users\\hramo\\uisness\\.venv\\Scripts\\python.exe",
+      "C:\\Users\\hramo\\uisness\\scripts\\preprod_ai_matrix.py",
+      "--profile",
+      "site",
+      "--scenario",
+      "skills_mismatch",
+      "--output",
+      "C:\\Users\\hramo\\uisness\\data\\preprod_skills_mismatch.json"
+    ],
+    "exit_code": 0,
+    "duration_sec": 21.6,
+    "stdout_tail": "{\n  \"scenario\": \"skills_mismatch\",\n  \"pass\": true,\n  \"lead_id\": 16702,\n  \"user_id\": \"7a83dbd8-ab41-4350-a183-38370d5b5c1c\",\n  \"user_tags\": [\n    \"yii2\"\n  ],\n  \"reply_draft\": \"Р—РґСЂР°РІСЃС‚РІСѓР№С‚Рµ! РџРѕ РІР°С€РµРјСѓ Р·Р°РєР°Р·Сѓ вЂ” Р±СЌРєРµРЅРґ РЅР° Node.js (NestJS) РґР»СЏ CS-РјР°СЂРєРµС‚РїР»РµР№СЃР° СЃ РёРЅС‚РµРіСЂР°С†РёРµР№ Steam API. РџРѕ СЃС‚РµРєСѓ РІРёР¶Сѓ JavaScript, PostgreSQL РґР»СЏ Р±Р°Р·С‹ РґР°РЅРЅС‹С… Рё Redis РґР»СЏ РєСЌС€РёСЂРѕРІР°РЅРёСЏ Рё СЃРµСЃСЃРёР№. Р”Р»СЏ P2P-СЃРґРµР»РѕРє Рё РґСЂСѓРіРёС… real-time РѕР±РЅРѕРІР»РµРЅРёР№, РєР°Рє СѓРєР°Р·Р°РЅРѕ, РЅР°СЃС‚СЂРѕСЋ WebSocket. РџРѕРґСЃРєР°Р¶РёС‚Рµ, РёРЅС‚РµРіСЂР°С†РёСЏ СЃРѕ Steam API РїСЂРµРґРїРѕР»Р°РіР°РµС‚ С‚РѕР»СЊРєРѕ Р°РІС‚РѕСЂРёР·Р°С†РёСЋ Рё РїРѕР»СѓС‡РµРЅРёРµ РёРЅРІРµРЅС‚Р°СЂСЏ РёР»Рё С‚Р°РєР¶Рµ Р°РІС‚РѕРјР°С‚РёР·Р°С†РёСЋ СЃР°РјРёС… РѕР±РјРµРЅРѕРІ?\",\n  \"timings_ms\": {\n    \"total\": 18498\n  },\n  \"checks\": {\n    \"non_empty\": true,\n    \"no_yii2_fontlab\": true,\n    \"no_smell\": true,\n    \"node_from_tz\": true,\n    \"under_budget\": true\n  },\n  \"smell\": null,\n  \"errors\": [],\n  \"summary\": {\n    \"pass\": true\n  }\n}\n",
+    "stderr_tail": "",
+    "pass": true,
+    "summary": {
+      "pass": true
+    },
+    "artifact": "C:\\Users\\hramo\\uisness\\data\\preprod_skills_mismatch.json"
   },
   "parser_snapshot": {
     "health_lines": {},
@@ -330,7 +710,7 @@
     "red_sources": [],
     "pass": true,
     "note": "См. PREPROD_STRESS_RUN § Parser — downloaded>0 ≠ сломан",
-    "log_source": "C:\\Users\\hramo\\uisness\\data\\radar_site.log"
+    "log_source": "vps:/opt/rawlead/data/radar_site.log"
   },
   "ingest_24h": {
     "max_gap_min": null,
@@ -339,22 +719,32 @@
     "pass": true
   },
   "l2_quality": {
-    "pass": false,
-    "error": "db: connection timeout expired"
+    "sample_size": 30,
+    "draft_only_pass_pct": 100.0,
+    "tools_pass_pct": 100.0,
+    "auto_pass_pct": 100.0,
+    "auto_pass": true,
+    "top_fails": [],
+    "send_gate": {
+      "mode": "skipped",
+      "pass": true,
+      "note": "run --l2-judge or preprod_ai_prod_audit --judge"
+    },
+    "pass": true
   },
   "pass_summary": {
     "gates": {
-      "tier_matrix": false,
+      "tier_matrix": true,
       "load_p95_feed": true,
-      "l2_auto": false,
-      "l2_send": false,
+      "l2_auto": true,
+      "l2_send": "skipped",
       "draft_burst": true,
-      "tz_leads": false,
-      "ux_journey": "skipped",
+      "tz_leads": true,
+      "ux_journey": true,
       "parsers": true,
       "ingest_24h": true,
-      "skills_mismatch": "skipped"
+      "skills_mismatch": true
     },
-    "pass": false
+    "pass": true
   }
 }

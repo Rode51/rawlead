@@ -4,15 +4,19 @@
 
 **Очередь:** [`TASKS.md`](TASKS.md) · **Coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md)
 
-**Next:** G7a tier/tz — SSH tunnel `:15432` + mint trial/free · deploy lead_pipeline если не на VPS · **YouDo watch**
+**Next:** Lead deploy API `3e12011` + Next (CABINET-EXCHANGE-LINK) · **G-SEC**
 
-**Parser probe 2026-06-21 ~13:37 UTC:** FL/Kwork/YouDo listing **ok** · YouDo antibot `html_len=1701` burst 13:33–13:35 · pchyol proxy fail · neon legacy IPv6 noise · см. `PROD_FACTS` AUTO
+**G7b full ✅ (2026-06-21):** `preprod_stress_v2.json` **09:52Z** · `pass_summary.pass: true` · l2_auto ✅ · ux_journey ✅ · load p95 ✅ · stress harness: journey before draft_burst + acc1 tag restore
+
+**CABINET-EXCHANGE-LINK ✅ (2026-06-21):** `InboxCard.tsx` — «Читать на бирже ↗» · `data-testid="inbox-exchange-link"`
+
+**G7b-L2-TOOLS ✅ code (Lead 2026-06-21):** commit `3e12011` — `finalize_tools_for_lead` + `_effective_tools_for_audit` · pytest **50+30** green
 
 **G6 ✅ (2026-06-21):** `preprod_ai_prod_audit_judge.md` **Accept L3: ✅ PASS** · 2026-06-20T18:24Z · uniq **3.04** · combined **4.19** · send **68%** · leak **0%** · L3 v4 `l3_opener_too_similar` + deploy VPS
 
 **YOUDO-T14878013 ✅ (2026-06-21):** lead #8256 delist `youdo_detail_mismatch` · `lead_pipeline` — всегда fetch YouDo detail · [`problems/2026-06-20-youdo-t14878013-mismatch.md`](../problems/2026-06-20-youdo-t14878013-mismatch.md)
 
-**FEED-MULTI-FILTER ✅ (2026-06-21):** multi category/source chips · `feed-filters.ts` · `FilterBar`/`FilterSheet`/`FilterDropdown` · `lenta/page.tsx` · `api.ts`
+**FEED-MULTI-FILTER ✅ (2026-06-21):** multi category/source · **deploy Next ✅** prod verify
 
 **G4-fix ✅ (2026-06-20):** desktop J1–J9,J5,J6,J8,J11 **10/10** · mobile J10 **1/1** · gate `preprod_ux_journey.json` **11/11** · `j5_draft_ok: true` · `critical_count: 0` · harness J5 = n16 parity (no reload между drafts)
 
@@ -31,8 +35,8 @@
 | G4 | UX journey J1–J11 | @coder | ✅ **11/11** · `j5_draft_ok` · 0 critical (2026-06-20 · desktop+mobile gate) |
 | G5 | AI matrix S1 | @coder | ✅ **12/12** · `s1_pass` (2026-06-20) |
 | G6 | L3 judge uniquify | @coder | ✅ **PASS** uniq 3.04 (2026-06-21) |
-| G7a | Load quick smoke | @coder | ⏳ load **PASS** p95 1781ms · tier/tz/l2 **FAIL** без tunnel (2026-06-21) |
-| G7b | Load **full** 50 VU + draft×20 | @coder | ⏳ после G7a |
+| G7a | Load quick smoke | @coder | ✅ env **tier_matrix** · **tz 3/3** · load p95 1651ms (2026-06-21) · l2/draft_burst ⏳ G7b |
+| G7b | Load **full** 50 VU + draft×20 | @coder | ✅ **09:52Z** pass · deploy API ⏳ Lead |
 | G-SEC | Security regression | @coder | ⏳ pytest ✅ · S-1/S-2 ручные · MiMo M0 **P0=0** |
 | M0–M4 | **MiMo** audit + skills | owner | **M0** ✅ gsec-delta · **M1** ✅ post-g1-e2e · M2–M4 ⏳ |
 | G8 | Radar 2–4 цикла | owner | ⏳ |

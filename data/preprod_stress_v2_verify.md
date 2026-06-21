@@ -1,25 +1,25 @@
 # PRE-PROD Stress V2 verify (O168)
 
-**Generated:** 2026-06-21T06:08:22.434695+00:00
-**Overall:** FAIL
+**Generated:** 2026-06-21T09:52:46.338922+00:00
+**Overall:** PASS
 
 ## Gates
 
-- **tier_matrix**: ❌
+- **tier_matrix**: ✅
 - **load_p95_feed**: ✅
-- **l2_auto**: ❌
-- **l2_send**: ❌
+- **l2_auto**: ✅
+- **l2_send**: ⏭
 - **draft_burst**: ✅
-- **tz_leads**: ❌
-- **ux_journey**: ⏭
+- **tz_leads**: ✅
+- **ux_journey**: ✅
 - **parsers**: ✅
 - **ingest_24h**: ✅
-- **skills_mismatch**: ⏭
+- **skills_mismatch**: ✅
 
 ## Metrics
 
-- feed p95 @50 VU: **1139.2 ms** (target <2000)
-- L2 auto: **—%** · send: **—%** (—)
+- feed p95 @50 VU: **1101.0 ms** (target <2000)
+- L2 auto: **100.0%** · send: **—%** (skipped)
 - ingest max gap: **None min**
 
 ## Next
