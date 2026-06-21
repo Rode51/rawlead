@@ -147,6 +147,21 @@ class TestYookassaWebhookDigest(unittest.TestCase):
         self.assertEqual(mock_handle.call_args[0][1], body)
 
 
+class TestMeAuthRequired(unittest.TestCase):
+    def test_me_feed_without_bearer_401(self) -> None:
+        client = TestClient(app)
+        resp = client.get("/v1/me/feed")
+        self.assertEqual(resp.status_code, 401)
+
+    def test_me_feed_owner_header_without_bearer_401(self) -> None:
+        client = TestClient(app)
+        resp = client.get(
+            "/v1/me/feed",
+            headers={"X-RawLead-User-Id": "00000000-0000-0000-0000-000000000001"},
+        )
+        self.assertEqual(resp.status_code, 401)
+
+
 class TestDraftFeedMembership(unittest.TestCase):
     def test_lead_not_in_feed_when_km_zero(self) -> None:
         cur = MagicMock()

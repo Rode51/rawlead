@@ -4,13 +4,19 @@
 
 **Очередь:** [`TASKS.md`](TASKS.md) · **Coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md)
 
-**Next:** Lead deploy API `3e12011` + Next (CABINET-EXCHANGE-LINK) · **G-SEC**
+**Next:** **M1 wave 1** посевы · CSP/HSTS nginx (post-M1)
 
-**G7b full ✅ (2026-06-21):** `preprod_stress_v2.json` **09:52Z** · `pass_summary.pass: true` · l2_auto ✅ · ux_journey ✅ · load p95 ✅ · stress harness: journey before draft_burst + acc1 tag restore
+**Pre-M1 security hotfix ✅ (2026-06-21 @coder):** M2 owner fallback убран · M1 `RADAR_CORS_ORIGINS` на VPS · prod `GET /v1/me/feed` без Bearer → **401** · G0 **32 passed**, 1 skipped
 
-**CABINET-EXCHANGE-LINK ✅ (2026-06-21):** `InboxCard.tsx` — «Читать на бирже ↗» · `data-testid="inbox-exchange-link"`
+**MiMo ✅ (2026-06-21):** [`2026-06-21-mimo-pre-m1-security.md`](../problems/2026-06-21-mimo-pre-m1-security.md) · [`2026-06-21-mimo-post-g7b-load.md`](../problems/2026-06-21-mimo-post-g7b-load.md) · **P0=0**
 
-**G7b-L2-TOOLS ✅ code (Lead 2026-06-21):** commit `3e12011` — `finalize_tools_for_lead` + `_effective_tools_for_audit` · pytest **50+30** green
+**Принято владельцем (2026-06-21):** G7b deploy + ЛК ссылка ✅
+
+**Deploy ✅ (2026-06-21 Lead):** `deploy-l2-stack-vps.py` + `deploy-web-rawlead-vps.py` · commits `3e12011`+`2af72a1`
+
+**G7b full ✅:** stress **09:52Z** PASS · **prod** API+Next залиты
+
+**CABINET-EXCHANGE-LINK ✅:** «Читать на бирже ↗» в ЛК · **prod** Next
 
 **G6 ✅ (2026-06-21):** `preprod_ai_prod_audit_judge.md` **Accept L3: ✅ PASS** · 2026-06-20T18:24Z · uniq **3.04** · combined **4.19** · send **68%** · leak **0%** · L3 v4 `l3_opener_too_similar` + deploy VPS
 
@@ -24,24 +30,24 @@
 
 ---
 
-## PRE-ADS-GATE ⏳ (блокер M1 wave 1)
+## PRE-ADS-GATE ✅ (2026-06-21 Lead sign-off → M1)
 
 | Шаг | Прогон | Кто | Статус |
 |-----|--------|-----|--------|
-| G0 | pytest smoke | @coder | ✅ **30 passed**, 1 skipped (Lead 2026-06-20) |
+| G0 | pytest smoke | @coder | ✅ **32 passed**, 1 skipped (2026-06-21 pre-M1 security) |
 | G1 | Next E2E 24/24 | @coder | ✅ **24/24** (2026-06-20 · n5/n17 draftable lead id) |
 | G2 | Playwright smoke 5/5 | @coder | ✅ **5/5** `s2_pass` (2026-06-20 · Next selectors) |
 | G3 | UX audit 0 critical | @coder | ✅ **0 critical** · U1–U12 **24/24** (2026-06-20) |
 | G4 | UX journey J1–J11 | @coder | ✅ **11/11** · `j5_draft_ok` · 0 critical (2026-06-20 · desktop+mobile gate) |
 | G5 | AI matrix S1 | @coder | ✅ **12/12** · `s1_pass` (2026-06-20) |
 | G6 | L3 judge uniquify | @coder | ✅ **PASS** uniq 3.04 (2026-06-21) |
-| G7a | Load quick smoke | @coder | ✅ env **tier_matrix** · **tz 3/3** · load p95 1651ms (2026-06-21) · l2/draft_burst ⏳ G7b |
-| G7b | Load **full** 50 VU + draft×20 | @coder | ✅ **09:52Z** pass · deploy API ⏳ Lead |
-| G-SEC | Security regression | @coder | ⏳ pytest ✅ · S-1/S-2 ручные · MiMo M0 **P0=0** |
-| M0–M4 | **MiMo** audit + skills | owner | **M0** ✅ gsec-delta · **M1** ✅ post-g1-e2e · M2–M4 ⏳ |
-| G8 | Radar 2–4 цикла | owner | ⏳ |
-| G9 | S5–S6-b ручная | owner | ⏳ |
-| G10 | anon квиз→TG→% | owner | ⏳ |
+| G7a | Load quick smoke | @coder | ✅ tier+tz+load (2026-06-21) |
+| G7b | Load **full** 50 VU + draft×20 | @coder | ✅ deploy **2026-06-21** Lead |
+| G-SEC | Security regression | @coder + owner | ✅ S-1 + **S-2 owner** |
+| M0–M4 | **MiMo** audit + skills | owner | **M0–M1** ✅ · **M2+M4** ✅ **2026-06-21** |
+| G8 | Radar 2–4 цикла | owner | ✅ owner **2026-06-21** |
+| G9 | S5–S6-b ручная | owner | ✅ owner **2026-06-21** |
+| G10 | anon квиз→TG→% | owner | ✅ owner **2026-06-21** |
 
 § команды → [`CODER_PROMPT`](../architect/CODER_PROMPT.md) · runbook → [`PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md)
 

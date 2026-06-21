@@ -57,10 +57,10 @@ class TestFeedDelayedJwt(unittest.TestCase):
         token = issue_access_token(user_id, tg_user_id=4242)
         empty_page = ([], 0, 0)
 
-        with patch.object(api_server, "psycopg") as mock_pg:
+        with patch.object(api_server, "_db_conn") as mock_db:
             conn = MagicMock()
             cur = MagicMock()
-            mock_pg.connect.return_value.__enter__.return_value = conn
+            mock_db.return_value.__enter__.return_value = conn
             conn.cursor.return_value.__enter__.return_value = cur
             with patch.object(api_server, "_personal_feed_page", return_value=empty_page):
                 with patch.object(api_server, "_feed_today_count", return_value=0):

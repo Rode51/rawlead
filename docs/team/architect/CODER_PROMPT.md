@@ -1,10 +1,241 @@
 # Coder — hot queue (active)
 
-**→ Now:** § **G6** (L3 judge uniquify)
+**→ Now:** post-M1 backlog (CSP/HSTS nginx · pool/COUNT load)
 
-**Index:** G0–G4 ✅ · G3-POLISH ✅ · draft_as_is-L2 ✅ · **G5** ✅ · **G6** ⏳
+**Index:** G0–G10 ✅ · MiMo ✅ · **PRE-M1 security** M1+M2 ✅ **2026-06-21**
 
-**Владелец:** посевы M1 **после** зелёного sign-off § PRE-ADS-GATE · runbook [`PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md)
+---
+
+## § PRE-M1-SECURITY — Lead ✅ 2026-06-21
+
+**MiMo M1+M2:** `_resolve_user_id` Bearer-only · `RADAR_CORS_ORIGINS` на VPS.
+
+| Проверка | Результат |
+|----------|-----------|
+| pytest G0 | **32 passed**, 1 skipped |
+| `GET /v1/me/feed` без Bearer | **401** prod |
+| `X-RawLead-User-Id` без Bearer | **401** (unit) |
+| deploy | `_deploy_pre_m1_security_vps.py` |
+
+**Post-M1:** CSP/HSTS · JWT httpOnly · rate-limit — MiMo backlog.
+
+**Владелец:** посевы M1 **после** G-SEC + G8–G10 · runbook [`PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md)
+
+---
+
+## § G-SEC — безопасность
+
+**Авто:** G0 pytest ✅ **2026-06-21** — `30 passed`, `1 skipped`.
+
+**S-1 ✅ (2026-06-21 @coder, prod `api.rawlead.ru`):**
+| Проверка | Код |
+|----------|-----|
+| JWT acc1 `GET /v1/me/replies` | **200** · inbox только user acc1 |
+| JWT monica `GET /v1/me/replies` (изоляция) | **200** · overlap lead_id с acc1 = **0** |
+| JWT acc1 `POST /v1/me/leads/999999991/draft` (нет в ленте) | **404** |
+
+**S-2:** владелец 5 мин — `/ops/` под паролем · webhook без секрета → 401/403
+
+**Не в scope G-SEC:** CSP/HSTS · JWT localStorage · rate-limit — post-M1 (MiMo backlog)
+
+---
+
+## § G7b + CABINET — Lead ✅ 2026-06-21
+
+**Commits:** `3e12011` (L2 tools finalize) · `2af72a1` (stress PASS + InboxCard link).
+
+**Артефакт:** `data/preprod_stress_v2.json` **09:52Z** · `pass_summary.pass: true` · l2 **100%** · draft p95 **~22s** · load p95 **1101ms**.
+
+**Осталось:** ~~deploy~~ ✅ Lead 2026-06-21.
+
+---
+
+## § G7-SKILLS-VPS-USER (Lead ✅ 2026-06-21)
+
+`preprod_ai_matrix` + `_ensure_preprod_test_user` · `data/preprod_skills_mismatch.json` PASS.
+
+---
+
+## § G7a-env (Lead ✅ 2026-06-21)
+
+tunnel `:15432` · free acc2 mint · trial JWT · `--quick --skip-journey` → **tier_matrix ✅** · **tz 3/3 ✅** · load p95 **1651ms ✅** · `data/preprod_stress_v2.json`
+
+**Overall FAIL** — не блокер G7a-env: `l2_auto` 60% · `draft_burst` p95 96s>90s · `skills_mismatch` FK (§ выше).
+
+---
+
+## § DEPLOY-WIN-NPM (Lead ✅ 2026-06-21)
+
+`deploy-web-rawlead-vps.py` — `npm.cmd` + `shell=nt`.
+
+---
+
+**Артефакт:** `data/preprod_stress_v2.json` · commit `92060b7`
+
+| Gate | Результат |
+|------|-----------|
+| load_p95_feed | ✅ **1139 ms** @50 VU |
+| draft_burst | ✅ |
+| parsers | ✅ |
+| tier_matrix | ❌ free token → `plan=null` · trial token missing |
+| tz_leads / l2 | ❌ без tunnel `DATABASE_URL` :15432 |
+
+**DoD G7a (smoke):** load PASS — **✅**
+
+**§ G7a-env (следующий шаг @coder):**
+1. SSH tunnel VPS Postgres `:15432` · `.env.site` sync
+2. Mint/refresh `RAWLEAD_PREPROD_FREE_TOKEN` · `RAWLEAD_PREPROD_TRIAL_TOKEN` (acc2/acc3)
+3. Re-run: `.venv\Scripts\python.exe scripts\preprod_stress_v2.py --quick --skip-journey`
+4. DoD: tier_matrix ✅ · tz ≥2/3
+
+**После G7a-env PASS:** G7b full · G-SEC
+
+---
+
+## § G7a — load quick smoke (архив prompt)
+
+## § G6 — L3 uniquify (Lead ✅ 2026-06-21)
+
+`preprod_ai_prod_audit_judge.md` · **Accept L3: ✅ PASS** · 2026-06-20T18:24Z · 25/25 · uniq **3.04** · combined **4.19** · send **68%** · leak **0%** · L3 v4 `l3_opener_too_similar` · deploy API VPS.
+
+---
+
+## § YOUDO-T14878013 (Lead ✅ 2026-06-21)
+
+Lead #8256 delist · `lead_pipeline` always fetch YouDo detail · pytest `test_youdo_long_listing_snippet_still_fetches_detail` · [`problems/2026-06-20-youdo-t14878013-mismatch.md`](../../problems/2026-06-20-youdo-t14878013-mismatch.md) · **deploy radar/API** если ещё не на prod.
+
+---
+
+## § FEED-MULTI-FILTER (Lead ✅ 2026-06-21 · **prod**)
+
+`feed-filters.ts` · multi category/source · prod JS `page-50500e5c9078817b.js` · `lenta/index.html` 2026-06-21 06:40 UTC · owner smoke: dropdown «Фильтр» → биржи · чипы multi-toggle.
+
+---
+
+## § YOUDO-T14878013 — карточка ≠ биржа (архив)
+
+**Симптом:** https://youdo.com/t14878013 — в ленте **полное несоответствие** (скрин: «Закрытый парсинг», до 400₽, web scraping/python) vs реальная страница YouDo.
+
+**Гипотезы (проверить по факту):**
+1. listing snippet попал в `title`/`body`, detail fetch fail → `detail:short` (см. [`problems/2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md))
+2. неверный `url` / external id / чужая карточка в listing
+3. устаревший body после редиректа/antibot HTML
+
+| # | Действие | DoD |
+|---|----------|-----|
+| 1 | VPS/SQL: `SELECT id, source, title, body, url, budget_text, task_summary, created_at FROM leads WHERE url ILIKE '%14878013%'` | lead_id + поля в отчёт |
+| 2 | Сравнить с live: detail fetch / curl / debug HTML `data/debug_listings/youdo_*` | таблица: поле в БД vs YouDo live |
+| 3 | Root cause в `youdo_parser.py` / `exchange_browser_fetch.py` / `lead_pipeline.py` | фикс + pytest при возможности |
+| 4 | Если лид мусор — delist/hide + **не** показывать в `/v1/feed` | owner smoke: карточка исчезла или совпадает |
+| 5 | Кратко в `docs/problems/2026-06-20-youdo-t14878013-mismatch.md` | симптом · причина · фикс |
+
+**Deploy:** API/radar если parser/pipeline · Next не трогать если только ingest.
+
+---
+
+## § FEED-MULTI-FILTER — несколько категорий и бирж (owner 2026-06-20)
+
+**Запрос:** в ленте выбирать **несколько категорий** и **несколько бирж** сразу. Кнопка **«Все»** (категории) — сброс остальных, показать всё.
+
+**API уже есть:**
+- `GET /v1/feed?category=dev,design` · `parse_category_param` в `src/lead_category.py`
+- `GET /v1/feed?source=fl,youdo,kwork` · `parse_feed_source_param` в `src/public_feed.py`
+
+**Менять backend только если дыра в API.**
+
+### Категории (чипы на desktop + sheet на mobile)
+
+| Правило UX | Поведение |
+|------------|-----------|
+| **«Все»** | `categories=[]` → API без `category` · снять подсветку с dev/design/… |
+| Клик **dev/design/…** | toggle в `Set` · **не** radio · можно 2+ активных |
+| Клик «Все» при активных | сброс multi → показать все категории |
+| Сняли последнюю категорию | = «Все» (пустой фильтр) |
+| Pill / label | «Разработка · Дизайн» или «2 категории» |
+
+### Биржи (dropdown / sheet)
+
+| Правило | Поведение |
+|---------|-----------|
+| Чипы бирж | multi-toggle (как категории) |
+| API | `source=fl,youdo` comma-join |
+| Сброс | все биржи (пустой `source`) |
+
+| # | Файлы | DoD |
+|---|-------|-----|
+| 1 | `FilterBar.tsx` — desktop category chips multi | dev+design одновременно · «Все» сбрасывает |
+| 2 | `FilterSheet.tsx` — mobile categories + sources multi | то же |
+| 3 | `FilterDropdown.tsx` — sources multi | |
+| 4 | `app/lenta/page.tsx` · `lib/api.ts` — `categories: string[]` `sources: string[]` → `category=dev,design` `source=fl,youdo` | feed reload |
+| 5 | E2E опц. | `next_e2e` J3 / `ux_journey` J3 не регресс |
+
+**Не в scope:** WP theme · saved filters ЛК.
+
+---
+
+## § FEED-MULTI-SOURCE — (merged → § FEED-MULTI-FILTER выше)
+
+_legacy index only — см. § FEED-MULTI-FILTER_
+
+**Что такое L3 (канон, не путать):**
+- **L2** = один shared `reply_draft` на лид (`leads.reply_draft`) — это G5 ✅.
+- **L3** = `rephrase_reply_draft_per_user()` — **переписать L2** другим каркасом/тоном для пары `user_id + lead_id` (O89 anti-copypaste).
+- **НЕ** подстановка навыков из ЛК в текст. `user_id` → seed вариации; стек **только из base (L2)**.
+- Код: `src/ai_analyze.py` · `src/l3_human_style.py` · `match_push._build_personalized_reply`.
+
+**Что НЕ делать в G6:** skills_mismatch / O128 / «разные навыки → разный стек» — **post-M1** (`--scenario skills_mismatch` в matrix).
+
+**Прогон:**
+```powershell
+.venv\Scripts\python.exe scripts/preprod_ai_prod_audit.py --profile site --judge-l3 --judge-l3-limit 25
+```
+(флаги `--judge` / `--judge-l1` **не обязательны** для gate G6)
+
+**Env:** `.env.site` — `DATABASE_URL` (**VPS Postgres**, не Neon) · OpenRouter · `AI_ENABLED=1`
+
+**БД локально:** SSH-туннель → [`PREPROD_ACCOUNTS.md`](../../ops/PREPROD_ACCOUNTS.md) § 1b · `DATABASE_URL=...@127.0.0.1:15432/rawlead` · или mint/audit на VPS.
+
+**Как скрипт собирает пары L3:**
+1. Из БД: `user_lead_replies` vs `leads.reply_draft` (source=db), где personal ≠ shared.
+2. Добор synthetic: `rephrase_reply_draft_per_user` на свежих лидах для 2 audit user_id (`…a101`, `…a102`).
+
+**Judge:** LLM сравнивает **shared_reply** vs **personal_reply** → метрики uniquify.
+
+| Метрика | PASS |
+|---------|------|
+| `accept_l3` | **true** |
+| `avg_uniqueness` | ≥ **3.0**/5 |
+| `avg_combined_3` | ≥ **3.8**/5 |
+| `send_as_is_pct` | ≥ **50%** |
+| `forbidden_leak_pct` | ≤ **10%** (нет Cursor/ИИ/ChatGPT в personal) |
+
+**Артефакты:** `data/preprod_ai_prod_audit.json` · `data/preprod_ai_prod_audit_judge.md` (секция **L3 — per-user reply**) · `preprod_ai_prod_audit_human.md`
+
+**Если FAIL:** правки **только L3** (`l3_human_style.build_uniquify_system`, `rephrase_reply_draft_per_user`, retry `l3_too_similar`) · deploy API если менял `src/` · **не** L2 shared prompt (G5/L2 уже ✅).
+
+**После PASS:** Lead verify → G7a `preprod_stress_v2.py --quick`
+
+**Lead verify 2026-06-20:** код L3 v2 + neon guard — OK · gate `preprod_ai_prod_audit_judge.md` **старый (2026-06-14, без L3)** → **FAIL** до прогона с VPS `DATABASE_URL`.
+
+| # | Действие | DoD |
+|---|----------|-----|
+| 1 | **Локальный `.env.site`:** VPS Postgres tunnel `:15432` — ✅ owner 2026-06-20 (`scripts/_fix_local_env_vps_db.py`) | neon guard OK |
+| 2 | Прогон `--judge-l3 --judge-l3-limit 25` | `Accept L3: ✅ PASS` в **gate** `preprod_ai_prod_audit_judge.md` |
+| 3 | Commit: `l3_human_style.py` · `preprod_ai_prod_audit.py` · артефакты `data/preprod_ai_prod_audit*` | Lead verify |
+
+---
+
+## § NEON→VPS — канон БД (owner 2026-06-20)
+
+**Факт:** prod `DATABASE_URL` = **Postgres на VPS** (`127.0.0.1:5432` на сервере) · [`PROD_FACTS.md`](../common/PROD_FACTS.md). Neon — **архив**, не preprod.
+
+| Зона | Что сделать |
+|------|-------------|
+| **Локально** | `.env.site` — только VPS (tunnel `:15432` или mint на VPS) |
+| **Hot docs** | `PREPROD_ACCOUNTS` · `PREPROD_STRESS_RUN` · `CODER_PROMPT` · `MIGRATE_NEON_TO_VPS_POSTGRES` — уже VPS |
+| **`.env.example`** | комментарии «Neon» → «VPS Postgres» |
+| **Скрипты preprod** | stderr/print «Neon» → «VPS Postgres» где про `DATABASE_URL` |
+| **Не в этом шаге** | rename `neon_legacy_consumer.py` · архив `docs/problems/*neon*` · массовый refactor `neon_insert` в логах |
 
 ---
 

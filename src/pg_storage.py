@@ -24,6 +24,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_PG_POOL: Any | None = None
+
+
+def bind_pg_connection_pool(pool: Any | None) -> None:
+    """Optional shared pool (api_server startup). Without pool: one connect per call."""
+    global _PG_POOL
+    _PG_POOL = pool
+
 _SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
 _leads_columns_ready = False
 _leads_columns_lock = __import__("threading").Lock()
@@ -223,8 +231,13 @@ class NeonLeadStorage:
     def connection(self):
         _ensure_leads_columns(self._url)
         _ensure_user_tags_columns(self._url)
-        with psycopg.connect(self._url) as conn:
-            yield conn
+        pool = _PG_POOL
+        if pool is not None:
+            with pool.connection() as conn:
+                yield conn
+        else:
+            with psycopg.connect(self._url) as conn:
+                yield conn
 
     @property
     def enabled(self) -> bool:

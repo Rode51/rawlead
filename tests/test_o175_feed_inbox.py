@@ -89,19 +89,20 @@ class TestInboxRepliesWhere(unittest.TestCase):
         user_id = "00000000-0000-0000-0000-000000000055"
         token = issue_access_token(user_id, tg_user_id=555)
 
-        with patch.object(api_server, "psycopg") as mock_pg:
-            conn = MagicMock()
-            cur = MagicMock()
-            mock_pg.connect.return_value.__enter__.return_value = conn
-            conn.cursor.return_value.__enter__.return_value = cur
-            cur.fetchall.return_value = []
-            cur.fetchone.return_value = (0,)
+        with patch.object(api_server, "_load_user_tags", return_value={}):
+            with patch.object(api_server, "_db_conn") as mock_db:
+                conn = MagicMock()
+                cur = MagicMock()
+                mock_db.return_value.__enter__.return_value = conn
+                conn.cursor.return_value.__enter__.return_value = cur
+                cur.fetchall.return_value = []
+                cur.fetchone.return_value = (0,)
 
-            client = TestClient(app)
-            resp = client.get(
-                "/v1/me/replies",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+                client = TestClient(app)
+                resp = client.get(
+                    "/v1/me/replies",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
 
         self.assertEqual(resp.status_code, 200)
         executed = "\n".join(str(c[0][0]) for c in cur.execute.call_args_list)
@@ -113,10 +114,10 @@ class TestInboxRepliesWhere(unittest.TestCase):
 class TestFeedSourceParamEndpoint(unittest.TestCase):
     def test_feed_passes_source_keys_to_page(self) -> None:
         empty_page = ([], 0, 0)
-        with patch.object(api_server, "psycopg") as mock_pg:
+        with patch.object(api_server, "_db_conn") as mock_db:
             conn = MagicMock()
             cur = MagicMock()
-            mock_pg.connect.return_value.__enter__.return_value = conn
+            mock_db.return_value.__enter__.return_value = conn
             conn.cursor.return_value.__enter__.return_value = cur
             with patch.object(api_server, "_feed_page_time", return_value=empty_page) as mock_time:
                 with patch.object(api_server, "_feed_today_count_cached", return_value=0):
@@ -131,10 +132,10 @@ class TestFeedSourceParamEndpoint(unittest.TestCase):
         user_id = "00000000-0000-0000-0000-000000000044"
         token = issue_access_token(user_id, tg_user_id=444)
         empty_page = ([], 0, 0)
-        with patch.object(api_server, "psycopg") as mock_pg:
+        with patch.object(api_server, "_db_conn") as mock_db:
             conn = MagicMock()
             cur = MagicMock()
-            mock_pg.connect.return_value.__enter__.return_value = conn
+            mock_db.return_value.__enter__.return_value = conn
             conn.cursor.return_value.__enter__.return_value = cur
             with patch.object(
                 api_server, "_personal_feed_page", return_value=empty_page
@@ -150,10 +151,10 @@ class TestFeedSourceParamEndpoint(unittest.TestCase):
 
     def test_anon_feed_source_tg(self) -> None:
         empty_page = ([], 0, 0)
-        with patch.object(api_server, "psycopg") as mock_pg:
+        with patch.object(api_server, "_db_conn") as mock_db:
             conn = MagicMock()
             cur = MagicMock()
-            mock_pg.connect.return_value.__enter__.return_value = conn
+            mock_db.return_value.__enter__.return_value = conn
             conn.cursor.return_value.__enter__.return_value = cur
             with patch.object(api_server, "_feed_page_time", return_value=empty_page) as mock_time:
                 with patch.object(api_server, "_feed_today_count_cached", return_value=0):
@@ -165,10 +166,10 @@ class TestFeedSourceParamEndpoint(unittest.TestCase):
 
     def test_anon_feed_match_with_source(self) -> None:
         empty_page = ([], 0, 0)
-        with patch.object(api_server, "psycopg") as mock_pg:
+        with patch.object(api_server, "_db_conn") as mock_db:
             conn = MagicMock()
             cur = MagicMock()
-            mock_pg.connect.return_value.__enter__.return_value = conn
+            mock_db.return_value.__enter__.return_value = conn
             conn.cursor.return_value.__enter__.return_value = cur
             with patch.object(api_server, "_feed_page_match", return_value=empty_page) as mock_match:
                 with patch.object(api_server, "_feed_today_count_cached", return_value=0):
@@ -182,10 +183,10 @@ class TestFeedSourceParamEndpoint(unittest.TestCase):
         user_id = "00000000-0000-0000-0000-000000000066"
         token = issue_access_token(user_id, tg_user_id=666)
         empty_page = ([], 0, 0)
-        with patch.object(api_server, "psycopg") as mock_pg:
+        with patch.object(api_server, "_db_conn") as mock_db:
             conn = MagicMock()
             cur = MagicMock()
-            mock_pg.connect.return_value.__enter__.return_value = conn
+            mock_db.return_value.__enter__.return_value = conn
             conn.cursor.return_value.__enter__.return_value = cur
             with patch.object(
                 api_server, "_personal_feed_page", return_value=empty_page
@@ -204,10 +205,10 @@ class TestFeedSourceParamEndpoint(unittest.TestCase):
         user_id = "00000000-0000-0000-0000-000000000067"
         token = issue_access_token(user_id, tg_user_id=667)
         empty_page = ([], 0, 0)
-        with patch.object(api_server, "psycopg") as mock_pg:
+        with patch.object(api_server, "_db_conn") as mock_db:
             conn = MagicMock()
             cur = MagicMock()
-            mock_pg.connect.return_value.__enter__.return_value = conn
+            mock_db.return_value.__enter__.return_value = conn
             conn.cursor.return_value.__enter__.return_value = cur
             with patch.object(
                 api_server, "_personal_feed_page", return_value=empty_page

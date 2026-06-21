@@ -1353,28 +1353,19 @@ def _canonical_user_id_from_jwt(
 def _resolve_user_id(
     request: Request,
     authorization: str = Header(default="", alias="Authorization"),
-    x_rawlead_user_id: str = Header(default="", alias="X-RawLead-User-Id"),
 ) -> str:
-    """Bearer JWT (кабинет) или заголовок owner (#1) для dogfood."""
+    """Bearer JWT required for all /v1/me/* (no owner header fallback)."""
     auth = (authorization or "").strip()
-    if auth.lower().startswith("bearer "):
-        token = auth[7:].strip()
-        if not token:
-            raise HTTPException(status_code=401, detail="Unauthorized")
-        try:
-            data = decode_access_token(token)
-        except ValueError as exc:
-            raise HTTPException(status_code=401, detail="Unauthorized") from exc
-        return _canonical_user_id_from_jwt(data, request=request)
-
-    uid = (x_rawlead_user_id or "").strip() or _OWNER_USER_ID
+    if not auth.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    token = auth[7:].strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     try:
-        UUID(uid)
+        data = decode_access_token(token)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="invalid user id") from exc
-    if uid != _OWNER_USER_ID:
-        raise HTTPException(status_code=403, detail="use telegram login")
-    return uid
+        raise HTTPException(status_code=401, detail="Unauthorized") from exc
+    return _canonical_user_id_from_jwt(data, request=request)
 
 
 def _try_user_from_bearer(authorization: str) -> str | None:
@@ -1471,6 +1462,9 @@ def _log_db_connection_mode() -> None:
             open=True,
         )
         logger.info("db: app_pool min=4 max=40")
+        from pg_storage import bind_pg_connection_pool
+
+        bind_pg_connection_pool(_DB_POOL)
         try:
             with _db_conn() as conn:
                 with conn.cursor() as cur:
@@ -1494,6 +1488,9 @@ def _log_db_connection_mode() -> None:
 @app.on_event("shutdown")
 def _close_db_pool() -> None:
     global _DB_POOL
+    from pg_storage import bind_pg_connection_pool
+
+    bind_pg_connection_pool(None)
     if _DB_POOL is not None:
         _DB_POOL.close()
         _DB_POOL = None
@@ -1526,7 +1523,7 @@ def auth_telegram(payload: TelegramAuthPayload) -> dict[str, Any]:
     photo_url = (payload.photo_url or "").strip() or None
 
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 user_id = _upsert_telegram_user(
                     cur,
@@ -1595,7 +1592,7 @@ def _complete_bot_auth(auth_token: str) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     av: dict[str, bool | None] = {"avatar_url": None, "has_avatar": False}
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1712,7 +1709,7 @@ def health() -> dict[str, Any]:
 def _public_leads_week_count() -> int:
     """Visible leads ingested in the last 7 days (marketing ticker)."""
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1967,7 +1964,7 @@ def get_lead(
     """Одна карточка лида по id; Bearer → keyword_match для deep link ?lead=."""
     user_id = _try_user_from_bearer(authorization)
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT {_SELECT_COLS} FROM leads WHERE id = %s",
@@ -2011,7 +2008,7 @@ def me_profile(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     from user_avatar import avatar_api_fields, ensure_avatar_cached
 
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -2036,7 +2033,7 @@ def me_profile(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     av = avatar_api_fields(user_id)
     can_ops_admin = False
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 can_ops_admin = is_owner_db_user(cur, user_id)
     except Exception as exc:
@@ -2060,7 +2057,7 @@ def me_avatar(user_id: str = Depends(_resolve_user_id)) -> Response:
     from user_avatar import ensure_avatar_cached, read_avatar_bytes
 
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 ensure_avatar_cached(cur, user_id)
             conn.commit()
@@ -2085,7 +2082,7 @@ class TagsPayload(BaseModel):
 @app.get("/v1/me/tags")
 def me_tags(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -2397,7 +2394,7 @@ def me_tags_put(
 ) -> dict[str, Any]:
     tags = normalize_user_tags(payload.tags)
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 _rewrite_user_tags(cur, user_id, tags)
             conn.commit()
@@ -2473,7 +2470,7 @@ class FeedPrefsPayload(BaseModel):
 @app.get("/v1/me/feed-prefs")
 def me_feed_prefs_get(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 return _load_feed_prefs(cur, user_id)
     except Exception as exc:
@@ -2491,7 +2488,7 @@ def me_feed_prefs_put(
     if payload.sort is not None and payload.sort not in _FEED_PREFS_SORT:
         raise HTTPException(status_code=400, detail="sort must be time or match")
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 current = _load_feed_prefs(cur, user_id)
                 if payload.sort is not None:
@@ -2531,7 +2528,7 @@ def me_feed(
     category_list = parse_category_param(category)
     source_keys = parse_feed_source_param(source)
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 items, count, _today = _personal_feed_page(
                     cur,
@@ -2569,6 +2566,25 @@ def _fetch_visible_lead(cur: Any, lead_id: int) -> tuple[Any, ...] | None:
         (lead_id, *feed_params),
     )
     return cur.fetchone()
+
+
+def _lead_in_user_feed(cur: Any, user_id: str, lead_id: int) -> bool:
+    """PA-5b: lead must be feed-visible and match user tags (same gate as /v1/me/feed)."""
+    row = _fetch_visible_lead(cur, lead_id)
+    if row is None:
+        return False
+    user_tags = _load_user_tags(cur, user_id)
+    if not user_tags:
+        return True
+    tags = _canonical_lead_tags(row[8])
+    category = resolve_lead_category(row[11], row[2] or "", row[3] or "", tags)
+    km = _keyword_match_for_user(
+        tags,
+        user_tags,
+        has_profile=True,
+        lead_category=category,
+    )
+    return _passes_min_match(km, 0)
 
 
 def _parse_ai_reasons(raw: Any) -> list[str]:
@@ -2713,6 +2729,17 @@ def me_lead_draft(
         )
 
     try:
+        with _db_conn() as conn:
+            with conn.cursor() as cur:
+                if not _lead_in_user_feed(cur, user_id, lead_id):
+                    raise HTTPException(status_code=404, detail="not found")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("me_lead_draft feed check %d: %s", lead_id, exc)
+        raise HTTPException(status_code=500, detail="db error") from exc
+
+    try:
         resp = submit_draft(
             cfg,
             user_id=user_id,
@@ -2773,7 +2800,7 @@ def me_replies(
     """Inbox откликов для /cabinet/ (без soft-deleted; 7d по replied_at)."""
     inbox_where, inbox_params = inbox_replies_where_sql(alias="ulr")
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 user_tags = _load_user_tags(cur, user_id)
                 cur.execute(
@@ -2830,7 +2857,7 @@ def me_reply_delete(
 ) -> dict[str, Any]:
     """Soft-delete отклика из inbox."""
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -3012,7 +3039,7 @@ def _me_subscription_payload(cur: Any, user_id: str) -> dict[str, Any]:
 @app.get("/v1/me/subscription")
 def me_subscription(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 payload = _me_subscription_payload(cur, user_id)
                 conn.commit()
@@ -3046,7 +3073,7 @@ def me_subscription_checkout(
     if not yookassa_available(cfg):
         raise HTTPException(status_code=503, detail="Оплата временно недоступна")
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 expire_stale_trials(cur)
                 result = create_checkout(cfg, cur, user_id, payload.kind)
@@ -3071,7 +3098,7 @@ async def yookassa_webhook(request: Request) -> dict[str, str]:
     secret = cfg.yookassa_webhook_secret.strip()
     if secret:
         got = (request.headers.get("X-Yookassa-Webhook-Secret") or "").strip()
-        if got != secret:
+        if not (len(got) == len(secret) and secrets.compare_digest(got, secret)):
             raise HTTPException(status_code=403, detail="forbidden")
     try:
         body = await request.json()
@@ -3097,7 +3124,7 @@ def me_subscription_confirm(
         raise HTTPException(status_code=503, detail="Оплата временно недоступна")
     payment_id = (payload.payment_id or "").strip() or None
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 result = confirm_pending_payment(
                     cfg, cur, user_id, payment_id=payment_id
@@ -3119,7 +3146,7 @@ def me_subscription_cancel(
     user_id: str = Depends(_resolve_user_id),
 ) -> dict[str, Any]:
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 canceled = cancel_subscription(cur, user_id)
                 subscription = _me_subscription_payload(cur, user_id)
@@ -3143,7 +3170,7 @@ def me_subscription_pause(
     user_id: str = Depends(_resolve_user_id),
 ) -> dict[str, Any]:
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 plan, is_active, active_until, paused_until, trial_used_at = (
                     _ensure_subscription(cur, user_id)
@@ -3192,7 +3219,7 @@ def me_subscription_pause(
 @app.get("/v1/me/notification-settings")
 def me_notification_settings_get(user_id: str = Depends(_resolve_user_id)) -> dict[str, Any]:
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -3225,7 +3252,7 @@ def me_notification_settings_patch(
     if payload.push_min_match is not None and not (30 <= payload.push_min_match <= 100):
         raise HTTPException(status_code=400, detail="push_min_match must be 30..100")
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 if payload.push_min_match is not None and payload.push_enabled is not None:
                     cur.execute(
@@ -3278,15 +3305,13 @@ def _resolve_support_actor(
     x_rawlead_guest: str = Header(default="", alias="X-RawLead-Guest-Token"),
 ) -> tuple[str | None, str | None]:
     user_id = _try_user_from_bearer(authorization)
-    if user_id:
-        return user_id, None
     guest = normalize_guest_token(x_rawlead_guest)
-    if guest:
-        return None, guest
-    raise HTTPException(
-        status_code=400,
-        detail="X-RawLead-Guest-Token required when not logged in",
-    )
+    if not user_id and not guest:
+        raise HTTPException(
+            status_code=400,
+            detail="X-RawLead-Guest-Token required when not logged in",
+        )
+    return user_id, guest
 
 
 @app.post("/v1/support/ticket")
@@ -3341,7 +3366,7 @@ def _require_owner_user(
     user_id: str = Depends(_resolve_bearer_user_id),
 ) -> str:
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 if not is_owner_db_user(cur, user_id):
                     raise HTTPException(status_code=403, detail="owner only")
@@ -3445,7 +3470,7 @@ def _owner_dashboard_data(jwt: str) -> dict[str, Any] | None:
         return None
     try:
         user_id = str(decode_access_token(jwt)["sub"])
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 if not is_owner_db_user(cur, user_id):
                     return None
@@ -3832,7 +3857,7 @@ def ingest_lead(payload: IngestPayload) -> Any:
     )
 
     try:
-        with psycopg.connect(_db_url()) as conn:
+        with _db_conn() as conn:
             with conn.cursor() as cur:
                 if h:
                     cur.execute(
