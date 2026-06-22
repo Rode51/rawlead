@@ -11,7 +11,8 @@
 | `@lead-marketing` | `lead-marketing.mdc` | `LEAD_MARKETING_PROMPT` · **онбординг A+B+C** |
 | `@lead-designer` | `lead-designer.mdc` | **`LEAD_DESIGN_PROMPT`** · регламент **`LEAD_DESIGN.md`** |
 | `@lead-portfolio` | `lead-portfolio.mdc` | **`LEAD_PORTFOLIO_PROMPT`** · регламент **`LEAD_PORTFOLIO.md`** |
-| `@coder` | `coder.mdc` | **`CODER_PROMPT.md`** только (без vision, без design) |
+| `@coder` | `coder.mdc` | **`CODER_PROMPT.md`** — **fallback** если Lead: Маршрут @coder |
+| **MiMo `coder`** | `mimo.mdc` + `.mimocode/MIMO_CODER.md` | **`CODER_PROMPT.md`** § — **основной** исполнитель кода (2026-06-22) |
 | `@designer` | `designer.mdc` | **`DESIGNER_PROMPT.md` hot** (~80 строк) |
 | `@mechanic` | `mechanic.mdc` | **`PROD_FACTS`** · **`docs/problems/<тикет>.md`** |
 | `@owner` | `owner.mdc` | **`docs/FOR_YOU.md`** |
@@ -60,6 +61,15 @@
 | `lead-marketing.mdc` | `@lead-marketing` |
 | `lead-designer.mdc` | `@lead-designer` |
 | `lead-portfolio.mdc` | `@lead-portfolio` |
+
+### MiMo (вне Cursor)
+
+| Файл | Зачем |
+|------|--------|
+| `mimo.mdc` | Поток владельца · копипаст · паритет coder |
+| `.mimocode/MIMO_RULES.md` | Агент **audit** |
+| `.mimocode/MIMO_CODER.md` | Агент **coder** |
+| `.mimocode/mimocode.jsonc` | Права edit/bash/read |
 
 ### Исполнители
 

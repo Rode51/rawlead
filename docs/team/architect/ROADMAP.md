@@ -2,134 +2,85 @@
 
 **Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.12**
 
-**Снимок:** [`STATUS.md`](../common/STATUS.md) · **очередь:** [`TASKS.md`](../common/TASKS.md) · **реклама:** [`PRE_LAUNCH_MARKETING.md`](../../ops/PRE_LAUNCH_MARKETING.md)
+**Снимок:** [`STATUS.md`](../common/STATUS.md) · **очередь:** [`TASKS.md`](../common/TASKS.md)
 
 ---
 
-## Сейчас (2026-06-15)
+## Сейчас (2026-06-22)
 
-**Стадия:** prod **1.19.18** · лента OK · **→ O247b + O248** (Coder) · **→ O237** Metrika · ads ⏸
+**Стадия:** prod **Next** на `rawlead.ru` · API+радар+бот на VPS · **M1 реклама запущена** · первые посетители **~23.06**
 
-### ✅ Недавно закрыто
+### 🔴 M1 hot — риск для новых юзеров
 
-O236–O246 UX/Perf · O247 hotfix · tier smoke PASS · TG xlsx owner base copied.
+| # | Что | Почему срочно | Статус |
+|---|-----|---------------|--------|
+| **YOUDO-DETAIL** | Пробой **detail-fetch** YouDo (`/t{id}`) — полное ТЗ, не snippet | ServicePipe блокирует detail на VPS · L1/черновики YouDo слабее FL/Kwork · в ленте 4219 лидов с body 60–100 chars | **→ @coder P0** |
+| **mitigation** | Snippet-режим в ленте | `YOUDO_DETAIL_MIN_CHARS=0` · restore 4219 visible | ✅ 2026-06-22 |
 
-### ⏳ До soft ads (порядок) — **owner 2026-06-18: O280 перед GTM**
+**Для посетителя сейчас:** FL · Kwork · TG — **норм** (полное ТЗ) · YouDo — **есть в ленте**, но описание короткое · фильтры — ✅ после hotfix 22.06.
 
-| Волна | Что | Кто |
-|-------|-----|-----|
-| **2.5 · UI** | **O280** WP → Next `rawlead-next/` — **phase 1 ✅** home+lenta · phase 2 cabinet завтра | Claude Code + @coder deploy/CORS · [`WP_TO_NEXT_HANDOFF.md`](WP_TO_NEXT_HANDOFF.md) |
-| **1 · TG** | t2b sync · **O207** funnel proof · O188 join ~127 | @coder |
-| **2 · Концепция** | **O208** quiz-first · **O217** synthetic quiz pack | @lead-product → @coder |
-| **4 · L2** | **O200** full regen · **≥70% × 4 категории** | @coder |
-| **5 · SEO + analytics** | **O113-seo** · **Метрика** 109860210 | @coder · owner |
-| **6 · Pre-ads QA** | **O218** Playwright · stress · security | @coder · на **Next** URL после O280 |
-| **7 · GTM** | ads + rode51.ru | **последним** ⏸ |
+**Канон проблемы:** [`2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) · O262g detail ServicePipe · golden baseline O268.
 
-**Снято с блокера «WP perf»:** волна 3 Perf WP — заменена O280 Next.
+### ✅ Закрыто до M1
 
-**Гейт GTM:** O280 cutover ✅ · O218 green · L2 **70%×4** · Metrika · stress green.
+| Блок | Факт |
+|------|------|
+| **O280** WP → Next cutover | ✅ **2026-06-19** · nginx → `/var/www/rawlead.ru` (static export) |
+| **O218 / PRE-ADS** | G0–G10 ✅ · stress 50 VU · security hotfix |
+| **O200 L2/L3** | judge PASS · draft quality gate |
+| **O271** | БД на VPS Postgres |
+| **rode51.ru** | portfolio P2 live |
 
-**Не в hot:** join wave можно идти **параллельно** волне 2–3 на VPS.
+WP тема в repo — **legacy**, не на корне домена. Rollback: `/var/www/rawlead.ru-wp`.
 
-### ⏸ После ads / фон
+### → Сейчас (owner)
+
+**M1 wave 1** — реклама **запущена** · TG посевы · воронка `@rawlead_bot` · [`M1_SEEDING_CHECKLIST.md`](../marketing/M1_SEEDING_CHECKLIST.md)
+
+**Smoke перед трафиком:** `/lenta/` FL+Kwork карточки + черновик · YouDo — карточки есть, ТЗ короткое (см. YOUDO-DETAIL).
+
+### После wave 1 / фон (@coder)
 
 | # | Что |
 |---|-----|
-| **ingest SLA** | Биржи: lag p50 в ops · укоротить цикл где безопасно (FL/Kwork = poll, не push как TG) |
-| **O73** | heatmap Metrika/Clarity (после базового счётчика) |
-| **O105-w2** | crypto auto-check |
-| **O110** | FL 403 отдельный пул — по триггеру |
-| **O92b** | pending_tags review |
-| **O82-w3** | embeddings match |
+| **YOUDO-DETAIL** | § `CODER_PROMPT` · detail breakthrough ServicePipe |
+| CSP/HSTS nginx | MiMo backlog |
+| JWT httpOnly | XSS hardening |
+| DB pool + feed COUNT | нагрузка >50 VU |
+| O284 billing confirm | return URL cabinet |
+| O207 TG funnel metrics | не блокер посевов |
+
+### ⏸ Позже
+
+ingest SLA · O73 heatmap · O92b pending_tags · api_server split (A13)
 
 ---
 
 ## Фазы vision §4 (сжато)
 
 | Фаза | Статус |
-|------|--------|
+|------|------|
 | **0** · dogfood радар | ✅ |
-| **E0–E5** · WP site + auth + cabinet | ✅ |
-| **3f** · ИИ draft + L2/L3 | ✅ gate passed |
-| **Launch** · pay + trial + E2E | **→ сейчас** |
-| **GTM** · soft ads | после launch |
-| **v1** · multi-user scale · billing polish | backlog |
+| **E0–E5** · site + auth + cabinet | ✅ (Next) |
+| **3f** · ИИ draft + L2/L3 | ✅ |
+| **Launch** · trial + pay + pre-ads gate | ✅ gate |
+| **GTM** · M1 посевы | **→ сейчас** |
+| **v1** · scale + billing polish | backlog |
 
 **Отменено:** mobile app · отдельный маркет-сайт · Freelancehunt
 
 ---
 
-## O72e / O200 gate (2026-06-18 full run)
+## O200 gate (reference)
 
-| Слой | Gate | Факт |
-|------|------|------|
-| L2 LLM judge (owner) | send ≥70% × 4 cat | **✅** dev 90% · design/mkt/text 80% · [`preprod_o200_judge_human.md`](../../data/preprod_o200_judge_human.md) |
-| L2 LLM judge overall | send ≥70% | **82.5%** ✅ |
-| L2 combined | ≥4.0 | **4.25** ✅ |
-| Auto vault (строже) | draft ≥95% · auto ≥85% | **🟡** 92.4% / 60.8% · в основном `tools:empty` (не блокер M1) |
-| L1 | usable ≥70% | **83.1%** ✅ (aggregate) |
-| O280 E2E Next | 24/24 | **✅** 2026-06-20 |
+L2 judge send **82.5%** · combined **4.25** · L3 uniq **3.04** · артефакт `data/preprod_o200_judge_human.md`
 
-Артефакт: `data/preprod_o200_judge.json` · pilot r5 (70 лидов) был зелёнее — full 79 лидов строже по auto-tools.
+## Парсеры
+
+FL · Kwork · TG · FR · FreelanceJob · Пчёл — ✅ prod · full TZ via HTTP detail.
+
+**YouDo** — listing ✅ camoufox · **detail `/t{id}` ❌ ServicePipe** → snippet-only в ленте до § **YOUDO-DETAIL-BREAKTHROUGH** · код `fetch_youdo_detail_snapshot` есть, пробой антибота — нет.
 
 ---
 
-## Парсеры (O63)
-
-| source | Статус |
-|--------|--------|
-| FL · Kwork · TG | ✅ prod |
-| FR.ru · FreelanceJob · Пчёл | ✅ secondary VPS |
-| YouDo | ⏳ chromium/proxy — не блокер launch |
-
----
-
-## O207 — TG: доказать воронку + настройка фильтра (owner 2026-06-13)
-
-**Проблема:** непонятно, **есть ли заказы в группах** и **только ли filter/L1** их режет — или listen gap / handler / «не слушаем».
-
-**Принцип:** сначала **измерить правду** (принято → причина отсева → лента), потом **крутить фильтр на данных**, не вслепую.
-
-| Фаза | Что | Артефакт |
-|------|-----|----------|
-| **A. Truth ladder** | На каждое TG-сообщение: стадия + `skip_reason` (listen / filter / spam / L1 / AI / neon) | лог + Neon агрегаты · `/ops/tg` per-acc **и per-chat** |
-| **B. Chat health** | По каждому listen-чату: `msgs_24h` · `last_msg` · breakdown причин | ops таблица «чат молчит vs режем» |
-| **C. Sample audit** | N случайных `skip` в сутки — **полный текст** + ссылка; owner размечает «заказ / не заказ» | `data/tg_skip_samples.json` · кнопка в ops «разбор» |
-| **D. Filter lab** | Replay размеченного корпуса через `filters.py` / L1 **без деплоя**; diff до/после правки | скрипт + отчёт «+N заказов / +M шума» |
-| **E. Golden posts** | Test group + 5–10 эталонных vacancy-постов owner — **must pass** filter→L1 | pytest + smoke чеклист |
-
-**Не делаем в O207:** слепое ужесточение `word_filter` без sample audit · «режем file до 5 чатов» (owner intent: listen = joined).
-
-**Зависимости:** O206 **t3c** (handlers живы) → **t2b** sync → O207 A→E.
-
-**Тикет:** [`problems/2026-06-13-tg-feed-volume.md`](../../problems/2026-06-13-tg-feed-volume.md) · решение owner: [`OWNER_INTENT.md`](OWNER_INTENT.md)
-
-**Coder (когда дойдём):** § **O207** в `CODER_PROMPT` · наследует O206 t4b/t5.
-
----
-
-## O208 — Концепция quiz-first: UI · copy · воронка (owner 2026-06-13)
-
-**Контекст:** концепция сменилась — пользователь **не выбирает навыки руками**; квиз + лента учат профиль. Старые фильтры/копирайт/экраны — от прошлой модели.
-
-**После волны 1 (TG t2b + O207 базово).**
-
-| Слой | Что | Артефакт |
-|------|-----|----------|
-| **Product** | Tier/лимиты **✅ freeze** · vision bump после O209 | `LEAD_PRODUCT_PROMPT` § O208-MONETIZATION |
-| **Design** | **O209** — полный UX+copy match-first (quiz · lenta · home · pricing · FAQ) | `LEAD_DESIGN_PROMPT` § **O209-MATCH-EXPERIENCE** |
-| **Coder** | ~~Убрать manual skills picker~~ ✅ · quiz-first only · **O230** снять cap 12 в API/JS · `DRAFT_HOURLY_LIMIT=5` · card strip · L3 judge→K | § после PM+Design freeze |
-| **Не смешивать** | Ingest filter/L1 (O207) ≠ UI «навыки» — разные слои |
-
-**Perf (волна 3):** scope в Design § O199 «Site optimization» → Coder: `/lenta/` P0.
-
-**Зависимости:** O207 A (truth ladder) желательно до тюнинга **ingest** filter · O208 — **продуктовый** слой для пользователя.
-
----
-
-Coder ТЗ: [`CODER_PROMPT.md`](CODER_PROMPT.md) · решения: [`OWNER_INTENT.md`](OWNER_INTENT.md)
-
----
-
-_Lead Architect · 2026-06-14 · O218 Playwright pre-ads gate · O217 synthetic live_
+Детали O207/O208 и старые волны → [`ROADMAP` archive](../archive/) · [`OWNER_INTENT.md`](OWNER_INTENT.md)

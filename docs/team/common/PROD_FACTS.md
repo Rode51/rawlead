@@ -6,7 +6,69 @@
 
 > Детали задач → [`STATUS.md`](STATUS.md) · шаги владельца → [`FOR_YOU.md`](../../FOR_YOU.md)
 
-**Обновлено:** 2026-06-21 (pre-M1 security M1+M2 · G-SEC S-1)
+**Обновлено:** 2026-06-22 (YOUDO click-through backup + § CODER_PROMPT)
+
+## YOUDO-RESTORE-SNIPPETS (2026-06-22)
+
+| | |
+|---|---|
+| **Env** | `YOUDO_DETAIL_MIN_CHARS=0` (gate disabled) |
+| **Код** | `_youdo_detail_short_skips_l1` early exit при `min_chars==0` · `restore_youdo_visible_vps.py` |
+| **pytest** | `test_o281` + `test_o223` — **17 passed** |
+| **Deploy** | `lead_pipeline.py` + restore script · `rawlead-api` + `rawlead-radar` **active** |
+| **DB** | `youdo_visible=4219` · restore `--apply` restored=4219 |
+| **API** | `GET /v1/feed?source=youdo&limit=3` — ok |
+| **Ограничение** | body 56–102 chars (snippet) · ServicePipe блокирует detail · full TZ — § **YOUDO-DETAIL-BREAKTHROUGH** P0 M1 |
+| **Бэкап профиля** | `backups/youdo_profile_pre_clickthrough_2026-06-22.tar.gz` (64M, sha256 `ae806424…98f9`) · golden O268 `youdo_profile_g2_2026-06-19.tar.gz` |
+| **FL/Kwork** | detail HTTP ✅ · полное ТЗ · эталон для YouDo |
+
+## FEED-FILTER-TG-STUCK (2026-06-22)
+
+| | |
+|---|---|
+| **v2 fix** | `rawlead_feed_prefs_v3` · v2→v3 migrate `sources=[]` · merge без server sources · `filterGenerationRef` |
+| **Deploy** | `deploy-web-rawlead-vps.py` **2026-06-22** · `/lenta/` HTTP 200 · chunk `page-853f2c34…js` |
+| **pytest** | `test_o280_next_e2e` — **2 passed** (static) · Playwright race test opt-in `RAWLEAD_O280_E2E=1` |
+| **DoD** | ✅ owner: Ctrl+F5 `/lenta/` — все биржи после первого захода (v2 TG сброшен) |
+
+## L1-TILDA-TAGS (2026-06-22)
+
+| | |
+|---|---|
+| **Код** | `sanitize_l1_cms_tags` Tilda · L1 prompt · `enrich_youdo_l1_snippet` + detail parser |
+| **Deploy** | `youdo_parser.py` (upload) · `deploy-g6-l3-vps.py` (`ai_analyze`) · `deploy-o230-skills-cap-vps.py` (`skills_catalog`) · `rawlead-api` **active** |
+| **pytest** | `test_l1_tags_cms.py` — **4 passed, 6 subtests** (Lead verify) |
+| **re-L1 18311** | ✅ Lead verify prod DB: `['tilda_dev','ecommerce_dev','api_integration']` · body 233 chars · `YOUDO_DETAIL_FETCH=1` · TZ-fallback (ServicePipe на detail) |
+| **DoD** | ✅ golden · prod 18311 · pytest 4 passed · `YOUDO_DETAIL_FETCH=1` |
+
+## FEED-QUIZ-POLISH (2026-06-22)
+
+| | |
+|---|---|
+| **A — фильтры** | `rawlead_feed_prefs` localStorage + `GET/PUT /v1/me/feed-prefs` · F5 `/lenta/` сохраняет категории/биржи/sort |
+| **B — квиз** | `QUIZ_MIN_TOTAL=8` · `QUIZ_EARLY_SIGNAL_MIN=4` (shown signals leader niche) · `QUIZ_NORMAL_STOP_MIN=10` · insufficient → retry UI |
+| **Deploy** | `deploy-o217-quiz-vps.py` (API) + `deploy-web-rawlead-vps.py` (Next 63 files) · `rawlead-api` **active** |
+| **pytest** | `test_o197_quiz_adaptive` + `test_o280_next_e2e::test_feed_prefs_module_exports` — **24 passed** (Lead verify) |
+| **prod** | `GET /v1/quiz/start` → `qc_dev_python_01` synthetic · `/lenta/` HTTP **200** |
+
+## BOT-NOTIFY-START (2026-06-21)
+
+| | |
+|---|---|
+| **Поведение** | Первый `/start` юзера в `@rawlead_bot` → 1 сообщение владельцу в `TELEGRAM_CHAT_ID` · повторы — молча · свой `/start` (admin) — skip |
+| **Флаг** | VPS `.env.site` `BOT_NOTIFY_OWNER_START=1` |
+| **Dedup** | `users.bot_start_owner_notified_at` · migration `sql/026` |
+| **Deploy** | `telegram_control.py` + `config.py` · `rawlead-bot-poll` **active** |
+| **pytest** | `TestBotNotifyOwnerStart` + `TestM1Welcome` — **13 passed** (Lead verify) |
+
+## CABINET-PARITY (2026-06-21)
+
+| | |
+|---|---|
+| **Push** | `🔔 Match` без процента · VPS ✅ |
+| **ЛК** | Уведомления без % на кнопках ✅ |
+| **Retake** | `#rl-cabinet-quiz-retake` в шапке «Мои отклики» · навыки **не** показываем |
+| **pytest** | `test_match_push_o50` · `test_match_push_o250` |
 
 ## Pre-M1 security M1+M2 (2026-06-21)
 
@@ -91,13 +153,13 @@
 | **ЮKassa keys** | `.env.site` (3 vars) · **не** в корневом `.env` |
 | **Checkout API** | `POST api.rawlead.ru/v1/me/subscription/checkout` |
 | **Webhook** | `POST api.rawlead.ru/v1/webhooks/yookassa` · secret header + `compare_digest` (MiMo M0 ✅) |
-| **Return URL** | `https://rawlead.ru/cabinet/` (default) |
-| **Next gap** | нет `POST /v1/me/subscription/confirm` на return → § **O284** |
+| **Return URL** | `https://rawlead.ru/cabinet/` · `meApi.confirmSubscription()` on mount (`cabinet/page.tsx`, `pricing/page.tsx`) |
+| **API** | `POST /v1/me/subscription/confirm` ✅ · webhook `payment.succeeded` |
 
 ---
 
 <!-- AUTO:VPS_PROBE:START -->
-**Probe:** 2026-06-21 06:44 UTC · `python scripts/probe_prod_facts_vps.py --write`
+**Probe:** 2026-06-21 18:46 UTC · `python scripts/probe_prod_facts_vps.py --write`
 
 | Unit | State |
 |------|-------|
@@ -108,13 +170,11 @@
 - **YOUDO_BROWSER:** `camoufox`
 - **RADAR_PROFILE:** `site`
 - **Theme prod `ver`:** `?`
-- **Last YouDo ok:** 2026-06-21 14:40:23 youdo:trace stage=fetch_end fresh=50 kind=ok new=9 parsed=50
+- **Last YouDo ok:** 2026-06-22 02:34:59 youdo:trace stage=fetch_end fresh=0 kind=ok new=0 parsed=50
 - **O254 code on VPS:** ✅ (`youdo_browser_teardown`)
 - **TG join v4 pending:** 101
 
 - **DB site units:** api=`unset` · bot-poll=`unset` · radar=`unset`
-
-- **Deploy `92060b7` on VPS:** ✅ `l3_opener_too_similar` · ✅ `lead_pipeline` (no snippet skip) · ✅ Next `feed-filters` in `/var/www/rawlead.ru` (2026-06-21 06:40 UTC)
 
 <!-- AUTO:VPS_PROBE:END -->
 
@@ -158,7 +218,7 @@ Env: `RADAR_PROFILE=site` · SQLite `data/projects.db` · log `data/radar_site.l
 |---|---|
 | **rawlead.ru** | **Next.js static** `rawlead-next/out` · deploy `deploy-web-rawlead-vps.py` |
 | **nginx headers** | `X-Frame-Options` · `nosniff` · `Referrer-Policy` · **нет** CSP/HSTS (MiMo M0 → post-M1) |
-| **POST-CUTOVER R10** | ⏳ | Next header «Админка» → `/ops/` |
+| **POST-CUTOVER R10** | ✅ | `Header.tsx` — ссылка «Админка» → `/ops/` |
 | **POST-CUTOVER R9b** | ✅ **2026-06-19** | avatar dir `/opt/rawlead/data/avatars` · env + guard |
 | **POST-CUTOVER R9** | ✅ **2026-06-19** | лента без счётчика · avatar login path |
 | **WP rollback** | `/var/www/rawlead.ru-wp` (full copy pre-cutover) |

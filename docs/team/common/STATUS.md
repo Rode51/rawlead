@@ -2,87 +2,123 @@
 
 **Vision:** [`PRODUCT_VISION.md`](../product/PRODUCT_VISION.md) **v0.12** · [`ROADMAP.md`](../architect/ROADMAP.md)
 
-**Очередь:** [`TASKS.md`](TASKS.md) · **Coder:** [`CODER_PROMPT.md`](../architect/CODER_PROMPT.md)
+**→ Now:** M1 реклама live · **MiMo coder** = основной кодинг · § YOUDO-DETAIL P0 · § ARTICLE-DEMO-INBOX
 
-**Next:** **M1 wave 1** посевы · CSP/HSTS nginx (post-M1)
-
-**Pre-M1 security hotfix ✅ (2026-06-21 @coder):** M2 owner fallback убран · M1 `RADAR_CORS_ORIGINS` на VPS · prod `GET /v1/me/feed` без Bearer → **401** · G0 **32 passed**, 1 skipped
-
-**MiMo ✅ (2026-06-21):** [`2026-06-21-mimo-pre-m1-security.md`](../problems/2026-06-21-mimo-pre-m1-security.md) · [`2026-06-21-mimo-post-g7b-load.md`](../problems/2026-06-21-mimo-post-g7b-load.md) · **P0=0**
-
-**Принято владельцем (2026-06-21):** G7b deploy + ЛК ссылка ✅
-
-**Deploy ✅ (2026-06-21 Lead):** `deploy-l2-stack-vps.py` + `deploy-web-rawlead-vps.py` · commits `3e12011`+`2af72a1`
-
-**G7b full ✅:** stress **09:52Z** PASS · **prod** API+Next залиты
-
-**CABINET-EXCHANGE-LINK ✅:** «Читать на бирже ↗» в ЛК · **prod** Next
-
-**G6 ✅ (2026-06-21):** `preprod_ai_prod_audit_judge.md` **Accept L3: ✅ PASS** · 2026-06-20T18:24Z · uniq **3.04** · combined **4.19** · send **68%** · leak **0%** · L3 v4 `l3_opener_too_similar` + deploy VPS
-
-**YOUDO-T14878013 ✅ (2026-06-21):** lead #8256 delist `youdo_detail_mismatch` · `lead_pipeline` — всегда fetch YouDo detail · [`problems/2026-06-20-youdo-t14878013-mismatch.md`](../problems/2026-06-20-youdo-t14878013-mismatch.md)
-
-**FEED-MULTI-FILTER ✅ (2026-06-21):** multi category/source · **deploy Next ✅** prod verify
-
-**G4-fix ✅ (2026-06-20):** desktop J1–J9,J5,J6,J8,J11 **10/10** · mobile J10 **1/1** · gate `preprod_ux_journey.json` **11/11** · `j5_draft_ok: true` · `critical_count: 0` · harness J5 = n16 parity (no reload между drafts)
-
-**draft_as_is-L2 ✅ (Lead 2026-06-20):** avg **4.0** · vendor-lock **0** · ux_audit **0 critical 24/24** · G0 pytest ✅
+**Prod UI:** `rawlead.ru` = **Next.js** (O280 cutover ✅ **2026-06-19**)
 
 ---
 
-## PRE-ADS-GATE ✅ (2026-06-21 Lead sign-off → M1)
+## Процесс кодинга (2026-06-22)
 
-| Шаг | Прогон | Кто | Статус |
-|-----|--------|-----|--------|
-| G0 | pytest smoke | @coder | ✅ **32 passed**, 1 skipped (2026-06-21 pre-M1 security) |
-| G1 | Next E2E 24/24 | @coder | ✅ **24/24** (2026-06-20 · n5/n17 draftable lead id) |
-| G2 | Playwright smoke 5/5 | @coder | ✅ **5/5** `s2_pass` (2026-06-20 · Next selectors) |
-| G3 | UX audit 0 critical | @coder | ✅ **0 critical** · U1–U12 **24/24** (2026-06-20) |
-| G4 | UX journey J1–J11 | @coder | ✅ **11/11** · `j5_draft_ok` · 0 critical (2026-06-20 · desktop+mobile gate) |
-| G5 | AI matrix S1 | @coder | ✅ **12/12** · `s1_pass` (2026-06-20) |
-| G6 | L3 judge uniquify | @coder | ✅ **PASS** uniq 3.04 (2026-06-21) |
-| G7a | Load quick smoke | @coder | ✅ tier+tz+load (2026-06-21) |
-| G7b | Load **full** 50 VU + draft×20 | @coder | ✅ deploy **2026-06-21** Lead |
-| G-SEC | Security regression | @coder + owner | ✅ S-1 + **S-2 owner** |
-| M0–M4 | **MiMo** audit + skills | owner | **M0–M1** ✅ · **M2+M4** ✅ **2026-06-21** |
-| G8 | Radar 2–4 цикла | owner | ✅ owner **2026-06-21** |
-| G9 | S5–S6-b ручная | owner | ✅ owner **2026-06-21** |
-| G10 | anon квиз→TG→% | owner | ✅ owner **2026-06-21** |
+**MiMo `coder`** пишет код · **Lead** verify + deploy + commit. Канон: `.cursor/rules/mimo.mdc` · `.mimocode/MIMO_CODER.md`.
 
-§ команды → [`CODER_PROMPT`](../architect/CODER_PROMPT.md) · runbook → [`PREPROD_STRESS_RUN.md`](../../ops/PREPROD_STRESS_RUN.md)
+---
 
-**G4 сдача (Lead ✅ 2026-06-20):** `ux_journey.py` Next dual-path · desktop J1–J9,J5,J6,J8,J11 + mobile J10 · `data/preprod_ux_journey.json` **11/11** · `j5_draft_ok: true` · leads 13353+13221 · 0 critical
+## YOUDO-RESTORE-SNIPPETS ✅ deploy (2026-06-22)
 
-**G3 сдача:** `scripts/preprod_playwright/ux_audit.py` — Next/WP dual-path (`next_ui`) · benign 404/Metrika console · артефакты `data/preprod_ux_audit.json` + `data/preprod_ux_audit_human.md`
-
-**draft_as_is-L2 сдача (2026-06-20):** `src/ai_analyze.py` (`_shared_reply_system` · `_build_shared_reply_user` · `_shared_draft_send_ready_reason` · tool aliases · fail on last send_ready) · `src/l3_human_style.py` · deploy `scripts/deploy-o200-l2-vps.py` · `ux_audit.py --base-url https://rawlead.ru` (без `--skip-llm`) → avg **4.0** · vendor-lock **0** · **24/24** · critical **0**
-
-**G2 сдача:** `scripts/preprod_playwright/smoke.py` — dual Next/WP селекторы · артефакт `data/preprod_playwright_report.json`
-
-**Sign-off M1:** все G0–G10 ✅ → Lead → посевы
-
-## O280 Feed UX ✅ (owner accept 2026-06-20)
+**Решение владельца:** вернуть YouDo с snippets пока ServicePipe не починен.
 
 | | |
 |---|---|
-| **R1** | «открыть ссылку» · жёлтый **Отклик ✓** · draft при раскрытии · выделение текста |
-| **R2** | Квота **справа** над «Кабинет →»: `Осталось N откликов` · при лимите `· лимит обновится через M мин` |
-| **Deploy** | `deploy-web-rawlead-vps.py` · owner smoke ✅ |
+| **Env** | `YOUDO_DETAIL_MIN_CHARS=0` на VPS |
+| **Restore** | `restore_youdo_visible_vps.py --apply` → **restored=4219** |
+| **DB** | `youdo_visible=4219` · `youdo_hidden=1` |
+| **API** | `GET /v1/feed?source=youdo` — лиды есть |
+| **pytest** | `test_o281` + `test_o223` — **17 passed** |
 
-Файлы: `LoginPanel.tsx` · `lenta/page.tsx` · `FeedCard.tsx` · `globals.css`
-
-## O116 Support ✅ · M1-bot ✅ · PRE-ADS W1 ✅ (2026-06-20)
-
-FAB↔TG↔reply в боте · bot ▶️ Старт + UTM · API pool + webhook digest + draft feed gate.
+**Smoke:** Ctrl+F5 `/lenta/` → «Фильтр» → **YouDo** → карточки появляются (snippet-тело, не full TZ).
 
 ---
 
-## Index (детали в архиве / PROD_FACTS)
+## M1 + YouDo — риск для посетителей (2026-06-22)
 
-| Блок | Где |
-|------|-----|
-| O280-E2E gate | `data/preprod_next_e2e_human.md` |
-| O200 L2 judge | `data/preprod_o200_judge_human.md` |
-| Portfolio rode51 P2 | [`PROD_FACTS`](PROD_FACTS.md) |
-| Billing O283/O284 | archive · PROD_FACTS |
-| Repo audit A7–A12 | [`TASKS`](TASKS.md) § аудит |
+**Реклама запущена** · первые визиты ~23.06.
+
+| Источник | Для юзера | Риск |
+|----------|-----------|------|
+| FL · Kwork · TG | полное ТЗ · L1 · черновик | ✅ низкий |
+| YouDo | карточки в ленте · **короткое описание** | ⚠️ средний — отклик менее точный |
+| Фильтры | работают после hotfix 22.06 | ✅ |
+
+**Mitigation:** snippet-режим deployed · **P0:** § YOUDO-DETAIL → **MiMo coder**.
+
+**Probe 22.06:** listing `parsed=50` · `new=0` после 01:08 (дедуп) · antibot 1701b watch · [`2026-06-22-youdo-m1-day.md`](../problems/2026-06-22-youdo-m1-day.md)
+
+---
+
+## FEED-FILTER-TG-STUCK-v2 ✅ deploy (2026-06-22) + hotfix
+
+Prefs **v3** · v2 migrate сбрасывает биржи · merge без server sources · race fix `filterGenerationRef`.
+
+**Hotfix (Lead):** `FilterBar.handleSheetApply` / `handleDropdownApply` вызывали `onCategoriesChange` + `onSourcesChange` + `onSortChange` — каждый вызов `applyFilters` перезаписывал остальные с устаревшими значениями. Исправлено: `FilterBar` теперь принимает `onApplyFilters(FeedFilterState)` и делает **один** вызов для всех объединённых операций.
+
+**Owner smoke:** Ctrl+F5 `/lenta/` → выбрать FL → список фильтруется · «Сбросить» → все биржи
+
+---
+
+## L1-TILDA-TAGS ✅ (2026-06-22)
+
+YouDo t14881683: L1 угадывал `wordpress_dev` без «тильда» в коротком snippet.
+
+| # | Сделано |
+|---|---------|
+| 1 | `sanitize_l1_cms_tags` — tilda/тильda/zero block → strip `wordpress_dev`, ensure `tilda_dev` |
+| 2 | L1 prompt — явное правило Tilda ≠ WordPress (O47) |
+| 3 | `enrich_youdo_l1_snippet` + detail carousel fallback в `fetch_project_page_html` |
+| 4 | golden `tilda_turnkey` · `tilda_zero_block` |
+| 5 | Deploy — `youdo_parser` + `g6` + `o230` · API active |
+| 6 | **Follow-up:** `YOUDO_DETAIL_FETCH=1` · re-L1 `18311` → `['tilda_dev','ecommerce_dev','api_integration']` |
+| 7 | `/lenta/` карточка #14881683 — теги `tilda dev` (без `wordpress_dev`) |
+
+**Ограничение prod:** YouDo detail pages — ServicePipe на всех DC+RU слотах VPS (2026-06-22); re-L1 `18311` с TZ-fallback после неудачного detail fetch.
+
+**pytest:** `tests/test_l1_tags_cms.py` — **4 passed**
+
+**Как проверить:** `https://rawlead.ru/lenta/` → YouDo «Сделать сайт под ключ» → `tilda dev` · `https://youdo.com/t14881683`
+
+**Скрипт one-shot:** `scripts/replay_l1_youdo_tilda_vps.py`
+
+---
+
+## FEED-QUIZ-POLISH ✅ deploy (2026-06-22)
+
+Фильтры F5 · квиз Variant C (min 8 + signal coverage 4) · insufficient retry. Deploy Lead verify.
+
+---
+
+## PRE-ADS-GATE ✅ → M1 (2026-06-21)
+
+| Шаг | Статус |
+|-----|--------|
+| G0–G7b · G-SEC · G8–G10 | ✅ |
+| MiMo M0–M4 | ✅ P0=0 |
+| Pre-M1 security M1+M2 | ✅ commit `786aede` |
+| BOT-NOTIFY-START | ✅ deploy **2026-06-21** |
+| CABINET-PARITY | ✅ **2026-06-21** |
+
+Чеклист посевов: [`M1_SEEDING_CHECKLIST.md`](../marketing/M1_SEEDING_CHECKLIST.md)
+
+---
+
+## Недавно на prod
+
+| Что | Когда |
+|-----|-------|
+| YOUDO-FULL-TZ-GATE O281 — gate + audit 521 hidden | 2026-06-22 |
+| FEED-FILTER-TG-STUCK-v2 — prefs v3, TG reset fix | 2026-06-22 |
+| FEED-QUIZ-POLISH — F5 фильтры + квиз depth + deploy | 2026-06-22 |
+| BOT-NOTIFY-START — пинг владельцу на первый /start | 2026-06-21 |
+| CABINET-PARITY — push Match без %, retake-кнопка | 2026-06-21 |
+| Bearer-only `/v1/me/*` + CORS | 2026-06-21 |
+| G7b deploy · ЛК «Читать на бирже» | 2026-06-21 |
+| G6 L3 judge PASS · multi-filter · YouDo #8256 | 2026-06-20–21 |
+| O280 Feed UX R1+R2 · E2E 24/24 | 2026-06-20 |
+| rode51.ru P2 | 2026-06-21 |
+
+Детали prod → [`PROD_FACTS.md`](PROD_FACTS.md) · артефакты → `data/preprod_*`
+
+---
+
+## Index (архив)
+
+G2–G5 сдачи · draft_as_is-L2 · O116/M1-bot · MiMo отчёты → [`STATUS_ARCHIVE`](../archive/STATUS_ARCHIVE.md) · [`problems/`](../../problems/)

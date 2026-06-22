@@ -64,7 +64,7 @@
 | **O29** | **Stars** — живая оплата (не заглушка) | § **3f-C-STARS** P0 · **→ Coder до Design** |
 | **O30** | **Push match:** не top-3 глобально — **каждому paid** при `keyword_match ≥ порог`; порог **настраивает пользователь** (default **60%**, диапазон 30–100) | § **MATCH-PUSH-V2** · отменяет top-K=3 (O28 MVP) |
 | **O46** | **Match F2:** `km = matched/lead_tags×100` · «ИДЕАЛЬНО ✦» только при ≥2 тегах лида и полном покрытии · ~~cap навыков **12**~~ → **снят** quiz-first **2026-06-15** | § **PRE-STRESS-PACK O42** · 2026-05-29 |
-| **O47** | **L1 tags strict:** Joomla/Bitrix ≠ wordpress_dev · post-validate · golden tests | § **PRE-STRESS-WAVE-2** · **P0 до stress** |
+| **O281** | **YouDo без полного ТЗ — не в ленту и не в L1** (не «угадывать» по заголовку) | § **YOUDO-FULL-TZ-GATE** · откат компромисса O262g (`YOUDO_DETAIL_FETCH=0` + L1 на snippet) |
 | **O48** | **Draft reliability:** log 503 · retry · rate limit · UI «Повторить» · scale | § **PRE-STRESS-WAVE-2** · **P0** |
 | **O49** | **L2 premium v2:** без «Готов…» · шаги · 9/10 quality | § **PRE-STRESS-WAVE-2** |
 | **O50** | **TG push:** полная карточка + callback «Сгенерировать» → draft в TG + ЛК | § **PRE-STRESS-WAVE-2** |
@@ -121,29 +121,20 @@
 
 Историческая таблица 2026-05-28 → [`archive/OWNER_INTENT_SECTIONS_ARCHIVE.md`](../archive/OWNER_INTENT_SECTIONS_ARCHIVE.md).
 
-## § MIMO-AUDIT — MiMo Code (**read-only**, owner 2026-06-12 · lockdown 2026-06-20)
+## § MIMO — audit + coder (owner 2026-06-22)
 
-**Режим 2026-06-20:** MiMo **не кодит** и **не плодит docs** — только аудит → `docs/problems/` → **@lead-architect** → Cursor `@coder`. Канон: [`.mimocode/MIMO_RULES.md`](../../../.mimocode/MIMO_RULES.md) · глобально `~/.codex/CLAUDE.md` § RawLead.
+**Решение:** весь кодинг → **MiMo `coder`** (экономия Cursor) · Lead verify/deploy/commit.
 
-**Что это:** [MiMo Code](https://github.com/XiaomiMiMo/MiMo-Code) — terminal agent (OpenCode fork) · **не** замена Cursor.
+| Режим | Конфиг | Выход |
+|-------|--------|-------|
+| **audit** (default) | `MIMO_RULES.md` | `docs/problems/*-mimo-*.md` |
+| **coder** | `MIMO_CODER.md` | diff в repo → Lead verify |
 
-**Зачем:** wide audit (парсеры, ИИ, Next, docs drift) — отчёт как `problems/2026-05-29-gemini-full-audit.md`.
+Канон Cursor: `.cursor/rules/mimo.mdc` · handoff: `lead-architect.mdc` § Маршрут.
 
-**Запрещено MiMo:** `src/`, `scripts/`, `tests/`, `docs/team/**`, маркетинг `MIMO_*_PLAN.md`, deploy, git commit, pip, pytest.
+**Запрещено MiMo:** commit · deploy · `.env` · правка `CODER_PROMPT` (edit deny в jsonc).
 
-**Разрешено:** read/grep · **новый файл только** `docs/problems/YYYY-MM-DD-mimo-*.md` (ask в UI).
-
-**Безопасность:** `.mimocode/mimocode.jsonc` — `edit: deny` кроме `docs/problems/**` · deny `.env`/`data/` · MiMo Auto = трафик Xiaomi — **без секретов в чате**.
-
-**Промпт старта:** см. `.mimocode/MIMO_RULES.md` (копипаст блок).
-
-**Сравнение:**
-
-| | Cursor + Lead/Coder | MiMo |
-|--|---------------------|------|
-| Код / deploy | ✅ | ❌ |
-| Аудит широкий | O38 / Mechanic | ✅ отчёт only |
-| Маркетинг-канон | @lead-marketing | ❌ не писать планы |
+**Читать отчёты прогонов:** audit/coder может `data/preprod_*.json` / `*.md`.
 
 ---
 
@@ -153,6 +144,14 @@
 
 | Дата | Мысль / запрос | Kуда ушло |
 |------|----------------|----------|
+| 2026-06-22 | **Экономия:** весь кодинг → MiMo `coder` · Cursor Lead = verify/deploy | `mimo.mdc` · `MIMO_CODER.md` |
+| 2026-06-22 | **M1 реклама live** · YouDo 22.06: O281 скрыл ленту → restore · listing `parsed=50` жив | `problems/2026-06-22-youdo-m1-day.md` · YOUDO-DETAIL P0 |
+| 2026-06-22 | **YouDo:** вернуть snippets в ленту (ServicePipe detail) | **YOUDO-RESTORE-SNIPPETS** ✅ |
+| 2026-06-22 | **Лента:** фильтр TG включается сам — prefs v3 | **FEED-FILTER-TG-STUCK** ✅ |
+| 2026-06-22 | **YouDo:** нельзя тащить заказы только из заголовка — без полного ТЗ не в ленту | **O281** · § **YOUDO-FULL-TZ-GATE** |
+| 2026-06-22 | **YouDo t14881683:** Тильда в ТЗ, на карточке `wordpress_dev` | § **L1-TILDA-TAGS** ✅ |
+| 2026-06-22 | **Лента:** F5 сбрасывает фильтры · **Квиз:** слишком короткий | § **FEED-QUIZ-POLISH** ✅ |
+| 2026-06-20 | **PRE-ADS:** сначала **MiMo audit** → Lead triage → **@coder** § PRE-ADS-GATE · **M1 реклама** параллельно | `CODER_PROMPT` § PRE-ADS-GATE · `MIMO_RULES` |
 | 2026-06-16 | **Soft launch M1** — TG ads test · РФ · все фрилансеры · budget **≤5k ₽** (старт 2–3k) · trial · параллельно инженерии · owner мониторит | **§ M1** `LEAD_MARKETING_PROMPT` · `@lead-marketing` |
 | 2026-06-16 | **Роль Lead Marketing** — кампании, UTM, KPI; понимает квиз-first + trial | `.cursor/rules/lead-marketing.mdc` · `docs/team/marketing/` |
 | 2026-06-16 | **YouDo O260 DC-first** — slot1=DC · node max 1 при dc_alive=0 · hard reset при банах на DC | **§ O260** ✅ prod |

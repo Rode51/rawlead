@@ -1,73 +1,87 @@
-# RawLead — MiMo в роли Coder (только с handoff Lead)
+# RawLead — MiMo в роли Coder (паритет с `.cursor/rules/coder.mdc`)
+
+**Решение владельца 2026-06-22:** MiMo `coder` = **основной** исполнитель кода. Cursor `@coder` — fallback. Lead = verify + deploy + commit.
 
 **Не стартуй сам.** Сначала `@lead-architect` → § в `CODER_PROMPT.md` → копипаст сюда.
 
 ## Переключение
 
-В MiMo: агент **`coder`** (не `audit`).  
-`default_agent` = audit — код только когда **явно** выбрал coder.
+| Шаг | Действие |
+|-----|----------|
+| 1 | MiMo: агент **`coder`** (`/agent coder`) — **не** `audit`, **не** `plan` |
+| 2 | **Новая сессия** из `C:\Users\hramo\uisness` после смены конфига |
+| 3 | В промпте — § из `CODER_PROMPT` + список файлов из § «Файлы» |
 
-**Права (v3):** только агент **`coder`**. Явный allow: `scripts/**` (удаление `.out`/`.html`/`_tmp_*` по §), `src/**`, `.gitignore`. Deny: секреты, Lead-docs.
+**Проверка прав:** создать/удалить `scripts\_test_mimo_perm.txt`. Deny → не тот агент.
 
-**Обязательно перед кодом:**
-1. Агент **`coder`** — Tab / `/agent coder`. **Не** `audit`, **не** `plan` (plan отключён в конфиге).
-2. **Новая сессия** `mimo` из `C:\Users\hramo\uisness` после смены конфига.
-3. В промпте — § из `CODER_PROMPT` (список файлов на удаление).
+Конфиг: `.mimocode/mimocode.jsonc` · кратко: `.cursor/rules/mimo.mdc`
 
-**Проверка прав (10 сек):** `del scripts\_test_mimo_perm.txt` или edit-tool создать/удалить этот файл. Deny → не тот агент или старая сессия.
-
-Глобальных `instructions` с `MIMO_RULES.md` больше нет — они давали read-only даже в coder.
-
-## Обязательно в первом сообщении (от Lead / владельца)
-
-1. **§ задачи** из `docs/team/architect/CODER_PROMPT.md` (шапка + DoD + «Файлы»).
-2. Фраза: «Режим Coder · одна задача · файлы только из §».
-
-Опционально вставить выдержку из `.cursor/rules/coder.mdc` — **дополнительно**, не вместо §.
-
-## Read перед кодом (как @coder)
+## Обязательно Read (как @coder)
 
 | # | Файл |
 |---|------|
-| 1 | `docs/team/architect/CODER_PROMPT.md` — § в шапке |
-| 2 | `docs/team/common/STATUS.md` — hot |
-| 3 | `docs/team/common/PROD_FACTS.md` — если prod/парсеры |
+| 1 | `docs/team/architect/CODER_PROMPT.md` — § в шапке + § «Файлы» + DoD |
+| 2 | `docs/team/common/STATUS.md` — hot (~80 строк) |
+| 3 | `docs/team/common/PROD_FACTS.md` — если § prod/парсеры/browser |
 
-**Не читать** vision, archive, `OWNER_INTENT` целиком, marketing — без указания Lead.
+**Не читать:** archive, vision, `OWNER_INTENT` целиком, marketing — без указания Lead.
 
-## Можно править (только файлы из § CODER_PROMPT)
+**Первый ответ:** `Прочитал: CODER_PROMPT §<name>, STATUS` → что делаешь по §.
 
-- `src/`, `scripts/`, `tests/`, `rawlead-next/`, `wordpress/` — если в §
+## Можно править (только из § «Файлы»)
+
+- `src/`, `scripts/`, `tests/`, `sql/`
+- `rawlead-next/`, `wordpress/`, `portfolio/`, `desktop/` — если в §
 - `.gitignore` — если § гигиена repo
-- `docs/team/common/STATUS.md` — § «Сделано» после задачи
-- `docs/team/marketing/M1_*.md` — **только** если явно в § (не `MIMO_*_PLAN`)
+- `docs/team/common/STATUS.md` — § «Сделано» после задачи (если в §)
 
 ## Запрещено (даже в режиме coder)
 
 | | |
 |---|---|
+| `git commit` / `git push` / `git add` | Lead |
+| `scripts/deploy-*` | Lead после verify |
+| `pip install` | deny bash |
+| Править `CODER_PROMPT`, `TASKS`, `OWNER_INTENT`, `ROADMAP` | Lead |
 | Новые `docs/team/marketing/MIMO_*` | Lead Marketing |
-| Править `CODER_PROMPT`, `TASKS`, `OWNER_INTENT` | Lead |
-| `git commit` / `git push` | Lead |
-| `scripts/deploy-*` без «задеплой» от владельца | Lead Architect |
 | `.env`, `data/`, сессии | deny |
 | Scope creep — файлы вне § | стоп → Lead |
 
-## Проверка
+## Анти-регрессия (обязательно)
 
-- `pytest` по § промпта (релевантные тесты)
-- `git diff` — только ожидаемые файлы
-- **Сдача:** владелец → `@lead-architect` verify → потом commit Lead
+**Починил одно — не вырезай другое.** Lead не примет сдачу «кнопка ок, карточка сломана».
+
+| Правило | Действие |
+|---------|----------|
+| UX/CSS/анимации | Не удалять без пункта § «remove …» |
+| CSS/JS уменьшился | `git diff` — если меньше строк/keyframes → восстановить или объяснить в STATUS |
+| DoD | Каждый пункт § DoD + smoke из промпта |
+| Сомневаешься | Стоп → Lead |
+
+## Проверка перед сдачей
+
+```powershell
+# из корня uisness
+.venv\Scripts\python.exe -m pytest <tests из § DoD> -q --tb=short
+git diff
+```
+
+- Только ожидаемые файлы в diff
+- **Сдача:** владелец → `@lead-architect` verify → deploy/commit Lead
+
+## Skills / search
+
+Перед правкой — **grep/read** по repo (не угадывать). Канон Cursor: `.cursor/skills/rawlead-search-first`.
 
 ## Промпт-обёртка (копипаст + § от Lead)
 
 ```text
-Ты Coder RawLead. Одна задача. Английский в промпте, UI-строки RU по цитатам.
+Ты Coder RawLead (MiMo). Одна задача. English в рассуждениях, UI RU по цитатам.
 Прочитай CODER_PROMPT § ниже + STATUS hot + PROD_FACTS если prod.
-Не создавай лишних файлов. Не трогай marketing docs. Не commit.
+Не создавай лишних файлов. Не commit. Не deploy.
 
 --- ЗАДАЧА (от Lead) ---
-<вставить § CODER_PROMPT>
+<вставить § CODER_PROMPT целиком>
 ```
 
-_Канон Cursor: `.cursor/rules/coder.mdc` · lockdown audit: `MIMO_RULES.md`_
+_Канон Cursor: `.cursor/rules/coder.mdc` · audit lockdown: `MIMO_RULES.md`_

@@ -6,9 +6,101 @@
 
 ---
 
-# Перенесено из hot **2026-06-20** — A12-SCRIPTS-JUNK ✅
+# Перенесено из hot **2026-06-22** — YOUDO-RESTORE-SNIPPETS ✅
 
-11 junk files удалены из `scripts/` (4×`.out`, html, txt, 4×`_tmp_*.py`) · `.gitignore` +`scripts/_*.out`/`_*.html` · **KEEP** `_tmp_o170_delist_tg_ads.py`. Lead verify: disk ok · в git diff были **чужие** правки `deploy-o*`/`bot_poll` — не в A12 commit.
+`YOUDO_DETAIL_MIN_CHARS=0` на VPS · gate disabled (`min_chars==0` early exit) · `scripts/restore_youdo_visible_vps.py --apply` restored=4219 · `youdo_visible=4219` · pytest `test_o281`+`test_o223` 17 passed · curl `/v1/feed?source=youdo` ok.
+
+---
+
+# Перенесено из hot **2026-06-22** — FEED-FILTER-TG-STUCK-v2 ✅
+
+v3 key `rawlead_feed_prefs_v3` · v2 migrate sources=[] · mergeFeedPrefsOnLogin без server sources · filterGenerationRef race fix · deploy `deploy-web-rawlead-vps.py` · pytest `test_feed_prefs_module_exports` passed.
+
+---
+
+# Перенесено из hot **2026-06-22** — YOUDO-FULL-TZ-GATE ✅
+
+O281: YouDo без полного ТЗ — skip L1 · `is_visible=false` · `pipeline:skip … detail:short` · `_youdo_detail_short_skips_l1` закрывает лазейку `detail_ok=None` · `scripts/audit_youdo_short_visible_vps.py` · deploy `deploy-o223-youdo-guard-vps.py` · audit `--apply` hidden=521 · pytest `test_o281` 6 passed.
+
+---
+
+# Перенесено из hot **2026-06-22** — FEED-FILTER-TG-STUCK ✅
+
+Prefs v2 `rawlead_feed_prefs_v2` · drop v1 · `initFilterState` one-shot `?source=` → persist → `replaceState` · reset strip URL+API · `deploy-web-rawlead-vps.py` · owner blocker «TG сам включается» закрыт.
+
+---
+
+# Перенесено из hot **2026-06-22** — L1-TILDA-TAGS ✅
+
+YouDo t14881683: `sanitize_l1_cms_tags` Tilda · L1 prompt · `enrich_youdo_l1_snippet` · detail carousel fallback · `YOUDO_DETAIL_FETCH=1` · re-L1 lead `18311` → `tilda_dev` (TZ-fallback при ServicePipe) · `scripts/replay_l1_youdo_tilda_vps.py` · pytest `test_l1_tags_cms` 4 passed.
+
+---
+
+# Перенесено из hot **2026-06-22** — FEED-QUIZ-POLISH ✅
+
+F5 фильтры (`rawlead_feed_prefs` + API merge) · квиз Variant C: `QUIZ_MIN_TOTAL=8`, `QUIZ_EARLY_SIGNAL_MIN=4`, `QUIZ_NORMAL_STOP_MIN=10` · insufficient retry UI · pytest 24 passed · deploy `deploy-o217-quiz-vps.py` + `deploy-web-rawlead-vps.py`.
+
+---
+
+# Перенесено из hot **2026-06-21** — BOT-NOTIFY-START ✅
+
+Первый `/start` в `@rawlead_bot` → 1 пинг владельцу (`TELEGRAM_CHAT_ID`) · dedup `users.bot_start_owner_notified_at` · флаг `BOT_NOTIFY_OWNER_START=1` · pytest `TestBotNotifyOwnerStart` 4/4 · deploy VPS migration `026` + `rawlead-bot-poll` restart.
+
+---
+
+# Перенесено из hot **2026-06-21** — CABINET-PARITY ✅
+
+Push Match без % · ЛК notifications labels · skills + quiz retake · deploy API+Next.
+
+---
+
+# Перенесено из hot **2026-06-21** — PRE-ADS-GATE closed → M1
+
+G6/G7/G7b/FEED-MULTI/YOUDO/G-SEC детальные § — gate ✅. Hot сжат до § POST-M1-BACKLOG.
+
+---
+
+# Перенесено из hot **2026-06-20** — draft_as_is-L2 ✅
+
+L2 prompts + send_ready retry · deploy `deploy-o200-l2-vps.py` · `ux_audit` avg **4.0** · vendor-lock **0** · 24/24 · critical **0** · owner B.
+
+---
+
+# Перенесено из hot **2026-06-20** — G1-hotfix-n16 ✅
+
+Harness: n5/n16/n17 — `draftable_lead_ids_for_e2e` + `expand_card_by_lead_id` (PA-5b km>0). Prod `next_e2e --gate-all` **24/24** 2026-06-20T09:45 UTC.
+
+---
+
+# Перенесено из hot **2026-06-20** — O280-FEED-UX-R2 ✅ owner accept
+
+Квота справа в шапке · `Осталось N откликов` · при лимите `· лимит обновится через M мин`. Deploy `deploy-web-rawlead-vps.py --skip-build` ✅ · **owner accept** 2026-06-20.
+
+---
+
+# Перенесено из hot **2026-06-20** — O280-FEED-UX-R1 ✅ owner accept
+
+LoginPanel «открыть ссылку» · Отклик ✓ badge · draft expand/select · `.rl-badge--replied` · deploy 2026-06-20 · **owner accept** 2026-06-20.
+
+**Owner verify (premium `/lenta/`):**
+1. Справа над «Кабинет →»: `Осталось N откликов` или `Осталось 0 · лимит обновится через M мин`
+2. Карточка с `reply_draft` → жёлтый «ОТКЛИК ✓» (свёрнута) · раскрыть → черновик без generate
+3. Выделение текста черновика · login QR «открыть ссылку»
+4. Регрессии: anon/free CTA · FAB support
+
+---
+
+# Перенесено из hot **2026-06-20** — O116-SUPPORT ✅ (TG-reply + thread)
+
+**TG-reply:** `reply_to_message` на notice · `#N` / `тN:` · `admin_reply` · FAB error UX.
+
+**Thread hotfix:** logged-in FAB игнорировал `guest_token` → `ticket_for_actor` OR + `updated_at` · bot `require_database_url()` · FAB poll 15s.
+
+Deploy: `deploy-o116-support-thread-vps.py` + Next · **owner smoke OK** 2026-06-20.
+
+---
+
+# Перенесено из hot **2026-06-20** — A12-SCRIPTS-JUNK ✅
 
 ---
 

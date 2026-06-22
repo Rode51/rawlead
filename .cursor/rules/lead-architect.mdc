@@ -42,13 +42,58 @@ alwaysApply: false
 | Идея/баг в чате | `OWNER_INTENT` § бэклог · не сразу `@coder` |
 | Активная фича | § в `CODER_PROMPT` / `DESIGNER_PROMPT` когда «→ Now» |
 | Инцидент сейчас | `docs/problems/` → `@mechanic` (Gemini 2.5) |
-| Плановая задача | `@coder` · один § = один чат |
+| Плановая задача | § в `CODER_PROMPT` → **Маршрут:** MiMo или `@coder` (таблица в `lead-architect.mdc`) |
 
 **Coder vs Mechanic:** узкий § + файлы → Coder · регресс/неясный корень → Mechanic. Канон: `LEAD.md`.
 
 **Спор с владельцем:** риск → альтернатива → вопрос A/B. Настаивает → «решение владельца» в каноне.
 
 **Новый `.md`:** только с «да» владельца · иначе правка канона · исключение: один `problems/YYYY-MM-DD-*.md`.
+
+---
+
+## Маршрут исполнителя (MiMo vs Cursor) — **обязательно в каждом handoff**
+
+**Решение владельца 2026-06-22:** весь кодинг → **MiMo `coder`** (бесплатно/дешевле) · Cursor **Lead** = verify + deploy + docs · `@coder` Cursor — **fallback**.
+
+**Владелец не должен спрашивать «MiMo или Cursor?»** — Lead **сам** пишет одну строку **Маршрут:** в конце triage/handoff.
+
+| Куда | Когда | Примеры RawLead |
+|------|--------|-----------------|
+| **MiMo `coder`** (**default**) | § в `CODER_PROMPT` · ≤3 файла · pytest · **без** deploy/commit | M1-bot · YouDo detail · гигиена `scripts/` · один модуль |
+| **MiMo `audit`** | read-only · широкий разбор · отчёт P0/P1 | PRE-ADS · security surface · drift |
+| **`@coder` (Cursor)** | >3 файлов · API+Next вместе · миграции · stress/L3/load | PRE-ADS W1–W2 · `api_server` bulk · rawlead-next auth wave |
+| **`@mechanic`** | prod инцидент · неясный корень · регресс парсера | radar OOM · мульти-модульный затык |
+| **Lead** | verify · deploy · commit · `CODER_PROMPT` / triage | после **любой** сдачи MiMo/coder |
+
+**Жёстко Cursor (не MiMo):** deploy · `git commit` · правка `CODER_PROMPT`/`TASKS` · prod secrets · load/k6 · judge-l3 · schema/migrations · >3 файлов или >~150 строк diff · MCP-only в Cursor.
+
+**Жёстко MiMo audit (не coder):** нет § в `CODER_PROMPT` · только «посмотри весь проект».
+
+**После MiMo coder:** владелец → `@lead-architect` verify (diff + pytest) → deploy Lead · **не** prod из MiMo.
+
+### Формат ответа владельцу (всегда)
+
+```
+Маршрут: <MiMo coder | MiMo audit | @coder | @mechanic>
+Почему: <одна фраза>
+```
+
+**Default:** `MiMo coder` если § узкий и ≤3 файла.
+
+### Копипаст MiMo coder (default)
+
+См. `.cursor/rules/mimo.mdc` · `.mimocode/MIMO_CODER.md`
+
+```text
+MiMo: /agent coder · сессия из C:\Users\hramo\uisness
+Одна задача. Не commit. Не deploy.
+§: docs/team/architect/CODER_PROMPT.md — § <имя>
+Прочитай § + STATUS hot + PROD_FACTS если prod.
+pytest по DoD → @lead-architect verify.
+```
+
+Канон lockdown: `.mimocode/MIMO_RULES.md` · `.mimocode/MIMO_CODER.md`
 
 ---
 
@@ -72,13 +117,16 @@ alwaysApply: false
 ## Handoff → `@coder` (порядок)
 
 1. **Сводка RU** (до 8 строк): что изменится для пользователя · что тронет Coder · что нужно владельцу
-2. **Копипаст:**
+2. **Копипаст** (сначала строка **Маршрут:** — см. § «Маршрут исполнителя»):
 
+**Cursor:**
 ```text
 @coder
 Правила: .cursor/rules/coder.mdc
 Задача: docs/team/architect/CODER_PROMPT.md — § <имя>
 ```
+
+**MiMo coder** — блок из § «Копипаст MiMo coder» · § имя то же.
 
 **ТЗ в чат не копировать.** Промпты агентам — **English** · сводки/commit — **RU**.
 

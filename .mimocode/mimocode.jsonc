@@ -59,6 +59,11 @@
           "src/**": "allow",
           "tests/**": "allow",
           "sql/**": "allow",
+          "rawlead-next/**": "allow",
+          "wordpress/**": "allow",
+          "portfolio/**": "allow",
+          "desktop/**": "allow",
+          "requirements.txt": "allow",
           ".gitignore": "allow",
           "docs/team/common/STATUS.md": "allow",
           "docs/team/marketing/M1_*.md": "allow",
@@ -74,7 +79,8 @@
           "docs/team/architect/OWNER_INTENT.md": "deny",
           "docs/team/architect/ROADMAP.md": "deny",
           "docs/team/common/TASKS.md": "deny",
-          "docs/team/marketing/MIMO_*.md": "deny"
+          "docs/team/marketing/MIMO_*.md": "deny",
+          "deploy/**": "deny"
         },
         "bash": {
           "*": "allow",
@@ -86,6 +92,9 @@
           "Remove-Item scripts/*": "allow",
           "Remove-Item -Force scripts/*": "allow",
           "Remove-Item -Path scripts/*": "allow",
+          "pytest *": "allow",
+          "python -m pytest*": "allow",
+          ".venv\\Scripts\\python.exe -m pytest*": "allow",
           "pip *": "deny",
           "pip3 *": "deny",
           "python -m pip*": "deny",
@@ -103,6 +112,10 @@
           ".env": "deny",
           ".env.*": "deny",
           "data/**": "deny",
+          "data/preprod_*.json": "allow",
+          "data/preprod_*.md": "allow",
+          "data/preprod_*/*.png": "allow",
+          "data/preprod_*/*.jpg": "allow",
           "**/*.session": "deny"
         }
       }
@@ -135,6 +148,9 @@
       "*.env.*": "deny",
       "*.env.example": "allow",
       "data/**": "deny",
+      "data/preprod_*.json": "allow",
+      "data/preprod_*.md": "allow",
+      "data/preprod_*/*": "allow",
       "**/*.session": "deny",
       "**/mcp.pool.json": "deny",
       "scripts/backup.config.json": "deny"

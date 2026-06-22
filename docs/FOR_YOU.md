@@ -1,18 +1,119 @@
 # Для тебя
 
-## Сейчас (2026-06-20)
+## Сейчас (2026-06-22)
 
 | Что | Статус |
 |-----|--------|
-| **rawlead.ru** | ✅ **Next.js** на prod · E2E gate **24/24** (2026-06-20) |
-| **O200 judge** | ✅ owner bar (70%×4 cat) · прогон 2026-06-18 · `data/preprod_o200_judge_human.md` |
-| **→ M1** | волна 1 посевы · [`M1_CAMPAIGN_SEO_PLAN.md`](team/marketing/M1_CAMPAIGN_SEO_PLAN.md) |
-| **→ smoke** | anon квиз → TG → % в ленте (15 мин, твои руки) |
-| **Оплата** | ЮKassa keys в `.env.site` · confirm webhook owner |
-| **Portfolio** | ✅ **https://rode51.ru** (P1) · P2 WhyMe/FAQ/EN — локально, deploy после commit |
-| **БД prod** | VPS Postgres (O271) · Neon архив |
-| **YouDo** | 🟡 camoufox · `/ops/` restart |
+| **→ Сейчас** | **M1 реклама запущена** · первые визиты ~23.06 |
+| **Smoke лента** | FL/Kwork — полное ТЗ ✅ · YouDo — карточки есть, описание короткое ⚠️ |
+| **Бот M1** | Первый `/start` нового юзера → пинг тебе в `@rawlead_bot` (один раз на человека) |
+| **Гейт pre-ads** | ✅ G0–G10 · security hotfix · можно посевать |
+| **rawlead.ru** | ✅ **Next.js** (O280 cutover 2026-06-19) · не WordPress |
+| **Картинка M1** | `docs/design/assets/m1-tg-card-v8.png` |
+| **Portfolio** | ✅ https://rode51.ru |
+| **БД prod** | VPS Postgres · локально preprod через tunnel `:15432` |
+| **YouDo** | ⚠️ snippet в ленте · listing `parsed=50` ок · detail ServicePipe P0 |
+| **Кодинг** | **MiMo `coder`** (основной) → `@lead-architect` verify · Cursor `@coder` — fallback |
 | **Админка** | https://rawlead.ru/ops/ |
+
+### M1: что увидит посетитель (честно)
+
+| Работает | Слабее |
+|----------|--------|
+| Сайт, квиз, регистрация, бот | — |
+| Лента FL · Kwork · TG — заказы + черновики | YouDo — заказы **есть**, описание **короткое** (антибот YouDo) |
+| Фильтры, кабинет, trial | — |
+
+**Не паникуем:** основной трафик M1 идёт на квиз + ленту FL/Kwork — там всё ок. YouDo чиним P0 параллельно (`§ YOUDO-DETAIL`).
+
+### Кодинг через MiMo (экономия Cursor)
+
+1. `@lead-architect` — задача + **Маршрут: MiMo coder**
+2. MiMo: `/agent coder` · новая сессия из папки `uisness`
+3. Копипаст § из `CODER_PROMPT` (Lead даст)
+4. «Готово» → снова `@lead-architect` verify + deploy
+
+Подробно: `.cursor/rules/mimo.mdc`
+
+---
+
+### Cursor + VPN vs deploy (owner 2026-06-21)
+
+**Ситуация:** в Cursor без VPN не работаешь · `deploy-*-vps.py` с VPN даёт `WinError 10060`.
+
+**Не мучайся переключением каждый раз — три рабочих режима:**
+
+| Режим | Когда | Как |
+|-------|-------|-----|
+| **A — Split tunnel (лучший)** | VPN умеет bypass / split | Исключи из VPN только **`62.113.103.231`** (Beget VPS). Cursor через VPN, SSH — напрямую. WireGuard: `AllowedIPs` без этого IP · OpenVPN: `route-nopull` + маршрут · Dolphin/другие — «обход для IP» / split tunnel в настройках |
+| **B — Deploy из браузера (VPN можно оставить)** | Split tunnel нет | Beget → облако → **веб-терминал** на VPS → `git pull` + `systemctl restart …` (§ Plan B выше). SSH с ПК не нужен |
+| **C — Разовый deploy** | Редко | Отдельное окно PowerShell **без VPN** (или мобильный интернет) · только `deploy-g6-l3-vps.py` / `deploy-web-rawlead-vps.py --skip-build` · Cursor не трогать — но **работает только если VPN не system-wide** |
+
+**Проверка перед deploy с ПК:**
+```powershell
+Test-NetConnection 62.113.103.231 -Port 22
+```
+`True` — деплой с ПК ok · `False` — режим **B** (Beget терминал) или включи split (**A**).
+
+**ЮБуст (Windows):** в режиме «весь интернет» туннель на **весь ПК** — split по IP в приложении обычно **нет**. Варианты: (1) маршрут Windows ниже · (2) deploy из **Beget веб-терминала** · (3) спросить в [@uboost_live_bot](https://t.me/uboost_live_bot) про исключение IP.
+
+**Маршрут мимо VPN (PowerShell от админа, после подключения ЮБуст):**
+
+Твой ПК (2026-06-21): шлюз **`192.168.0.1`**, LAN-интерфейс **`19`** (Realtek).
+
+```powershell
+# PowerShell «Запуск от имени администратора»
+route -p add 62.113.103.231 mask 255.255.255.255 192.168.0.1 metric 5 if 19
+route print 62.113.103.231
+Test-NetConnection 62.113.103.231 -Port 22
+```
+
+Ожидание: в `route print` строка на `62.113.103.231` · `TcpTestSucceeded : True` при **включённом** ЮБуст.
+
+Удалить (если надо): `route delete 62.113.103.231`
+
+---
+
+Кодер сдал `92060b7` — на prod **ещё не залито**.
+
+**Диагностика (если deploy падает):**
+
+| Ошибка | Причина | Что делать |
+|--------|---------|------------|
+| `WinError 10060` на `deploy-g6-l3-vps.py` | **SSH :22 недоступен** с твоей сети (ping VPS ok, порт 22 closed) | Beget панель → VPS **запущен** · firewall / «SSH снаружи» · попробуй **другую сеть/VPN** · или деплой из **веб-терминала Beget** на самом VPS (§ Plan B) |
+| `FileNotFoundError: npm` в `deploy-web-rawlead-vps.py` | Python на Windows не находит `npm` (нужен `npm.cmd`) | Собери вручную, потом `--skip-build` (§ Plan A npm) |
+
+**Plan A — Next (npm вручную, потом upload):**
+
+```powershell
+cd C:\Users\hramo\uisness\rawlead-next
+npm ci
+npm run build
+cd ..
+# когда SSH заработает:
+.venv\Scripts\python.exe scripts\deploy-web-rawlead-vps.py --skip-build
+```
+
+**Plan A — backend (нужен живой SSH :22):**
+
+```powershell
+cd C:\Users\hramo\uisness
+Test-NetConnection 62.113.103.231 -Port 22   # TcpTestSucceeded должен быть True
+.venv\Scripts\python.exe scripts\deploy-g6-l3-vps.py
+# lead_pipeline hotfix — после g6-l3:
+.venv\Scripts\python.exe -c "import sys; sys.path.insert(0,'scripts'); import deploy_vps_ssh as s; from pathlib import Path; s.upload(Path('src/lead_pipeline.py'),'/opt/rawlead/src/lead_pipeline.py'); s.run('chown rawlead:rawlead /opt/rawlead/src/lead_pipeline.py && systemctl restart rawlead-api rawlead-radar')"
+.venv\Scripts\python.exe scripts\probe_prod_facts_vps.py --write
+```
+
+**Plan B — SSH с ПК не открывается:** Beget → облако → **терминал в браузере** на VPS:
+
+```bash
+cd /opt/rawlead && sudo -u rawlead git pull
+# или scp/rsync с другой машины где :22 открыт
+sudo systemctl restart rawlead-api rawlead-radar
+```
+
+Проверь в `.env`: `VPS_SSH_HOST` · `VPS_SSH_USER` · `VPS_SSH_PASSWORD` или `VPS_SSH_KEY`.
 
 ---
 
@@ -25,7 +126,18 @@
 | **В git?** | Нет — `.gitignore` + `.cursorignore` + MiMo deny ✅ |
 | **Зачем тогда «критично» в аудите?** | Файл **на диске** всё равно читаем: бэкап в облако, скрин, вставка в чат AI, чужой доступ к ПК |
 | **Что делать сейчас** | 1) Не копировать `.env` в чат/TG/Git · 2) Бэкап — локально, не OneDrive ([`BACKUP.md`](ops/BACKUP.md)) · 3) Не просить AI «прочитай .env» |
-| **Когда менять пароли** | Только если **утечка**: случайно закоммитил, отправил в чат, скрин с паролем, взлом ПК. Тогда по очереди: VPS → Neon → TG BotFather → OPS → прокси |
+| **Когда менять пароли** | Только если **утечка**: случайно закоммитил, отправил в чат, скрин с паролем, взлом ПК. Тогда по очереди: VPS → TG BotFather → OPS → прокси (Neon — архив) |
+
+### Локальный `.env.site` — не Neon (2026-06-20) ✅
+
+**Сделано:** `scripts/_fix_local_env_vps_db.py` — `.env.site` → VPS `127.0.0.1:15432` · Neon в `.env` → `NEON_DATABASE_URL` (архив).
+
+**Перед preprod-скриптами с БД** — поднять туннель:
+```powershell
+ssh -i C:\Users\hramo\.ssh\id_rawlead_vps -L 15432:127.0.0.1:5432 root@62.113.103.231 -N
+```
+
+**Не коммитить** `.env` / `.env.site`.
 | **Проверка «был ли в git»** | `git log -- .env` — пусто = никогда не коммитился ✅ |
 | **A1 Lead 2026-06-20** | Проект **не** в OneDrive (`C:\Users\hramo\uisness`) · бэкап → `D:\Backups\uisness\2026-06-18_2348` (`.env` внутри) · **не** облако ✅ |
 
@@ -480,21 +592,20 @@ Baseline из лога (уже есть после deploy): `data/tg_funnel_audi
 
 ---
 
-## MiMo Code — только аудит (read-only)
+## MiMo Code — аудит + скиллы (бесплатно)
 
-**С 2026-06-20:** MiMo **не правит код** и **не создаёт** маркетинг-планы. Только отчёт в `docs/problems/` → `@lead-architect`.
+**Роль:** параллельно PRE-ADS G0–G7 · read-only + отчёты в `docs/problems/` → `@lead-architect` → `@coder`.
 
 | Файл | Зачем |
 |------|--------|
-| [`.mimocode/MIMO_RULES.md`](../.mimocode/MIMO_RULES.md) | правила + стартовый промпт |
-| [`.mimocode/mimocode.jsonc`](../.mimocode/mimocode.jsonc) | deny edit везде кроме `docs/problems/**` |
-| `~/.codex/CLAUDE.md` § RawLead | глобальное напоминание |
+| [`.mimocode/MIMO_RULES.md`](../.mimocode/MIMO_RULES.md) | M0–M4 промпты · **skills.sh** |
+| [`.mimocode/mimocode.jsonc`](../.mimocode/mimocode.jsonc) | deny secrets · **allow** `data/preprod_*` |
 
-**Проверка:** `mimo` в корне `uisness` → «создай файл в src/» → **deny** · «прочитай .env» → **deny**.
+**Скиллы (один раз):** `npx skills find security` → install в MiMo · см. MIMO_RULES § Скиллы.
 
-**Инцидент 2026-06-20:** MiMo насоздавал лишние docs — откат `git checkout` · дальше только через Lead.
+**Сейчас для гейта:** ✅ закрыт (2026-06-21). Посевы → [`M1_SEEDING_CHECKLIST.md`](team/marketing/M1_SEEDING_CHECKLIST.md).
 
-Канон triage: `OWNER_INTENT` § MIMO-AUDIT · `docs/problems/*-mimo-*.md`.
+**Не:** MiMo не гоняет pytest/playwright/load · не деплой · не правит `src/` (только audit agent).
 
 ---
 
