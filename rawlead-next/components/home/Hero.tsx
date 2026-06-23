@@ -7,7 +7,7 @@ import { feedApi } from '@/lib/api'
 
 const EXPO_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
-const LINES = ['Заказы под твой стек.', 'Без мусора.']
+const LINES = ['Стоп мониторить', 'вручную.']
 
 function OrdersBadge() {
   const [count, setCount] = useState<string | null>(null)
@@ -98,7 +98,7 @@ export default function Hero() {
           transition={{ duration: 0.55, delay: 0.68, ease: EXPO_OUT }}
           className="font-sans text-[#1A1918] text-lg sm:text-xl leading-[1.6] max-w-[36rem] mb-10 font-medium"
         >
-          Агрегирует FL, Kwork, YouDo и Telegram. Подбирает по твоему стеку — без мусора. ИИ пишет черновик отклика за тебя.
+          FL, Kwork, YouDo и Telegram — в одной ленте. ИИ фильтрует по твоему стеку и пишет черновик отклика.
         </motion.p>
 
         {/* CTA */}
