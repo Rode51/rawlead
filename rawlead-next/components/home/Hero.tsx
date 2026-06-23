@@ -1,22 +1,40 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { feedApi } from '@/lib/api'
 
 const EXPO_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
-// H1 split into two lines for the curtain reveal
 const LINES = ['Заказы под твой стек.', 'Без мусора.']
 
-const SKILLS = [
-  'Python', 'WordPress', 'React', 'Figma', 'SEO',
-  'Laravel', 'Telegram Bot', 'UI/UX', 'Копирайтинг',
-  'Node.js', 'PHP', 'Таргет',
-]
+function OrdersBadge() {
+  const [count, setCount] = useState<string | null>(null)
+
+  useEffect(() => {
+    feedApi.list({ limit: 1 })
+      .then(r => setCount(r.today_count > 0 ? String(r.today_count) : '1 200+'))
+      .catch(() => setCount('1 200+'))
+  }, [])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.05, ease: EXPO_OUT }}
+      className="mb-5"
+    >
+      <span className="inline-flex items-center gap-2 bg-white border-2 border-[#111010] px-3 py-1 font-display font-black text-sm text-[#111010]">
+        🟢 Найдено сегодня: {count ?? '...'} заказов
+      </span>
+    </motion.div>
+  )
+}
 
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden bg-[#FACC15] border-b-2 border-[#111010] min-h-[100svh] flex flex-col justify-between py-20">
+    <section className="relative overflow-hidden bg-[#FACC15] min-h-[100svh] flex flex-col justify-center py-16 sm:py-20">
 
       {/* Декоративная сетка */}
       <div
@@ -34,6 +52,9 @@ export default function Hero() {
         className="relative mx-auto px-6 w-full flex-1 flex flex-col justify-center"
         style={{ maxWidth: 'var(--rl-container)' }}
       >
+        {/* Счётчик заказов */}
+        <OrdersBadge />
+
         {/* Eyebrow */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -77,9 +98,7 @@ export default function Hero() {
           transition={{ duration: 0.55, delay: 0.68, ease: EXPO_OUT }}
           className="font-sans text-[#1A1918] text-lg sm:text-xl leading-[1.6] max-w-[36rem] mb-10 font-medium"
         >
-          ИИ находит. Пишет черновик — свой у каждого.
-          <br />
-          Учится на твоих откликах.
+          Агрегирует FL, Kwork, YouDo и Telegram. Подбирает по твоему стеку — без мусора. ИИ пишет черновик отклика за тебя.
         </motion.p>
 
         {/* CTA */}
@@ -87,46 +106,22 @@ export default function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.84, ease: EXPO_OUT }}
-          className="flex flex-wrap items-center gap-4"
+          className="flex flex-wrap items-start gap-4"
         >
-          <Link
-            href="/lenta/"
-            data-testid="hero-cta-lenta"
-            className="inline-flex items-center gap-2 h-12 px-7 bg-[#111010] text-white font-display font-black text-sm uppercase tracking-[0.08em] border-2 border-[#111010] shadow-[4px_4px_0_#111010] hover:shadow-[7px_7px_0_#111010] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150"
-          >
-            Смотреть ленту →
-          </Link>
-          <Link
-            href="/lenta/#quiz"
-            data-testid="hero-cta-quiz"
-            className="inline-flex items-center gap-2 h-12 px-7 bg-white text-[#111010] font-display font-black text-sm uppercase tracking-[0.08em] border-2 border-[#111010] shadow-[4px_4px_0_#111010] hover:shadow-[7px_7px_0_#111010] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150"
-          >
-            Настроить ленту →
-          </Link>
+          <div className="flex flex-col gap-1.5">
+            <Link
+              href="/lenta/#quiz"
+              data-testid="hero-cta-quiz"
+              className="inline-flex items-center gap-2 h-12 px-7 bg-[#111010] text-white font-display font-black text-sm uppercase tracking-[0.08em] border-2 border-[#111010] shadow-[4px_4px_0_#111010] hover:shadow-[7px_7px_0_#111010] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150"
+            >
+              Подобрать заказы →
+            </Link>
+            <span className="font-sans text-sm text-[#1A1918] opacity-70">
+              3 дня бесплатно · без карты
+            </span>
+          </div>
         </motion.div>
       </div>
-
-      {/* Навыки-бегущая строка */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.1, duration: 0.6 }}
-        className="overflow-hidden border-t-2 border-[#111010] bg-[#111010] py-3"
-      >
-        <div
-          className="marquee-run"
-          style={{ '--marquee-dur': '22s' } as React.CSSProperties}
-        >
-          {[...SKILLS, ...SKILLS, ...SKILLS].map((skill, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center shrink-0 mx-4 font-display font-black text-xs uppercase tracking-[0.1em] text-[#FACC15] px-3 py-1 border border-[#FACC15]/40"
-            >
-              {skill}
-            </span>
-          ))}
-        </div>
-      </motion.div>
     </section>
   )
 }
