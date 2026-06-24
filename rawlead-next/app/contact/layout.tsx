@@ -4,7 +4,7 @@ import { pageMetadata } from '@/lib/seo'
 export const metadata: Metadata = {
   ...pageMetadata({
     title: 'Контакт — RawLead',
-    description: 'Написать напрямую — @rcnn43 в Telegram.',
+    description: 'Написать напрямую — @rode_51 в Telegram.',
     path: '/contact/',
   }),
 }

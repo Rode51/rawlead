@@ -42,6 +42,12 @@ def test_physical_courier_delivery_is_physical() -> None:
     assert is_physical_service_job("Курьерская доставка документов", "По Москве, срочно")
 
 
+def test_physical_cleaning_and_massage() -> None:
+    assert is_physical_service_job("Генеральная уборка квартиры", "")
+    assert is_physical_service_job("Массаж на дому", "60 минут")
+    assert is_physical_service_job("Собрать стеллаж IKEA", "Нужен мастер на дом")
+
+
 def test_physical_lite_hidden_no_tags() -> None:
     lite = physical_service_lite_analysis(
         title=_T14857148_TITLE,
@@ -92,10 +98,13 @@ def test_youdo_detail_short_skips_l1() -> None:
         listing_snippet="short",
         source=SOURCE_YOUDO,
     )
-    os.environ["YOUDO_DETAIL_MIN_CHARS"] = "300"
+    # Rev2: detail_ok=True → pass (any length); detail_ok≠True → skip
     assert _youdo_detail_short_skips_l1(project, "short", detail_ok=False)
+    assert _youdo_detail_short_skips_l1(project, "short", detail_ok=None)
     assert not _youdo_detail_short_skips_l1(project, "short", detail_ok=True)
-    assert not _youdo_detail_short_skips_l1(project, "x" * 350, detail_ok=False)
+    assert not _youdo_detail_short_skips_l1(project, "x" * 100, detail_ok=True)
+    assert not _youdo_detail_short_skips_l1(project, "x" * 350, detail_ok=True)
+    assert _youdo_detail_short_skips_l1(project, "x" * 350, detail_ok=False)
 
 
 def test_finalize_lite_overrides_dev_physical() -> None:

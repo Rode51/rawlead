@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { FeedTier } from '@/lib/auth-context'
+import type { FeedFilterState, FeedSort } from '@/lib/feed-prefs'
 import {
   CATEGORY_OPTIONS,
   formatCategoryPill,
@@ -16,11 +17,9 @@ const ALL_CATEGORY = { slug: '', label: 'Все' }
 interface Props {
   categories: string[]
   sources: string[]
-  sort: 'time' | 'match'
+  sort: FeedSort
   feedTier: FeedTier
-  onCategoriesChange: (cats: string[]) => void
-  onSourcesChange: (srcs: string[]) => void
-  onSortChange: (sort: 'time' | 'match') => void
+  onApplyFilters: (state: FeedFilterState) => void
 }
 
 export default function FilterBar({
@@ -28,9 +27,7 @@ export default function FilterBar({
   sources,
   sort,
   feedTier,
-  onCategoriesChange,
-  onSourcesChange,
-  onSortChange,
+  onApplyFilters,
 }: Props) {
   const [showSheet, setShowSheet] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -46,22 +43,16 @@ export default function FilterBar({
   const pillText = pillParts.join(' · ')
 
   function handleSheetApply(cats: string[], srcs: string[], srt: 'time' | 'match') {
-    onCategoriesChange(cats)
-    onSourcesChange(srcs)
-    onSortChange(srt)
+    onApplyFilters({ categories: cats, sources: srcs, sort: srt })
   }
 
   function handleDropdownApply(srcs: string[], srt: 'time' | 'match') {
-    onSourcesChange(srcs)
-    onSortChange(srt)
+    onApplyFilters({ categories, sources: srcs, sort: srt })
   }
 
   function handleCategoryClick(slug: string) {
-    if (!slug) {
-      onCategoriesChange([])
-      return
-    }
-    onCategoriesChange(toggleCategorySelection(categories, slug))
+    const newCats = !slug ? [] : toggleCategorySelection(categories, slug)
+    onApplyFilters({ categories: newCats, sources, sort })
   }
 
   return (
@@ -115,6 +106,7 @@ export default function FilterBar({
                       background: active ? '#111010' : '#fff',
                       color: active ? '#fff' : '#111010',
                     }}
+                    data-active={active ? '1' : '0'}
                   >
                     {cat.label}
                   </button>
@@ -127,6 +119,7 @@ export default function FilterBar({
             <div className="flex items-center gap-2 shrink-0 ml-auto" style={{ position: 'relative' }}>
               {(sources.length > 0 || sort !== 'time') && (
                 <span
+                  data-testid="feed-source-pill"
                   className="text-[11px] font-semibold px-2 py-1 leading-none whitespace-nowrap"
                   style={{ background: '#EEEDEA', color: '#111010' }}
                 >
@@ -139,12 +132,13 @@ export default function FilterBar({
               <button
                 onClick={() => setShowDropdown(v => !v)}
                 data-testid="feed-filter-dropdown"
+                data-active={sources.length > 0 ? '1' : '0'}
                 id="rl-feed-sort-dd"
                 className="inline-flex items-center gap-1 h-8 px-3 text-[12px] font-bold border-2 border-[#111010] shrink-0 transition-all duration-100 whitespace-nowrap"
                 style={{
-                  background: (sources.length > 0 || sort !== 'time') ? '#111010' : '#fff',
-                  color: (sources.length > 0 || sort !== 'time') ? '#fff' : '#111010',
-                  boxShadow: (sources.length > 0 || sort !== 'time') ? '2px 2px 0 #E8A020' : '2px 2px 0 #D4D4D0',
+                  background: sources.length > 0 ? '#111010' : '#fff',
+                  color: sources.length > 0 ? '#fff' : '#111010',
+                  boxShadow: sources.length > 0 ? '2px 2px 0 #E8A020' : '2px 2px 0 #D4D4D0',
                 }}
               >
                 Фильтр

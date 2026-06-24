@@ -100,6 +100,215 @@ async def _run_listing_fetch(
     return payload
 
 
+# --- Click-through detail (§ YOUDO-DETAIL-BREAKTHROUGH) ---
+
+_DESC_SELECTORS = [
+    '[class*="TaskDescription"]',
+    '[class*="Description_text"]',
+    '[class*="taskDescription"]',
+    '[class*="TaskNeed"]',
+    '[class*="Need_text"]',
+    ".task-description",
+    "article",
+]
+
+
+def _parse_detail_body(html: str) -> str:
+    """Extract description text from detail page HTML (sync fallback)."""
+    from bs4 import BeautifulSoup
+
+    if not html or not html.strip():
+        return ""
+    soup = BeautifulSoup(html, "html.parser")
+    script = soup.find("script", id="__NEXT_DATA__")
+    if script and script.string:
+        try:
+            import json as _json
+
+            payload = _json.loads(script.string)
+            props = payload.get("props", {}).get("pageProps", {})
+            for key in ("task", "taskData", "data"):
+                block = props.get(key)
+                if isinstance(block, dict):
+                    for field in ("description", "text", "content", "body"):
+                        val = block.get(field)
+                        if isinstance(val, str) and len(val.strip()) > 100:
+                            return val.strip()
+        except Exception:
+            pass
+    for sel in _DESC_SELECTORS:
+        for node in soup.select(sel):
+            text = node.get_text("\n", strip=True)
+            if len(text) > 100:
+                return text
+    return ""
+
+
+async def _run_click_through_details(
+    page: Any,
+    *,
+    lead_ids: list[str],
+    listing_url: str,
+    timeout_sec: float,
+    proxy_url: str,
+) -> dict[str, Any]:
+    """Click through to detail pages for new leads in the same sticky session."""
+    import random as _rng
+
+    t0 = time.monotonic()
+    results: dict[str, dict[str, Any]] = {}
+    listing_url = listing_url or await page.evaluate("() => window.location.href")
+
+    for idx, ext_id in enumerate(lead_ids[:10]):  # cap 10
+        # Inter-card jitter (human-like: 1.5-4s between clicks)
+        if idx > 0:
+            await page.wait_for_timeout(_rng.randint(1500, 4000))
+
+        lead_t0 = time.monotonic()
+        outcome = "selector_miss"
+        body = ""
+        clicked = False
+        selector_used = ""
+        fallback_goto = False
+        debug_path = ""
+
+        # Find card by data-id or href /t{id}
+        card = None
+        for sel in (
+            f'a[data-id="{ext_id}"]',
+            f'a[href*="/t{ext_id}"]',
+            f'[data-id="{ext_id}"]',
+        ):
+            loc = page.locator(sel)
+            if await loc.count() > 0:
+                card = loc.first
+                selector_used = sel.split("[")[0] if "[" in sel else sel
+                break
+
+        if card is None:
+            outcome = "selector_miss"
+            results[ext_id] = {
+                "outcome": outcome,
+                "selector": selector_used or "none",
+                "clicked": 0,
+                "body_len": 0,
+                "ms": int((time.monotonic() - lead_t0) * 1000),
+                "fallback": "",
+                "debug_path": "",
+            }
+            continue
+
+        # Hover before click (human-like)
+        try:
+            await card.hover(timeout=3000)
+            await page.wait_for_timeout(_rng.randint(300, 800))
+        except Exception:
+            pass
+
+        # Click the card
+        try:
+            await card.click(timeout=5000)
+            clicked = True
+        except Exception:
+            outcome = "click_fail"
+            results[ext_id] = {
+                "outcome": outcome,
+                "selector": selector_used,
+                "clicked": 0,
+                "body_len": 0,
+                "ms": int((time.monotonic() - lead_t0) * 1000),
+                "fallback": "",
+                "debug_path": "",
+            }
+            continue
+
+        # Wait for description to appear
+        detail_html = ""
+        sp_on_click = False
+        try:
+            for desc_sel in _DESC_SELECTORS:
+                try:
+                    await page.wait_for_selector(desc_sel, timeout=8000)
+                    break
+                except Exception:
+                    continue
+            detail_html = await page.content()
+            body = _parse_detail_body(detail_html)
+            sp_on_click = "ServicePipe" in (detail_html or "") or len(detail_html or "") < 2000
+        except Exception:
+            outcome = "parse_fail"
+
+        if body and len(body) >= 100:
+            outcome = "ok"
+        elif sp_on_click:
+            outcome = "antibot"
+        elif not body:
+            outcome = "empty_body"
+
+        # On SP/click fail: try go_back() in same tab (don't tear down sticky)
+        if outcome in ("antibot", "click_fail", "parse_fail", "empty_body"):
+            try:
+                await page.go_back(wait_until="domcontentloaded", timeout=10000)
+                await page.wait_for_timeout(1500)
+                back_html = await page.content()
+                if "ServicePipe" not in (back_html or "") and len(back_html or "") > 5000:
+                    outcome = "go_back_ok"
+            except Exception:
+                pass
+
+        # Fallback: goto /t{id} in same session (last resort)
+        if outcome != "ok":
+            fallback_goto = True
+            detail_url = f"https://youdo.com/t{ext_id}"
+            try:
+                await page.goto(detail_url, wait_until="domcontentloaded", timeout=15000)
+                await page.wait_for_timeout(2000)
+                detail_html = await page.content()
+                body = _parse_detail_body(detail_html)
+                if body and len(body) >= 100:
+                    outcome = "fallback_ok"
+                elif "ServicePipe" in (detail_html or "") or len(detail_html or "") < 2000:
+                    outcome = "fallback_antibot"
+                else:
+                    outcome = "fallback_empty"
+            except Exception:
+                outcome = "fallback_fail"
+
+            # Navigate back to listing
+            try:
+                await page.goto(listing_url, wait_until="domcontentloaded", timeout=15000)
+                await page.wait_for_timeout(2000)
+            except Exception:
+                pass
+
+        if outcome not in ("ok", "fallback_ok") and debug_path == "":
+            try:
+                debug_path = f"/opt/rawlead/data/debug_listings/youdo_click_miss_{ext_id}.html"
+            except Exception:
+                pass
+
+        results[ext_id] = {
+            "outcome": outcome,
+            "selector": selector_used,
+            "clicked": 1 if clicked else 0,
+            "body_len": len(body),
+            "body": body[:2000] if body else "",
+            "ms": int((time.monotonic() - lead_t0) * 1000),
+            "fallback": "goto" if fallback_goto else "",
+            "debug_path": debug_path,
+        }
+
+    total_ms = int((time.monotonic() - t0) * 1000)
+    ok_count = sum(1 for r in results.values() if r["outcome"] in ("ok", "fallback_ok"))
+    return {
+        "stage": "click_through_details",
+        "results": results,
+        "ok_count": ok_count,
+        "total_count": len(lead_ids),
+        "total_ms": total_ms,
+    }
+
+
 async def _session_loop(*, proxy_url: str, user_agent: str) -> int:
     _check_camoufox_playwright_compat()
     try:
@@ -155,6 +364,28 @@ async def _session_loop(*, proxy_url: str, user_agent: str) -> int:
                     break
                 if cmd == "ping":
                     _emit({"stage": "sticky_ping", "ok": 1})
+                    continue
+                if cmd == "click_through_details":
+                    lead_ids_raw = req.get("lead_ids") or []
+                    lead_ids = [str(x) for x in lead_ids_raw if x]
+                    listing_url_cmd = str(req.get("listing_url") or "").strip()
+                    timeout_ct = float(req.get("timeout") or 60.0)
+                    try:
+                        payload = await _run_click_through_details(
+                            page,
+                            lead_ids=lead_ids,
+                            listing_url=listing_url_cmd,
+                            timeout_sec=timeout_ct,
+                            proxy_url=proxy_url,
+                        )
+                        if profile_dir is not None:
+                            payload["profile_dir"] = str(profile_dir)
+                        _emit(payload)
+                    except Exception as exc:
+                        _emit({
+                            "error": f"{type(exc).__name__}: {exc}",
+                            "stage": "click_through_details",
+                        })
                     continue
                 url = str(req.get("url") or "").strip()
                 tier = str(req.get("tier") or "dc").strip() or "dc"

@@ -55,6 +55,7 @@ def _cfg(**overrides: object) -> Config:
         filters_md_path=_ROOT / "docs" / "ops" / "FILTERS_SITE.md",
         site_notify_on_ai_unavailable=False,
         site_notify_owner=False,
+        bot_notify_owner_start=False,
         radar_conveyor=False,
         l1_batch_per_cycle=1,
         l1_max_workers=1,

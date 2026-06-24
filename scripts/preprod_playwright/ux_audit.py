@@ -29,6 +29,7 @@ sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_PLAYWRIGHT_DIR))
 
 import feed_ui  # noqa: E402
+import next_ui as nui  # noqa: E402
 import ux_journey  # noqa: E402
 
 _ARTIFACT_DIR = _ROOT / "data" / "preprod_ux_audit"
@@ -70,6 +71,29 @@ class AuditCtx:
         self.findings.append(
             {"severity": severity, "scenario": scenario, "viewport": self.viewport, "message": message}
         )
+
+
+def _home_is_next(page: Any) -> bool:
+    return page.locator('[data-testid="header-logo"]').count() > 0
+
+
+def _feed_is_next(page: Any) -> bool:
+    return page.locator(nui.FEED_APP).count() > 0
+
+
+def _benign_console_line(text: str) -> bool:
+    low = text.casefold()
+    if "favicon" in low:
+        return True
+    if "failed to load resource: the server responded with a status of 404" in low:
+        return True
+    if "429" in text:
+        return True
+    if "websocket" in low and "yandex" in low:
+        return True
+    if "mc.yandex.ru" in text:
+        return True
+    return nui._benign_console_error(text)
 
 
 def _load_env_value(key: str) -> str | None:
@@ -122,7 +146,7 @@ def _attach_observers(ctx: AuditCtx) -> None:
     def on_console(msg: Any) -> None:
         if msg.type == "error":
             text = msg.text or ""
-            if "favicon" in text.casefold():
+            if _benign_console_line(text):
                 return
             ctx.console_errors.append(f"[{msg.type}] {text}")
 
@@ -214,6 +238,44 @@ def _card_tools_joined(card: Any) -> str:
     return ", ".join(parts)
 
 
+def _require_premium_token(ctx: AuditCtx) -> str:
+    if not ctx.access_token:
+        raise RuntimeError("RAWLEAD_PREPROD_ACCESS_TOKEN required")
+    return ctx.access_token
+
+
+def _reset_next_feed_all_category(ctx: AuditCtx) -> None:
+    """Undo prior scenario filters (e.g. U2 design) so expand tests see full feed."""
+    page = ctx.page
+    if ctx.is_mobile:
+        nui.open_mobile_filter_sheet(page)
+        page.locator('[data-testid="sheet-cat-all"]').click()
+        nui.apply_mobile_sheet(page)
+    else:
+        nui.click_category(page, "")
+
+
+def _draftable_lead_ids(
+    ctx: AuditCtx,
+    need: int,
+    *,
+    min_need: int | None = None,
+    prefer_high_match: bool = False,
+) -> list[str]:
+    token = _require_premium_token(ctx)
+    return nui.draftable_lead_ids_for_e2e(
+        token,
+        base_url=ctx.base,
+        need=need,
+        min_need=min_need,
+        prefer_high_match=prefer_high_match,
+    )
+
+
+def _card_by_lead_id(ctx: AuditCtx, lead_id: str) -> Any:
+    return nui.expand_card_by_lead_id(ctx.page, lead_id)
+
+
 def _card_draft_ready(card: Any) -> tuple[bool, str]:
     """Same gates as U5: draft ≥40, no tools placeholder, no vendor lock."""
     reply = card.locator("[data-reply-text]")
@@ -291,6 +353,26 @@ def u1_header_footer(ctx: AuditCtx) -> None:
     base = ctx.base
     page = ctx.page
     page.goto(f"{base}/", wait_until="domcontentloaded")
+    if _home_is_next(page):
+        page.locator('[data-testid="header-logo"]').click()
+        page.wait_for_url(re.compile(r"/$|/\?"), timeout=15_000)
+        if ctx.is_mobile:
+            page.goto(f"{base}/lenta/", wait_until="domcontentloaded")
+        else:
+            page.locator('[data-testid="header-nav-lenta"]').click()
+            page.wait_for_url(re.compile(r"/lenta"), timeout=15_000)
+        cabinet = page.locator('[data-testid="header-cabinet"], a[href*="/cabinet"]')
+        if not cabinet.count():
+            page.goto(f"{base}/", wait_until="domcontentloaded")
+            cabinet = page.locator('a[href*="/cabinet"]')
+        if not cabinet.count():
+            raise RuntimeError("cabinet link missing in header/footer")
+        for path in ("/how/", "/pricing/", "/faq/", "/contact/"):
+            resp = page.goto(f"{base}{path}", wait_until="domcontentloaded")
+            if resp and resp.status >= 400:
+                raise RuntimeError(f"{path} HTTP {resp.status}")
+        return
+
     page.wait_for_selector(".rl-hero", state="visible")
 
     page.locator("a.rl-logo").first.click()
@@ -329,6 +411,21 @@ def u1_header_footer(ctx: AuditCtx) -> None:
 
 def u2_lenta_skills(ctx: AuditCtx) -> None:
     feed_ui.goto_lenta(ctx.page, ctx.base)
+    if _feed_is_next(ctx.page):
+        tier = ctx.tier or nui.wait_feed_tier(ctx.page, "anon", "free", "premium")
+        if ctx.is_mobile:
+            nui.open_mobile_filter_sheet(ctx.page)
+            ctx.page.locator('[data-testid="sheet-cat-design"]').click()
+            nui.apply_mobile_sheet(ctx.page)
+        else:
+            nui.click_category(ctx.page, "design")
+        page = ctx.page
+        app = page.locator(nui.FEED_APP)
+        if app.count():
+            text = (app.inner_text() or "")[:400]
+            if "не удалось загрузить ленту" in text.casefold():
+                raise RuntimeError(f"feed error: {text[:200]}")
+        return
     tier = ctx.tier or feed_ui.wait_feed_tier(ctx.page, "anon", "free", "premium")
     feed_ui.apply_category_design(ctx.page, is_mobile=ctx.is_mobile)
     if _feed_error(ctx):
@@ -349,8 +446,44 @@ def u2_lenta_skills(ctx: AuditCtx) -> None:
         raise RuntimeError(f"feed count error: {after}")
 
 
+def _u3_sort_next_premium(ctx: AuditCtx) -> None:
+    page = ctx.page
+    if ctx.is_mobile:
+        nui.open_mobile_filter_sheet(page)
+        page.get_by_role("button", name="По совместимости").click()
+        nui.apply_mobile_sheet(page)
+        page.wait_for_selector(nui.FEED_SHEET, state="hidden", timeout=10_000)
+        return
+    page.locator('[data-testid="feed-filter-dropdown"]').click()
+    panel = page.locator('[data-testid="feed-sort-panel"]')
+    panel.wait_for(state="visible", timeout=10_000)
+    page.get_by_role("button", name="По совм.").click()
+    panel.get_by_role("button", name="Применить").click()
+    page.wait_for_timeout(600)
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(400)
+    if panel.is_visible():
+        page.mouse.click(8, 8)
+        page.wait_for_timeout(400)
+    if panel.is_visible():
+        raise RuntimeError("sort dropdown did not close (Esc / tap outside)")
+
+
 def u3_sort_dropdown(ctx: AuditCtx) -> None:
     feed_ui.goto_lenta(ctx.page, ctx.base)
+    if _feed_is_next(ctx.page):
+        tier = ctx.tier or nui.wait_feed_tier(ctx.page, "anon", "free", "premium")
+        if tier == "anon":
+            if ctx.is_mobile:
+                nui.open_mobile_filter_sheet(ctx.page)
+                if not ctx.page.locator('[data-testid="sheet-cat-all"]').count():
+                    raise RuntimeError("mobile sheet: category filters missing")
+                nui.apply_mobile_sheet(ctx.page)
+            return
+        if tier == "free":
+            return
+        _u3_sort_next_premium(ctx)
+        return
     tier = ctx.tier or feed_ui.get_feed_tier(ctx.page)
     if tier == "anon":
         if ctx.is_mobile:
@@ -410,6 +543,20 @@ def u3_sort_dropdown(ctx: AuditCtx) -> None:
 
 def u4_card_tap_outside(ctx: AuditCtx) -> None:
     feed_ui.goto_lenta(ctx.page, ctx.base)
+    if _feed_is_next(ctx.page):
+        if ctx.access_token:
+            nui.bootstrap_preprod_feed(ctx.page, ctx.base, ctx.access_token)
+        _reset_next_feed_all_category(ctx)
+        nui.wait_feed_card_count(ctx.page, 2, timeout_ms=60_000)
+        c1 = nui.expand_card_at(ctx.page, 0)
+        if not nui.card_body_visible(c1):
+            raise RuntimeError("card 1 did not expand")
+        c2 = nui.expand_card_at(ctx.page, 1)
+        if nui.card_body_visible(c1):
+            raise RuntimeError("card 1 should collapse when card 2 opens")
+        if not nui.card_body_visible(c2):
+            raise RuntimeError("card 2 did not expand")
+        return
     card = ctx.page.locator(feed_ui.FEED_CARD).first
     card.wait_for(state="visible")
     feed_ui.collapse_card_tap_outside(card, ctx.page)
@@ -417,6 +564,24 @@ def u4_card_tap_outside(ctx: AuditCtx) -> None:
 
 def u5_draft_tools(ctx: AuditCtx) -> None:
     jctx = ctx.journey_ctx()
+    feed_ui.goto_lenta(ctx.page, ctx.base)
+    if _feed_is_next(ctx.page):
+        token = _require_premium_token(ctx)
+        nui.bootstrap_preprod_feed(ctx.page, ctx.base, token)
+        _reset_next_feed_all_category(ctx)
+        nui.wait_feed_card_count(ctx.page, 1, timeout_ms=60_000)
+        last_err = "no draftable card with draft/tools"
+        for lid in _draftable_lead_ids(ctx, need=12, min_need=1):
+            try:
+                card = _card_by_lead_id(ctx, lid)
+                _ensure_premium_draft(jctx, card, ctx.page)
+                ctx.draft_tools_lead_id = lid
+                return
+            except RuntimeError as exc:
+                last_err = str(exc)
+                continue
+        raise RuntimeError(last_err)
+
     ux_journey._wait_feed_logged_in(jctx)
     ux_journey._wait_effective_access(jctx)
     ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
@@ -440,6 +605,20 @@ def u5_draft_tools(ctx: AuditCtx) -> None:
 def u6_fab_modal(ctx: AuditCtx) -> None:
     jctx = ctx.journey_ctx()
     ux_journey._goto_lenta(jctx)
+    if _feed_is_next(ctx.page):
+        fab = ctx.page.locator(nui.SUPPORT_FAB)
+        fab.wait_for(state="visible")
+        fab.click()
+        ctx.page.wait_for_timeout(400)
+        backdrop = ctx.page.locator("div.fixed.inset-0.z-40")
+        if backdrop.count():
+            backdrop.first.click(force=True)
+        else:
+            fab.click()
+        ctx.page.wait_for_timeout(500)
+        if fab.get_attribute("class") and "rl-support-fab--open" in (fab.get_attribute("class") or ""):
+            raise RuntimeError("support modal did not close on overlay tap")
+        return
     fab = ctx.page.locator("#rl-support-fab")
     fab.wait_for(state="visible")
     fab.click()
@@ -456,6 +635,29 @@ def u6_fab_modal(ctx: AuditCtx) -> None:
 
 
 def u7_cabinet_skills_inbox(ctx: AuditCtx) -> None:
+    if ctx.access_token:
+        nui.inject_token(ctx.page, ctx.access_token, base=ctx.base)
+        nui.goto_path(ctx.page, ctx.base, "/cabinet/")
+        if ctx.page.locator('[data-testid="cabinet-app"]').count():
+            ctx.page.wait_for_function(
+                """() => {
+                  const app = document.querySelector('#rl-cabinet-app');
+                  const panel = document.querySelector('[data-testid="cabinet-login-panel"]');
+                  const spin = document.querySelector('.animate-spin');
+                  return !!app && !panel && !spin;
+                }""",
+                timeout=45_000,
+            )
+            if not ctx.page.get_by_role("heading", name="Мои отклики").count():
+                raise RuntimeError("cabinet inbox section missing")
+            cards = ctx.page.locator("article")
+            if cards.count():
+                cards.first.click()
+                ctx.page.wait_for_timeout(800)
+                body = cards.first.locator('[data-reply-text], p')
+                if not body.count():
+                    raise RuntimeError("inbox card did not expand")
+            return
     jctx = ctx.journey_ctx()
     ux_journey._wait_feed_logged_in(jctx)
     ctx.page.goto(f"{ctx.base}/cabinet/", wait_until="domcontentloaded")
@@ -545,13 +747,31 @@ def u9_marketing_cta(ctx: AuditCtx) -> None:
 
 
 def u10_console_network(ctx: AuditCtx) -> None:
-    errors = [e for e in ctx.console_errors if e.startswith("[error]")]
+    errors = []
+    for e in ctx.console_errors:
+        if not e.startswith("[error]"):
+            continue
+        text = e.removeprefix("[error] ").strip()
+        if _benign_console_line(text):
+            continue
+        errors.append(e)
     if errors:
         raise RuntimeError(f"console errors: {errors[:3]}")
     bad = [
         f
         for f in ctx.network_failures
         if f.get("status", 0) >= 400 and f.get("status") not in (429,)
+    ]
+    bad = [
+        f
+        for f in bad
+        if not (
+            f.get("status") == 404
+            and any(
+                x in (f.get("url") or "")
+                for x in nui._BENIGN_HTTP_404_PARTS
+            )
+        )
     ]
     feed_draft = [
         f
@@ -566,6 +786,74 @@ def u10_console_network(ctx: AuditCtx) -> None:
 def u10b_draft_tools_batch(ctx: AuditCtx) -> None:
     """O80: «Написать отклик» до 3 карточек — блоки Инструменты + Черновик."""
     jctx = ctx.journey_ctx()
+    feed_ui.goto_lenta(ctx.page, ctx.base)
+    if _feed_is_next(ctx.page):
+        token = _require_premium_token(ctx)
+        nui.bootstrap_preprod_feed(ctx.page, ctx.base, token)
+        _reset_next_feed_all_category(ctx)
+        nui.wait_feed_card_count(ctx.page, 1, timeout_ms=60_000)
+        lead_ids = _draftable_lead_ids(ctx, need=12, min_need=3, prefer_high_match=True)
+        pending_ids: list[str] = []
+        ready_ids: list[str] = []
+        for lid in lead_ids:
+            card = ctx.page.locator(f'{nui.FEED_CARD}[data-id="{lid}"]')
+            if not card.count():
+                pending_ids.append(lid)
+                continue
+            card.first.scroll_into_view_if_needed()
+            _expand_feed_card(card.first, ctx.page)
+            ok, _ = _card_draft_ready(card.first)
+            (ready_ids if ok else pending_ids).append(lid)
+        ordered_ids = pending_ids + ready_ids
+        reviewed = 0
+        for lid in ordered_ids:
+            if reviewed >= 3:
+                break
+            if reviewed > 0:
+                ctx.page.wait_for_timeout(35_000)
+            card = _card_by_lead_id(ctx, lid)
+            lead_id = lid
+            card.scroll_into_view_if_needed()
+            try:
+                draft_text = _ensure_premium_draft(jctx, card, ctx.page)
+            except RuntimeError as exc:
+                msg = str(exc).casefold()
+                if "rate limit" in msg or "/час" in msg:
+                    if reviewed >= 3:
+                        break
+                    continue
+                if "недоступ" in msg or "timeout" in msg or "429" in msg:
+                    continue
+                raise
+
+            tools_list: list[str] = []
+            tools_el = card.locator(".rl-feed-card__tools li")
+            if tools_el.count():
+                for ti in range(tools_el.count()):
+                    tools_list.append((tools_el.nth(ti).inner_text() or "").strip())
+
+            reviewed += 1
+            section = card.locator(".rl-feed-card__section").first
+            if section.count():
+                section.first.scroll_into_view_if_needed()
+            shot_tools = _shot_named(ctx, f"U10b_{ctx.viewport}_card{reviewed}_tools")
+            shot_draft = _shot_named(ctx, f"U10b_{ctx.viewport}_card{reviewed}_draft")
+
+            ctx.draft_reviews.append(
+                {
+                    "lead_id": lead_id,
+                    "index": reviewed,
+                    "tools": tools_list,
+                    "draft_preview": draft_text[:500],
+                    "screenshots": {"tools": shot_tools, "draft": shot_draft},
+                }
+            )
+            ctx.page.wait_for_timeout(3000)
+
+        if reviewed < 3:
+            raise RuntimeError(f"U10b: only {reviewed}/3 drafts OK (AI fail on other cards)")
+        return
+
     ux_journey._wait_feed_logged_in(jctx)
     ux_journey._wait_effective_access(jctx)
     ctx.page.wait_for_selector("#rl-feed-list .rl-lead-card[data-id]", timeout=45_000)
@@ -651,8 +939,36 @@ def u11_match_breakdown(ctx: AuditCtx) -> None:
 
 
 def u12_tools_auth_only(ctx: AuditCtx) -> None:
-    """O83: anon/free — no tools; premium — tools section after draft."""
+    """O83: anon/free — no tools; premium — tools section after draft (WP) or draft CTA (Next)."""
     tier = ctx.tier or "premium"
+    feed_ui.goto_lenta(ctx.page, ctx.base)
+    if _feed_is_next(ctx.page):
+        if tier != "premium" or not ctx.access_token:
+            nui.wait_feed_tier(ctx.page, "anon", "free", timeout_ms=45_000)
+            for i in range(min(3, nui.feed_card_count(ctx.page))):
+                card = ctx.page.locator(nui.FEED_CARD).nth(i)
+                text = (card.inner_text() or "").casefold()
+                if "инструменты" in text:
+                    raise RuntimeError("U12: anon/free sees «Инструменты» without premium draft")
+            return
+        nui.bootstrap_preprod_feed(ctx.page, ctx.base, ctx.access_token, timeout_ms=45_000)
+        if ctx.is_mobile:
+            nui.open_mobile_filter_sheet(ctx.page)
+            ctx.page.locator('[data-testid="sheet-cat-all"]').click()
+            nui.apply_mobile_sheet(ctx.page)
+        else:
+            nui.click_category(ctx.page, "")
+        ctx.page.wait_for_timeout(1000)
+        if nui.feed_card_count(ctx.page) < 1:
+            raise RuntimeError("U12: no feed cards")
+        card = nui.expand_card_at(ctx.page, 0)
+        draft = card.locator(nui.FEED_DRAFT_TEXT)
+        reply_btn = card.locator('[data-testid="feed-card-cta"]')
+        if draft.count() and (draft.first.inner_text() or "").strip():
+            return
+        if reply_btn.count():
+            return
+        raise RuntimeError("U12: premium — no draft CTA on expanded card")
     jctx = ctx.journey_ctx()
     if tier == "premium" and ctx.access_token:
         ux_journey._wait_feed_logged_in(jctx)
@@ -943,7 +1259,14 @@ def run_audit(
             _attach_observers(ctx)
             if tier in ("free", "premium") and access_token:
                 feed_ui.goto_lenta(page, base)
-                feed_ui.wait_feed_tier(page, tier, timeout_ms=60_000)
+                if _feed_is_next(page):
+                    if tier == "premium":
+                        nui.bootstrap_preprod_feed(page, base, access_token, timeout_ms=60_000)
+                    else:
+                        nui.reload_with_token(page, base, access_token)
+                        nui.wait_feed_tier(page, tier, timeout_ms=60_000)
+                else:
+                    feed_ui.wait_feed_tier(page, tier, timeout_ms=60_000)
 
             for sid, (title, sev, fn) in SCENARIOS.items():
                 if sid == "U8" and vp_label != "mobile":

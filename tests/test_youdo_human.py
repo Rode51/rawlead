@@ -51,6 +51,7 @@ class TestYoudoHuman(unittest.TestCase):
         os.environ["YOUDO_MAX_DC_BANS_PER_FETCH"] = "2"
         os.environ["YOUDO_SLOT_RETRY_ON_TIMEOUT"] = "3"
         os.environ["YOUDO_DC_RETRY_MAX"] = "4"
+        os.environ["YOUDO_DETAIL_FETCH"] = "1"
         reset_cascade_state_for_tests()
 
     def tearDown(self) -> None:
@@ -81,12 +82,13 @@ class TestYoudoHuman(unittest.TestCase):
         self.assertIn("antibot cooldown", str(ctx.exception).casefold())
         mock_fetch.assert_not_called()
 
-    @patch("youdo_parser.fetch_youdo_detail_html")
+    @patch("youdo_parser.fetch_youdo_detail_snapshot")
     def test_detail_browser_only_no_exchange_get(self, mock_detail: MagicMock) -> None:
         mock_detail.return_value = (
             '<html><body><a data-id="123" href="/t123">Task</a>'
             + "x" * 600
-            + "</body></html>"
+            + "</body></html>",
+            "https://youdo.com/t123",
         )
         cfg = MagicMock()
         cfg.http_user_agent = "Mozilla/5.0 Chrome/122"

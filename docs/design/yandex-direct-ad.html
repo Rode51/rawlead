@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1080" />
+  <title>RawLead — Yandex Direct 1080×1080</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --yellow: #FACC15;
+      --ink: #111010;
+      --muted: #3d3c3a;
+      --white: #ffffff;
+      --green: #22c55e;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 1080px;
+      height: 1080px;
+      overflow: hidden;
+      background: var(--yellow);
+      font-family: 'Inter', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+    }
+
+    .grid-bg {
+      position: absolute;
+      inset: 0;
+      opacity: 0.07;
+      background-image:
+        linear-gradient(var(--ink) 1px, transparent 1px),
+        linear-gradient(90deg, var(--ink) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      width: 1080px;
+      height: 1080px;
+      padding: 56px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 32px;
+    }
+
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 700;
+      font-size: 42px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+
+    .live {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      background: var(--white);
+      border: 3px solid var(--ink);
+      box-shadow: 4px 4px 0 var(--ink);
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--ink);
+    }
+
+    .live-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 28px;
+      align-items: stretch;
+      min-height: 0;
+    }
+
+    .copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 28px;
+      padding-right: 8px;
+    }
+
+    .h1 {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 700;
+      font-size: 88px;
+      line-height: 0.92;
+      letter-spacing: -0.02em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+
+    .sub {
+      font-size: 30px;
+      line-height: 1.35;
+      font-weight: 600;
+      color: var(--muted);
+      max-width: 520px;
+    }
+
+    .sub strong {
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .bullets {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .bullet {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.25;
+    }
+
+    .bullet-num {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      background: var(--ink);
+      color: var(--yellow);
+      font-family: 'Oswald', sans-serif;
+      font-size: 18px;
+    }
+
+    .mock {
+      background: var(--white);
+      border: 4px solid var(--ink);
+      box-shadow: 10px 10px 0 var(--ink);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .mock-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 14px;
+      border-bottom: 3px solid var(--ink);
+    }
+
+    .mock-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink);
+    }
+
+    .match {
+      font-size: 14px;
+      font-weight: 800;
+      padding: 6px 10px;
+      background: var(--yellow);
+      border: 2px solid var(--ink);
+      color: var(--ink);
+    }
+
+    .card {
+      border: 3px solid var(--ink);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #fafafa;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .src {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .pct {
+      font-family: 'Oswald', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .job {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.2;
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 5px 8px;
+      border: 2px solid var(--ink);
+      background: var(--white);
+      margin-right: 6px;
+    }
+
+    .draft {
+      margin-top: 4px;
+      padding: 14px;
+      border: 2px dashed var(--ink);
+      background: #fffef5;
+      font-size: 15px;
+      line-height: 1.45;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .draft b { color: var(--ink); }
+
+    .bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 22px 36px;
+      background: var(--ink);
+      color: var(--white);
+      font-family: 'Oswald', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border: 4px solid var(--ink);
+      box-shadow: 6px 6px 0 rgba(17, 16, 16, 0.35);
+    }
+
+    .trial {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--ink);
+      text-align: right;
+      line-height: 1.3;
+    }
+
+    .trial span {
+      display: block;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-bg" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">RawLead</div>
+      <div class="live"><span class="live-dot"></span> Радар онлайн</div>
+    </div>
+
+    <div class="main">
+      <div class="copy">
+        <h1 class="h1">Заказы<br>под твой стек</h1>
+        <p class="sub"><strong>FL + Kwork</strong> в одной ленте. ИИ пишет <strong>черновик отклика</strong> — свой у каждого.</p>
+        <div class="bullets">
+          <div class="bullet"><span class="bullet-num">1</span>Match по навыкам, не по словам</div>
+          <div class="bullet"><span class="bullet-num">2</span>Без мусора — только под тебя</div>
+          <div class="bullet"><span class="bullet-num">3</span>Пишешь и отправляешь сам</div>
+        </div>
+      </div>
+
+      <div class="mock">
+        <div class="mock-head">
+          <div class="mock-title">Лента заказов</div>
+          <div class="match">MATCH 87%</div>
+        </div>
+        <div class="card">
+          <div class="card-top">
+            <div class="src">Kwork</div>
+            <div class="pct">92%</div>
+          </div>
+          <div class="job">Telegram-бот на Python + API</div>
+          <div>
+            <span class="tag">Python</span>
+            <span class="tag">aiogram</span>
+          </div>
+          <div class="draft"><b>Черновик:</b> «Здравствуйте! Делал похожих ботов — могу показать кейс…»</div>
+        </div>
+        <div class="card" style="opacity: 0.55; transform: scale(0.98);">
+          <div class="card-top">
+            <div class="src">FL.ru</div>
+            <div class="pct">84%</div>
+          </div>
+          <div class="job">Лендинг на Next.js, 5 экранов</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom">
+      <div class="cta">Попробовать бесплатно →</div>
+      <div class="trial">
+        Trial 3 дня
+        <span>rawlead.ru</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

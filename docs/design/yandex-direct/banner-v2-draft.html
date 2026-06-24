@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080">
+<title>RawLead — Баннер v2 Черновик 1080×1080</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 1080px;
+    height: 1080px;
+    overflow: hidden;
+    font-family: 'Manrope', -apple-system, sans-serif;
+  }
+
+  .banner {
+    width: 1080px;
+    height: 1080px;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border: 4px solid #111010;
+    position: relative;
+  }
+
+  /* ── HEADER ── */
+  .banner-header {
+    background: #FACC15;
+    padding: 28px 40px 28px;
+    border-bottom: 4px solid #111010;
+    flex-shrink: 0;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-mark {
+    width: 32px; height: 32px;
+    background: #111010;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 900; color: #FACC15;
+  }
+  .logo-name {
+    font-size: 22px; font-weight: 900; color: #111010; letter-spacing: -0.5px;
+  }
+  .eyebrow {
+    font-size: 11px; font-weight: 800; color: #111010; letter-spacing: 0.12em;
+    text-transform: uppercase; opacity: 0.55; margin-bottom: 10px;
+  }
+  .hero-headline {
+    font-size: 54px;
+    font-weight: 900;
+    color: #111010;
+    line-height: 1.0;
+    letter-spacing: -2px;
+  }
+  .hero-headline em {
+    font-style: normal;
+    text-decoration: underline;
+    text-decoration-thickness: 4px;
+    text-underline-offset: 4px;
+  }
+
+  /* ── BODY with 2 cards stacked ── */
+  .cards-section {
+    flex: 1;
+    background: #F5F5F0;
+    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: hidden;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: #111010;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.45;
+    margin-bottom: 4px;
+  }
+
+  /* CARD — closed (Dev, top) */
+  .card {
+    background: #FFFFFF;
+    border: 2px solid #111010;
+    box-shadow: 4px 4px 0 #111010;
+    border-radius: 4px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  .card-niche-pill {
+    background: #111010;
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 8px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .card-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #111010;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.2px;
+  }
+  .card-meta {
+    font-size: 12px;
+    font-weight: 600;
+    color: #111010;
+    opacity: 0.5;
+    margin-top: 3px;
+  }
+  .card-match-chip {
+    background: #FACC15;
+    color: #111010;
+    font-size: 12px;
+    font-weight: 900;
+    padding: 5px 12px;
+    border: 2px solid #111010;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+  }
+
+  /* CARD — open with draft (Marketing, bottom) */
+  .card-expanded {
+    background: #FFFFFF;
+    border: 2px solid #111010;
+    box-shadow: 5px 5px 0 #111010;
+    border-radius: 4px;
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .card-exp-header {
+    padding: 14px 20px 10px;
+    border-bottom: 2px solid #111010;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .card-exp-niche {
+    background: #111010;
+    color: #FACC15;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 8px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .card-exp-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #111010;
+    line-height: 1.3;
+    letter-spacing: -0.2px;
+  }
+  .card-exp-meta {
+    font-size: 12px; color: #111010; opacity: 0.5; font-weight: 600; margin-top: 3px;
+  }
+
+  .draft-area {
+    padding: 14px 20px 16px;
+    flex: 1;
+    overflow: hidden;
+    background: #FEFCE8;
+    border-top: none;
+  }
+  .draft-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: #111010;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.5;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .draft-label-icon {
+    width: 16px; height: 16px;
+    background: #111010;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: #FACC15; font-weight: 900;
+    flex-shrink: 0;
+  }
+  .draft-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111010;
+    line-height: 1.55;
+    letter-spacing: -0.1px;
+  }
+  .draft-footer {
+    padding: 10px 20px;
+    background: #FFFFFF;
+    border-top: 2px solid #111010;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .draft-btn {
+    background: #111010;
+    color: #FACC15;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 7px 16px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .draft-budget {
+    font-size: 15px; font-weight: 900; color: #111010; letter-spacing: -0.5px;
+  }
+
+  /* ── FOOTER ── */
+  .banner-footer {
+    background: #111010;
+    padding: 16px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    border-top: 4px solid #111010;
+  }
+  .footer-promise {
+    font-size: 15px;
+    font-weight: 700;
+    color: #FFFFFF;
+  }
+  .footer-promise span { color: #FACC15; }
+  .footer-sub {
+    font-size: 11px; color: rgba(255,255,255,0.35); font-weight: 600;
+    letter-spacing: 0.04em; margin-top: 2px;
+  }
+  .footer-left { display: flex; flex-direction: column; gap: 1px; }
+  .footer-cta {
+    background: #FACC15;
+    color: #111010;
+    font-size: 14px;
+    font-weight: 900;
+    padding: 10px 22px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="banner">
+
+  <!-- HEADER -->
+  <div class="banner-header">
+    <div class="header-top">
+      <div class="logo">
+        <div class="logo-mark">RL</div>
+        <div class="logo-name">RawLead</div>
+      </div>
+    </div>
+    <div class="eyebrow">ИИ-ассистент для digital-фрилансера</div>
+    <div class="hero-headline">ИИ пишет черновик<br><em>под каждый</em> заказ</div>
+  </div>
+
+  <!-- CARDS SECTION -->
+  <div class="cards-section">
+    <div class="section-label">Персональная лента · 2 заказа под твой стек</div>
+
+    <!-- Dev card — closed -->
+    <div class="card">
+      <div class="card-niche-pill">Dev</div>
+      <div class="card-info">
+        <div class="card-title">Бот для уведомлений и парсинга данных — Python</div>
+        <div class="card-meta">Python · FastAPI · Telegram Bot · 15 000 ₽</div>
+      </div>
+      <div class="card-match-chip">Match 91%</div>
+    </div>
+
+    <!-- Marketing card — expanded with draft -->
+    <div class="card-expanded">
+      <div class="card-exp-header">
+        <div class="card-exp-niche">Marketing</div>
+        <div>
+          <div class="card-exp-title">Настройка таргета ВКонтакте для e-commerce — тест + масштаб</div>
+          <div class="card-exp-meta">Таргетинг · ВКонтакте · A/B-тест · 18 000 ₽ · Match 87%</div>
+        </div>
+      </div>
+      <div class="draft-area">
+        <div class="draft-label">
+          <div class="draft-label-icon">AI</div>
+          ИИ-черновик отклика — уникальный под это ТЗ
+        </div>
+        <div class="draft-text">
+          Изучил ТЗ. Настраиваю таргет ВКонтакте с нуля и масштабирую<br>
+          работающие аудитории — не откручиваю бюджет вслепую.<br><br>
+          По вашей задаче: сплит на холодных и тёплых, Look-alike по базе.<br>
+          A/B на 3–4 объявления. Оптимизация по CPL, не кликам.<br><br>
+          Реалистичная оценка: 2 недели до стабильных CPA.<br>
+          Что важнее в первый месяц — CPL или объём заявок?
+        </div>
+      </div>
+      <div class="draft-footer">
+        <div class="draft-budget">18 000 ₽</div>
+        <div class="draft-btn">Скопировать черновик →</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="banner-footer">
+    <div class="footer-left">
+      <div class="footer-promise">Не шаблон — <span>уникальный черновик</span> на каждый заказ</div>
+      <div class="footer-sub">rawlead.ru · trial бесплатно</div>
+    </div>
+    <div class="footer-cta">Попробовать →</div>
+  </div>
+
+</div>
+</body>
+</html>

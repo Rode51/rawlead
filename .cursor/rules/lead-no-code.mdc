@@ -16,22 +16,27 @@ alwaysApply: true
 - `.env`, `data/`, сессии, lock-файлы
 - `Shell` для запуска радара, pip, pytest · **deploy на VPS** — см. исключение Lead Architect
 - «Быстро сделаю сам» / «пока Lead поправлю» / «доделаю из summary» — **нет**
-- **«деплой на VPS»** от владельца — по умолчанию § `CODER_PROMPT` + **MiMo coder** · **или** `@lead-architect` если владелец явно просит «задеплой» / «Lead, деплой» (см. § Lead Architect deploy)
+- **«деплой на VPS»** от владельца — по умолчанию § `CODER_PROMPT` + **MiMo coder** · **или** `@lead-architect` если владелец явно просит «задеплой» / «Lead, деплой» → см. § **Deploy** ниже (детали в `lead-architect.mdc`)
 
-## Lead Architect — deploy (решение владельца 2026-06-14)
+## Срочно / hotfix — не для Lead
 
-**Только `@lead-architect`**, не Lead Product / Lead Designer / Lead Portfolio.
+«Срочно», «сейчас», «hotfix», «быстро поправь», «пока не ломается» — **не** разрешение Lead писать код.
 
-| Разрешено | Запрещено |
-|-----------|-----------|
-| `Shell`: **существующие** `scripts/deploy-*-vps.py`, `scripts/deploy-wp-theme-vps.py` | Править `src/`, `wordpress/`, `scripts/` перед деплоем |
-| После **✅ verify** сдачи Coder (diff + pytest по § `CODER_PROMPT`) | Деплой без verify · деплой «из summary» без кода в repo |
-| Verify prod: curl/HTML `ver=` · `systemctl is-active` | pip install · pytest в Shell · restart radar «на всякий случай» |
-| `scripts/probe_prod_facts_vps.py --write` · `STATUS` / `TASKS` / `PROD_FACTS` / hot `CODER_PROMPT` | Новые скрипты в `scripts/` — пишет **MiMo coder** / `@coder`, Lead **запускает** probe/deploy |
+| Ситуация | Куда |
+|----------|------|
+| Плановая задача / баг в коде | § `CODER_PROMPT` → **MiMo coder** (default) |
+| Prod лежит сейчас | `docs/problems/` → **@mechanic** |
+| Deploy после фикса | **@lead-architect** verify → deploy (или явное «Lead, задеплой») |
 
-**Триггер от владельца:** «задеплой», «Lead, деплой», «залей на VPS» — Lead Architect **может** выполнить deploy в этой сессии, не handoff на Coder.
+Даже «маленькая» правка в `src/` — **MiMo coder** / `@coder` / `@mechanic`, не Lead.
 
-**Lead Product / Lead Designer / Lead Portfolio:** deploy **не делают** — handoff Architect или owner по `FOR_YOU.md`.
+## Lead Architect — deploy
+
+**Только `@lead-architect`**, не Lead Product / Designer / Portfolio.
+
+Исключение из бана кода: **существующие** `scripts/deploy-*-vps.py` · после **✅ verify** · или триггер «задеплой» / «Lead, деплой» от владельца в **этом** сообщении.
+
+**Полная таблица разрешено/запрещено:** `lead-architect.mdc` § **Deploy**.
 
 ## Summary / handoff — не повод кодить
 
@@ -49,8 +54,8 @@ alwaysApply: true
 
 1. Отказ одной фразой  
 2. Записать задачу в `docs/team/architect/CODER_PROMPT.md` + `docs/team/common/TASKS.md`  
-3. Владельцу: **сводка простым языком** + копипаст **MiMo coder** или `@coder` (см. `lead-architect.mdc` § Handoff · `mimo.mdc`)
+3. Владельцу: **сводка простым языком** + копипаст из **`mimo.mdc` § Копипаст** (или `@coder` — `lead-architect.mdc` § Handoff)
 
-Даже если фича «маленькая» или «срочная» — только **MiMo coder** / Coder / Mechanic.
+Даже если фича «маленькая» или «срочная» — только **MiMo coder** / Coder / Mechanic (см. § **Срочно / hotfix** выше).
 
 Регламент: `docs/team/architect/LEAD.md` § «Защита от кода Lead»

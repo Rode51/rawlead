@@ -2055,6 +2055,91 @@ def _youdo_sticky_reload_sp_abort_sec() -> float:
         return 15.0
 
 
+# --- Click-through detail (§ YOUDO-DETAIL-BREAKTHROUGH) ---
+
+
+def youdo_click_detail_enabled() -> bool:
+    return os.getenv("YOUDO_CLICK_DETAIL", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _youdo_click_detail_max() -> int:
+    raw = os.getenv("YOUDO_CLICK_DETAIL_MAX", "10").strip()
+    try:
+        return max(1, min(20, int(raw)))
+    except ValueError:
+        return 10
+
+
+def youdo_click_through_details(
+    lead_ids: list[str],
+    *,
+    listing_url: str,
+    user_agent: str,
+    timeout_sec: float = 60.0,
+    proxy_url: str = "",
+) -> dict[str, dict[str, Any]]:
+    """Send click_through_details command to sticky worker. Returns {ext_id: {body, ...}}."""
+    if not _on_playwright_thread():
+        return _playwright_sync(
+            youdo_click_through_details,
+            lead_ids,
+            listing_url=listing_url,
+            user_agent=user_agent,
+            timeout_sec=timeout_sec,
+            proxy_url=proxy_url,
+        )
+    if not lead_ids:
+        return {}
+    if not _youdo_sticky_session_enabled() or not _youdo_is_camoufox():
+        return {}
+    capped = lead_ids[:_youdo_click_detail_max()]
+
+    with _fetch_lock("youdo"):
+        with _YOUDO_STICKY_LOCK:
+            proc = _YOUDO_STICKY_PROC
+            if proc is None or proc.poll() is not None:
+                return {}
+            if not _YOUDO_STICKY_PROXY or _YOUDO_STICKY_PROXY != proxy_url:
+                return {}
+
+        req = {
+            "cmd": "click_through_details",
+            "lead_ids": capped,
+            "listing_url": listing_url,
+            "timeout": timeout_sec,
+        }
+        try:
+            result = _youdo_sticky_send_json(
+                proc,
+                req,
+                timeout_sec=timeout_sec + 30.0,
+            )
+        except HtmlFetchError:
+            return {}
+
+    results_raw = result.get("results") or {}
+    out: dict[str, dict[str, Any]] = {}
+    for ext_id, info in results_raw.items():
+        if not isinstance(info, dict):
+            continue
+        body = info.get("body") or ""
+        detail_ok = info.get("outcome") in ("ok", "fallback_ok") and len(body) >= 100
+        out[str(ext_id)] = {
+            "body": body,
+            "detail_ok": detail_ok,
+            "outcome": info.get("outcome", ""),
+            "selector": info.get("selector", ""),
+            "clicked": info.get("clicked", 0),
+            "ms": info.get("ms", 0),
+            "fallback": info.get("fallback", ""),
+        }
+    return out
+
+
 def _youdo_ru_burst_max_per_day() -> int:
     raw = os.getenv("YOUDO_RU_BURST_MAX_PER_DAY", "2").strip()
     try:

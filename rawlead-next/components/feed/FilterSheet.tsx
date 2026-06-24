@@ -142,6 +142,7 @@ export default function FilterSheet({
                       color: active ? '#fff' : '#111010',
                       boxShadow: active ? '3px 3px 0 #E8A020' : '2px 2px 0 #D4D4D0',
                     }}
+                    data-active={active ? '1' : '0'}
                   >
                     {cat.label}
                   </button>

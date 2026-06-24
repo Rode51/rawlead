@@ -23,6 +23,7 @@ from listing_dedup import listing_content_hash
 from pg_storage import NeonLeadRow, NeonLeadStorage
 from public_feed import is_public_feed_source
 from storage import ProjectStorage
+from youdo_imap import _IMAP_MIN_DETAIL_LEN
 from radar_cycle_log import (
     SourceCycleStats,
     log_pipeline_line,
@@ -86,8 +87,24 @@ def _resolve_ingest_body(
 
     if is_web_detail_source(source):
         if source == SOURCE_YOUDO:
+            # Model B: email body in snippet is already detail — skip browser
+            if len(base) >= _IMAP_MIN_DETAIL_LEN:
+                return base, None, True
             if not _youdo_detail_fetch_enabled():
                 return base, None, None
+            # Check click-through cache first (§ YOUDO-DETAIL-BREAKTHROUGH)
+            try:
+                from exchange_browser_fetch import youdo_click_detail_enabled
+                from youdo_parser import _click_detail_cache_get
+
+                if youdo_click_detail_enabled():
+                    cached = _click_detail_cache_get(ext_id)
+                    if cached is not None:
+                        cached_body, cached_ok = cached
+                        if cached_ok and len(cached_body) > len(base):
+                            return cached_body, None, True
+            except Exception:
+                pass
         text, html, ok = fetch_project_detail(
             source,
             project.url,
@@ -142,12 +159,14 @@ def _youdo_detail_short_skips_l1(
     body: str,
     detail_ok: bool | None,
 ) -> bool:
-    """O223: detail fetch failed and body too short — не вызывать L1."""
+    """YOUDO-SOURCE-GATE rev2: only detail_ok matters.
+
+    detail_ok=True → pass (any length TZ is fine).
+    detail_ok≠True → delist, reason=youdo_no_detail.
+    """
     if project.source != SOURCE_YOUDO:
         return False
-    if detail_ok is not False:
-        return False
-    return len((body or "").strip()) < _youdo_detail_min_chars()
+    return detail_ok is not True
 
 
 def _apply_physical_pre_l1(
@@ -491,13 +510,22 @@ def plan_new_listing(
             neon_replay = True
         elif in_neon and not inserted:
             if exchange_neon:
+                lite_state = pg.fetch_lead_lite_state(
+                    source=project.source,
+                    external_id=ext_id,
+                    errors=errors,
+                )
+                if lite_state is not None and lite_state.has_l1:
+                    storage.mark_neon_dup_synced(
+                        project.source, project.project_id, fingerprint
+                    )
+                    return _neon_dup_skip_return(
+                        project, inserted=inserted, errors=errors, stats=stats
+                    )
                 prev_hash = storage.get_neon_synced_hash(
                     project.source, project.project_id
                 )
-                if prev_hash and prev_hash != fingerprint:
-                    storage.clear_neon_dup_synced(project.source, project.project_id)
-                    neon_replay = True
-                else:
+                if prev_hash and prev_hash == fingerprint:
                     storage.mark_neon_dup_synced(
                         project.source, project.project_id, fingerprint
                     )
@@ -507,6 +535,9 @@ def plan_new_listing(
                     return _neon_dup_skip_return(
                         project, inserted=inserted, errors=errors, stats=stats
                     )
+                if prev_hash and prev_hash != fingerprint:
+                    storage.clear_neon_dup_synced(project.source, project.project_id)
+                neon_replay = True
             else:
                 return _neon_dup_skip_return(
                     project, inserted=inserted, errors=errors, stats=stats
@@ -550,6 +581,13 @@ def plan_new_listing(
         return inserted or neon_replay or neon_sqlite_resync, None
 
     ingest_body, tz_attachment_meta, detail_ok = _resolve_ingest_body(project, cfg, errors)
+
+    # Clear pending flag on success (§ YOUDO-CLICK-RETRY)
+    if project.source == SOURCE_YOUDO and detail_ok is True:
+        try:
+            storage.set_setting(f"youdo_detail_pending:{ext_id}", "0")
+        except Exception:
+            pass
 
     if neon_wide and pg is not None and not in_neon:
         in_neon, neon_replay, neon_sqlite_resync, dup_abort = _insert_neon_after_gates(
@@ -602,11 +640,24 @@ def plan_new_listing(
             return was_new, None
 
         if _youdo_detail_short_skips_l1(project, ingest_snippet, detail_ok):
-            line = f"pipeline:skip youdo:id={ext_id} detail:short"
+            line = f"pipeline:skip youdo:id={ext_id} no_detail"
             errors.append(line)
             log_pipeline_line(cfg.radar_log_path, line)
             if stats is not None:
-                stats.note_skip("skip:youdo_detail_short")
+                stats.note_skip("skip:youdo_no_detail")
+            # Mark pending for click-through retry (§ YOUDO-CLICK-RETRY)
+            try:
+                storage.set_setting(f"youdo_detail_pending:{ext_id}", "1")
+            except Exception:
+                pass
+            if pg is not None:
+                lead_id = pg.fetch_lead_id(project.source, ext_id, errors)
+                if lead_id is not None:
+                    pg.delist_lead(
+                        lead_id,
+                        reason="youdo_no_detail",
+                        errors=errors,
+                    )
             return was_new, None
 
     if (
@@ -916,6 +967,15 @@ def drain_l1_backlog(
     for row in rows:
         project = _listing_from_neon_row(row)
         snippet = (project.listing_snippet or project.title or "").strip()
+        if (
+            row.source == SOURCE_YOUDO
+            and _youdo_detail_min_chars() > 0
+            and len(snippet) < _youdo_detail_min_chars()
+        ):
+            errors.append(
+                f"youdo:id={row.external_id} pipeline:skip detail:short:backlog"
+            )
+            continue
         if not word_filter.accepts_listing(project, wide=cfg.filter_wide):
             errors.append(f"{row.source}:id={row.external_id} skip:filter:backlog")
             continue

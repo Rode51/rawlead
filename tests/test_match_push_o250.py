@@ -183,7 +183,8 @@ class TestO250bPushMatchParity(TestCase):
         self.assertEqual(sent, 1)
         mock_send.assert_called_once()
         push_text = mock_send.call_args[0][2]
-        self.assertIn("Match 100%", push_text)
+        self.assertIn("🔔 Match", push_text)
+        self.assertNotIn("Match 100%", push_text)
         self.assertTrue(any("push:match:user=00000000" in e and "km=100" in e for e in errors))
 
 

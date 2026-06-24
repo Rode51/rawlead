@@ -72,6 +72,7 @@ class Config:
     filters_md_path: Path
     site_notify_on_ai_unavailable: bool
     site_notify_owner: bool
+    bot_notify_owner_start: bool
     radar_conveyor: bool
     l1_batch_per_cycle: int
     l1_max_workers: int
@@ -1021,6 +1022,10 @@ def load_config() -> Config:
         os.environ.get("SITE_NOTIFY_OWNER"),
         default=False,
     )
+    bot_notify_owner_start = _parse_bool_flag(
+        os.environ.get("BOT_NOTIFY_OWNER_START"),
+        default=False,
+    )
 
     match_push_enabled = _parse_bool_flag(
         os.environ.get("MATCH_PUSH"),
@@ -1095,6 +1100,7 @@ def load_config() -> Config:
         filters_md_path=filters_path,
         site_notify_on_ai_unavailable=site_notify_on_ai_unavailable,
         site_notify_owner=site_notify_owner,
+        bot_notify_owner_start=bot_notify_owner_start,
         radar_conveyor=radar_conveyor,
         l1_batch_per_cycle=l1_batch_per_cycle,
         l1_max_workers=l1_max_workers,

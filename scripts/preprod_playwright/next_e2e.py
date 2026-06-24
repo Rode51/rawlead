@@ -216,7 +216,10 @@ def n5_draft(page: Any, cfg: RunConfig) -> None:
     tier = ui.bootstrap_preprod_feed(page, cfg.base_url, cfg.preprod_token)
     if tier != "premium":
         raise RuntimeError(f"preprod feed tier {tier!r}, need premium for draft")
-    card = ui.expand_card_at(page, 0)
+    lead_ids = ui.draftable_lead_ids_for_e2e(
+        cfg.preprod_token, base_url=cfg.base_url, need=1
+    )
+    card = ui.expand_card_by_lead_id(page, lead_ids[0])
     text = ui.generate_draft_on_card(page, card)
     if len(text) < 80:
         raise RuntimeError(f"draft too short: {len(text)}")
@@ -354,10 +357,13 @@ def n16_draft_twice(page: Any, cfg: RunConfig) -> None:
     if not cfg.preprod_token:
         raise RuntimeError("RAWLEAD_PREPROD_ACCESS_TOKEN required")
     ui.bootstrap_preprod_feed(page, cfg.base_url, cfg.preprod_token, timeout_ms=45_000)
-    for idx in (0, 1):
+    lead_ids = ui.draftable_lead_ids_for_e2e(
+        cfg.preprod_token, base_url=cfg.base_url, need=2
+    )
+    for idx, lid in enumerate(lead_ids):
         if idx == 1:
             page.wait_for_timeout(35_000)
-        card = ui.expand_card_at(page, idx)
+        card = ui.expand_card_by_lead_id(page, lid)
         ui.generate_draft_on_card(page, card)
         card.click()
         page.wait_for_timeout(400)
@@ -367,7 +373,10 @@ def n17_draft_collapse_mid(page: Any, cfg: RunConfig) -> None:
     if not cfg.preprod_token:
         raise RuntimeError("RAWLEAD_PREPROD_ACCESS_TOKEN required")
     ui.bootstrap_preprod_feed(page, cfg.base_url, cfg.preprod_token, timeout_ms=45_000)
-    card = ui.expand_card_at(page, 0)
+    lead_ids = ui.draftable_lead_ids_for_e2e(
+        cfg.preprod_token, base_url=cfg.base_url, need=1
+    )
+    card = ui.expand_card_by_lead_id(page, lead_ids[0])
     card.locator('[data-testid="feed-card-cta"]').click()
     page.wait_for_timeout(800)
     card.click()

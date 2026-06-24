@@ -1,12 +1,19 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { feedApi, meApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { useAuthModal } from '@/lib/auth-modal-context'
 import type { LeadItem } from '@/lib/types'
 import { readPendingDraftsMap } from '@/lib/pending-drafts'
+import {
+  initFilterState,
+  mergeFeedPrefsOnLogin,
+  persistFeedPrefs,
+  type FeedFilterState,
+  type FeedSort,
+} from '@/lib/feed-prefs'
 
 const MOCK_LEADS: LeadItem[] = [
   { id: 1, source: 'fl', title: 'Разработка Telegram-бота для записи клиентов', body: '', task_summary: 'Бот принимает заявки, отправляет напоминания, интегрируется с Google Sheets. Python + aiogram.', url: 'https://fl.ru', budget_text: '25 000 – 40 000 ₽', ai_score: 91, keyword_match: 88, final_rank: 88, category: 'dev', lead_tags: ['telegram_bot_dev', 'python', 'aiogram'], lead_tag_labels: {}, tools_required: ['python', 'aiogram'], difficulty: '2', tz_attachment: null, created_at: new Date(Date.now() - 18 * 60000).toISOString(), is_hot: true, display_views: 34, display_replies: 4, reply_draft: '' },
@@ -76,7 +83,11 @@ export default function LentaPage() {
   const [done, setDone] = useState(false)
   const [categories, setCategories] = useState<string[]>([])
   const [sources, setSources] = useState<string[]>([])
-  const [sort, setSort] = useState<'time' | 'match'>('time')
+  const [sort, setSort] = useState<FeedSort>('time')
+  const [prefsReady, setPrefsReady] = useState(false)
+  const mergedOnLoginRef = useRef(false)
+  const filterGenerationRef = useRef(0)
+  const deepLinkRef = useRef<number | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [showQuiz, setShowQuiz] = useState(false)
   const [anonQuizDone, setAnonQuizDone] = useState(false)
@@ -103,10 +114,30 @@ export default function LentaPage() {
       const data = await withTimeout(feedApi.list(params), FETCH_TIMEOUT_MS)
 
       if (isReset) {
-        setItems(data.items)
-        setOffset(data.items.length)
+        let items = data.items
+        // Deep link: merge lead if not in feed results
+        const dlId = deepLinkRef.current
+        if (dlId && !items.some(x => x.id === dlId)) {
+          try {
+            const lead = await feedApi.lead(dlId)
+            if (lead?.id) items = [lead, ...items]
+          } catch { /* will appear after next loadMore */ }
+        }
+        setItems(items)
+        setOffset(items.length)
         setTotal(data.count)
-        setExpandedId(null)
+        if (!dlId) setExpandedId(null)
+        // Scroll + pulse after items are settled
+        if (dlId) {
+          window.setTimeout(() => {
+            const card = document.querySelector(`.rl-lead-card[data-id="${dlId}"]`)
+            if (card instanceof HTMLElement) {
+              card.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              card.classList.add('rl-lead-card--push-focus')
+              window.setTimeout(() => card.classList.remove('rl-lead-card--push-focus'), 2800)
+            }
+          }, 100)
+        }
       } else {
         setItems(prev => [...prev, ...data.items])
         setOffset(prev => prev + data.items.length)
@@ -127,14 +158,14 @@ export default function LentaPage() {
           setOffset(filtered.length)
           setTotal(filtered.length)
           setDone(true)
-          setExpandedId(null)
+          if (!deepLinkRef.current) setExpandedId(null)
         } else {
           setError('Не удалось загрузить ленту. Обновите страницу или зайдите позже.')
           setItems([])
           setOffset(0)
           setTotal(0)
           setDone(true)
-          setExpandedId(null)
+          if (!deepLinkRef.current) setExpandedId(null)
         }
       }
     } finally {
@@ -143,11 +174,45 @@ export default function LentaPage() {
     }
   }, [categories, sources, sort])
 
+  useEffect(() => {
+    const { state, urlApplied } = initFilterState()
+    setCategories(state.categories)
+    setSources(state.sources)
+    setSort(state.sort)
+    setPrefsReady(true)
+    if (urlApplied) void persistFeedPrefs(state)
+  }, [])
+
+  useEffect(() => {
+    if (!prefsReady || auth.status !== 'auth' || mergedOnLoginRef.current) return
+    mergedOnLoginRef.current = true
+    const genAtMerge = filterGenerationRef.current
+    let cancelled = false
+    void mergeFeedPrefsOnLogin().then(state => {
+      if (cancelled || genAtMerge !== filterGenerationRef.current) return
+      setCategories(state.categories)
+      setSources(state.sources)
+      setSort(state.sort)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [auth.status, prefsReady])
+
+  const applyFilters = useCallback((next: FeedFilterState) => {
+    filterGenerationRef.current += 1
+    setCategories(next.categories)
+    setSources(next.sources)
+    setSort(next.sort)
+    void persistFeedPrefs(next)
+  }, [])
+
   // Load feed on mount and when auth/filters change.
   // auth.status 'pending' is treated as 'anon' in feedTier — no blocking wait.
   useEffect(() => {
+    if (!prefsReady) return
     loadFeed(true, 0)
-  }, [auth.status, categories, sources, sort, loadFeed])
+  }, [auth.status, categories, sources, sort, loadFeed, prefsReady])
 
   // Draft quota — premium only, poll every 30s
   useEffect(() => {
@@ -201,15 +266,8 @@ export default function LentaPage() {
     const focusRaw = params.get('lead') || params.get('id') || ''
     const focusId = parseInt(focusRaw, 10)
     if (focusId > 0) {
+      deepLinkRef.current = focusId
       setExpandedId(focusId)
-      window.setTimeout(() => {
-        const card = document.querySelector(`.rl-lead-card[data-id="${focusId}"]`)
-        if (card instanceof HTMLElement) {
-          card.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          card.classList.add('rl-lead-card--push-focus')
-          window.setTimeout(() => card.classList.remove('rl-lead-card--push-focus'), 2800)
-        }
-      }, 400)
     }
   }, [])
 
@@ -221,9 +279,7 @@ export default function LentaPage() {
     loadFeed(false, offset)
   }
 
-  function handleCategoriesChange(cats: string[]) { setCategories(cats) }
-  function handleSourcesChange(srcs: string[]) { setSources(srcs) }
-  function handleSortChange(s: 'time' | 'match') { setSort(s) }
+  // applyFilters is passed directly to FilterBar as onApplyFilters
 
   return (
     <>
@@ -233,9 +289,7 @@ export default function LentaPage() {
         sources={sources}
         sort={sort}
         feedTier={auth.feedTier}
-        onCategoriesChange={handleCategoriesChange}
-        onSourcesChange={handleSourcesChange}
-        onSortChange={handleSortChange}
+        onApplyFilters={applyFilters}
       />
 
       {auth.feedTier === 'anon' && !loading && (
@@ -246,6 +300,8 @@ export default function LentaPage() {
         data-rl-app="feed"
         data-testid="feed-app"
         data-feed-tier={auth.feedTier}
+        data-feed-prefs-ready={prefsReady ? '1' : '0'}
+        data-feed-sources={sources.join(',')}
         className="min-h-screen py-6 sm:py-8 pb-16"
       >
         <div className="max-w-feed mx-auto px-4 sm:px-6">

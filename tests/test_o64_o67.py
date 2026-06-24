@@ -107,6 +107,7 @@ def test_legacy_poll_interval_config() -> None:
         filters_md_path=Path("docs/ops/FILTERS_LEGACY.md"),
         site_notify_on_ai_unavailable=False,
         site_notify_owner=False,
+        bot_notify_owner_start=False,
         radar_conveyor=False,
         l1_batch_per_cycle=40,
         l1_max_workers=3,

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import subprocess
 import time
 
+import psycopg
 import requests
 
 from config import Config, _PROJECT_ROOT
@@ -38,6 +40,8 @@ from tg_relay_allowlist import (
     was_message_relayed,
 )
 
+logger = logging.getLogger(__name__)
+
 _TELEGRAM_BOT_IN_PATH = re.compile(r"(/bot)[^/\s]+(/)")
 _PAUSE_CMDS = frozenset({"/pause", "/стоп"})
 _RESUME_CMDS = frozenset({"/resume", "/старт"})
@@ -55,10 +59,21 @@ _ACTION_RESUME = "resume"
 _ACTION_STATUS = "status"
 _ACTION_STOP_HARD = "stop_hard"
 
-_WELCOME_SUBSCRIBER = "RawLead — лента заказов: https://rawlead.ru/lenta/"
+_WELCOME_SUBSCRIBER = (
+    "RawLead — заказы с FL, Kwork и TG в одной ленте.\n"
+    "ИИ пишет черновик отклика. Trial бесплатно."
+)
 _WELCOME_LOGIN = (
     "RawLead — откройте ссылку ниже, чтобы войти в кабинет на сайте."
 )
+
+_M1_UTM_BASE = (
+    "utm_source=telegram&utm_medium=organic&utm_campaign=m1_test_v0"
+)
+
+
+def _m1_welcome_url(utm_content: str = "bot_welcome") -> str:
+    return f"https://rawlead.ru/?{_M1_UTM_BASE}&utm_content={utm_content}"
 
 
 class TelegramControlError(RuntimeError):
@@ -117,6 +132,18 @@ def _remove_keyboard_markup() -> str:
 
 def _inline_url_markup(url: str, label: str) -> str:
     markup = {"inline_keyboard": [[{"text": label, "url": url}]]}
+    return json.dumps(markup, ensure_ascii=False, separators=(",", ":"))
+
+
+_BTN_M1_START = "\u25b6\ufe0f \u0421\u0442\u0430\u0440\u0442"
+
+
+def _m1_start_reply_keyboard() -> str:
+    markup = {
+        "keyboard": [[{"text": _BTN_M1_START}]],
+        "resize_keyboard": True,
+        "one_time_keyboard": False,
+    }
     return json.dumps(markup, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -348,6 +375,72 @@ def _send_to_chat(
     if not body.get("ok", False):
         desc = str(body.get("description") or "unknown error")
         raise TelegramControlError(f"sendMessage: {desc}")
+
+
+def _bot_start_payload_label(payload: str) -> str:
+    if not payload:
+        return "—"
+    if payload in ("m1_chat", "bot_welcome", "login"):
+        return payload
+    return payload
+
+
+def _notify_owner_first_bot_start(
+    cfg: Config,
+    *,
+    tg_user_id: int,
+    tg_username: str | None,
+    payload_label: str,
+) -> None:
+    """Первый /start юзера → одно уведомление владельцу (dedup в users)."""
+    if not cfg.bot_notify_owner_start:
+        return
+    url = cfg.database_url.strip()
+    owner_chat = str(cfg.telegram_chat_id or "").strip()
+    if not url or not owner_chat:
+        return
+    uname_part = f"@{tg_username}" if tg_username else "—"
+    text = (
+        f"🆕 /start @rawlead_bot · {uname_part} · tg {tg_user_id} · start: {payload_label}"
+    )
+    try:
+        with psycopg.connect(url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT bot_start_owner_notified_at
+                    FROM users
+                    WHERE tg_user_id = %s
+                    FOR UPDATE
+                    """,
+                    (tg_user_id,),
+                )
+                row = cur.fetchone()
+                if not row or row[0] is not None:
+                    return
+                _send_to_chat(
+                    cfg,
+                    owner_chat,
+                    text,
+                    with_admin_keyboard=False,
+                )
+                cur.execute(
+                    """
+                    UPDATE users
+                    SET bot_start_owner_notified_at = NOW()
+                    WHERE tg_user_id = %s
+                    """,
+                    (tg_user_id,),
+                )
+                conn.commit()
+    except TelegramControlError:
+        raise
+    except Exception as exc:
+        logger.warning(
+            "bot_start_notify: tg=%s: %s",
+            tg_user_id,
+            exc,
+        )
 
 
 def _send_message(
@@ -690,6 +783,9 @@ def _handle_subscriber_message(
     if chat_id is None or user_id is None:
         return True
 
+    if text.strip() == _BTN_M1_START:
+        text = _START_CMD
+
     cmd = _normalize_command(text)
     if cmd in ("/login", "/cabinet"):
         return _handle_bot_login_link(
@@ -719,6 +815,18 @@ def _handle_subscriber_message(
             tg_chat_id=int(chat_id),
         )
         payload = _start_payload(text)
+        if cfg.bot_notify_owner_start and not is_admin:
+            from_user = message.get("from") if isinstance(message.get("from"), dict) else {}
+            username = str(from_user.get("username") or "").strip() or None
+            try:
+                _notify_owner_first_bot_start(
+                    cfg,
+                    tg_user_id=int(user_id),
+                    tg_username=username,
+                    payload_label=_bot_start_payload_label(payload),
+                )
+            except TelegramControlError:
+                pass
         try:
             if payload == "login":
                 return _handle_bot_login_link(
@@ -732,7 +840,20 @@ def _handle_subscriber_message(
                 pay_method = _resolve_pay_start_payload(payload)
                 _send_pay_flow(cfg, chat_id, int(user_id), errors, method=pay_method or "menu")
             else:
-                _send_to_chat(cfg, chat_id, _WELCOME_SUBSCRIBER, remove_keyboard=True)
+                utm_content = "m1_chat" if payload == "m1_chat" else "bot_welcome"
+                url = _m1_welcome_url(utm_content)
+                _send_to_chat(
+                    cfg,
+                    chat_id,
+                    _WELCOME_SUBSCRIBER,
+                    reply_markup=_inline_url_markup(url, "Попробовать →"),
+                )
+                _send_to_chat(
+                    cfg,
+                    chat_id,
+                    "Кнопка ниже — если нужно снова.",
+                    reply_markup=_m1_start_reply_keyboard(),
+                )
         except TelegramControlError:
             pass
         return True
@@ -767,7 +888,79 @@ def _handle_subscriber_message(
     if not is_admin and _resolve_action(text) is not None:
         return True
 
+    if not is_admin:
+        try:
+            url = _m1_welcome_url("bot_welcome")
+            _send_to_chat(
+                cfg,
+                chat_id,
+                _WELCOME_SUBSCRIBER,
+                reply_markup=_inline_url_markup(url, "Попробовать →"),
+            )
+        except TelegramControlError:
+            pass
+        return True
+
     return False
+
+
+def _handle_admin_support_reply(
+    message: dict,
+    cfg: Config,
+    text: str,
+    errors: list[str],
+) -> bool:
+    """Owner: reply to support notice or #N / тN: fallback → admin_reply."""
+    body = (text or "").strip()
+    ticket_id: int | None = None
+    reply_body: str | None = None
+
+    reply_to = message.get("reply_to_message")
+    if isinstance(reply_to, dict):
+        parent_text = reply_to.get("text")
+        if isinstance(parent_text, str):
+            from support_tickets import parse_ticket_id_from_notice
+
+            ticket_id = parse_ticket_id_from_notice(parent_text)
+            if ticket_id is not None and body:
+                reply_body = body
+
+    if ticket_id is None and body:
+        from support_tickets import parse_admin_fallback_reply
+
+        parsed = parse_admin_fallback_reply(body)
+        if parsed:
+            ticket_id, reply_body = parsed
+
+    if ticket_id is None or not reply_body:
+        return False
+
+    from support_tickets import admin_reply
+    from config import require_database_url
+
+    try:
+        admin_reply(require_database_url(), ticket_id=ticket_id, body=reply_body)
+    except ValueError as exc:
+        errors.append(f"тг:support:{exc}")
+        try:
+            _send_message(cfg, f"Тикет #{ticket_id} не найден.")
+        except TelegramControlError:
+            pass
+        return True
+    except Exception as exc:
+        errors.append(f"тг:support:{type(exc).__name__}:{str(exc)[:120]}")
+        try:
+            _send_message(cfg, f"Ошибка ответа в тикете #{ticket_id}.")
+        except TelegramControlError:
+            pass
+        return True
+
+    try:
+        _send_message(cfg, f"✓ Ответ в тикете #{ticket_id}")
+    except TelegramControlError as exc:
+        errors.append(f"тг:support:ack:{_mask_token(str(exc))[:120]}")
+    errors.append(f"тг:support:reply ticket={ticket_id}")
+    return True
 
 
 def _handle_non_admin_message(
@@ -947,6 +1140,11 @@ def poll_commands(cfg: Config, storage: ProjectStorage) -> list[str]:
             continue
 
         if not admin:
+            continue
+
+        if _handle_admin_support_reply(message, cfg, text, errors):
+            if isinstance(update_id, int):
+                next_offset = max(next_offset, update_id + 1)
             continue
 
         action = _resolve_action(text)

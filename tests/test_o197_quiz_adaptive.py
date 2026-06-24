@@ -22,8 +22,12 @@ from fastapi.testclient import TestClient  # noqa: E402
 from src import api_server  # noqa: E402
 from src.api_server import app  # noqa: E402
 from src.quiz_adaptive import (  # noqa: E402
+    QUIZ_EARLY_SIGNAL_MIN,
     QUIZ_MAX_CARDS,
+    QUIZ_MIN_TOTAL,
+    QUIZ_NORMAL_STOP_MIN,
     QUIZ_SIGNALS,
+    _distinct_signals_shown,
     build_profile,
     check_stop,
     compute_niche_confidence,
@@ -86,12 +90,43 @@ class TestConfidenceAndStop(unittest.TestCase):
         self.assertEqual(conf["dev"], 2)
         self.assertEqual(conf["design"], -1)
 
-    def test_early_stop_after_six_likes_one_niche(self) -> None:
+    def test_no_early_stop_before_min_total(self) -> None:
         history = [
             {"card_id": str(22141 + i), "liked": True, "tags": ["python"]}
-            for i in range(6)
+            for i in range(QUIZ_MIN_TOTAL - 1)
         ]
-        cats = {str(22141 + i): "dev" for i in range(6)}
+        cats = {str(22141 + i): "dev" for i in range(QUIZ_MIN_TOTAL - 1)}
+        stop, null = check_stop(history, cats)
+        self.assertFalse(stop)
+        self.assertFalse(null)
+
+    def test_no_early_stop_without_signal_coverage(self) -> None:
+        """6 dev likes with only 2 distinct signals — must not early-stop."""
+        card_ids = ["qc_dev_python_01", "qc_dev_wp_01"] * 3
+        history = [{"card_id": cid, "liked": True, "tags": ["python"]} for cid in card_ids]
+        cats = {cid: "dev" for cid in card_ids}
+        stop, null = check_stop(history, cats)
+        self.assertFalse(stop)
+        self.assertFalse(null)
+        self.assertLess(
+            _distinct_signals_shown(history, cats, "dev"),
+            QUIZ_EARLY_SIGNAL_MIN,
+        )
+
+    def test_early_stop_after_min_total_and_signal_coverage(self) -> None:
+        base_ids = [
+            "qc_dev_python_01",
+            "qc_dev_wp_01",
+            "qc_dev_api_01",
+            "qc2_dev_js_01",
+        ]
+        card_ids = (base_ids * 2)[:QUIZ_MIN_TOTAL]
+        history = [{"card_id": cid, "liked": True, "tags": ["python"]} for cid in card_ids]
+        cats = {cid: "dev" for cid in card_ids}
+        self.assertGreaterEqual(
+            _distinct_signals_shown(history, cats, "dev"),
+            QUIZ_EARLY_SIGNAL_MIN,
+        )
         stop, null = check_stop(history, cats)
         self.assertTrue(stop)
         self.assertFalse(null)
@@ -99,9 +134,9 @@ class TestConfidenceAndStop(unittest.TestCase):
     def test_null_stop_all_disliked(self) -> None:
         history = [
             {"card_id": str(22141 + i), "liked": False, "tags": ["python"]}
-            for i in range(13)
+            for i in range(QUIZ_NORMAL_STOP_MIN)
         ]
-        cats = {str(22141 + i): "dev" for i in range(13)}
+        cats = {str(22141 + i): "dev" for i in range(QUIZ_NORMAL_STOP_MIN)}
         stop, null = check_stop(history, cats)
         self.assertTrue(stop)
         self.assertTrue(null)
@@ -211,10 +246,14 @@ class TestQuizEndpoints(unittest.TestCase):
         self.assertEqual(body["card"]["category"], "design")
 
     def test_early_stop_returns_profile(self) -> None:
-        history = [
-            {"card_id": str(22141 + i), "liked": True, "tags": ["python"]}
-            for i in range(6)
+        base_ids = [
+            "qc_dev_python_01",
+            "qc_dev_wp_01",
+            "qc_dev_api_01",
+            "qc2_dev_js_01",
         ]
+        card_ids = (base_ids * 2)[:QUIZ_MIN_TOTAL]
+        history = [{"card_id": cid, "liked": True, "tags": ["python"]} for cid in card_ids]
 
         def fake_categories(_cur: Any, card_ids: list[str]) -> dict[str, str]:
             return {cid: "dev" for cid in card_ids}
@@ -348,6 +387,26 @@ class TestO221DevCoverageSimulation(unittest.TestCase):
 
         self.assertEqual(len(seen), QUIZ_MAX_CARDS)
         self.assertGreaterEqual(len(seen), 12)
+
+
+class TestQuizInsufficientProfile(unittest.TestCase):
+    def test_done_without_card_returns_null_profile(self) -> None:
+        cur = MagicMock()
+        with patch("src.quiz_adaptive.fetch_quiz_card", return_value=None):
+            with patch("src.quiz_adaptive.fetch_card_categories", return_value={}):
+                with patch("src.quiz_adaptive.check_stop", return_value=(False, False)):
+                    resp = quiz_next_response([], cur)
+        self.assertTrue(resp["done"])
+        self.assertIsNone(resp["profile"])
+
+    def test_quiz_overlay_handles_insufficient_retry(self) -> None:
+        """Client contract: done && !profile → retry UI (data-testid quiz-insufficient)."""
+        overlay = (
+            _ROOT / "rawlead-next" / "components" / "feed" / "QuizOverlay.tsx"
+        ).read_text(encoding="utf-8")
+        self.assertIn('data-testid="quiz-insufficient"', overlay)
+        self.assertIn('data-testid="quiz-retry"', overlay)
+        self.assertIn("Попробовать ещё", overlay)
 
 
 if __name__ == "__main__":

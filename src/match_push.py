@@ -461,7 +461,7 @@ def _format_push_text(
     src = _source_label(source)
     _, tag_labels = lead_tags_for_feed(lead_tags)
     lines = [
-        f"🔔 Match {match_pct}%",
+        "🔔 Match",
         f"{src} · {budget}",
         "",
         head,
@@ -477,6 +477,27 @@ def _format_push_text(
     link = (order_url or "").strip() or _LENTA_BASE
     lines.append(f"→ {link}")
     return "\n".join(lines)
+
+
+def _draft_result_keyboard(
+    *,
+    reply_draft: str,
+    order_url: str,
+    source: str,
+) -> str:
+    """Inline keyboard for draft result message: copy_text + source link."""
+    copy_text = strip_tg_draft_price_deadline(reply_draft)
+    if len(copy_text) > 256:
+        copy_text = copy_text[:253] + "…"
+    label = f"На {_source_label(source)} ↗" if source else "На биржу ↗"
+    link = (order_url or "").strip() or _LENTA_BASE
+    rows: list[list[dict[str, str | dict[str, str]]]] = [
+        [
+            {"text": "Скопировать текст", "copy_text": {"text": copy_text}},
+            {"text": label, "url": link},
+        ],
+    ]
+    return json.dumps({"inline_keyboard": rows}, ensure_ascii=False)
 
 
 def _push_keyboard(*, show_generate: bool, lead_id: int, order_url: str = "") -> str:
@@ -610,6 +631,8 @@ def _analyze_shared_ondemand(
     log_prefix: str,
     max_retries: int = 2,
     lead_id: int | None = None,
+    source: str = "",
+    url: str = "",
 ) -> str | None:
     """O57/O59a: shared on-demand L2 — без profile, отдельный semaphore + backoff."""
     attempts = max(1, int(max_retries))
@@ -622,6 +645,8 @@ def _analyze_shared_ondemand(
                 lite=lite,
                 tools_required=tools_required,
                 description=description,
+                source=source,
+                url=url,
                 errors=ai_errors,
                 log_prefix=log_prefix,
                 timeout_sec=90.0,
@@ -899,6 +924,8 @@ def generate_and_store_lead_draft(
                 log_prefix=prefix,
                 max_retries=max_retries,
                 lead_id=lead_id,
+                source=row[1] or "",
+                url=row[4] or "",
             )
             log_draft_stage(
                 prefix,
@@ -995,6 +1022,8 @@ def warm_shared_lead_draft(
                 log_prefix=prefix,
                 max_retries=2,
                 lead_id=lead_id,
+                source=row[1] or "",
+                url=row[4] or "",
             )
             log_draft_stage(
                 prefix,
@@ -1037,6 +1066,9 @@ def _send_tg_draft_result(
     reply_draft: str,
     errors: list[str],
     user_id: str,
+    *,
+    source: str = "",
+    order_url: str = "",
 ) -> None:
     tg_draft = strip_tg_draft_price_deadline(reply_draft)
     body = (
@@ -1044,7 +1076,12 @@ def _send_tg_draft_result(
         f"{tg_draft}\n\n"
         f"→ Inbox: {_CABINET_URL}"
     )
-    _send_draft_reply(cfg, chat_id, body, errors)
+    keyboard = _draft_result_keyboard(
+        reply_draft=reply_draft,
+        order_url=order_url,
+        source=source,
+    )
+    _send_draft_reply(cfg, chat_id, body, errors, reply_markup=keyboard)
     errors.append(f"tg:draft:ok user={_uid8(user_id)} lead={lead_id}")
     from api_server import _apply_tag_weight_event_for_lead
 
@@ -1191,6 +1228,23 @@ def handle_tg_draft_callback(
 
         _answer_callback_query(cfg, str(callback_id), "Генерирую отклик…", errors)
 
+        # Lookup lead source + url for inline buttons
+        lead_source = ""
+        lead_url = ""
+        try:
+            with psycopg.connect(cfg.database_url) as lconn:
+                with lconn.cursor() as lcur:
+                    lcur.execute(
+                        "SELECT source, url FROM leads WHERE id = %s",
+                        (lead_id,),
+                    )
+                    lrow = lcur.fetchone()
+                    if lrow:
+                        lead_source = str(lrow[0] or "")
+                        lead_url = str(lrow[1] or "")
+        except Exception:
+            pass
+
         from draft_async import poll_draft, submit_draft
 
         prefix = f"tg:draft:{lead_id}:"
@@ -1202,7 +1256,10 @@ def handle_tg_draft_callback(
             quick_wait_sec=3.0,
         )
         if resp.status == "ready":
-            _send_tg_draft_result(cfg, int(chat_id), lead_id, resp.reply_draft, errors, user_id)
+            _send_tg_draft_result(
+                cfg, int(chat_id), lead_id, resp.reply_draft, errors, user_id,
+                source=lead_source, order_url=lead_url,
+            )
             return True
 
         def _poll_and_send() -> None:
@@ -1211,7 +1268,8 @@ def handle_tg_draft_callback(
                 polled = poll_draft(cfg, user_id=user_id, lead_id=lead_id, log_prefix=prefix)
                 if polled.status == "ready":
                     _send_tg_draft_result(
-                        cfg, int(chat_id), lead_id, polled.reply_draft, errors, user_id
+                        cfg, int(chat_id), lead_id, polled.reply_draft, errors, user_id,
+                        source=lead_source, order_url=lead_url,
                     )
                     return
                 if polled.status == "failed":
@@ -1341,17 +1399,22 @@ def _send_draft_reply(
     chat_id: int,
     text: str,
     errors: list[str] | None = None,
+    *,
+    reply_markup: str | None = None,
 ) -> None:
     proxies = telegram_requests_proxies(cfg)
     api_url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/sendMessage"
     chunk = text[:4000]
     err = errors if errors is not None else []
+    payload: dict[str, Any] = {"chat_id": str(chat_id), "text": chunk}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
     try:
         session = requests.Session()
         session.trust_env = False
         resp = session.post(
             api_url,
-            data={"chat_id": str(chat_id), "text": chunk},
+            data=payload,
             timeout=20.0,
             proxies=proxies,
         )

@@ -265,9 +265,121 @@ def feed_card_count(page: Any) -> int:
     return page.locator(FEED_CARD).count()
 
 
+def wait_feed_card_count(
+    page: Any,
+    min_count: int = 1,
+    *,
+    timeout_ms: int = 45_000,
+) -> int:
+    """Wait for feed list to render at least min_count cards (load-more retries)."""
+    deadline = time.perf_counter() + timeout_ms / 1000
+    while time.perf_counter() < deadline:
+        n = feed_card_count(page)
+        if n >= min_count:
+            return n
+        _maybe_load_more_feed(page)
+        page.evaluate(
+            "document.getElementById('rl-feed-list')?.lastElementChild?.scrollIntoView()"
+        )
+        page.wait_for_timeout(800)
+    n = feed_card_count(page)
+    if n < min_count:
+        raise RuntimeError(f"need >={min_count} feed cards, got {n}")
+    return n
+
+
 def click_category(page: Any, slug: str) -> None:
     page.locator(f'[data-testid="feed-cat-{slug or "all"}"]').click()
     page.wait_for_timeout(800)
+
+
+FEED_PREFS_KEY_V1 = "rawlead_feed_prefs"
+FEED_PREFS_KEY_V2 = "rawlead_feed_prefs_v2"
+FEED_PREFS_KEY_V3 = "rawlead_feed_prefs_v3"
+
+
+def clear_feed_prefs_storage(page: Any) -> None:
+    page.evaluate(
+        f"""() => {{
+          localStorage.removeItem({FEED_PREFS_KEY_V1!r});
+          localStorage.removeItem({FEED_PREFS_KEY_V2!r});
+          localStorage.removeItem({FEED_PREFS_KEY_V3!r});
+        }}"""
+    )
+
+
+def seed_stuck_feed_prefs_v2(page: Any, source: str = "tg") -> None:
+    """v2 localStorage with stuck exchange filter (FEED-FILTER-TG-STUCK repro)."""
+    page.evaluate(
+        """(source) => {
+          localStorage.setItem('rawlead_feed_prefs_v2', JSON.stringify({
+            sort: 'time', min_match: 80, category: '', source, sources: [source],
+            updated_at: '2020-01-01T00:00:00.000Z'
+          }));
+          localStorage.removeItem('rawlead_feed_prefs_v3');
+        }""",
+        source,
+    )
+
+
+def seed_stuck_feed_prefs_v3(page: Any, source: str = "tg") -> None:
+    page.evaluate(
+        """(source) => {
+          localStorage.setItem('rawlead_feed_prefs_v3', JSON.stringify({
+            sort: 'time', min_match: 80, category: '', source, sources: [source],
+            updated_at: new Date().toISOString()
+          }));
+        }""",
+        source,
+    )
+
+
+def wait_feed_prefs_ready(page: Any, timeout_ms: int = 60_000) -> None:
+    page.wait_for_selector('[data-feed-prefs-ready="1"]', timeout=timeout_ms)
+
+
+def assert_no_tg_source_filter(page: Any) -> None:
+    main = page.locator(FEED_APP)
+    sources = main.get_attribute("data-feed-sources") or ""
+    if "tg" in [s for s in sources.split(",") if s]:
+        raise AssertionError(f"TG filter active in data-feed-sources: {sources!r}")
+    pill = page.locator('[data-testid="feed-source-pill"]')
+    if pill.count() and "Telegram" in (pill.inner_text() or ""):
+        raise AssertionError("Telegram pill visible in filter bar")
+    dropdown = page.locator('[data-testid="feed-filter-dropdown"]')
+    if dropdown.count() and dropdown.get_attribute("data-active") == "1":
+        raise AssertionError("feed-filter-dropdown inverted (source filter active)")
+
+
+def open_feed_filter_dropdown(page: Any) -> None:
+    page.locator('[data-testid="feed-filter-dropdown"]').click()
+    page.wait_for_selector('[data-testid="feed-sort-panel"]', state="visible", timeout=10_000)
+
+
+def reset_feed_filter_dropdown(page: Any) -> None:
+    open_feed_filter_dropdown(page)
+    reset_btn = page.locator('[data-testid="feed-sort-panel"] button:has-text("Сбросить")')
+    if reset_btn.count():
+        reset_btn.first.click()
+        page.wait_for_timeout(400)
+    else:
+        page.keyboard.press("Escape")
+
+
+def toggle_dropdown_source(page: Any, slug: str) -> None:
+    open_feed_filter_dropdown(page)
+    page.locator(f'[data-testid="dropdown-src-{slug}"]').click()
+    page.locator('[data-testid="feed-sort-panel"] button:has-text("Применить")').click()
+    page.wait_for_timeout(400)
+
+
+def assert_source_pill_contains(page: Any, label: str) -> None:
+    pill = page.locator('[data-testid="feed-source-pill"]')
+    if not pill.count():
+        raise AssertionError(f"feed-source-pill missing, expected {label!r}")
+    text = pill.inner_text() or ""
+    if label not in text:
+        raise AssertionError(f"feed-source-pill {text!r} does not contain {label!r}")
 
 
 def open_mobile_filter_sheet(page: Any) -> None:
@@ -280,8 +392,7 @@ def apply_mobile_sheet(page: Any) -> None:
     page.wait_for_timeout(900)
 
 
-def expand_card_at(page: Any, index: int = 0) -> Any:
-    card = page.locator(FEED_CARD).nth(index)
+def expand_card_element(page: Any, card: Any) -> Any:
     card.scroll_into_view_if_needed()
     title = card.locator("h3").first
     if title.count():
@@ -294,7 +405,115 @@ def expand_card_at(page: Any, index: int = 0) -> Any:
             return card
         card.click(force=True)
         page.wait_for_timeout(250)
-    raise RuntimeError(f"feed card {index} did not expand")
+    lid = card.get_attribute("data-id") or "?"
+    raise RuntimeError(f"feed card {lid} did not expand")
+
+
+def expand_card_at(page: Any, index: int = 0) -> Any:
+    card = page.locator(FEED_CARD).nth(index)
+    return expand_card_element(page, card)
+
+
+def _maybe_load_more_feed(page: Any) -> None:
+    more = page.locator(FEED_LOAD_MORE)
+    if more.count() and more.is_visible():
+        more.click()
+        page.wait_for_timeout(2500)
+
+
+def expand_card_by_lead_id(page: Any, lead_id: str) -> Any:
+    sel = f'{FEED_CARD}[data-id="{lead_id}"]'
+    for _ in range(8):
+        card = page.locator(sel)
+        if card.count():
+            return expand_card_element(page, card.first)
+        _maybe_load_more_feed(page)
+        page.evaluate(
+            "document.getElementById('rl-feed-list')?.lastElementChild?.scrollIntoView()"
+        )
+        page.wait_for_timeout(800)
+    raise RuntimeError(f"feed card lead {lead_id} not found in DOM")
+
+
+def fetch_me_feed(
+    token: str,
+    *,
+    base_url: str,
+    limit: int = 80,
+    sort: str = "time",
+) -> dict[str, Any]:
+    api = api_base_for_site(base_url)
+    url = f"{api.rstrip('/')}/v1/me/feed?limit={limit}&sort={sort}"
+    req = Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "RawLeadNextE2E/1.0",
+        },
+    )
+    try:
+        with urlopen(req, timeout=45) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            return body if isinstance(body, dict) else {}
+    except HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")[:300]
+        raise RuntimeError(f"me/feed HTTP {exc.code}: {raw}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"me/feed failed: {exc}") from exc
+
+
+def lead_ids_pass_draft_gate(items: list[dict[str, Any]]) -> list[str]:
+    """PA-5b / _lead_in_user_feed(min_match=0): keyword_match must be > 0."""
+    out: list[str] = []
+    for item in items:
+        km = item.get("keyword_match")
+        if km is None:
+            continue
+        try:
+            if int(km) <= 0:
+                continue
+        except (TypeError, ValueError):
+            continue
+        lid = item.get("id")
+        if lid is not None:
+            out.append(str(lid))
+    return out
+
+
+def draftable_lead_ids_for_e2e(
+    token: str,
+    *,
+    base_url: str,
+    need: int = 2,
+    min_need: int | None = None,
+    prefer_high_match: bool = False,
+) -> list[str]:
+    feed = fetch_me_feed(token, base_url=base_url, limit=80)
+    items = feed.get("items") or []
+    gated: list[tuple[int, str]] = []
+    for item in items:
+        km = item.get("keyword_match")
+        if km is None:
+            continue
+        try:
+            km_i = int(km)
+        except (TypeError, ValueError):
+            continue
+        if km_i <= 0:
+            continue
+        lid = item.get("id")
+        if lid is not None:
+            gated.append((km_i, str(lid)))
+    if prefer_high_match:
+        gated.sort(key=lambda pair: pair[0], reverse=True)
+    ids = [lid for _, lid in gated]
+    floor = need if min_need is None else min_need
+    if len(ids) < floor:
+        raise RuntimeError(
+            f"need {floor} leads with keyword_match>0 for draft (PA-5b); "
+            f"API returned {len(ids)}"
+        )
+    return ids[:need]
 
 
 def card_body_visible(card: Any) -> bool:
@@ -596,9 +815,8 @@ def generate_draft_on_card(page: Any, card: Any, *, _retry_429: bool = True) -> 
 
 
 def collapse_draft_panel(card: Any) -> None:
-    btn = card.locator(FEED_DRAFT_COLLAPSE)
-    if btn.count():
-        btn.click()
+    """Collapse draft panel by clicking the card (toggle)."""
+    card.click()
 
 
 def copy_draft(card: Any) -> None:

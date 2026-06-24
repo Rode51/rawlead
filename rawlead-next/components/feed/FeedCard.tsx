@@ -177,6 +177,7 @@ export default function FeedCard({
   const isAnon = feedTier === 'anon'
   const isExpiredTrial = feedTier === 'expired_trial'
   const isPremium = feedTier === 'premium'
+  const hasDraftReady = isPremium && draftDone && !!draftText && !draftGenerating
   const ctaLabel = isAnon
     ? (anonQuizDone ? 'Войти — персональная лента →' : 'Настроить ленту →')
     : isExpiredTrial
@@ -323,15 +324,28 @@ export default function FeedCard({
               </a>
             </p>
           )}
-          <button
-            data-testid="feed-card-cta"
-            data-free-premium-step={freePremiumStep ? '1' : undefined}
-            className={`rl-feed-card__reply-btn w-full h-9 text-[11px] font-bold uppercase tracking-widest border-2 border-[#111010] text-[#111010] bg-white transition-colors duration-150 hover:bg-[#111010] hover:text-white ${draftGenerating ? 'is-generating' : ''} ${freePremiumStep ? 'rl-card-cta--buy-premium' : ''}`}
-            onClick={handleReplyClick}
-            disabled={draftGenerating}
-          >
-            {replyBtnLabel}
-          </button>
+          {hasDraftReady ? (
+            <div
+              data-testid="feed-card-cta"
+              className="rl-badge rl-badge--replied rl-card-cta--replied-slot"
+              role="button"
+              tabIndex={0}
+              onClick={e => { e.stopPropagation(); onToggle() }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
+            >
+              Отклик ✓
+            </div>
+          ) : (
+            <button
+              data-testid="feed-card-cta"
+              data-free-premium-step={freePremiumStep ? '1' : undefined}
+              className={`rl-feed-card__reply-btn w-full min-h-9 text-[11px] font-bold uppercase tracking-widest border-2 border-[#111010] text-[#111010] bg-white transition-colors duration-150 hover:bg-[#111010] hover:text-white ${draftGenerating ? 'is-generating' : ''} ${freePremiumStep ? 'rl-card-cta--buy-premium' : ''}`}
+              onClick={handleReplyClick}
+              disabled={draftGenerating}
+            >
+              {replyBtnLabel}
+            </button>
+          )}
         </div>
       </div>
 
@@ -370,11 +384,11 @@ export default function FeedCard({
               style={{ color: '#9B9B97' }}
               onClick={e => e.stopPropagation()}
             >
-              Читать на бирже ↗
+              Открыть на {SOURCE_LABEL[item.source] ?? 'бирже'} ↗
             </a>
           )}
 
-          {isPremium && (draftOpen || draftGenerating) && (
+          {isPremium && (draftOpen || draftGenerating || (draftDone && !!draftText)) && (
             <div className="mt-4 pt-4 border-t border-[#EAEAE6]" data-testid="feed-draft-panel">
               {draftGenerating ? (
                 <div className="rl-feed-card__draft-skeleton flex flex-col gap-2">
@@ -386,7 +400,7 @@ export default function FeedCard({
               ) : draftText ? (
                 <>
                   <p
-                    className="rl-feed-card__reply text-[14px] leading-relaxed mb-3 whitespace-pre-wrap"
+                    className="rl-feed-card__reply select-text text-[14px] leading-relaxed mb-3 whitespace-pre-wrap"
                     data-testid="feed-draft-text"
                     data-reply-text
                   >
@@ -400,14 +414,6 @@ export default function FeedCard({
                       className="h-8 px-3 text-[11px] font-bold border-2 border-[#111010] bg-white"
                     >
                       {copied ? 'Скопировано' : 'Копировать'}
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="feed-draft-collapse"
-                      onClick={() => setDraftOpen(false)}
-                      className="h-8 px-3 text-[11px] font-bold border-2 border-[#111010] bg-[#F5F4F0]"
-                    >
-                      Свернуть
                     </button>
                   </div>
                 </>

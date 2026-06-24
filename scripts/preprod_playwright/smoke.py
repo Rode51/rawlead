@@ -40,6 +40,44 @@ def _scenario(name: str, fn) -> dict:
         return {"name": name, "pass": False, "ms": ms, "error": str(exc)}
 
 
+def _is_next_feed(page) -> bool:
+    return page.locator('[data-testid="feed-app"]').count() > 0
+
+
+def _is_next_cabinet(page) -> bool:
+    return page.locator("#rl-cabinet-app").count() > 0
+
+
+def _assert_no_feed_error(page, *, next_site: bool) -> None:
+    if next_site:
+        app = page.locator('[data-testid="feed-app"]')
+        if app.count():
+            text = (app.inner_text() or "")[:400]
+            if "не удалось загрузить ленту" in text.casefold():
+                raise RuntimeError(f"feed error: {text[:200]}")
+        return
+    err = feed_ui.feed_error_visible(page)
+    if err:
+        raise RuntimeError(f"feed error banner: {err[:200]}")
+
+
+def _wait_feed_ready(page, *, next_site: bool, timeout_ms: int) -> None:
+    if next_site:
+        page.wait_for_function(
+            """() => {
+              const cards = document.querySelectorAll('[data-testid="feed-card"]');
+              if (cards.length > 0) return true;
+              const loading = document.querySelector('.animate-pulse');
+              if (loading) return false;
+              const txt = document.body.innerText || '';
+              return txt.includes('Пока нет заказов');
+            }""",
+            timeout=timeout_ms,
+        )
+        return
+    page.wait_for_selector(feed_ui.FEED_READY, timeout=timeout_ms)
+
+
 def run_smoke(base_url: str, headless: bool, timeout_ms: int) -> list[dict]:
     from playwright.sync_api import sync_playwright
 
@@ -58,49 +96,62 @@ def run_smoke(base_url: str, headless: bool, timeout_ms: int) -> list[dict]:
         def s1_lenta_loads() -> None:
             page.goto(f"{base}/lenta/", wait_until="domcontentloaded")
             page.wait_for_selector('[data-rl-app="feed"]', state="visible")
-            err = page.locator("#rl-feed-error:not([hidden])")
-            if err.count() and err.is_visible():
-                raise RuntimeError(f"feed error banner: {err.inner_text()[:200]}")
-            # карточки или empty — оба ок
-            page.wait_for_selector(
-                feed_ui.FEED_READY,
-                timeout=timeout_ms,
-            )
+            next_site = _is_next_feed(page)
+            _assert_no_feed_error(page, next_site=next_site)
+            _wait_feed_ready(page, next_site=next_site, timeout_ms=timeout_ms)
 
         def s2_multi_category() -> None:
             page.goto(f"{base}/lenta/", wait_until="domcontentloaded")
-            page.wait_for_selector("#filter-category-design", state="visible")
-            before = page.locator("#rl-feed-list .rl-lead-card").count()
-            page.locator("#filter-category-design input").check(force=True)
-            page.wait_for_timeout(800)
-            meta = page.locator(feed_ui.FEED_META)
-            if meta.count():
-                text = meta.inner_text()
+            page.wait_for_selector('[data-rl-app="feed"]', state="visible")
+            next_site = _is_next_feed(page)
+            _wait_feed_ready(page, next_site=next_site, timeout_ms=timeout_ms)
+            if next_site:
+                page.locator('[data-testid="feed-cat-design"]').click()
+                page.wait_for_timeout(1000)
             else:
-                text = ""
-            if "ошиб" in text.casefold():
-                raise RuntimeError(f"count after category: {text}")
-            # сеть могла вернуть 0 — допустимо, главное без error banner
-            err = page.locator("#rl-feed-error:not([hidden])")
-            if err.count() and err.is_visible():
-                raise RuntimeError("error after category filter")
-            _ = before  # noqa: F841 — для отладки владельца
+                page.wait_for_selector("#filter-category-design", state="visible")
+                page.locator("#filter-category-design input").check(force=True)
+                page.wait_for_timeout(800)
+                meta = page.locator(feed_ui.FEED_META)
+                if meta.count():
+                    text = meta.inner_text()
+                    if "ошиб" in text.casefold():
+                        raise RuntimeError(f"count after category: {text}")
+            _assert_no_feed_error(page, next_site=next_site)
 
         def s3_skills_apply() -> None:
             page.goto(f"{base}/lenta/", wait_until="domcontentloaded")
-            page.wait_for_selector(feed_ui.FEED_READY, timeout=timeout_ms)
+            page.wait_for_selector('[data-rl-app="feed"]', state="visible")
+            next_site = _is_next_feed(page)
+            _wait_feed_ready(page, next_site=next_site, timeout_ms=timeout_ms)
+            if next_site:
+                return  # Next: навыки через квиз, не filter bar (anon smoke)
             if feed_ui.is_filter_locked(page, "skills"):
-                return  # anon: locked — ожидаемо
+                return
+            if not page.locator(feed_ui.SKILLS_TRIGGER).count():
+                return
             feed_ui.open_skills_modal(page)
             feed_ui.pick_first_skill_chip(page)
             feed_ui.apply_skills_modal(page)
             page.wait_for_timeout(1000)
-            err = page.locator("#rl-feed-error:not([hidden])")
-            if err.count() and err.is_visible():
-                raise RuntimeError("error after skills apply")
+            _assert_no_feed_error(page, next_site=False)
 
         def s4_cabinet_login_stub() -> None:
             page.goto(f"{base}/cabinet/", wait_until="domcontentloaded")
+            if _is_next_cabinet(page):
+                page.wait_for_function(
+                    """() => {
+                      const app = document.querySelector('#rl-cabinet-app');
+                      const panel = document.querySelector('[data-testid="cabinet-login-panel"]');
+                      const spin = document.querySelector('.animate-spin');
+                      return !!app && !!panel && !spin;
+                    }""",
+                    timeout=timeout_ms,
+                )
+                title = page.locator('[data-testid="cabinet-login-panel"] h1')
+                if not title.count() or "кабинет" not in title.inner_text().casefold():
+                    raise RuntimeError("cabinet login block missing")
+                return
             page.wait_for_selector('[data-rl-app="cabinet"]', state="visible")
             page.wait_for_selector("#rl-cabinet-login", state="visible")
             title = page.locator(".rl-cabinet-login__title")
@@ -110,7 +161,7 @@ def run_smoke(base_url: str, headless: bool, timeout_ms: int) -> list[dict]:
         def s5_no_verdict_chips() -> None:
             page.goto(f"{base}/lenta/", wait_until="domcontentloaded")
             page.wait_for_timeout(1500)
-            cards = page.locator("#rl-feed-list .rl-lead-card")
+            cards = page.locator('#rl-feed-list [data-testid="feed-card"], #rl-feed-list .rl-lead-card')
             n = cards.count()
             if n == 0:
                 return

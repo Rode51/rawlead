@@ -102,7 +102,7 @@
 
 | Что | Политика |
 |-----|----------|
-| `leads` | DELETE старше **7 дней** · `scripts/purge_old_leads.py` |
+| `leads` | DELETE старше **2 дней** · `scripts/purge_old_leads.py` |
 | Delisted | purge через **1 день** (env `DELIST_PURGE_DAYS`) |
 | Users/tags/subs | **не трогаем** |
 | Расписание VPS | systemd `rawlead-purge-leads.timer` **03:15 daily** |

@@ -9,7 +9,7 @@
 | 0 | **Все AI** | [`docs/README.md`](../README.md) — дерево папок `docs/` |
 | 1 | **Все AI** | **Этот файл** (`PROJECT_MAP.md`) — зоны, процессы, «куда идти» |
 | 2 | **Все AI** | Файл роли из таблицы «Кому» ниже — **не** обходить repo наугад |
-| 3 | **Lead Architect** | После приёмки Coder/Mechanic/Product/Design — **обновить эту карту**, если сменились пути, зоны или lock |
+| 3 | **Lead Architect** | После приёмки Coder/Mechanic/Product/Design — **обновить эту карту**, если сменились пути, зоны или lock · **блокер ✅** — `lead-architect.mdc` § **Архитектурный гард** |
 
 **Lead Architect** ведёт чистоту repo: дедуп docs, `git commit` / `git push` (по просьбе владельца). Coder/Mechanic/Designer **не коммитят** без явной просьбы Lead.
 
@@ -24,7 +24,7 @@
 | Мысли / решения владельца | [`architect/OWNER_INTENT.md`](../architect/OWNER_INTENT.md) | чат, дубли в FOR_YOU |
 | Активный план Product | [`product/LEAD_PRODUCT_PROMPT.md`](../product/LEAD_PRODUCT_PROMPT.md) | новый `TZ_*.md` |
 | Активный план Marketing | [`marketing/LEAD_MARKETING_PROMPT.md`](../marketing/LEAD_MARKETING_PROMPT.md) | ads copy в чат |
-| WP → Next handoff (O280) | [`architect/WP_TO_NEXT_HANDOFF.md`](../architect/WP_TO_NEXT_HANDOFF.md) · [`migration/README.md`](../../migration/README.md) | Claude Code **`rawlead-next/`** · до ads |
+| WP → Next handoff (O280) | [`architect/WP_TO_NEXT_HANDOFF.md`](../architect/WP_TO_NEXT_HANDOFF.md) · **cutover ✅** · [`migration/README.md`](../../migration/README.md) |
 | Активный план Portfolio | [`portfolio/LEAD_PORTFOLIO_PROMPT.md`](../portfolio/LEAD_PORTFOLIO_PROMPT.md) · Claude: [`portfolio/CLAUDE_CODE_HANDOFF.md`](../portfolio/CLAUDE_CODE_HANDOFF.md) | P288 legacy · `design/portfolio/refs/` |
 | Задача Coder | [`architect/CODER_PROMPT.md`](../architect/CODER_PROMPT.md) hot · [`archive/CODER_PROMPT_ARCHIVE.md`](../archive/CODER_PROMPT_ARCHIVE.md) | TASKS, чат (только копипаст) |
 | Задача Designer | [`design/DESIGNER_PROMPT.md`](../design/DESIGNER_PROMPT.md) hot · [`archive/DESIGNER_PROMPT_ARCHIVE.md`](../archive/DESIGNER_PROMPT_ARCHIVE.md) | LEAD_DESIGN архив |
@@ -196,6 +196,8 @@ flowchart TB
 | Бот молчит | VPN, proxy, `tg_smoke.py`, `telegram_notify.py` |
 | Биржи FL/Kwork 403, pool exhausted | `exchange_proxy.py`, `exchange_browser_fetch.py`, `.env` proxy URLs |
 | Secondary 0 лидов (YouDo/FR/job/Пчёл) | `youdo_parser.py`, `freelance_*_parser.py`, `pchyol_parser.py` · § **O63-FIX** |
+| **YouDo antibot / detail / click-through** | `youdo_parser.py` (листинг+ingest) · `exchange_browser_fetch.py` (browser RPC) · `scripts/youdo_sticky_worker.py` · `scripts/youdo_fetch_worker.py` · лог `youdo:trace` · карта: `CODE_STRUCTURE.md` § heavy |
+| **YouDo IMAP (mail.ru)** | `src/youdo_imap.py` · `scripts/youdo_imap_poller.py` · `rawlead-youdo-imap.timer` · лог `youdo:imap` |
 | Фильтр / ИИ | `filters.py`, `lead_pipeline.py`, `docs/ops/FILTERS.md` |
 
 ---

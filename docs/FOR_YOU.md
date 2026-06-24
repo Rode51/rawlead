@@ -12,7 +12,8 @@
 | **Картинка M1** | `docs/design/assets/m1-tg-card-v8.png` |
 | **Portfolio** | ✅ https://rode51.ru |
 | **БД prod** | VPS Postgres · локально preprod через tunnel `:15432` |
-| **YouDo** | ⚠️ snippet в ленте · listing `parsed=50` ок · detail ServicePipe P0 |
+| **YouDo** | **✅ IMAP-only** model B deploy · smoke `/lenta/` |
+| **Квиз** | переделка **после** YouDo · код в **стороннем cloud** (ТЗ от product+design) |
 | **Кодинг** | **MiMo `coder`** (основной) → `@lead-architect` verify · Cursor `@coder` — fallback |
 | **Админка** | https://rawlead.ru/ops/ |
 
@@ -34,6 +35,8 @@
 4. «Готово» → снова `@lead-architect` verify + deploy
 
 Подробно: `.cursor/rules/mimo.mdc`
+
+**Экономия токенов (W3 ✅):** `react-best-practices` — **Agent decides** (не always-on). Portfolio: skill вручную при необходимости.
 
 ---
 
@@ -606,6 +609,33 @@ Baseline из лога (уже есть после deploy): `data/tg_funnel_audi
 **Сейчас для гейта:** ✅ закрыт (2026-06-21). Посевы → [`M1_SEEDING_CHECKLIST.md`](team/marketing/M1_SEEDING_CHECKLIST.md).
 
 **Не:** MiMo не гоняет pytest/playwright/load · не деплой · не правит `src/` (только audit agent).
+
+---
+
+## YouDo: почта mail.ru (IMAP) — что сделать тебе
+
+**Решение 2026-06-22:** новые заказы YouDo ловим **из письма**, браузер — только чтобы добрать полное ТЗ. Радар-листинг **не выключаем** пару дней (backup).
+
+### 1. На YouDo
+
+В личном кабинете YouDo включи **email-уведомления о новых заданиях** на **`89500804443@mail.ru`**. Письма попадают в папку **«Рассылки»** (`INBOX/Newsletters` по IMAP) — **не** во «Входящие».
+
+### 2. На Mail.ru — пароль для приложения
+
+✅ App-password создан (имя `rawlead-vps`). **После деплоя на VPS — смени пароль** (он был в чате с AI).
+
+### 3. На VPS — ✅ deploy 2026-06-22
+
+`.env.site` настроен · timer `rawlead-youdo-imap.timer` **active** (каждые ~90s) · bootstrap пропустил старые ~297 писем.
+
+Проверка: `journalctl -u rawlead-youdo-imap -f`
+
+### 4. Проверка (твой smoke)
+
+- Письмо YouDo в «Рассылки» → лог `youdo:imap new_id=…` → заказ в `/lenta/` **с полным описанием из письма** (без браузера, если парсер ок).
+- Listing-радар backup — не трогаем 2–3 дня.
+
+**Для @coder:** probe `data/_youdo_imap_sample.json` (5 последних писем, ids 14886201…).
 
 ---
 

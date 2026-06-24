@@ -115,22 +115,22 @@ Debug с окном браузера: `--headed`
 
 ### S3-pre — лимит соединений Postgres (edge case, **до** k6/load)
 
-**Prod БД:** **Neon Postgres** (`DATABASE_URL`), не Supabase — но лимит **max connections** тот же класс проблем.
+**Prod БД:** **VPS Postgres** (`DATABASE_URL` → `127.0.0.1:5432` на VPS), не Neon.
 
 **Как сейчас в коде:** `NeonLeadStorage.connection()` → **`psycopg.connect()` на каждый запрос** без app-level pool (`src/pg_storage.py`). 50 воркеров = до **50 одновременных** сессий к Postgres.
 
 | Симптом при перегрузе | Значение |
 |-----------------------|----------|
 | p95 **> 5000 ms**, рост 502 от nginx | connection starvation / DB reject |
-| `too many connections` · `53300` · `42P05` | лимит Neon исчерпан |
+| `too many connections` · `53300` · `42P05` | лимит `max_connections` Postgres |
 | 5xx **> 1%** только под нагрузкой | не «медленный API», а **DB pool** |
 
 **Перед запуском S3 (checklist):**
 
 | # | Проверка |
 |---|----------|
-| 1 | **`DATABASE_URL`** на VPS — **pooler** Neon (host `*-pooler.*` или порт **6543**), не direct при 50 VU. См. Neon dashboard → Connection pooling. **Проверка:** `python scripts/check_neon_pooler.py` (локально/VPS env) · в логе `rawlead-api` startup: `db: pooler`. |
-| 2 | Если только direct URL — **снизить** load: `--workers 15–20` или k6 `VUS=20`, не 50 с первого раза. |
+| 1 | **`DATABASE_URL`** на VPS — localhost Postgres · `postgresql://rawlead@127.0.0.1:5432/rawlead` · **не** `*.neon.tech`. |
+| 2 | Локальный preprod — SSH tunnel `:15432` · см. [`PREPROD_ACCOUNTS.md`](PREPROD_ACCOUNTS.md) § 1b. |
 | 3 | **Ramp-up:** 2 мин × 10 VU → 3 мин × 30 → 5 мин × 50 (k6 stages или два прогона `preprod_load_feed.py`). |
 | 4 | Во время прогона: `journalctl -u rawlead-api -n 50` — нет лавины `psycopg` / `connection` / `53300`. |
 | 5 | **→ Coder backlog (O129):** app-level pool или `psycopg_pool` + cap; до фикса — жёсткий ceiling VU в runbook. |
@@ -215,7 +215,7 @@ k6 run -e API_URL=https://api.rawlead.ru -e VUS=50 -e DURATION=5m scripts/prepro
 1. DNS + certbot + WP theme (владелец)
 2. preprod_ai_matrix.py          → S1 (+ S1-b когда Coder)
 3. preprod_playwright/smoke.py   → S2
-4. S3-pre: Neon pooler / ramp    → затем k6 или load
+4. S3-pre: VPS Postgres / ramp    → затем k6 или load
 5. radar_site.log (S4-pre прокси) → S4
 6. глазами S5–S6–S6-b            → владелец
 ```
@@ -304,7 +304,7 @@ cd C:\Users\hramo\uisness
 
 ## Wave 2 — O129 (Coder)
 
-**Pre-gate O131-PERF (owner, до полного rerun):** deploy § O131 в `CODER_PROMPT.md` · Neon **pooler** на VPS · затем Wave 2 gates ниже.
+**Pre-gate O131-PERF (owner, до полного rerun):** deploy § O131 в `CODER_PROMPT.md` · VPS Postgres · затем Wave 2 gates ниже.
 
 Полная симуляция: тиры × draft burst × TZ × **timings JSON** × parser snapshot. § **O129-STRESS-V2** в `CODER_PROMPT.md`.
 
@@ -380,7 +380,7 @@ cd C:\Users\hramo\uisness
 | JSON | `data/preprod_quiz_e2e.json` |
 | Screenshots (fail) | `data/preprod_quiz_e2e/` |
 
-**Env:** `RAWLEAD_PREPROD_ACCESS_TOKEN` · `RAWLEAD_MONICA_TOKEN` · opt. `DATABASE_URL` (Neon j3)
+**Env:** `RAWLEAD_PREPROD_ACCESS_TOKEN` · `RAWLEAD_MONICA_TOKEN` · opt. `DATABASE_URL` (VPS Postgres j3)
 
 ---
 

@@ -14,7 +14,7 @@ export default function AnnouncementBar() {
   }, [])
 
   const ITEMS = [
-    { text: stat ? `Радар онлайн · ${stat} лидов за неделю` : 'Радар онлайн', cta: true },
+    { text: stat ? `Радар онлайн · ${stat} лидов за 2 дня` : 'Радар онлайн', cta: true },
     { text: 'Агрегатор фриланс-бирж RawLead', cta: false },
     { text: 'Поиск заказов для Python · FastAPI · WordPress · Design', cta: false },
   ]

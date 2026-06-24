@@ -39,6 +39,7 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 _PLAYWRIGHT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_PLAYWRIGHT_DIR))
 import feed_ui  # noqa: E402
+import next_ui as nui  # noqa: E402
 
 _DEFAULT_STORAGE = _ROOT / "data" / "preprod_playwright" / "storage_state.json"
 _ARTIFACT_DIR = _ROOT / "data" / "preprod_ux_journey"
@@ -206,6 +207,18 @@ def _launch_playwright_context(
     raise ValueError(f"unknown browser: {browser_name}")
 
 
+def _home_is_next(page: Any) -> bool:
+    return page.locator('[data-testid="header-logo"]').count() > 0
+
+
+def _site_is_next(page: Any) -> bool:
+    return _home_is_next(page)
+
+
+def _feed_is_next(page: Any) -> bool:
+    return page.locator(nui.FEED_APP).count() > 0
+
+
 @dataclass
 class JourneyCtx:
     base: str
@@ -213,6 +226,7 @@ class JourneyCtx:
     profile_auth: bool = False
     allow_manual_login: bool = False
     is_mobile: bool = False
+    access_token: str | None = None
     console_errors: list[str] = field(default_factory=list)
     network_failures: list[dict[str, Any]] = field(default_factory=list)
     findings: list[dict[str, Any]] = field(default_factory=list)
@@ -238,6 +252,8 @@ def _attach_observers(ctx: JourneyCtx) -> None:
             text = msg.text or ""
             if "favicon" in text.casefold():
                 return
+            if nui._benign_console_error(text):
+                return
             ctx.console_errors.append(f"[{msg.type}] {text}")
 
     def on_response(response: Any) -> None:
@@ -245,9 +261,11 @@ def _attach_observers(ctx: JourneyCtx) -> None:
         if status < 400:
             return
         url = response.url
+        if status == 404 and any(x in url for x in nui._BENIGN_HTTP_404_PARTS):
+            return
         if not any(
             x in url
-            for x in ("/wp-json/rawlead", "api.rawlead", "/v1/feed", "/v1/skills")
+            for x in ("/wp-json/rawlead", "api.rawlead", "/v1/feed", "/v1/skills", "/v1/me")
         ):
             return
         ctx.network_failures.append(
@@ -296,6 +314,14 @@ def _goto_lenta(ctx: JourneyCtx) -> None:
 def _lenta_fresh(ctx: JourneyCtx, *, is_mobile: bool = False) -> None:
     """Lenta load with filters reset (J3 design+skills must not leak into J4+)."""
     _goto_lenta(ctx)
+    if _feed_is_next(ctx.page):
+        if is_mobile:
+            nui.open_mobile_filter_sheet(ctx.page)
+            ctx.page.locator('[data-testid="sheet-cat-all"]').click()
+            nui.apply_mobile_sheet(ctx.page)
+        else:
+            nui.click_category(ctx.page, "")
+        return
     feed_ui.reset_feed_filters(ctx.page, is_mobile=is_mobile)
 
 
@@ -332,6 +358,9 @@ def _wait_feed_logged_in(ctx: JourneyCtx) -> None:
 
 
 def _wait_effective_access(ctx: JourneyCtx) -> None:
+    if _site_is_next(ctx.page):
+        nui.wait_feed_tier(ctx.page, "premium", timeout_ms=60_000)
+        return
     try:
         ctx.page.wait_for_function(
             """
@@ -376,6 +405,13 @@ def _card_match_percent(card: Any) -> int:
 
 def _ensure_feed_draft_ready(ctx: JourneyCtx) -> None:
     """Вход + paid → карточки с кнопкой «Написать отклик» (O61: km=0 OK)."""
+    if _site_is_next(ctx.page):
+        if not ctx.access_token:
+            raise RuntimeError("RAWLEAD_PREPROD_ACCESS_TOKEN required for draft journeys")
+        nui.bootstrap_preprod_feed(ctx.page, ctx.base, ctx.access_token, timeout_ms=60_000)
+        nui.draftable_lead_ids_for_e2e(ctx.access_token, base_url=ctx.base, need=1)
+        nui.wait_feed_card_count(ctx.page, 1, timeout_ms=60_000)
+        return
     _wait_feed_logged_in(ctx)
     feed_ui.reset_feed_filters(ctx.page, is_mobile=ctx.is_mobile)
     _wait_effective_access(ctx)
@@ -536,6 +572,28 @@ def _run_journey(
 
 def j1_home(ctx: JourneyCtx) -> None:
     ctx.page.goto(f"{ctx.base}/", wait_until="domcontentloaded")
+    if _home_is_next(ctx.page):
+        ctx.page.wait_for_selector('[data-testid="hero-cta-lenta"]', state="visible")
+        ctx.page.wait_for_function(
+            """
+            () => {
+              const articles = document.querySelectorAll('main article');
+              if (articles.length < 3) return false;
+              let withPct = 0;
+              articles.forEach(function (c) {
+                if (/\\d+\\s*%/.test(c.innerText || '')) withPct++;
+              });
+              return withPct >= 3;
+            }
+            """,
+            timeout=30_000,
+        )
+        with ctx.page.expect_navigation():
+            ctx.page.locator('[data-testid="hero-cta-lenta"]').click()
+        if "/lenta" not in ctx.page.url:
+            raise RuntimeError(f"expected /lenta/, got {ctx.page.url}")
+        return
+
     ctx.page.wait_for_selector(".rl-hero", state="visible")
     preview = ctx.page.locator("#rl-live-preview-cards")
     preview.wait_for(state="visible")
@@ -579,6 +637,20 @@ def j2_lenta_load(ctx: JourneyCtx) -> None:
 
 def j3_filters(ctx: JourneyCtx) -> None:
     _goto_lenta(ctx)
+    if _feed_is_next(ctx.page):
+        if ctx.is_mobile:
+            nui.open_mobile_filter_sheet(ctx.page)
+            ctx.page.locator('[data-testid="sheet-cat-design"]').click()
+            nui.apply_mobile_sheet(ctx.page)
+        else:
+            nui.click_category(ctx.page, "design")
+        app = ctx.page.locator(nui.FEED_APP)
+        if app.count():
+            text = (app.inner_text() or "")[:400]
+            if "не удалось загрузить ленту" in text.casefold():
+                raise RuntimeError(f"feed error: {text[:200]}")
+        return
+
     ctx.page.locator("#filter-category-design input").check(force=True)
     ctx.page.wait_for_timeout(1200)
     count_text = (
@@ -598,6 +670,23 @@ def j3_filters(ctx: JourneyCtx) -> None:
 
 def j4_card_expand(ctx: JourneyCtx) -> None:
     _lenta_fresh(ctx, is_mobile=ctx.is_mobile)
+    if _feed_is_next(ctx.page):
+        card = nui.expand_card_at(ctx.page, 0)
+        if not nui.card_body_visible(card):
+            raise RuntimeError("task_summary section missing in expanded card")
+        link = card.locator("a", has_text=re.compile("Читать на бирже"))
+        if not link.count() or not link.first.is_visible():
+            raise RuntimeError("«Читать на бирже» not visible")
+        title = card.locator("h3").first
+        if title.count():
+            title.click()
+        else:
+            card.click()
+        ctx.page.wait_for_timeout(400)
+        if nui.card_body_visible(card):
+            raise RuntimeError("card did not collapse")
+        return
+
     card = ctx.page.locator("#rl-feed-list .rl-lead-card[data-id]").first
     card.wait_for(state="visible")
     feed_ui.expand_card(card, ctx.page)
@@ -615,6 +704,26 @@ def j4_card_expand(ctx: JourneyCtx) -> None:
 
 
 def j5_draft_twice(ctx: JourneyCtx) -> None:
+    if _site_is_next(ctx.page):
+        if not ctx.access_token:
+            raise RuntimeError("RAWLEAD_PREPROD_ACCESS_TOKEN required for J5")
+        nui.bootstrap_preprod_feed(ctx.page, ctx.base, ctx.access_token, timeout_ms=60_000)
+        lead_ids = nui.draftable_lead_ids_for_e2e(
+            ctx.access_token, base_url=ctx.base, need=2, prefer_high_match=True
+        )
+        for idx, lid in enumerate(lead_ids[:2]):
+            if idx == 1:
+                # n16 parity: stay on feed, cooldown between drafts (no full reload)
+                ctx.page.wait_for_timeout(35_000)
+            card = nui.expand_card_by_lead_id(ctx.page, lid)
+            text = nui.generate_draft_on_card(ctx.page, card)
+            if len(text) < 40:
+                raise RuntimeError(f"draft too short: {len(text)}")
+            card.click()
+            ctx.page.wait_for_timeout(400)
+            ctx.add_finding("info", f"draft {idx + 1}/2 OK (lead {lid})", journey="J5")
+        return
+
     _ensure_feed_draft_ready(ctx)
     cards = _cards_with_reply_btn(ctx)
     if len(cards) < 2:
@@ -652,6 +761,36 @@ def j5_draft_twice(ctx: JourneyCtx) -> None:
 
 
 def j6_draft_collapse(ctx: JourneyCtx) -> None:
+    if _site_is_next(ctx.page):
+        if not ctx.access_token:
+            raise RuntimeError("RAWLEAD_PREPROD_ACCESS_TOKEN required for J6")
+        nui.bootstrap_preprod_feed(ctx.page, ctx.base, ctx.access_token, timeout_ms=60_000)
+        lead_ids = nui.draftable_lead_ids_for_e2e(
+            ctx.access_token, base_url=ctx.base, need=1
+        )
+        card = nui.expand_card_by_lead_id(ctx.page, lead_ids[0])
+        nui.generate_draft_on_card(ctx.page, card)
+        nui.collapse_draft_panel(card)
+        title = card.locator("h3").first
+        if title.count():
+            title.click()
+        ctx.page.wait_for_timeout(400)
+        if nui.card_body_visible(card):
+            nui.collapse_draft_panel(card)
+            if title.count():
+                title.click()
+            ctx.page.wait_for_timeout(400)
+        if nui.card_body_visible(card):
+            raise RuntimeError("expected collapsed card before re-expand")
+        if title.count():
+            title.click()
+        else:
+            card.click()
+        ctx.page.wait_for_timeout(500)
+        if not nui.card_body_visible(card):
+            raise RuntimeError("card body not visible after re-expand")
+        return
+
     _ensure_feed_draft_ready(ctx)
     card = ctx.page.locator(
         "#rl-feed-list .rl-lead-card[data-id]:has([data-reply-text])"
@@ -675,8 +814,34 @@ def j6_draft_collapse(ctx: JourneyCtx) -> None:
     card.locator(feed_ui.CARD_FRONT_BODY).first.wait_for(state="visible", timeout=15_000)
 
 
+def _clear_auth_storage(page: Any) -> None:
+    page.evaluate(
+        """() => {
+          try {
+            localStorage.removeItem('rawlead_access_token');
+            document.cookie = 'rl_access=; path=/; max-age=0; SameSite=Lax';
+          } catch (e) {}
+        }"""
+    )
+
+
 def j7_cabinet_anon(ctx: JourneyCtx) -> None:
     ctx.page.goto(f"{ctx.base}/cabinet/", wait_until="domcontentloaded")
+    try:
+        ctx.page.wait_for_selector("#rl-cabinet-app", timeout=15_000)
+        ctx.page.wait_for_function(
+            """() => {
+              const app = document.querySelector('#rl-cabinet-app');
+              const panel = document.querySelector('[data-testid="cabinet-login-panel"]');
+              const spin = document.querySelector('.animate-spin');
+              return !!app && !!panel && !spin;
+            }""",
+            timeout=60_000,
+        )
+        return
+    except Exception:
+        pass
+
     ctx.page.wait_for_selector('[data-rl-app="cabinet"]', state="visible")
     ctx.page.wait_for_selector("#rl-cabinet-login", state="visible")
     title = ctx.page.locator(".rl-cabinet-login__title").inner_text().casefold()
@@ -688,6 +853,34 @@ def j7_cabinet_anon(ctx: JourneyCtx) -> None:
 
 
 def j8_cabinet_logged(ctx: JourneyCtx) -> None:
+    if ctx.access_token:
+        nui.inject_token(ctx.page, ctx.access_token, base=ctx.base)
+        nui.goto_path(ctx.page, ctx.base, "/cabinet/")
+        try:
+            ctx.page.wait_for_function(
+                """() => {
+                  const app = document.querySelector('#rl-cabinet-app');
+                  const panel = document.querySelector('[data-testid="cabinet-login-panel"]');
+                  const spin = document.querySelector('.animate-spin');
+                  return !!app && !panel && !spin;
+                }""",
+                timeout=45_000,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                "PREPROD cabinet auth failed — refresh RAWLEAD_PREPROD_ACCESS_TOKEN in .env.site"
+            ) from exc
+        if not ctx.page.get_by_role("heading", name="Мои отклики").count():
+            raise RuntimeError("cabinet inbox section missing")
+        cards = ctx.page.locator("article")
+        if cards.count():
+            cards.first.click()
+            ctx.page.wait_for_timeout(800)
+            body = cards.first.locator('[data-reply-text], p')
+            if not body.count():
+                raise RuntimeError("inbox card did not expand")
+        return
+
     _wait_feed_logged_in(ctx)
     ctx.page.goto(f"{ctx.base}/cabinet/", wait_until="domcontentloaded")
     ctx.page.wait_for_selector('[data-rl-app="cabinet"]', state="visible", timeout=30_000)
@@ -730,6 +923,12 @@ def j9_marketing(ctx: JourneyCtx) -> None:
             raise RuntimeError(f"{path} HTTP {resp.status}")
         ctx.page.wait_for_load_state("domcontentloaded")
     ctx.page.goto(f"{ctx.base}/", wait_until="domcontentloaded")
+    if _home_is_next(ctx.page):
+        for testid in ("how", "pricing", "faq", "contact"):
+            link = ctx.page.locator(f'[data-testid="footer-link-{testid}"]')
+            if not link.count():
+                raise RuntimeError(f"footer link missing: {testid}")
+        return
     for label, path in (
         ("Как работает", "/how"),
         ("Тарифы", "/pricing"),
@@ -800,6 +999,21 @@ def _has_auth(*, browser_name: str = "chromium", storage_state: Path | None = No
 
 def j11_fab(ctx: JourneyCtx) -> None:
     _goto_lenta(ctx)
+    if _feed_is_next(ctx.page):
+        fab = ctx.page.locator(nui.SUPPORT_FAB)
+        fab.wait_for(state="visible")
+        fab.click()
+        ctx.page.wait_for_timeout(400)
+        backdrop = ctx.page.locator("div.fixed.inset-0.z-40")
+        if backdrop.count():
+            backdrop.first.click(force=True)
+        else:
+            fab.click()
+        ctx.page.wait_for_timeout(500)
+        if fab.get_attribute("class") and "rl-support-fab--open" in (fab.get_attribute("class") or ""):
+            raise RuntimeError("support modal did not close on overlay tap")
+        return
+
     fab = ctx.page.locator("#rl-support-fab")
     fab.wait_for(state="visible")
     fab.click()
@@ -829,6 +1043,11 @@ JOURNEYS: dict[str, tuple[str, str, Callable[[JourneyCtx], None]]] = {
     "J10": ("Mobile 390", "critical", j10_mobile_feed),
     "J11": ("FAB support", "critical", j11_fab),
 }
+
+# J7 anon before init-script auth is used for J5/J6/J8 (Next.js).
+_DESKTOP_JOURNEY_ORDER = (
+    "J1", "J2", "J3", "J4", "J7", "J9", "J5", "J6", "J8", "J11",
+)
 
 
 def _write_markdown(report: dict[str, Any], path: Path) -> None:
@@ -885,7 +1104,7 @@ def run_journeys(
             headless=headless,
             viewport=vp,
             storage_state=storage_state,
-            access_token=access_token,
+            access_token=None,
         )
         page = context.pages[0] if context.pages else context.new_page()
         page.set_default_timeout(timeout_ms)
@@ -896,6 +1115,7 @@ def run_journeys(
             in ("yandex-profile", "yandex-cdp", "cdp", "dolphin-cdp"),
             allow_manual_login=not headless,
             is_mobile=mobile,
+            access_token=access_token,
         )
         _attach_observers(ctx)
         has_auth = _has_auth(browser_name=browser_name, storage_state=storage_state) or bool(
@@ -910,7 +1130,7 @@ def run_journeys(
         elif mobile:
             journey_keys = ["J10"]
         else:
-            journey_keys = [k for k in journey_keys if k != "J10"]
+            journey_keys = [k for k in _DESKTOP_JOURNEY_ORDER if k in JOURNEYS]
         if not has_auth and not headless:
             ctx.add_finding(
                 "warn",

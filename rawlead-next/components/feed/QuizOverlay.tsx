@@ -15,7 +15,7 @@ interface Props {
   onLoginNeeded: () => void
 }
 
-type QuizStep = 'intro' | 'quiz' | 'done' | 'error'
+type QuizStep = 'intro' | 'quiz' | 'done' | 'insufficient' | 'error'
 
 export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
   const auth = useAuth()
@@ -35,7 +35,9 @@ export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
     metrikaGoal('quiz_start')
     try {
       const res = await quizApi.start()
-      if (res.done || !res.card) {
+      if (res.done && !res.profile) {
+        setStep('insufficient')
+      } else if (res.done || !res.card) {
         setStep('done')
       } else {
         setCard(res.card)
@@ -88,8 +90,8 @@ export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
       const res = await quizApi.next(newHistory)
       if (res.done && res.profile) {
         await finishQuiz(res.profile)
-      } else if (res.done) {
-        setStep('done')
+      } else if (res.done && !res.profile) {
+        setStep('insufficient')
       } else if (res.card) {
         setCard(res.card)
       } else {
@@ -251,6 +253,28 @@ export default function QuizOverlay({ onClose, onLoginNeeded }: Props) {
               {errorMsg && (
                 <p className="text-[12px] text-red-600 text-center">{errorMsg}</p>
               )}
+            </div>
+          )}
+
+          {step === 'insufficient' && (
+            <div id="rl-quiz-insufficient" data-testid="quiz-insufficient" className="flex flex-col gap-5">
+              <div>
+                <h2 className="font-display font-black text-[20px] text-[#111010] mb-2 leading-tight">
+                  Слишком мало данных — ответь ещё на несколько карточек
+                </h2>
+                <p className="text-[14px] text-[#6B6B6B] leading-relaxed">
+                  Нам нужно чуть больше сигналов, чтобы настроить ленту под твой профиль.
+                </p>
+              </div>
+              <button
+                type="button"
+                data-testid="quiz-retry"
+                onClick={() => void startQuiz()}
+                disabled={loading}
+                className="h-12 px-6 font-black text-[13px] uppercase tracking-wider text-white bg-[#111010] border-2 border-[#111010] hover:bg-[#333] transition-colors disabled:opacity-60"
+              >
+                {loading ? 'Загружаем…' : 'Попробовать ещё'}
+              </button>
             </div>
           )}
 

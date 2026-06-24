@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>RawLead — FL.ru Cover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@900&family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1200px;
+    height: 800px;
+    overflow: hidden;
+    background: #F5F4F0;
+    font-family: 'Manrope', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .canvas {
+    width: 1200px;
+    height: 800px;
+    border: 2px solid #111010;
+    display: grid;
+    grid-template-columns: 520px 1fr;
+    grid-template-rows: 1fr 64px;
+    position: relative;
+  }
+
+  /* ─── LEFT HERO PANEL ─── */
+  .hero {
+    background: #FACC15;
+    border-right: 2px solid #111010;
+    position: relative;
+    overflow: hidden;
+    padding: 52px 48px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    grid-row: 1;
+  }
+
+  /* Grid overlay */
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.07;
+    background-image:
+      linear-gradient(#111010 1px, transparent 1px),
+      linear-gradient(90deg, #111010 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+
+  .hero-top {
+    position: relative;
+  }
+
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+
+  .eyebrow-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #111010;
+    flex-shrink: 0;
+  }
+
+  .eyebrow-text {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 900;
+    font-size: 10px;
+    color: #111010;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .h1 {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 900;
+    font-size: 58px;
+    line-height: 0.92;
+    color: #111010;
+    letter-spacing: -0.03em;
+    margin-bottom: 24px;
+  }
+
+  .subtitle {
+    font-size: 16px;
+    font-weight: 500;
+    color: #1A1918;
+    line-height: 1.55;
+    max-width: 360px;
+    margin-bottom: 32px;
+  }
+
+  .cta-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 48px;
+    padding: 0 28px;
+    background: #111010;
+    color: #fff;
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 900;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 2px solid #111010;
+    box-shadow: 4px 4px 0 #111010;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .hero-bottom {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .sources-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #1A1918;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    opacity: 0.6;
+  }
+
+  .sources-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .src-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    font-family: 'Unbounded', sans-serif;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 2px solid currentColor;
+    background: rgba(255,255,255,0.35);
+  }
+
+  .src-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  /* ─── RIGHT FEED PANEL ─── */
+  .feed {
+    background: #F5F4F0;
+    padding: 28px 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    grid-row: 1;
+    overflow: hidden;
+  }
+
+  .feed-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #6B6B6B;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 2px;
+  }
+
+  /* ─── LEAD CARD ─── */
+  .lead-card {
+    background: #fff;
+    border: 2px solid #111010;
+    box-shadow: 4px 4px 0 #111010;
+    position: relative;
+    overflow: hidden;
+    padding: 18px 20px 16px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Left color stripe */
+  .lead-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--src-color);
+  }
+
+  .card-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .src-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    line-height: 1;
+    border: 1.5px solid;
+  }
+
+  .hot-badge {
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 3px 6px;
+    background: #EA580C;
+    color: #fff;
+    line-height: 1;
+  }
+
+  .card-time {
+    font-size: 10px;
+    color: #9B9B97;
+    font-weight: 500;
+    margin-left: auto;
+  }
+
+  .card-title {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 900;
+    font-size: 14px;
+    color: #111010;
+    line-height: 1.3;
+    letter-spacing: -0.025em;
+  }
+
+  .card-budget {
+    font-size: 14px;
+    font-weight: 800;
+    color: #111010;
+    line-height: 1;
+  }
+
+  /* Match bar */
+  .match-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .match-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .match-text {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #9B9B97;
+  }
+
+  .match-pct {
+    font-size: 10px;
+    font-weight: 800;
+    color: #111010;
+  }
+
+  .match-bg {
+    height: 5px;
+    background: #E8E8E4;
+    position: relative;
+  }
+
+  .match-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--fill-color, #111010);
+  }
+
+  .card-tags {
+    display: flex;
+    gap: 5px;
+    overflow: hidden;
+  }
+
+  .tag {
+    font-size: 9px;
+    font-weight: 600;
+    color: #6B6B6B;
+    background: #EEEDEA;
+    padding: 3px 7px;
+    white-space: nowrap;
+  }
+
+  .card-cta {
+    width: 100%;
+    height: 34px;
+    border: 2px solid #111010;
+    background: #fff;
+    color: #111010;
+    font-family: 'Unbounded', sans-serif;
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+  }
+
+  /* ─── FOOTER STRIPE ─── */
+  .footer {
+    grid-column: 1 / -1;
+    background: #111010;
+    border-top: 2px solid #111010;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 48px;
+  }
+
+  .footer-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .footer-logo {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 900;
+    font-size: 20px;
+    color: #fff;
+    letter-spacing: -0.02em;
+  }
+
+  .footer-sep {
+    width: 1px;
+    height: 20px;
+    background: #333;
+  }
+
+  .footer-desc {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6B6B6B;
+  }
+
+  .footer-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .stack-tag {
+    font-size: 10px;
+    font-weight: 700;
+    color: #111010;
+    background: #FACC15;
+    padding: 4px 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <!-- LEFT HERO -->
+  <div class="hero">
+    <div class="hero-top">
+      <div class="eyebrow">
+        <div class="eyebrow-dot"></div>
+        <span class="eyebrow-text">Радар онлайн · 24/7</span>
+      </div>
+
+      <h1 class="h1">Заказы<br>под твой<br>стек.<br>Без мусора.</h1>
+
+      <p class="subtitle">
+        ИИ парсит биржи и Telegram, оценивает совпадение с твоим стеком и пишет черновик отклика.
+      </p>
+
+      <div class="cta-btn">Смотреть ленту →</div>
+    </div>
+
+    <div class="hero-bottom">
+      <div class="sources-label">Источники</div>
+      <div class="sources-row">
+        <span class="src-chip" style="color:#00A65A">
+          <span class="src-dot"></span>FL.ru
+        </span>
+        <span class="src-chip" style="color:#EA580C">
+          <span class="src-dot"></span>Kwork
+        </span>
+        <span class="src-chip" style="color:#0088CC">
+          <span class="src-dot"></span>Telegram
+        </span>
+        <span class="src-chip" style="color:#2563EB">
+          <span class="src-dot"></span>YouDo
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT FEED -->
+  <div class="feed">
+    <div class="feed-label">Лента заказов · сейчас</div>
+
+    <!-- Card 1 — FL.ru HOT -->
+    <div class="lead-card" style="--src-color:#00A65A">
+      <div class="card-meta-row">
+        <span class="src-badge" style="color:#00A65A; border-color:#00A65A55; background:#00A65A15">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#00A65A;flex-shrink:0"></span>
+          FL.ru
+        </span>
+        <span class="hot-badge">HOT</span>
+        <span class="card-time">2 мин назад</span>
+      </div>
+
+      <div class="card-title">Разработка Telegram-бота для автоматизации приёма заявок</div>
+      <div class="card-budget">от 25 000 ₽</div>
+
+      <div class="match-wrap">
+        <div class="match-header">
+          <span class="match-text">Совместимость</span>
+          <span class="match-pct">91%</span>
+        </div>
+        <div class="match-bg">
+          <div class="match-fill" style="width:91%;--fill-color:#16A34A"></div>
+        </div>
+      </div>
+
+      <div class="card-tags">
+        <span class="tag">Python</span>
+        <span class="tag">Telegram Bot API</span>
+        <span class="tag">PostgreSQL</span>
+      </div>
+
+      <button class="card-cta">Написать отклик →</button>
+    </div>
+
+    <!-- Card 2 — Kwork -->
+    <div class="lead-card" style="--src-color:#EA580C">
+      <div class="card-meta-row">
+        <span class="src-badge" style="color:#EA580C; border-color:#EA580C55; background:#EA580C15">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#EA580C;flex-shrink:0"></span>
+          Kwork
+        </span>
+        <span class="card-time">17 мин назад</span>
+      </div>
+
+      <div class="card-title">Python-парсер цен конкурентов + экспорт в Google Sheets</div>
+      <div class="card-budget">до 12 000 ₽</div>
+
+      <div class="match-wrap">
+        <div class="match-header">
+          <span class="match-text">Совместимость</span>
+          <span class="match-pct">74%</span>
+        </div>
+        <div class="match-bg">
+          <div class="match-fill" style="width:74%;--fill-color:#111010"></div>
+        </div>
+      </div>
+
+      <div class="card-tags">
+        <span class="tag">Python</span>
+        <span class="tag">Парсинг</span>
+        <span class="tag">gspread</span>
+      </div>
+
+      <button class="card-cta">Написать отклик →</button>
+    </div>
+
+    <!-- Card 3 — Telegram -->
+    <div class="lead-card" style="--src-color:#0088CC; opacity:0.55">
+      <div class="card-meta-row">
+        <span class="src-badge" style="color:#0088CC; border-color:#0088CC55; background:#0088CC15">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#0088CC;flex-shrink:0"></span>
+          Telegram
+        </span>
+        <span class="card-time">41 мин назад</span>
+      </div>
+
+      <div class="card-title">Лендинг на Next.js — дизайн + разработка + деплой</div>
+      <div class="card-budget">от 18 000 ₽</div>
+
+      <div class="match-wrap">
+        <div class="match-header">
+          <span class="match-text">Совместимость</span>
+          <span class="match-pct">68%</span>
+        </div>
+        <div class="match-bg">
+          <div class="match-fill" style="width:68%;--fill-color:#111010"></div>
+        </div>
+      </div>
+
+      <button class="card-cta">Написать отклик →</button>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">
+      <div class="footer-logo">RAWLEAD</div>
+      <div class="footer-sep"></div>
+      <div class="footer-desc">Агрегатор фриланс-заказов с AI-анализом · rawlead.ru</div>
+    </div>
+    <div class="footer-right">
+      <span class="stack-tag">Python</span>
+      <span class="stack-tag">Next.js</span>
+      <span class="stack-tag">PostgreSQL</span>
+      <span class="stack-tag">VPS 24/7</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

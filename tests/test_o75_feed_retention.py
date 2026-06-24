@@ -12,12 +12,14 @@ from api_server import _feed_where_sql
 
 
 def test_feed_visibility_days_constant() -> None:
-    assert FEED_VISIBILITY_DAYS == 7
+    assert FEED_VISIBILITY_DAYS == 2
 
 
 def test_feed_visibility_where_includes_age_and_visible() -> None:
     sql, params = feed_visibility_where_sql()
     assert "is_visible = TRUE" in sql
+    assert "ai_verdict" in sql
+    assert "МИМО" in sql
     assert "make_interval(days => %s)" in sql
     assert FEED_VISIBILITY_DAYS in params
 

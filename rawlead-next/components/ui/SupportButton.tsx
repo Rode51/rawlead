@@ -39,6 +39,7 @@ export default function SupportButton() {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [sendError, setSendError] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
 
   const loadThread = useCallback(async () => {
@@ -68,6 +69,8 @@ export default function SupportButton() {
   useEffect(() => {
     if (open) {
       loadThread()
+      const id = setInterval(loadThread, 15_000)
+      return () => clearInterval(id)
     }
   }, [open, loadThread])
 
@@ -95,12 +98,19 @@ export default function SupportButton() {
         headers: supportHeaders(),
         body: JSON.stringify({ message: msg, url: window.location.href, source: 'fab' }),
       })
-      if (!r.ok) throw new Error()
+      if (!r.ok) {
+        setSendError(true)
+        setTimeout(() => setSendError(false), 2500)
+        return
+      }
       setText('')
       setSent(true)
       await loadThread()
       setTimeout(() => setSent(false), 2500)
-    } catch { /* keep text */ } finally {
+    } catch {
+      setSendError(true)
+      setTimeout(() => setSendError(false), 2500)
+    } finally {
       setSending(false)
     }
   }
@@ -190,7 +200,11 @@ export default function SupportButton() {
 
           {/* Composer */}
           <div style={{ borderTop: '1.5px solid #EAEAE6', padding: '12px 16px' }}>
-            {sent ? (
+            {sendError ? (
+              <p className="text-[13px] font-display font-black text-center py-1" style={{ color: '#B91C1C' }}>
+                Не отправилось, попробуй ещё
+              </p>
+            ) : sent ? (
               <p className="text-[13px] font-display font-black text-center py-1" style={{ color: '#111010' }}>
                 ✓ Отправлено
               </p>

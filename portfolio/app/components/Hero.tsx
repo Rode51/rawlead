@@ -56,12 +56,8 @@ export default function Hero({ content, ticker, locale = 'ru' }: Props) {
   return (
     <section id="hero" className="relative flex flex-col min-h-svh bg-void overflow-hidden">
 
-      {/* Top-right: availability + lang toggle */}
-      <div
-        className="absolute top-8 right-10 lg:right-20 flex items-center gap-5"
-        style={{ opacity: ready ? 1 : 0, transition: 'opacity 0.6s ease' }}
-      >
-        {/* Lang toggle */}
+      {/* Top-right: lang toggle (always visible, z-10 to stay above willChange div) */}
+      <div className="absolute top-8 right-10 lg:right-20 flex items-center gap-5 z-10">
         <div className="flex items-center gap-2 font-mono" style={{ fontSize: '10px', letterSpacing: '0.14em' }}>
           <a
             href="/"
@@ -80,8 +76,11 @@ export default function Hero({ content, ticker, locale = 'ru' }: Props) {
           </a>
         </div>
 
-        {/* Availability badge */}
-        <div className="flex items-center gap-2">
+        {/* Availability badge — appears after scramble */}
+        <div
+          className="flex items-center gap-2"
+          style={{ opacity: ready ? 1 : 0, transition: 'opacity 0.6s ease' }}
+        >
           <span className="relative flex h-2 w-2">
             <span
               className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60"
@@ -138,7 +137,7 @@ export default function Hero({ content, ticker, locale = 'ru' }: Props) {
 
         {/* CTA */}
         <a
-          href="https://t.me/rcnn43"
+          href="https://t.me/rode_51"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 self-start font-mono font-medium bg-amber text-void px-6 py-3 hover:opacity-90 transition-opacity"

@@ -57,7 +57,7 @@ export default function FAQ({ content }: Props) {
               <p
                 className="font-display font-black text-snow"
                 style={{
-                  fontSize: 'clamp(20px, 2vw, 30px)',
+                  fontSize: 'clamp(22px, 2.2vw, 34px)',
                   lineHeight: 0.95,
                   letterSpacing: '-0.02em',
                 }}

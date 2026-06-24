@@ -6,20 +6,90 @@
 
 > Детали задач → [`STATUS.md`](STATUS.md) · шаги владельца → [`FOR_YOU.md`](../../FOR_YOU.md)
 
-**Обновлено:** 2026-06-22 (YOUDO click-through backup + § CODER_PROMPT)
+**Обновлено:** 2026-06-24 (RETENTION-2D **deploy**)
+
+## RETENTION-2D (2026-06-24 deploy)
+
+| | |
+|---|---|
+| **Код** | `public_feed.py` `FEED_VISIBILITY_DAYS=2` · `purge_old_leads.py` `_DEFAULT_DAYS=2` · `api_server` / `quiz_adaptive` счётчик за 2d |
+| **Web** | `AnnouncementBar` «лидов за 2 дня» · `deploy-web-rawlead-vps.py` |
+| **systemd** | `rawlead-purge-leads.service` + timer (описание 2d) |
+| **Smoke** | `rawlead-api` **active** · `FEED_VISIBILITY_DAYS = 2` на VPS · `GET /v1/public/site-stats` → `leads_week=734` |
+| **Не менялось** | JWT session TTL 7d · `DELIST_PURGE_DAYS` default 1d |
+
+## YOUDO-IMAP-ONLY — model B (2026-06-23 deploy)
+
+| | |
+|---|---|
+| **Код** | `youdo_imap.py` (last N, no cursor) · `youdo_imap_poller.py` (PG dedup) · `lead_pipeline` (email≥300→detail_ok) · `youdo_parser` (`listing_skip`) |
+| **systemd** | `rawlead-youdo-imap.timer` (~90s) → oneshot `rawlead-youdo-imap.service` |
+| **Env** | `YOUDO_IMAP_ENABLED=1` · `YOUDO_IMAP_FETCH_LAST=30` · `YOUDO_LISTING_FETCH=0` · `YOUDO_CLICK_DETAIL=0` · `YOUDO_DETAIL_FETCH=0` |
+| **Backup** | `/opt/rawlead/data/backups/pre_youdo_imap_b_20260623-065533.tar.gz` |
+| **Smoke** | IMAP poll **30 tasks** · `youdo:listing_skip reason=imap_only` в `radar_site.log` · timer **active** (NEXT ~90s) |
+| **Watch** | `journalctl -u rawlead-youdo-imap` · `grep youdo:imap /opt/rawlead/data/radar_site.log` · oneshot может долго жить при ingest — см. STATUS |
+| **Откат** | `tar -xzf pre_youdo_imap_b_20260623-065533.tar.gz -C /` + env listing `1` + `systemctl restart rawlead-radar` |
+
+## YOUDO-IMAP-DISCOVERY (архив 2026-06-22)
+
+| | |
+|---|---|
+| **Код** | `youdo_imap.py` · `youdo_imap_poller.py` · mail.ru `INBOX/Newsletters` → ingest + `detail_ok` |
+| **systemd** | `rawlead-youdo-imap.timer` (90s) → `rawlead-youdo-imap.service` (oneshot `--once`) |
+| **Env (prod сейчас)** | `YOUDO_IMAP_*` · `YOUDO_IMAP_BOOTSTRAP_SKIP_OLD=1` · **устарело:** UID-курсор `youdo_imap_last_uid` |
+| **Env (после §)** | `YOUDO_IMAP_FETCH_LAST=30` · listing/browser **0** · **без** bootstrap/cursor |
+| **Backup** | `/opt/rawlead/data/backups/pre_youdo_imap_20260622-162048.tar.gz` |
+| **Smoke** | timer `active` · catch-up: `FETCH_LAST=50` + `poller --once` · новые → `youdo:imap new_id=` |
+| **Лог watch** | `journalctl -u rawlead-youdo-imap` · `grep youdo:imap /opt/rawlead/data/radar_site.log` |
+
+## YOUDO-CLICK-RETRY + SP-STABLE (2026-06-22 deploy)
+
+| | |
+|---|---|
+| **Код** | `youdo_detail_pending:{id}` · retry click на листинге · `click_summary` trace · SP-STABLE hover/jitter/go_back |
+| **Файлы** | `youdo_sticky_worker.py` · `youdo_parser.py` · `exchange_browser_fetch.py` · `lead_pipeline.py` |
+| **Backup** | `/opt/rawlead/data/backups/pre_click_retry_20260622-141501.tar.gz` |
+| **Откат** | `tar -xzf pre_click_retry_20260622-141501.tar.gz -C / && systemctl restart rawlead-radar` |
+| **pytest** | 44 passed (Lead verify 2026-06-22) |
+| **Лог watch** | `fetch:youdo … pending=N click_ok=K` · `stage=click_summary` · `click_detail outcome=ok` |
+| **24h DoD** | pending id на листинге -> `click_retry` / `click_detail` в течение 1-2 циклов |
+
+## YOUDO-SOURCE-GATE (2026-06-22 deploy)
+
+| | |
+|---|---|
+| **Код** | `detail_ok` only · `youdo_no_detail` · dedup `list_project_ids` |
+| **FEED-HYGIENE** | `public_feed` МИМО filter · `vacancy_filter` markers |
+| **Backup** | `/opt/rawlead/data/backups/pre_source_gate_20260622-114840.tar.gz` |
+| **Откат** | [`2026-06-22-youdo-source-gate-rollback.md`](../problems/2026-06-22-youdo-source-gate-rollback.md) |
+| **pytest** | 44 passed (Lead verify) |
+| **Лог watch** | `new=0` = все id в SQLite · `click_ok=0` = detail не достали |
+
+## YOUDO-CLICK-DETAIL (2026-06-22)
+
+| | |
+|---|---|
+| **Код** | click-through в sticky session · `youdo_click_through_details` · worker `click_through_details` · кэш → `lead_pipeline` |
+| **Env** | `YOUDO_CLICK_DETAIL=1` · `YOUDO_CLICK_DETAIL_MAX=10` |
+| **pytest** | `test_o269` + `test_youdo_human` — **45 passed** (Lead verify) |
+| **Deploy** | `exchange_browser_fetch.py` · `youdo_parser.py` · `lead_pipeline.py` · `youdo_sticky_worker.py` · radar+api **active** |
+| **Лог** | `youdo:trace stage=click_detail …` · `fetch:youdo … click_ok=N` |
+| **Watch** | `new=0` на листинге → click-through не запускается · traces появятся на **новых** id · post-restart antibot watch 14:09–14:12 UTC |
+| **Откат** | `YOUDO_CLICK_DETAIL=0` · restore `backups/youdo_profile_pre_clickthrough_2026-06-22.tar.gz` |
+| **DoD 24h** | ⏳ `grep stage=click_detail.*outcome=ok` ≥10 — ждём новые заказы |
 
 ## YOUDO-RESTORE-SNIPPETS (2026-06-22)
 
 | | |
 |---|---|
-| **Env** | `YOUDO_DETAIL_MIN_CHARS=0` (gate disabled) |
-| **Код** | `_youdo_detail_short_skips_l1` early exit при `min_chars==0` · `restore_youdo_visible_vps.py` |
+| **Env** | `YOUDO_DETAIL_MIN_CHARS=0` на VPS |
+| **Код (prod)** | `_youdo_detail_short_skips_l1` — delist при `detail_ok≠True` + floor 300 · **⏳ меняется** |
+| **Target (owner rev2)** | **Только detail_ok** в публичной ленте; сниппет без detail — **не в ленте** · короткое detail-TZ ок · § `YOUDO-SOURCE-GATE` |
 | **pytest** | `test_o281` + `test_o223` — **17 passed** |
 | **Deploy** | `lead_pipeline.py` + restore script · `rawlead-api` + `rawlead-radar` **active** |
 | **DB** | `youdo_visible=4219` · restore `--apply` restored=4219 |
 | **API** | `GET /v1/feed?source=youdo&limit=3` — ok |
-| **Ограничение** | body 56–102 chars (snippet) · ServicePipe блокирует detail · full TZ — § **YOUDO-DETAIL-BREAKTHROUGH** P0 M1 |
-| **Бэкап профиля** | `backups/youdo_profile_pre_clickthrough_2026-06-22.tar.gz` (64M, sha256 `ae806424…98f9`) · golden O268 `youdo_profile_g2_2026-06-19.tar.gz` |
+| **Ограничение** | snippet body · full TZ — click-through deployed, ждём `new>0` для traces |
 | **FL/Kwork** | detail HTTP ✅ · полное ТЗ · эталон для YouDo |
 
 ## FEED-FILTER-TG-STUCK (2026-06-22)
@@ -40,6 +110,18 @@
 | **pytest** | `test_l1_tags_cms.py` — **4 passed, 6 subtests** (Lead verify) |
 | **re-L1 18311** | ✅ Lead verify prod DB: `['tilda_dev','ecommerce_dev','api_integration']` · body 233 chars · `YOUDO_DETAIL_FETCH=1` · TZ-fallback (ServicePipe на detail) |
 | **DoD** | ✅ golden · prod 18311 · pytest 4 passed · `YOUDO_DETAIL_FETCH=1` |
+
+## QUIZ-REDESIGN — texts (2026-06-23 deploy)
+
+| | |
+|---|---|
+| **Карточки** | `quiz_cards_v1.json` 56 + `v2` 130 = **186** merged |
+| **Изменено** | только `title` + `task_summary` (понятный язык) |
+| **Без изменений** | `skills_on_like`, signals, niche, логика `quiz_adaptive.py` |
+| **Deploy** | `deploy-o217-quiz-vps.py` · `rawlead-api` **active** |
+| **Smoke** | `GET /v1/quiz/start` → `source=synthetic` · merged=186 |
+
+---
 
 ## FEED-QUIZ-POLISH (2026-06-22)
 
@@ -128,13 +210,14 @@
 | **Deploy** | `api_server.py` + `pg_storage.py` · `rawlead-api` active · `/health` ok |
 | **Changes** | connection pool on handlers · YooKassa `compare_digest` · draft feed-membership gate · `pg_storage` pool bind |
 
-## Portfolio rode51.ru (2026-06-21)
+## Portfolio rode51.ru (2026-06-23)
 
 | | |
 |---|---|
-| **URL** | https://rode51.ru · P2 static (WhyMe, FAQ, `/en`) |
-| **Deploy** | `deploy-portfolio-rode51-vps.py` · owner ✅ **2026-06-21** (Claude Code polish) |
-| **Fix** | deploy перезаписал nginx без 443 → восстановлен `deploy/nginx/rode51.ru.conf` SSL block |
+| **URL** | https://rode51.ru · static export (RU + `/en`) |
+| **Deploy** | `deploy-portfolio-rode51-vps.py --skip-build` · owner ✅ **2026-06-23** (Claude Code update) |
+| **Smoke** | `curl https://rode51.ru/` → HTTP 200 · title `Rode51 — Боты, парсеры, автоматизация` · `/en/` 200 |
+| **Fix** | deploy 2026-06-21 перезаписал nginx без 443 → восстановлен `deploy/nginx/rode51.ru.conf` SSL block |
 
 ---
 

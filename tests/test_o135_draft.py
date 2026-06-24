@@ -257,6 +257,22 @@ class TestO135OpenRouterProxy(unittest.TestCase):
 
 
 class TestO168L2Gates(unittest.TestCase):
+    def test_shared_reply_user_includes_kwork_platform(self) -> None:
+        lite = AiLiteAnalysis(
+            task_summary="Нужен чат-бот для Telegram",
+            feed_visible=True,
+        )
+        user = _build_shared_reply_user(
+            title="Создать Чат-бота",
+            budget_text="5000",
+            lite=lite,
+            tools_required=["python"],
+            source="kwork",
+            url="https://kwork.ru/projects/3203318/view",
+        )
+        self.assertIn("Биржа: Kwork", user)
+        self.assertIn("https://kwork.ru/projects/3203318/view", user)
+
     def test_shared_reply_prompt_requires_all_tools(self) -> None:
         sys_prompt = _shared_reply_system(cabinet=False)
         self.assertIn("все", sys_prompt.casefold())

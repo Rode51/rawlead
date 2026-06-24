@@ -11,8 +11,8 @@ from typing import Any
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_SOURCES = ("fl", "kwork")
 _PUBLIC_FEED_SOURCES_ENV = "PUBLIC_FEED_SOURCES"
-FEED_VISIBILITY_DAYS = 7
-INBOX_VISIBILITY_DAYS = 7
+FEED_VISIBILITY_DAYS = 2
+INBOX_VISIBILITY_DAYS = 2
 FEED_ANON_DELAY_MINUTES = 30
 FEED_SOURCE_KEYS = frozenset(
     {"fl", "kwork", "tg", "youdo", "freelance_ru", "freelancejob", "pchyol"}
@@ -140,6 +140,7 @@ def feed_visibility_where_sql(
         src_sql = src_sql.replace(" AND source", f" AND {prefix}source", 1)
     sql = (
         f"{prefix}is_visible = TRUE"
+        + f" AND COALESCE({prefix}ai_verdict, '') <> 'МИМО'"
         + src_sql
         + f" AND {prefix}created_at >= NOW() - make_interval(days => %s)"
     )

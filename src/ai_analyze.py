@@ -1672,6 +1672,7 @@ complexity — целое **1–4** (объём/риск для исполнит
 - Ниша обязательна: dev / design / marketing / text — при сомнении ближайшая, не пусто
 - Telegram-бот: разработка → telegram_bot_dev (dev); воронка/рассылка в TG → chatbot_marketing (marketing)
 - CMS (жёстко): Joomla, Bitrix/Битрикс, OpenCart, BaForms, MODX, Drupal — НЕ wordpress_dev
+- Tilda/Тильда/Zero Block/Tilda Commerce/Tilda Pay — **tilda_dev** (dev), **НЕ** wordpress_dev; «сайт на Тильде», магазин на Tilda, Zero Block → tilda_dev
 - wordpress_dev только при явном WordPress / WooCommerce / WP theme / WP plugin / wp hooks / Elementor-pro
 - Joomla/Bitrix/OpenCart: правки модулей/форм/капчи → php (dev); не путать с WordPress
 - WordPress: тема/плагин/код → wordpress_dev (dev); «сайт на WP» без кода → web_design (design)
@@ -2062,6 +2063,15 @@ def analyze_lite(
 
     is_tg = "t.me" in (url or "").casefold()
     snip = (snippet or title or "").strip()
+    if "youdo.com" in (url or "").casefold():
+        from youdo_parser import enrich_youdo_l1_snippet
+
+        snip = enrich_youdo_l1_snippet(
+            cfg,
+            url=url,
+            title=title,
+            snippet=snip,
+        )
     if len(snip) > _MAX_LITE_SNIPPET_CHARS:
         snip = snip[: _MAX_LITE_SNIPPET_CHARS - 1] + "…"
     budget_for_prompt = display_budget_text(budget_text, is_telegram=is_tg)
@@ -2494,6 +2504,54 @@ def _tz_stack_hints_for_reply(title: str, description: str, task_summary: str) -
     return "Подсказки §1:\n" + "\n".join(hints) + "\n\n"
 
 
+def resolve_reply_platform(source: str = "", url: str = "") -> str:
+    """Map lead source/url to platform key for L2 playbooks (kwork/fl/youdo/tg/…)."""
+    src = (source or "").strip().casefold()
+    if src in ("tg", "telegram"):
+        return "tg"
+    if src in (
+        "fl",
+        "kwork",
+        "youdo",
+        "freelance_ru",
+        "freelancejob",
+        "pchyol",
+        "vc_ru",
+        "habr_career",
+    ):
+        return src
+    raw_url = (url or "").strip().casefold()
+    if raw_url:
+        if "kwork.ru" in raw_url:
+            return "kwork"
+        if "fl.ru" in raw_url:
+            return "fl"
+        if "freelance.ru" in raw_url:
+            return "freelance_ru"
+        if "youdo.com" in raw_url:
+            return "youdo"
+        if "t.me/" in raw_url or "telegram." in raw_url:
+            return "tg"
+        if "freelancejob" in raw_url:
+            return "freelancejob"
+        if "pchyol" in raw_url or "pchel" in raw_url:
+            return "pchyol"
+    return src or "unknown"
+
+
+def reply_platform_label(platform: str, *, source: str = "") -> str:
+    from radar_cycle_log import SOURCE_LABELS
+
+    key = (platform or source or "").strip().casefold()
+    if key in SOURCE_LABELS:
+        return SOURCE_LABELS[key]
+    if key == "tg":
+        return "Telegram"
+    if key == "unknown":
+        return ""
+    return (source or platform or "").strip()
+
+
 def _build_shared_reply_user(
     *,
     title: str,
@@ -2501,6 +2559,8 @@ def _build_shared_reply_user(
     lite: AiLiteAnalysis,
     tools_required: list[str],
     description: str = "",
+    source: str = "",
+    url: str = "",
 ) -> str:
     tools_clean = [t.strip() for t in tools_required if str(t).strip()]
     tools_line = ", ".join(tools_clean)
@@ -2529,8 +2589,17 @@ def _build_shared_reply_user(
     attach_hint = attachment_prompt_hint(desc)
     cat = _normalize_primary_category(lite.primary_category or "")
     cat_line = f"primary_category: {cat}\n" if cat else ""
+    platform = resolve_reply_platform(source=source, url=url)
+    platform_label = reply_platform_label(platform, source=source)
+    platform_block = ""
+    if platform_label:
+        platform_block += f"Биржа: {platform_label}\n"
+    order_url = (url or "").strip()
+    if order_url:
+        platform_block += f"Ссылка на заказ: {order_url}\n"
     return (
         f"Заголовок: {title.strip()}\n"
+        f"{platform_block}"
         f"Бюджет: {budget_text.strip()}\n"
         f"{cat_line}\n"
         f"Суть заказа (task_summary):\n{lite.task_summary.strip()}\n\n"
@@ -2552,6 +2621,8 @@ def analyze_shared_reply_draft(
     lite: AiLiteAnalysis,
     tools_required: list[str] | None = None,
     description: str = "",
+    source: str = "",
+    url: str = "",
     timeout_sec: float = _DEFAULT_TIMEOUT_SEC,
     errors: list[str] | None = None,
     log_prefix: str = "",
@@ -2583,19 +2654,26 @@ def analyze_shared_reply_draft(
     set_reply_validate_lead_context(title, description)
     budget_for_prompt = display_budget_text(budget_text, is_telegram=False)
     tools = [str(t).strip() for t in (tools_required or []) if str(t).strip()]
+    platform = resolve_reply_platform(source=source, url=url)
     user = _build_shared_reply_user(
         title=title,
         budget_text=budget_for_prompt,
         lite=lite,
         tools_required=tools,
         description=description,
+        source=source,
+        url=url,
     )
     seed = int(
         hashlib.sha256(f"{title}:{summary}".encode("utf-8")).hexdigest()[:8],
         16,
     )
 
-    from l3_human_style import reply_ai_smell_reason, reply_retry_user_suffix
+    from l3_human_style import (
+        reply_ai_smell_reason,
+        reply_platform_mismatch_reason,
+        reply_retry_user_suffix,
+    )
 
     last_exc: BaseException | None = None
     retry_reason: str | None = None
@@ -2649,6 +2727,21 @@ def analyze_shared_reply_draft(
                 last_draft = None
                 last_exc = AiAnalyzeError(f"reply_draft: {smell}")
                 outcome = "fail_smell"
+                break
+            platform_mismatch = reply_platform_mismatch_reason(draft, platform)
+            if platform_mismatch:
+                if attempt < attempts - 1:
+                    retry_reason = platform_mismatch
+                    outcome = "retry_platform"
+                    time.sleep(
+                        _SHARED_DRAFT_BACKOFF_SEC[
+                            min(attempt, len(_SHARED_DRAFT_BACKOFF_SEC) - 1)
+                        ]
+                    )
+                    continue
+                last_draft = None
+                last_exc = AiAnalyzeError(f"reply_draft: {platform_mismatch}")
+                outcome = "fail_platform"
                 break
             send_ready = _shared_draft_send_ready_reason(
                 draft, description=description, tools_required=tools

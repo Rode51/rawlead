@@ -17,7 +17,7 @@ alwaysApply: true
 | `TASKS.md` | очередь | `TASKS_HISTORY` | Lead, владелец |
 | `PROD_FACTS.md` | prod snapshot | — | все AI перед triage |
 
-**Lead после ✅:** § → archive · hot — одна строка index · не дублировать ТЗ в чат · **в handoff всегда «Маршрут:»** (MiMo vs @coder — `lead-architect.mdc`).
+**Lead после ✅:** § → archive · hot — одна строка index · **`PROJECT_MAP` + `CODE_STRUCTURE` если менялись пути** (блокер — `lead-architect.mdc` § Архитектурный гард) · не дублировать ТЗ в чат · **в handoff всегда «Маршрут:»**
 
 **Coder/Mechanic/Designer:** `PROD_FACTS` + § шапки `CODER_PROMPT` + `STATUS` hot · **не** архив/vision без указания в промпте.
 

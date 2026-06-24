@@ -218,7 +218,7 @@ export default function LoginPanel({ variant = 'cabinet', onSuccess }: Props) {
                   rel="noopener noreferrer"
                   className={`${GHOST_BTN} hidden md:inline-flex`}
                 >
-                  Открыть ссылку на телефоне
+                  открыть ссылку
                 </a>
               )}
             </p>

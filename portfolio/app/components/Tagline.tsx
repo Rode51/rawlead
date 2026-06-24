@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParallax } from '../hooks/useParallax'
 
-const DEFAULT = 'Больше делаю, меньше обещаю.'
+const DEFAULT = 'От идеи до продакшена.'
 
 interface Props { text?: string }
 

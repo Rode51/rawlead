@@ -201,3 +201,54 @@ body {
 .rl-lead-card--shake-cta .rl-card-cta--buy-premium {
   animation: rl-feed-cta-shake 0.45s ease-in-out 2;
 }
+
+/* .rl-badge--replied — port from WP rawlead.css §3341 + §3357 + §8257 */
+.rl-badge--replied {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #facc15;
+  color: #0a0a0a;
+  border: 2px solid #0a0a0a;
+  border-radius: 2px;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.rl-card-cta--replied-slot {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0 14px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+/* G3-POLISH: 44px touch targets on mobile feed CTAs */
+@media (max-width: 640px) {
+  .rl-feed-card__reply-btn,
+  .rl-card-cta--replied-slot {
+    min-height: 44px;
+  }
+
+  .rl-feed-card__body-inner {
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+    padding-top: 18px !important;
+    padding-bottom: 16px !important;
+  }
+}
+
+/* user-select: text on draft text zone — overrides parent select-none */
+.rl-feed-card__reply {
+  user-select: text;
+  -webkit-user-select: text;
+}

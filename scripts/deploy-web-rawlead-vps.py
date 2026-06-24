@@ -18,12 +18,17 @@ sys.path.insert(0, str(_ROOT / "scripts"))
 import deploy_vps_ssh as ssh  # noqa: E402
 
 
+def _npm_cmd() -> str:
+    return "npm.cmd" if os.name == "nt" else "npm"
+
+
 def _npm_build() -> None:
     if not (_NEXT / "package.json").is_file():
         raise SystemExit(f"missing {_NEXT / 'package.json'}")
+    npm = _npm_cmd()
     env = os.environ.copy()
-    subprocess.run(["npm", "ci"], cwd=_NEXT, check=True, env=env)
-    subprocess.run(["npm", "run", "build"], cwd=_NEXT, check=True, env=env)
+    subprocess.run([npm, "ci"], cwd=_NEXT, check=True, env=env, shell=os.name == "nt")
+    subprocess.run([npm, "run", "build"], cwd=_NEXT, check=True, env=env, shell=os.name == "nt")
     if not (_OUT / "index.html").is_file():
         raise SystemExit(f"build failed: no {_OUT / 'index.html'}")
 

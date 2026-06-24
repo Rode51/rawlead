@@ -50,7 +50,7 @@ export const en: SiteContent = {
     cta:       '→ Message on Telegram',
     available: 'AVAILABLE FOR PROJECTS',
   },
-  tagline: 'I do more, I promise less.',
+  tagline: 'From idea to production.',
   services: {
     label: '/ WHAT I DO',
     items: [
@@ -87,6 +87,7 @@ export const en: SiteContent = {
       { q: 'Do I need a spec?',     a: 'No. Just tell me in plain words what you need and why — we work out the details together.' },
       { q: "What if I don't like it?", a: 'Payment only after review. If it works for you — you pay. If not — you don\'t.' },
       { q: 'How does remote work?', a: 'Telegram. No mandatory calls. Write when convenient — I respond within 24h.' },
+      { q: 'How do I pay?',        a: 'Bank transfer (RUB), via freelance platform (FL.ru, Kwork, YouDo), or crypto — USDT/USDC (TRC-20/ERC-20). You pay after verifying the result.' },
     ],
   },
   footer: {
@@ -95,9 +96,9 @@ export const en: SiteContent = {
     sub1:     'Tell me about it on Telegram — I\'ll reply within 24h.',
     sub2:     'Fixed price, no surprises.',
     cta:      '→ Message on Telegram',
-    handle:   '@rcnn43',
+    handle:   '@rode_51',
     city:     'MOSCOW',
   },
-  ticker: 'Taking projects  ·  Remote  ·  Reply ~24h  ·  Full-stack  ·  Prod  ·  @rcnn43  ·  ',
+  ticker: 'Taking projects  ·  Remote  ·  Reply ~24h  ·  Full-stack  ·  Prod  ·  @rode_51  ·  ',
   nav: { ru: 'RU', en: 'EN' },
 }

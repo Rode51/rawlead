@@ -24,6 +24,8 @@ from src.jwt_auth import issue_access_token  # noqa: E402
 from src.support_tickets import (  # noqa: E402
     normalize_body,
     normalize_guest_token,
+    parse_admin_fallback_reply,
+    parse_ticket_id_from_notice,
     preview_text,
     send_owner_support_notice,
 )
@@ -42,6 +44,32 @@ class TestSupportNormalize(unittest.TestCase):
     def test_preview(self) -> None:
         long = "x" * 400
         self.assertTrue(len(preview_text(long)) <= 280)
+
+    def test_parse_notice_ticket_id(self) -> None:
+        self.assertEqual(parse_ticket_id_from_notice("Тикет от пользователя 42\nTG: @u"), 42)
+        self.assertEqual(parse_ticket_id_from_notice("Новое сообщение в тикете 7"), 7)
+        self.assertIsNone(parse_ticket_id_from_notice("привет"))
+
+    def test_parse_fallback_reply(self) -> None:
+        self.assertEqual(parse_admin_fallback_reply("#42 привет мир"), (42, "привет мир"))
+        self.assertEqual(parse_admin_fallback_reply("т42: ответ владельца"), (42, "ответ владельца"))
+        self.assertIsNone(parse_admin_fallback_reply("просто текст"))
+
+    def test_ticket_for_actor_uses_both_keys(self) -> None:
+        from src.support_tickets import ticket_for_actor
+
+        cur = MagicMock()
+        cur.fetchone.return_value = (2,)
+        tid = ticket_for_actor(
+            cur,
+            user_id="00000000-0000-0000-0000-000000000001",
+            guest_token="guest12345678",
+        )
+        self.assertEqual(tid, 2)
+        sql = cur.execute.call_args[0][0]
+        self.assertIn("user_id", sql)
+        self.assertIn("guest_token", sql)
+        self.assertIn("updated_at", sql)
 
 
 class TestSupportApi(unittest.TestCase):
@@ -131,6 +159,7 @@ class TestSupportTg(unittest.TestCase):
         text = mock_send.call_args[0][2]
         self.assertIn("Тикет от пользователя 42", text)
         self.assertIn("@tester", text)
+        self.assertIn("Ответь на это сообщение", text)
 
 
 if __name__ == "__main__":

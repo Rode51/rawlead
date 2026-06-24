@@ -1,0 +1,10 @@
+[Unit]
+Description=YouDo IMAP Discovery Poller
+After=network.target
+
+[Service]
+Type=oneshot
+User=rawlead
+WorkingDirectory=/opt/rawlead
+EnvironmentFile=/opt/rawlead/.env.site
+ExecStart=/opt/rawlead/.venv/bin/python scripts/youdo_imap_poller.py --once

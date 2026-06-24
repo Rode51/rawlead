@@ -4,7 +4,7 @@
 
 **Кто пишет промпты:** `@lead-architect` · **кто кодит:** Claude Code в **`rawlead-next/`** · **verify/deploy:** `@lead-architect` / `@coder`.
 
-**Статус фаз (verify 2026-06-19):** phase 0–1 ✅ · cabinet **MVP** (parity gaps) · pricing ❌ · as-built [`O280_AS_BUILT.md`](../../migration/O280_AS_BUILT.md) § **Prod parity**
+**Статус фаз (verify 2026-06-21):** **cutover ✅ prod** · phase 0–2 MVP live · WP = legacy/rollback only · as-built [`O280_AS_BUILT.md`](../../migration/O280_AS_BUILT.md)
 
 **Пакет документации:** [`docs/migration/README.md`](../../migration/README.md) (PAGES · API · TOKENS · `rawlead-next/CLAUDE.md`).
 
@@ -169,7 +169,7 @@ Next **обязан** слушать `rawlead-tags-imported` и refetch tags + f
 
 - [ ] `/cabinet/` inbox `GET /v1/me/replies`
 - [ ] Draft generate/copy · quota
-- [ ] Retake quiz link
+- [x] Retake quiz link — **Next** `#rl-cabinet-quiz-retake` ✅ 2026-06-21
 - [ ] **DoD:** «Написать отклик» из ленты → черновик в кабинете
 
 ### Фаза 3 — pricing + home + cutover (день 3)

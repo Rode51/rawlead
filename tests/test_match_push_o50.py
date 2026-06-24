@@ -32,7 +32,8 @@ class TestMatchPushO50(TestCase):
             lead_tags=["wordpress_dev", "php"],
             tools_required=["git", "docker"],
         )
-        self.assertIn("Match 67%", text)
+        self.assertIn("🔔 Match", text)
+        self.assertNotIn("Match 67%", text)
         self.assertIn("FL.ru", text)
         self.assertIn("15 000", text)
         self.assertIn("Плагин WooCommerce", text)

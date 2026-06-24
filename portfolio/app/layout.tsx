@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { Barlow_Condensed } from "next/font/google";
+import { Barlow_Condensed, Oswald, JetBrains_Mono } from "next/font/google";
 import CustomCursor from "./components/CustomCursor";
 import Grain from "./components/Grain";
 import SmoothScroll from "./components/SmoothScroll";
@@ -20,6 +20,20 @@ const barlowCondensed = Barlow_Condensed({
   display: "swap",
 });
 
+const oswald = Oswald({
+  weight: ["400", "700"],
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-oswald",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  weight: ["400", "500", "700"],
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+
 const BASE_URL = 'https://rode51.ru'
 
 export const metadata: Metadata = {
@@ -30,7 +44,7 @@ export const metadata: Metadata = {
     template: '%s — Rode51',
   },
   description:
-    'Строю Telegram-боты, парсеры и веб-сервисы под задачу. Пишу, деплою, поддерживаю — без посредников. Москва, удалённо.',
+    'Строю Telegram-боты, парсеры и веб-сервисы под задачу. От идеи до продакшена — пишу, деплою, поддерживаю без посредников.',
 
   keywords: [
     'разработка ботов',
@@ -61,7 +75,7 @@ export const metadata: Metadata = {
     title: 'Rode51 — Боты, парсеры, автоматизация',
     description:
       'Строю Telegram-боты, парсеры и веб-сервисы под задачу. Пишу, деплою, поддерживаю — без посредников.',
-    creator: '@rcnn43',
+    creator: '@rode_51',
   },
 
   robots: {
@@ -82,7 +96,7 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body
-        className={`${geistMono.variable} ${barlowCondensed.variable} antialiased`}
+        className={`${geistMono.variable} ${barlowCondensed.variable} ${oswald.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <CustomCursor />
         <Grain />

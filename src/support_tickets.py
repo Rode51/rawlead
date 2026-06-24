@@ -16,6 +16,34 @@ _GUEST_TOKEN_RE = re.compile(r"^[a-zA-Z0-9_-]{8,64}$")
 _BODY_MAX = 4000
 _BODY_MIN = 3
 _PREVIEW_MAX = 280
+_SUPPORT_NOTICE_RE = re.compile(
+    r"^(?:Тикет от пользователя|Новое сообщение в тикете)\s+(\d+)",
+    re.IGNORECASE,
+)
+_SUPPORT_FALLBACK_HASH_RE = re.compile(r"^#(\d+)\s+(.+)", re.DOTALL)
+_SUPPORT_FALLBACK_T_RE = re.compile(r"^[тt](\d+):\s*(.+)", re.IGNORECASE | re.DOTALL)
+
+
+def parse_ticket_id_from_notice(text: str) -> int | None:
+    """Extract ticket id from owner TG notice header."""
+    m = _SUPPORT_NOTICE_RE.match((text or "").strip())
+    if not m:
+        return None
+    return int(m.group(1))
+
+
+def parse_admin_fallback_reply(text: str) -> tuple[int, str] | None:
+    """`#42 текст` or `т42: текст` — owner fallback without reply."""
+    s = (text or "").strip()
+    if not s:
+        return None
+    m = _SUPPORT_FALLBACK_HASH_RE.match(s)
+    if m:
+        return int(m.group(1)), m.group(2).strip()
+    m = _SUPPORT_FALLBACK_T_RE.match(s)
+    if m:
+        return int(m.group(1)), m.group(2).strip()
+    return None
 
 
 def normalize_guest_token(value: str) -> str | None:
@@ -78,7 +106,8 @@ def send_owner_support_notice(
         f"{header}\n"
         f"TG: {uname_part} · id {uid_part}\n"
         f"user_id: {db_part}\n"
-        f"\n{prev}"
+        f"\n{prev}\n"
+        f"\nОтветь на это сообщение"
     )
     try:
         _send_to_chat(
@@ -116,29 +145,18 @@ def get_or_create_ticket(
     page_url: str,
 ) -> tuple[int, bool]:
     """Return (ticket_id, is_new_ticket)."""
-    if user_id:
-        cur.execute(
-            """
-            SELECT id FROM support_tickets
-            WHERE user_id = %s::uuid
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """,
-            (user_id,),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT id FROM support_tickets
-            WHERE guest_token = %s
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """,
-            (guest_token,),
-        )
-    row = cur.fetchone()
-    if row:
-        return int(row[0]), False
+    existing = ticket_for_actor(cur, user_id=user_id, guest_token=guest_token)
+    if existing is not None:
+        if user_id:
+            cur.execute(
+                """
+                UPDATE support_tickets
+                SET user_id = %s::uuid
+                WHERE id = %s AND user_id IS NULL
+                """,
+                (user_id, existing),
+            )
+        return existing, False
 
     cur.execute(
         """
@@ -199,28 +217,26 @@ def ticket_for_actor(
     user_id: str | None,
     guest_token: str | None,
 ) -> int | None:
+    clauses: list[str] = []
+    params: list[Any] = []
     if user_id:
-        cur.execute(
-            """
-            SELECT id FROM support_tickets
-            WHERE user_id = %s::uuid
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """,
-            (user_id,),
-        )
-    elif guest_token:
-        cur.execute(
-            """
-            SELECT id FROM support_tickets
-            WHERE guest_token = %s
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """,
-            (guest_token,),
-        )
-    else:
+        clauses.append("user_id = %s::uuid")
+        params.append(user_id)
+    if guest_token:
+        clauses.append("guest_token = %s")
+        params.append(guest_token)
+    if not clauses:
         return None
+    where = " OR ".join(clauses)
+    cur.execute(
+        f"""
+        SELECT id FROM support_tickets
+        WHERE {where}
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+        """,
+        tuple(params),
+    )
     row = cur.fetchone()
     return int(row[0]) if row else None
 

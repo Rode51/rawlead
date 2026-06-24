@@ -32,7 +32,7 @@ def test_youdo_detail_fetch_disabled_skips_l1_gate() -> None:
         listing_snippet="short listing",
         source=SOURCE_YOUDO,
     )
-    assert not _youdo_detail_short_skips_l1(project, "short listing", detail_ok=None)
+    assert _youdo_detail_short_skips_l1(project, "short listing", detail_ok=None)
 
 
 def test_youdo_stuck_since_default() -> None:
@@ -48,7 +48,7 @@ def test_drain_l1_backlog_prioritizes_youdo_invisible(mock_lite: MagicMock) -> N
         source="youdo",
         external_id="14868001",
         title="YouDo stuck",
-        body="listing snippet body",
+        body="x" * 350,
         url="https://youdo.com/t14868001",
         budget_text="5000",
         category="",
@@ -81,6 +81,36 @@ def test_drain_l1_backlog_prioritizes_youdo_invisible(mock_lite: MagicMock) -> N
     assert mock_lite.call_count == 2
     first_call = mock_lite.call_args_list[0].kwargs
     assert first_call.get("title") == "YouDo stuck"
+    assert n == 0
+
+
+@patch("ai_analyze.analyze_lite")
+def test_drain_l1_backlog_skips_short_youdo_body(mock_lite: MagicMock) -> None:
+    mock_lite.return_value = None
+    youdo_row = NeonLeadRow(
+        lead_id=9002,
+        source="youdo",
+        external_id="14868002",
+        title="YouDo short",
+        body="short listing",
+        url="https://youdo.com/t14868002",
+        budget_text="5000",
+        category="",
+    )
+    pg = MagicMock()
+    pg.enabled = True
+    pg.fetch_youdo_invisible_missing_l1.return_value = [youdo_row]
+    pg.fetch_leads_missing_l1.return_value = []
+
+    cfg = MagicMock()
+    cfg.ai_active = True
+    word_filter = MagicMock()
+    word_filter.accepts_listing.return_value = True
+
+    with patch.dict(os.environ, {"YOUDO_DETAIL_MIN_CHARS": "300"}):
+        n = drain_l1_backlog(cfg, pg, word_filter, errors=[], limit=5)
+
+    mock_lite.assert_not_called()
     assert n == 0
 
 

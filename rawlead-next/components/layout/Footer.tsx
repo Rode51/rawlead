@@ -55,13 +55,13 @@ export default function Footer() {
               Контакты
             </p>
             <a
-              href="https://t.me/rawlead_bot"
+              href="https://t.me/rode_51"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-sm font-sans text-gray-400 hover:text-white transition-colors"
             >
               <span className="text-[#FACC15]">→</span>
-              Telegram @rawlead_bot
+              Telegram @rode_51
             </a>
           </div>
         </div>

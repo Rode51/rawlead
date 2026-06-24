@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1280" />
+  <title>RawLead TG Card 1280×1280</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --void:    #0e0e0e;
+      --surface: #141414;
+      --snow:    #e8e8e8;
+      --muted:   #555555;
+      --edge:    #222222;
+      --amber:   #F5A623;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 1280px;
+      height: 1280px;
+      overflow: hidden;
+      background: var(--void);
+      font-family: 'Geist Mono', monospace;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── 2-column grid ── */
+    .card {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr;
+      gap: 0;
+      padding: 0;
+      width: 1280px;
+      height: 1280px;
+    }
+
+    /* ── LEFT column ── */
+    .col-left {
+      padding: 80px 60px 80px 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 40px;
+      border-right: 2px solid var(--edge);
+    }
+
+    .col-left-top {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── RIGHT column ── */
+    .col-right {
+      padding: 80px 80px 80px 60px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Section label ── */
+    .section-label {
+      font-family: 'Geist Mono', monospace;
+      font-size: 18px;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    /* ── Headline ── */
+    .headline {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 700;
+      font-size: 96px;
+      line-height: 0.88;
+      letter-spacing: -0.01em;
+      color: var(--snow);
+      text-transform: uppercase;
+      margin: 32px 0;
+    }
+
+    /* ── Feature block ── */
+    .feature-block {
+      background: var(--surface);
+      border: 2px solid var(--edge);
+      border-radius: 0;
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .feature-label {
+      font-family: 'Geist Mono', monospace;
+      font-size: 16px;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .feature-title {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 700;
+      font-size: 28px;
+      line-height: 0.95;
+      letter-spacing: -0.01em;
+      color: var(--snow);
+      text-transform: uppercase;
+    }
+
+    .feature-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .feature-marker {
+      color: var(--amber);
+      font-size: 16px;
+      line-height: 1.6;
+      flex-shrink: 0;
+    }
+
+    .feature-text {
+      font-family: 'Geist Mono', monospace;
+      font-size: 16px;
+      letter-spacing: 0.03em;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    /* ── Footer ── */
+    .footer {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: auto;
+    }
+
+    .cta-line {
+      font-family: 'Geist Mono', monospace;
+      font-size: 18px;
+      letter-spacing: 0.18em;
+      color: var(--amber);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .bot-handle {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 700;
+      font-size: 72px;
+      line-height: 0.88;
+      letter-spacing: -0.01em;
+      color: var(--snow);
+      margin-bottom: 4px;
+    }
+
+    .site-url {
+      font-family: 'Geist Mono', monospace;
+      font-size: 18px;
+      letter-spacing: 0.18em;
+      color: var(--snow);
+      margin-top: auto;
+      align-self: flex-end;
+      flex: none;
+    }
+
+    .trial-label {
+      margin-top: 20px;
+      font-family: 'Geist Mono', monospace;
+      font-size: 18px;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding-left: 0;
+    }
+
+    .trial-label span { color: var(--amber); }
+
+    /* ── RIGHT: orders ── */
+    .right-label {
+      font-family: 'Geist Mono', monospace;
+      font-size: 18px;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      flex: none;
+    }
+
+    .orders {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border-top: 2px solid var(--edge);
+    }
+
+    .order-card {
+      flex: none;
+      background: var(--surface);
+      border-left: 2px solid var(--edge);
+      border-right: 2px solid var(--edge);
+      border-bottom: 2px solid var(--edge);
+      border-radius: 0;
+      padding: 24px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .order-card + .order-card {
+      border-top: none;
+    }
+
+    .order-top { display: flex; flex-direction: column; gap: 5px; }
+
+    .order-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .platform-label {
+      font-family: 'Geist Mono', monospace;
+      font-size: 14px;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .price {
+      font-family: 'Geist Mono', monospace;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    .order-title {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 700;
+      font-size: 34px;
+      line-height: 0.95;
+      letter-spacing: -0.01em;
+      color: var(--snow);
+      text-transform: uppercase;
+    }
+
+    .order-body {
+      font-family: 'Geist Mono', monospace;
+      font-size: 14px;
+      letter-spacing: 0.03em;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    .match-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .match-label {
+      font-family: 'Geist Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .match-track {
+      flex: 1;
+      height: 3px;
+      background: var(--edge);
+      position: relative;
+    }
+
+    .match-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      background: var(--amber);
+      height: 100%;
+    }
+
+    .match-pct {
+      font-family: 'Geist Mono', monospace;
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--amber);
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <!-- LEFT COLUMN -->
+    <div class="col-left">
+      <div class="col-left-top">
+        <div class="section-label">/ RAWLEAD</div>
+        <h1 class="headline">Пока ты спишь —<br>бот ищет заказы</h1>
+        <div class="feature-block">
+          <div class="feature-label">/ КАК ЭТО РАБОТАЕТ</div>
+          <div class="feature-title">Ты получаешь заказ + черновик</div>
+          <div class="feature-list">
+            <div class="feature-item">
+              <span class="feature-marker">▸</span>
+              <span class="feature-text">Лента подобрана под твой стек — не общая</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-marker">▸</span>
+              <span class="feature-text">ИИ написал отклик. Ты только правишь</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="cta-line">Попробуй бесплатно →</div>
+        <div class="bot-handle">@rawlead_bot</div>
+        <div class="trial-label"><span>3 ДНЯ БЕСПЛАТНО</span> · БЕЗ КАРТЫ</div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="col-right">
+      <div class="right-label">/ ЗАКАЗЫ ПОД ТВОЙ СТЕК</div>
+
+      <div class="orders">
+
+        <div class="order-card">
+          <div class="order-top">
+            <div class="order-meta">
+              <span class="platform-label">/ FL.RU</span>
+              <span class="price">до 5 000 ₽</span>
+            </div>
+            <div class="order-title">Парсинг email адресов</div>
+            <div class="order-body">Сбор email-адресов из открытых источников с сохранением в CSV / Excel.</div>
+          </div>
+          <div class="match-row">
+            <span class="match-label">Совпадение</span>
+            <div class="match-track"><div class="match-fill" style="width:85%"></div></div>
+            <span class="match-pct">85%</span>
+          </div>
+        </div>
+
+        <div class="order-card">
+          <div class="order-top">
+            <div class="order-meta">
+              <span class="platform-label">KWORK ·</span>
+              <span class="price">до 3 000 ₽</span>
+            </div>
+            <div class="order-title">Контент менеджер</div>
+            <div class="order-body">Удалённая работа. Посты для соцсетей, редактура, публикации по расписанию.</div>
+          </div>
+          <div class="match-row">
+            <span class="match-label">Совпадение</span>
+            <div class="match-track"><div class="match-fill" style="width:72%"></div></div>
+            <span class="match-pct">72%</span>
+          </div>
+        </div>
+
+        <div class="order-card">
+          <div class="order-top">
+            <div class="order-meta">
+              <span class="platform-label">/ TELEGRAM</span>
+              <span class="price">до 10 000 ₽</span>
+            </div>
+            <div class="order-title">Разработка Telegram бота</div>
+            <div class="order-body">Python + API интеграция. Срок до 15 июля. Бот для управления подпиской.</div>
+          </div>
+          <div class="match-row">
+            <span class="match-label">Совпадение</span>
+            <div class="match-track"><div class="match-fill" style="width:91%"></div></div>
+            <span class="match-pct">91%</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="site-url">rawlead.ru</div>
+    </div>
+
+  </div>
+</body>
+</html>

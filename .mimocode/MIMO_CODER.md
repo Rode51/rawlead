@@ -20,7 +20,7 @@
 
 | # | Файл |
 |---|------|
-| 1 | `docs/team/architect/CODER_PROMPT.md` — § в шапке + § «Файлы» + DoD |
+| 1 | `docs/team/architect/CODER_PROMPT.md` — § в шапке + § «Файлы» + **«Лимиты»** + DoD |
 | 2 | `docs/team/common/STATUS.md` — hot (~80 строк) |
 | 3 | `docs/team/common/PROD_FACTS.md` — если § prod/парсеры/browser |
 
@@ -46,6 +46,7 @@
 | Новые `docs/team/marketing/MIMO_*` | Lead Marketing |
 | `.env`, `data/`, сессии | deny |
 | Scope creep — файлы вне § | стоп → Lead |
+| **>3 файлов** или **>80 строк в heavy** без § split | стоп → Lead (нужен `@coder` или split §) |
 
 ## Анти-регрессия (обязательно)
 
@@ -73,15 +74,8 @@ git diff
 
 Перед правкой — **grep/read** по repo (не угадывать). Канон Cursor: `.cursor/skills/rawlead-search-first`.
 
-## Промпт-обёртка (копипаст + § от Lead)
+## Промпт-обёртка
 
-```text
-Ты Coder RawLead (MiMo). Одна задача. English в рассуждениях, UI RU по цитатам.
-Прочитай CODER_PROMPT § ниже + STATUS hot + PROD_FACTS если prod.
-Не создавай лишних файлов. Не commit. Не deploy.
+**Канон копипаст для владельца:** `.cursor/rules/mimo.mdc` § **Копипаст** — не дублировать здесь.
 
---- ЗАДАЧА (от Lead) ---
-<вставить § CODER_PROMPT целиком>
-```
-
-_Канон Cursor: `.cursor/rules/coder.mdc` · audit lockdown: `MIMO_RULES.md`_
+Вставь § из `CODER_PROMPT` в placeholder `<§>` того блока.

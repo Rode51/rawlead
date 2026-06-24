@@ -55,7 +55,7 @@ export default function ScrambleTitle({ onDone }: Props) {
   useEffect(() => {
     const isMobile = window.matchMedia('(pointer: coarse)').matches
     let frame = 0
-    const totalFrames = isMobile ? 150 : 300
+    const totalFrames = isMobile ? 112 : 300
     let raf: number
 
     const tick = () => {

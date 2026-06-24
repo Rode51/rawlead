@@ -8,6 +8,26 @@
 
 ---
 
+# Перенесено из hot **2026-06-24** — RULES-AUDIT-W1
+
+Hot ≤58 строк · активные: AI-IMAP dedup fix · FEED-HYGIENE apply · M1 watch.
+
+**Session bulk (pre-W1):** LENTA deep link ✅ · TG-DRAFT* ✅ · NEXT-UI+DRAFT ✅ · QUIZ ✅ · YOUDO waves ✅ · FEED-FILTER ✅ · L1-TILDA ✅ · FEED-QUIZ-POLISH ✅ · PRE-ADS-GATE ✅ → [`STATUS_W1_20260624_BULK.md`](STATUS_W1_20260624_BULK.md).
+
+**Git HEAD legacy:** YOUDO-RESTORE / M1 process blocks → index 2026-06-22 ниже.
+
+---
+
+## § 2026-06-20 — O280 Feed UX (R1+R2) owner accept
+
+| Ticket | Сводка |
+|--------|--------|
+| **R1** | Login «открыть ссылку» · Отклик ✓ · draft expand · select text · globals `.rl-badge--replied` |
+| **R2** | Квота справа · `Осталось N` · `лимит обновится через M мин` при retry |
+| **Deploy** | `deploy-web-rawlead-vps.py` 2026-06-20 |
+
+---
+
 ## § 2026-06-19 — O280 Next cutover + O272 + Portfolio P289
 
 | Ticket | Сводка |

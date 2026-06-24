@@ -57,6 +57,7 @@ from src.skills_catalog import (
 )
 from src.public_feed import (
     FEED_ANON_DELAY_MINUTES,
+    FEED_VISIBILITY_DAYS,
     feed_source_filter_sql,
     feed_visibility_where_sql,
     inbox_replies_where_sql,
@@ -1707,7 +1708,7 @@ def health() -> dict[str, Any]:
 
 
 def _public_leads_week_count() -> int:
-    """Visible leads ingested in the last 7 days (marketing ticker)."""
+    """Visible leads ingested within FEED_VISIBILITY_DAYS (marketing ticker)."""
     try:
         with _db_conn() as conn:
             with conn.cursor() as cur:
@@ -1716,8 +1717,9 @@ def _public_leads_week_count() -> int:
                     SELECT COUNT(*)::int
                     FROM leads
                     WHERE is_visible = TRUE
-                      AND created_at >= NOW() - INTERVAL '7 days'
-                    """
+                      AND created_at >= NOW() - make_interval(days => %s)
+                    """,
+                    (FEED_VISIBILITY_DAYS,),
                 )
                 row = cur.fetchone()
                 return int(row[0]) if row else 0

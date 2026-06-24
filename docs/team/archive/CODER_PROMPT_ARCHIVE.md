@@ -6,6 +6,48 @@
 
 ---
 
+---
+
+# Перенесено из hot **2026-06-24** — RULES-AUDIT-W1
+
+Hot ≤54 строк · активные: FEED-HYGIENE apply · ARTICLE-DEMO-INBOX · POST-M1 backlog.
+
+**Session bulk (uncommitted pre-W1, закрытые full §):** NEXT-UI-HOTFIX ✅ · NEXT-DRAFT-PLATFORM ✅ · YOUDO-IMAP-ONLY ✅ · YOUDO-IMAP-DISCOVERY ✅ · YOUDO-CLICK-PROXY ⏸ · YOUDO-CLICK-RETRY ✅ · YOUDO-SP-STABLE partial · YOUDO-SOURCE-GATE ✅ · YOUDO-AUDIT-P0 ✅ · QUIZ-REDESIGN ✅ · FEED-HYGIENE verify ✅ · CABINET-PARITY ✅ · PRE-M1-SECURITY ✅ → полные тексты: [`CODER_PROMPT_W1_20260624_BULK.md`](CODER_PROMPT_W1_20260624_BULK.md).
+
+**Git HEAD legacy:** YOUDO-DETAIL-BREAKTHROUGH (superseded IMAP-only) → index 2026-06-22 ниже · ARTICLE/POST-M1 остались в hot.
+
+---
+
+# Перенесено из hot **2026-06-23** — LENTA-DEEPLINK-RACE ✅ deploy
+
+merge `feedApi.lead` в `loadFeed` reset · `deepLinkRef` держит expand · scroll @100ms после setItems · build+deploy ok · **⚠️** skeleton flash при повторном load (auth) не убран
+
+---
+
+# Перенесено из hot **2026-06-23** — LENTA-LEAD-DEEPLINK ✅ deploy
+
+`deepLinkRef` · `feedApi.lead` prepend · expand+scroll+pulse · `npm run build` ok · `deploy-web-rawlead-vps.py` · **⚠️** focus по таймеру 600ms (не после load) · нет Playwright smoke · нет strip `?lead=`
+
+---
+
+# Перенесено из hot **2026-06-23** — TG-DRAFT-COPY-HOTFIX ✅ deploy
+
+P0: `copy_text` → `{"text": payload}` · truncate 256 · pytest `test_o265` 15 passed · incident closed
+
+---
+
+# Перенесено из hot **2026-06-23** — TG-DRAFT-BUTTONS ✅ verify
+
+`_draft_result_keyboard` · `copy_text` + «На {биржа} ↗» в сообщении черновика · `handle_tg_draft_callback` → `source`+`url` из PG · `_send_draft_reply(reply_markup=…)` · pytest `test_o265` **14 passed** · deploy `deploy-o265-match-push-bot-vps.py` **2026-06-23** · prod grep `_draft_result_keyboard` ok
+
+---
+
+# Перенесено из hot **2026-06-22** — YOUDO-DETAIL-BREAKTHROUGH ✅ deploy
+
+Click-through detail E+B: `youdo_click_through_details` · sticky worker `click_through_details` · кэш `_click_detail_cache_*` → `lead_pipeline` · kill-switch `YOUDO_CLICK_DETAIL` · trace `stage=click_detail` · pytest `test_o269`+`test_youdo_human` 45 passed · deploy 4 файла VPS · env `YOUDO_CLICK_DETAIL=1` `MAX=10` · DoD 24h traces — ждём `new>0`.
+
+---
+
 # Перенесено из hot **2026-06-22** — YOUDO-RESTORE-SNIPPETS ✅
 
 `YOUDO_DETAIL_MIN_CHARS=0` на VPS · gate disabled (`min_chars==0` early exit) · `scripts/restore_youdo_visible_vps.py --apply` restored=4219 · `youdo_visible=4219` · pytest `test_o281`+`test_o223` 17 passed · curl `/v1/feed?source=youdo` ok.

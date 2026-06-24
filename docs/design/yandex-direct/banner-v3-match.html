@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080">
+<title>RawLead — Баннер v3 Match 1080×1080</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 1080px;
+    height: 1080px;
+    overflow: hidden;
+    font-family: 'Manrope', -apple-system, sans-serif;
+  }
+
+  .banner {
+    width: 1080px;
+    height: 1080px;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    grid-template-rows: 1fr;
+    border: 4px solid #111010;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── LEFT COLUMN ── */
+  .left-col {
+    background: #FACC15;
+    border-right: 4px solid #111010;
+    display: flex;
+    flex-direction: column;
+    padding: 40px 36px;
+    position: relative;
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 40px;
+  }
+  .logo-mark {
+    width: 34px; height: 34px;
+    background: #111010;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 900; color: #FACC15;
+  }
+  .logo-name { font-size: 22px; font-weight: 900; color: #111010; letter-spacing: -0.5px; }
+
+  .left-eyebrow {
+    font-size: 11px;
+    font-weight: 800;
+    color: #111010;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    margin-bottom: 16px;
+  }
+
+  .left-headline {
+    font-size: 48px;
+    font-weight: 900;
+    color: #111010;
+    line-height: 1.0;
+    letter-spacing: -2px;
+    margin-bottom: 24px;
+  }
+
+  .left-desc {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111010;
+    line-height: 1.5;
+    opacity: 0.8;
+    margin-bottom: 32px;
+  }
+
+  .feature-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+  .feature-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .feature-icon {
+    width: 24px; height: 24px;
+    background: #111010;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: #FACC15; font-weight: 900;
+    flex-shrink: 0;
+  }
+  .feature-text {
+    font-size: 14px; font-weight: 700; color: #111010; letter-spacing: -0.2px;
+  }
+
+  .left-cta {
+    background: #111010;
+    color: #FACC15;
+    font-size: 15px;
+    font-weight: 900;
+    padding: 14px 0;
+    text-align: center;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-top: auto;
+  }
+
+  .left-url {
+    font-size: 11px; font-weight: 700;
+    color: rgba(17,16,16,0.4);
+    text-align: center;
+    margin-top: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  /* ── RIGHT COLUMN ── */
+  .right-col {
+    background: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 28px;
+    gap: 20px;
+  }
+
+  .right-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: #111010;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.4;
+    margin-bottom: 4px;
+  }
+
+  .card {
+    background: #FFFFFF;
+    border: 2px solid #111010;
+    box-shadow: 5px 5px 0 #111010;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .card-top {
+    padding: 16px 18px 14px;
+    border-bottom: 2px solid rgba(17,16,16,0.1);
+    position: relative;
+  }
+  .card-row-1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .niche-pill {
+    font-size: 10px;
+    font-weight: 800;
+    color: #FFFFFF;
+    background: #111010;
+    padding: 3px 8px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .card-time {
+    font-size: 11px; font-weight: 600; color: #111010; opacity: 0.4;
+  }
+  .match-badge {
+    margin-left: auto;
+    background: #FACC15;
+    border: 2px solid #111010;
+    font-size: 13px;
+    font-weight: 900;
+    color: #111010;
+    padding: 4px 10px;
+    letter-spacing: 0.02em;
+  }
+  .card-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #111010;
+    line-height: 1.3;
+    letter-spacing: -0.3px;
+    margin-bottom: 8px;
+  }
+  .card-tags {
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .tag {
+    font-size: 10px;
+    font-weight: 700;
+    color: #111010;
+    background: #F5F5F0;
+    border: 1.5px solid rgba(17,16,16,0.25);
+    padding: 3px 7px;
+    letter-spacing: 0.02em;
+  }
+
+  .card-bottom {
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #FAFAFA;
+  }
+  .card-budget {
+    font-size: 18px; font-weight: 900; color: #111010; letter-spacing: -0.5px;
+  }
+  .card-ai-score {
+    font-size: 11px; font-weight: 700; color: #111010; opacity: 0.45;
+  }
+  .card-btn {
+    font-size: 12px; font-weight: 800; color: #111010;
+    background: transparent;
+    border: 1.5px solid rgba(17,16,16,0.3);
+    padding: 5px 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  /* Match meter */
+  .match-meter {
+    height: 4px;
+    background: rgba(17,16,16,0.08);
+    border-radius: 0;
+    margin-top: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .match-fill {
+    height: 100%;
+    background: #FACC15;
+    border-right: 2px solid #111010;
+  }
+
+  /* separator */
+  .separator {
+    height: 2px;
+    background: rgba(17,16,16,0.08);
+    margin: 0 -28px;
+  }
+
+  /* right footer */
+  .right-footer {
+    background: #111010;
+    margin: 0 -28px -32px;
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .right-footer-text {
+    font-size: 13px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.2px;
+  }
+  .right-footer-text span { color: #FACC15; }
+  .right-footer-cta {
+    background: #FACC15; color: #111010;
+    font-size: 12px; font-weight: 900; padding: 8px 16px;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* Dots / decorative */
+  .score-row {
+    display: flex; align-items: center; gap: 6px; margin-top: 6px;
+  }
+  .score-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #111010;
+    opacity: 0.15;
+  }
+  .score-dot.active { opacity: 1; background: #FACC15; border: 1px solid #111010; }
+</style>
+</head>
+<body>
+<div class="banner">
+
+  <!-- LEFT COLUMN -->
+  <div class="left-col">
+    <div class="logo">
+      <div class="logo-mark">RL</div>
+      <div class="logo-name">RawLead</div>
+    </div>
+
+    <div class="left-eyebrow">Для digital-фрилансеров</div>
+    <div class="left-headline">Заказы<br>под твой<br>стек</div>
+    <div class="left-desc">
+      Персональная лента с оценкой совместимости — только те заказы, где ты реально нужен
+    </div>
+
+    <div class="feature-list">
+      <div class="feature-item">
+        <div class="feature-icon">✓</div>
+        <div class="feature-text">Лента под навыки, не общая выдача</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">AI</div>
+        <div class="feature-text">ИИ-черновик отклика под каждый заказ</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">%</div>
+        <div class="feature-text">Match показывает — твой заказ или нет</div>
+      </div>
+    </div>
+
+    <div class="left-cta">Попробовать бесплатно →</div>
+    <div class="left-url">rawlead.ru</div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="right-col">
+    <div class="right-label">Твоя лента · 2 заказа</div>
+
+    <!-- Card 1 — Dev, 94% -->
+    <div class="card">
+      <div class="card-top">
+        <div class="card-row-1">
+          <div class="niche-pill">Dev</div>
+          <div class="card-time">только что</div>
+          <div class="match-badge">Match 94%</div>
+        </div>
+        <div class="card-title">Парсер данных с интеграцией в Google Sheets — Python + API</div>
+        <div class="card-tags">
+          <span class="tag">Python</span>
+          <span class="tag">gspread</span>
+          <span class="tag">REST API</span>
+        </div>
+        <div class="match-meter"><div class="match-fill" style="width:94%"></div></div>
+      </div>
+      <div class="card-bottom">
+        <div>
+          <div class="card-budget">12 000 ₽</div>
+          <div class="card-ai-score">Оценка ИИ: отлично</div>
+        </div>
+        <div class="card-btn">Написать отклик</div>
+      </div>
+    </div>
+
+    <div class="separator" style="margin: 12px -28px;"></div>
+
+    <!-- Card 2 — Copywriting, 79% -->
+    <div class="card">
+      <div class="card-top">
+        <div class="card-row-1">
+          <div class="niche-pill">Текст</div>
+          <div class="card-time">3 мин назад</div>
+          <div class="match-badge">Match 79%</div>
+        </div>
+        <div class="card-title">Серия продающих e-mail для SaaS-продукта — 5 писем, onboarding</div>
+        <div class="card-tags">
+          <span class="tag">Копирайтинг</span>
+          <span class="tag">Email</span>
+          <span class="tag">SaaS</span>
+          <span class="tag">Onboarding</span>
+        </div>
+        <div class="match-meter"><div class="match-fill" style="width:79%"></div></div>
+      </div>
+      <div class="card-bottom">
+        <div>
+          <div class="card-budget">9 000 ₽</div>
+          <div class="card-ai-score">Оценка ИИ: хорошо</div>
+        </div>
+        <div class="card-btn">Написать отклик</div>
+      </div>
+    </div>
+
+    <div class="right-footer" style="margin-top: auto;">
+      <div class="right-footer-text">ИИ-черновик под <span>каждый</span> заказ</div>
+      <div class="right-footer-cta">Попробовать →</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

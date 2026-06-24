@@ -1,5 +1,5 @@
 const DEFAULT_LOOP =
-  "Принимаю проекты  ·  Remote  ·  Ответ ~24ч  ·  Full-stack  ·  Prod  ·  @rcnn43  ·  ";
+  "Принимаю проекты  ·  Удаленно  ·  Ответ ~24ч  ·  Full-stack  ·  Prod  ·  @rode_51  ·  ";
 
 interface Props { text?: string }
 

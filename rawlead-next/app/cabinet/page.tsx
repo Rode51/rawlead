@@ -75,6 +75,15 @@ function formatUntil(isoStr: string): string {
   return new Date(isoStr).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
 }
 
+function goQuizRetake() {
+  try {
+    sessionStorage.setItem('rawlead_quiz_retake', '1')
+  } catch {
+    // ignore
+  }
+  window.location.href = '/lenta/#quiz'
+}
+
 function mergePendingDrafts(items: LeadItem[]): LeadItem[] {
   const pending = readPendingDraftsMap()
   const byId = new Map(items.map(i => [i.id, i]))
@@ -365,9 +374,9 @@ function CabinetInner() {
   const subBadgeColor = subscription?.effective_access ? '#111010' : '#525252'
 
   const THRESHOLDS: Array<{ val: 60 | 80 | 100; label: string }> = [
-    { val: 60, label: 'Все подходящие (60%+)' },
-    { val: 80, label: 'Хорошие (80%+)' },
-    { val: 100, label: 'Только идеальные (100%)' },
+    { val: 60, label: 'Все подходящие' },
+    { val: 80, label: 'Хорошие' },
+    { val: 100, label: 'Только идеальные' },
   ]
 
   return (
@@ -526,12 +535,41 @@ function CabinetInner() {
 
         {/* 4. Inbox */}
         <div>
-          <h1
-            className="font-display font-black"
-            style={{ fontSize: '1.5rem', letterSpacing: '-0.04em', marginBottom: 8 }}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap',
+              marginBottom: 8,
+            }}
           >
-            Мои отклики
-          </h1>
+            <h1
+              className="font-display font-black"
+              style={{ fontSize: '1.5rem', letterSpacing: '-0.04em', margin: 0 }}
+            >
+              Мои отклики
+            </h1>
+            <button
+              type="button"
+              id="rl-cabinet-quiz-retake"
+              onClick={goQuizRetake}
+              style={{
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                color: '#525252',
+                background: 'transparent',
+                border: 'none',
+                padding: '4px 0',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                flexShrink: 0,
+              }}
+            >
+              Пройти тест заново
+            </button>
+          </div>
           <p style={{ fontSize: '0.9rem', color: '#525252', marginBottom: 20 }}>
             Отклики с ленты — здесь. Новые заказы →{' '}
             <Link href="/lenta/" style={{ color: '#111010', fontWeight: 600 }}>Лента</Link>

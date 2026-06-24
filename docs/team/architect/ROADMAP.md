@@ -10,14 +10,18 @@
 
 **Стадия:** prod **Next** на `rawlead.ru` · API+радар+бот на VPS · **M1 реклама запущена** · первые посетители **~23.06**
 
-### 🔴 M1 hot — риск для новых юзеров
+### 🔴 M1 hot — реклама live
 
-| # | Что | Почему срочно | Статус |
-|---|-----|---------------|--------|
-| **YOUDO-DETAIL** | Пробой **detail-fetch** YouDo (`/t{id}`) — полное ТЗ, не snippet | ServicePipe блокирует detail на VPS · L1/черновики YouDo слабее FL/Kwork · в ленте 4219 лидов с body 60–100 chars | **→ @coder P0** |
-| **mitigation** | Snippet-режим в ленте | `YOUDO_DETAIL_MIN_CHARS=0` · restore 4219 visible | ✅ 2026-06-22 |
+| # | Что | Почему | Статус |
+|---|-----|--------|--------|
+| **YOUDO-IMAP-ONLY** | Заказы **только из почты** · listing/antibot **выкл** · **last N + PG dedup** | Реклама · письма не доходят до ленты | **→ § CODER_PROMPT** P0 |
+| **QUIZ-REDESIGN** | Переделать квиз | После стабильного YouDo | **P1 queued** |
 
-**Для посетителя сейчас:** FL · Kwork · TG — **норм** (полное ТЗ) · YouDo — **есть в ленте**, но описание короткое · фильтры — ✅ после hotfix 22.06.
+**Для посетителя сейчас:** FL · Kwork · TG — **норм** · YouDo — **чиним IMAP** (не браузер).
+
+### ~~YOUDO-DETAIL / listing~~ — ⏸ 2026-06-23
+
+Решение owner: browser listing/click **не развиваем** · IMAP-only.
 
 **Канон проблемы:** [`2026-06-16-youdo-antibot-browser.md`](../../problems/2026-06-16-youdo-antibot-browser.md) · O262g detail ServicePipe · golden baseline O268.
 
@@ -43,7 +47,8 @@ WP тема в repo — **legacy**, не на корне домена. Rollback:
 
 | # | Что |
 |---|-----|
-| **YOUDO-DETAIL** | § `CODER_PROMPT` · detail breakthrough ServicePipe |
+| **YOUDO-IMAP-ONLY** | P0 · почта · **last N + PG dedup** · listing off |
+| **QUIZ-REDESIGN** | P1 · после YouDo ✅ · product+design → coder |
 | CSP/HSTS nginx | MiMo backlog |
 | JWT httpOnly | XSS hardening |
 | DB pool + feed COUNT | нагрузка >50 VU |

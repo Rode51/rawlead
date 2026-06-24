@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-07T12:09:18.036766+00:00",
+  "generated_at": "2026-06-20T12:43:42.080082+00:00",
   "base_url": "https://rawlead.ru",
   "tier": "premium",
   "browser": "chromium+token",
@@ -9,16 +9,16 @@
     "mobile"
   ],
   "scenarios_total": 24,
-  "scenarios_pass": 20,
-  "critical_count": 4,
-  "pass": false,
+  "scenarios_pass": 24,
+  "critical_count": 0,
+  "pass": true,
   "results": [
     {
       "id": "U1",
       "title": "Header + footer links",
       "viewport": "desktop",
       "pass": true,
-      "ms": 7004,
+      "ms": 1270,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U1_desktop_before.png",
@@ -30,7 +30,7 @@
       "title": "Лента: категория + навыки",
       "viewport": "desktop",
       "pass": true,
-      "ms": 10106,
+      "ms": 3125,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U2_desktop_before.png",
@@ -42,7 +42,7 @@
       "title": "Сортировка + закрытие",
       "viewport": "desktop",
       "pass": true,
-      "ms": 6967,
+      "ms": 3148,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U3_desktop_before.png",
@@ -54,7 +54,7 @@
       "title": "Expand + tap outside",
       "viewport": "desktop",
       "pass": true,
-      "ms": 8756,
+      "ms": 5180,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U4_desktop_before.png",
@@ -63,11 +63,11 @@
     },
     {
       "id": "U10b",
-      "title": "Draft×5 tools audit",
+      "title": "Draft×3 tools audit",
       "viewport": "desktop",
-      "pass": false,
-      "ms": 100312,
-      "error": "U10b: only 0/3 drafts OK (AI fail on other cards)",
+      "pass": true,
+      "ms": 89617,
+      "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U10b_desktop_before.png",
         "after": "data/preprod_ux_audit/U10b_desktop_after.png"
@@ -78,7 +78,7 @@
       "title": "Match breakdown",
       "viewport": "desktop",
       "pass": true,
-      "ms": 8017,
+      "ms": 2428,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U11_desktop_before.png",
@@ -86,23 +86,11 @@
       }
     },
     {
-      "id": "U12",
-      "title": "Tools auth-only",
-      "viewport": "desktop",
-      "pass": false,
-      "ms": 100196,
-      "error": "U12: premium — no «Инструменты» after draft",
-      "screenshots": {
-        "before": "data/preprod_ux_audit/U12_desktop_before.png",
-        "after": "data/preprod_ux_audit/U12_desktop_after.png"
-      }
-    },
-    {
       "id": "U5",
       "title": "Draft + инструменты",
       "viewport": "desktop",
       "pass": true,
-      "ms": 10839,
+      "ms": 6057,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U5_desktop_before.png",
@@ -110,11 +98,23 @@
       }
     },
     {
+      "id": "U12",
+      "title": "Tools auth-only",
+      "viewport": "desktop",
+      "pass": true,
+      "ms": 6165,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U12_desktop_before.png",
+        "after": "data/preprod_ux_audit/U12_desktop_after.png"
+      }
+    },
+    {
       "id": "U6",
       "title": "FAB support modal",
       "viewport": "desktop",
       "pass": true,
-      "ms": 6148,
+      "ms": 3261,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U6_desktop_before.png",
@@ -126,7 +126,7 @@
       "title": "ЛК: навыки + inbox",
       "viewport": "desktop",
       "pass": true,
-      "ms": 12639,
+      "ms": 1097,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U7_desktop_before.png",
@@ -138,7 +138,7 @@
       "title": "Marketing CTA",
       "viewport": "desktop",
       "pass": true,
-      "ms": 448,
+      "ms": 169,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U9_desktop_before.png",
@@ -150,7 +150,7 @@
       "title": "Console + network",
       "viewport": "desktop",
       "pass": true,
-      "ms": 63,
+      "ms": 64,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U10_desktop_before.png",
@@ -162,7 +162,7 @@
       "title": "Header + footer links",
       "viewport": "mobile",
       "pass": true,
-      "ms": 6620,
+      "ms": 1123,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U1_mobile_before.png",
@@ -174,7 +174,7 @@
       "title": "Лента: категория + навыки",
       "viewport": "mobile",
       "pass": true,
-      "ms": 11349,
+      "ms": 3622,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U2_mobile_before.png",
@@ -186,7 +186,7 @@
       "title": "Сортировка + закрытие",
       "viewport": "mobile",
       "pass": true,
-      "ms": 8512,
+      "ms": 3647,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U3_mobile_before.png",
@@ -198,7 +198,7 @@
       "title": "Expand + tap outside",
       "viewport": "mobile",
       "pass": true,
-      "ms": 8621,
+      "ms": 5821,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U4_mobile_before.png",
@@ -210,7 +210,7 @@
       "title": "Match breakdown",
       "viewport": "mobile",
       "pass": true,
-      "ms": 7996,
+      "ms": 2378,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U11_mobile_before.png",
@@ -218,23 +218,11 @@
       }
     },
     {
-      "id": "U12",
-      "title": "Tools auth-only",
-      "viewport": "mobile",
-      "pass": false,
-      "ms": 8847,
-      "error": "U12: premium — no «Инструменты» after draft",
-      "screenshots": {
-        "before": "data/preprod_ux_audit/U12_mobile_before.png",
-        "after": "data/preprod_ux_audit/U12_mobile_after.png"
-      }
-    },
-    {
       "id": "U5",
       "title": "Draft + инструменты",
       "viewport": "mobile",
       "pass": true,
-      "ms": 8769,
+      "ms": 6252,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U5_mobile_before.png",
@@ -242,11 +230,23 @@
       }
     },
     {
+      "id": "U12",
+      "title": "Tools auth-only",
+      "viewport": "mobile",
+      "pass": true,
+      "ms": 6519,
+      "error": null,
+      "screenshots": {
+        "before": "data/preprod_ux_audit/U12_mobile_before.png",
+        "after": "data/preprod_ux_audit/U12_mobile_after.png"
+      }
+    },
+    {
       "id": "U6",
       "title": "FAB support modal",
       "viewport": "mobile",
       "pass": true,
-      "ms": 6030,
+      "ms": 3243,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U6_mobile_before.png",
@@ -257,9 +257,9 @@
       "id": "U7",
       "title": "ЛК: навыки + inbox",
       "viewport": "mobile",
-      "pass": false,
-      "ms": 11618,
-      "error": "cabinet skills modal did not close on overlay tap",
+      "pass": true,
+      "ms": 783,
+      "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U7_mobile_before.png",
         "after": "data/preprod_ux_audit/U7_mobile_after.png"
@@ -270,7 +270,7 @@
       "title": "Mobile bottom sheet",
       "viewport": "mobile",
       "pass": true,
-      "ms": 11381,
+      "ms": 4200,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U8_mobile_before.png",
@@ -282,7 +282,7 @@
       "title": "Marketing CTA",
       "viewport": "mobile",
       "pass": true,
-      "ms": 419,
+      "ms": 150,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U9_mobile_before.png",
@@ -294,7 +294,7 @@
       "title": "Console + network",
       "viewport": "mobile",
       "pass": true,
-      "ms": 66,
+      "ms": 32,
       "error": null,
       "screenshots": {
         "before": "data/preprod_ux_audit/U10_mobile_before.png",
@@ -302,32 +302,45 @@
       }
     }
   ],
-  "findings": [
+  "findings": [],
+  "draft_reviews": [
     {
-      "severity": "critical",
-      "scenario": "U10b",
-      "viewport": "desktop",
-      "message": "Draft×5 tools audit: U10b: only 0/3 drafts OK (AI fail on other cards)"
+      "lead_id": "12437",
+      "index": 1,
+      "tools": [],
+      "draft_preview": "Здравствуйте! Готов выполнить визуальные доработки на вашем сайте WordPress, включая сложные анимации. Чтобы правки не затирались при обновлениях, буду работать через дочернюю тему. Пришлите, пожалуйста, файл с ТЗ для точной оценки сроков и стоимости. Подскажите, для анимаций есть предпочтения по технологии — CSS или JavaScript-библиотеки?",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card1_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card1_draft.png"
+      }
     },
     {
-      "severity": "critical",
-      "scenario": "U12",
-      "viewport": "desktop",
-      "message": "Tools auth-only: U12: premium — no «Инструменты» after draft"
+      "lead_id": "12258",
+      "index": 2,
+      "tools": [],
+      "draft_preview": "Здравствуйте! Готов разместить ваши объявления в интернете.\n\nЧтобы предложить подходящие площадки, подскажите, пожалуйста, что именно нужно рекламировать — товар или услугу?\n\nТакже важно уточнить: бюджет до 5000 ₽ — это только на работу или он включает и платные размещения на сайтах?",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card2_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card2_draft.png"
+      }
     },
     {
-      "severity": "critical",
-      "scenario": "U12",
-      "viewport": "mobile",
-      "message": "Tools auth-only: U12: premium — no «Инструменты» after draft"
-    },
-    {
-      "severity": "critical",
-      "scenario": "U7",
-      "viewport": "mobile",
-      "message": "ЛК: навыки + inbox: cabinet skills modal did not close on overlay tap"
+      "lead_id": "12217",
+      "index": 3,
+      "tools": [],
+      "draft_preview": "Здравствуйте! По вашей задаче — создам продающий сайт для бизнеса в сфере архитектурного и интерьерного декора. Сделаю акцент на портфолио, чтобы продемонстрировать вашу экспертизу в работе с освещением и светопрозрачными конструкциями для B2B и частных клиентов.\n\nС учетом бюджета, оптимальным решением будет сайт на Tilda: это позволит сделать стильный дизайн и сфокусироваться на подаче проектов. Продумаю структуру и формы для генерации заявок.\n\nПодскажите, у вас уже есть готовые фотографии и те",
+      "screenshots": {
+        "tools": "data/preprod_ux_audit/U10b_desktop_card3_tools.png",
+        "draft": "data/preprod_ux_audit/U10b_desktop_card3_draft.png"
+      }
     }
   ],
-  "draft_reviews": [],
-  "artifacts_dir": "data/preprod_ux_audit"
+  "artifacts_dir": "data/preprod_ux_audit",
+  "human_md": "data/preprod_ux_audit_human.md",
+  "llm": {
+    "path": "data/preprod_ux_audit_human.md",
+    "model": "google/gemini-2.5-flash-lite",
+    "mobile_screenshots": 12,
+    "llm_rating": null
+  }
 }

@@ -1,4 +1,4 @@
-"""O72d: перегенерация shared reply_draft в Neon (visible leads, gemini-2.5-pro).
+"""O72d: перегенерация shared reply_draft в prod Postgres (visible leads, gemini-2.5-pro).
 
   .venv\\Scripts\\python.exe scripts\\regen_shared_reply_drafts.py --profile site --dry-run --limit 5
   .venv\\Scripts\\python.exe scripts\\regen_shared_reply_drafts.py --profile site --apply --limit 80
@@ -123,6 +123,8 @@ def regen_one_lead(
             lite=lite,
             tools_required=tools,
             description=lead.get("body") or "",
+            source=lead.get("source") or "",
+            url=lead.get("url") or "",
             errors=ai_errors,
             log_prefix=prefix,
             timeout_sec=90.0,
@@ -269,11 +271,11 @@ def run_regen(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="O72d regen shared reply_draft in Neon")
+    parser = argparse.ArgumentParser(description="O72d regen shared reply_draft in prod Postgres")
     parser.add_argument("--profile", default="site", choices=("site", "legacy"))
     parser.add_argument("--limit", type=int, default=80, help="50–100 recommended")
     parser.add_argument("--lead-ids", default="", help="comma-separated lead ids")
-    parser.add_argument("--apply", action="store_true", help="write to Neon (default: dry-run)")
+    parser.add_argument("--apply", action="store_true", help="write to Postgres (default: dry-run)")
     parser.add_argument("--dry-run", action="store_true", help="explicit dry-run (default)")
     parser.add_argument("--sleep", type=float, default=1.5, help="pause between OpenRouter calls")
     parser.add_argument(

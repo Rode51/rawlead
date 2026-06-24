@@ -14,7 +14,7 @@
 
 
 
-**P1 v1 desktop — owner sign-off 2026-06-18.** **Prod:** https://rode51.ru — P1 live (Lead verify fetch 2026-06-20).
+**P1 v1 desktop — owner sign-off 2026-06-18.** **Prod:** https://rode51.ru — **P2** ✅ deploy Lead 2026-06-20.
 
 
 
@@ -48,7 +48,7 @@
 
 | p3 Mobile 390px | отложено | ⏸ |
 
-| p4 Deploy **rode51.ru** | owner «задеплой» + @lead-architect | ✅ P1 · **повторный deploy** после P2 merge |
+| p4 Deploy **rode51.ru** | owner «задеплой» + @lead-architect | ✅ **P2** 2026-06-20 |
 
 
 
@@ -173,7 +173,7 @@ Rode51 — инженер с живым prod. Тёмный editorial + terminal.
 | 2026-06-18 | RawLead = 4 кейса внутри одного проекта (не 4 фейковых продукта) |
 
 | 2026-06-18 | **P1 v1 desktop принят** → P2 polish |
-| 2026-06-20 | P2 WIP: WhyMe + FAQ + `/en` + 6 services · build ✅ · prod ещё P1 · metadataBase fix pending |
+| 2026-06-20 | **P2 deploy prod** — WhyMe, FAQ, `/en`, 6 services · 42 files · owner smoke 1440 |
 
 
 

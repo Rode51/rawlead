@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-06-20T04:14:21.857512+00:00",
+  "generated_at": "2026-06-20T11:07:20.628110+00:00",
   "base_url": "https://rawlead.ru",
   "pass": true,
   "desktop": {
-    "generated_at": "2026-06-20T04:14:17.196051+00:00",
+    "generated_at": "2026-06-20T11:07:15.581285+00:00",
     "base_url": "https://rawlead.ru",
     "viewport": "desktop",
     "scenarios_total": 23,
@@ -16,7 +16,7 @@
         "id": "n5",
         "viewport": "desktop",
         "pass": true,
-        "ms": 6011,
+        "ms": 28458,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -25,7 +25,7 @@
         "id": "n16",
         "viewport": "desktop",
         "pass": true,
-        "ms": 44556,
+        "ms": 77364,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -34,7 +34,7 @@
         "id": "n17",
         "viewport": "desktop",
         "pass": true,
-        "ms": 6589,
+        "ms": 7427,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -43,7 +43,7 @@
         "id": "n1",
         "viewport": "desktop",
         "pass": true,
-        "ms": 5296,
+        "ms": 6039,
         "error": null,
         "screenshot": null,
         "steps": [
@@ -58,7 +58,7 @@
         "id": "n2",
         "viewport": "desktop",
         "pass": true,
-        "ms": 8355,
+        "ms": 8497,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -67,7 +67,7 @@
         "id": "n3",
         "viewport": "desktop",
         "pass": true,
-        "ms": 3142,
+        "ms": 3139,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -76,7 +76,7 @@
         "id": "n6",
         "viewport": "desktop",
         "pass": true,
-        "ms": 5534,
+        "ms": 5605,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -85,7 +85,7 @@
         "id": "n7",
         "viewport": "desktop",
         "pass": true,
-        "ms": 14478,
+        "ms": 14334,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -94,7 +94,7 @@
         "id": "n25",
         "viewport": "desktop",
         "pass": true,
-        "ms": 9341,
+        "ms": 9448,
         "error": null,
         "screenshot": null,
         "steps": [
@@ -105,7 +105,7 @@
         "id": "n8",
         "viewport": "desktop",
         "pass": true,
-        "ms": 2931,
+        "ms": 3100,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -114,7 +114,7 @@
         "id": "n9",
         "viewport": "desktop",
         "pass": true,
-        "ms": 2290,
+        "ms": 2311,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -123,7 +123,7 @@
         "id": "n10",
         "viewport": "desktop",
         "pass": true,
-        "ms": 1966,
+        "ms": 1993,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -132,7 +132,7 @@
         "id": "n11",
         "viewport": "desktop",
         "pass": true,
-        "ms": 5242,
+        "ms": 5274,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -141,7 +141,7 @@
         "id": "n12",
         "viewport": "desktop",
         "pass": true,
-        "ms": 1423,
+        "ms": 1454,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -150,7 +150,7 @@
         "id": "n13",
         "viewport": "desktop",
         "pass": true,
-        "ms": 1471,
+        "ms": 1628,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -159,7 +159,7 @@
         "id": "n14",
         "viewport": "desktop",
         "pass": true,
-        "ms": 2935,
+        "ms": 2768,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -168,7 +168,7 @@
         "id": "n15",
         "viewport": "desktop",
         "pass": true,
-        "ms": 3970,
+        "ms": 3841,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -177,7 +177,7 @@
         "id": "n18",
         "viewport": "desktop",
         "pass": true,
-        "ms": 4127,
+        "ms": 3794,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -186,7 +186,7 @@
         "id": "n19",
         "viewport": "desktop",
         "pass": true,
-        "ms": 5429,
+        "ms": 5480,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -195,7 +195,7 @@
         "id": "n21",
         "viewport": "desktop",
         "pass": true,
-        "ms": 12276,
+        "ms": 12258,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -204,7 +204,7 @@
         "id": "n22",
         "viewport": "desktop",
         "pass": true,
-        "ms": 10068,
+        "ms": 10281,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -213,7 +213,7 @@
         "id": "n23",
         "viewport": "desktop",
         "pass": true,
-        "ms": 4191,
+        "ms": 4261,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -222,7 +222,7 @@
         "id": "n24",
         "viewport": "desktop",
         "pass": true,
-        "ms": 1926,
+        "ms": 2010,
         "error": null,
         "screenshot": null,
         "steps": []
@@ -231,7 +231,7 @@
     "artifacts_dir": "data\\preprod_next_e2e"
   },
   "mobile": {
-    "generated_at": "2026-06-20T04:14:21.857512+00:00",
+    "generated_at": "2026-06-20T11:07:20.628110+00:00",
     "base_url": "https://rawlead.ru",
     "viewport": "mobile",
     "scenarios_total": 1,
@@ -244,7 +244,7 @@
         "id": "n20",
         "viewport": "mobile",
         "pass": true,
-        "ms": 4284,
+        "ms": 4543,
         "error": null,
         "screenshot": null,
         "steps": []

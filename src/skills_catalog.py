@@ -539,11 +539,21 @@ def partition_lead_tags(raw_tags: list[str]) -> tuple[tuple[str, ...], tuple[str
 
 
 _CMS_NON_WP_MARKERS = ("joomla", "bitrix", "opencart", "baforms")
+_TILDA_MARKERS = ("tilda", "тильда", "zero block", "zero-block", "tilda commerce", "tilda pay")
 
 
-def _text_has_non_wp_cms(title: str, snippet: str) -> bool:
-    hay = f"{title or ''}\n{snippet or ''}".casefold()
+def _l1_cms_hay(title: str, snippet: str, body: str = "") -> str:
+    return f"{title or ''}\n{snippet or ''}\n{body or ''}".casefold()
+
+
+def _text_has_non_wp_cms(title: str, snippet: str, *, body: str = "") -> bool:
+    hay = _l1_cms_hay(title, snippet, body)
     return any(m in hay for m in _CMS_NON_WP_MARKERS)
+
+
+def _text_has_tilda_markers(title: str, snippet: str, *, body: str = "") -> bool:
+    hay = _l1_cms_hay(title, snippet, body)
+    return any(m in hay for m in _TILDA_MARKERS)
 
 
 def sanitize_l1_cms_tags(
@@ -551,11 +561,22 @@ def sanitize_l1_cms_tags(
     *,
     title: str = "",
     snippet: str = "",
+    body: str = "",
 ) -> tuple[str, ...]:
-    """Post-validate L1: Joomla/Bitrix/OpenCart/BaForms ≠ wordpress_dev (O47)."""
-    if not lead_tags or "wordpress_dev" not in lead_tags:
+    """Post-validate L1: Joomla/Bitrix/OpenCart/BaForms/Tilda ≠ wordpress_dev (O47)."""
+    if not lead_tags:
         return lead_tags
-    if not _text_has_non_wp_cms(title, snippet):
+
+    if "wordpress_dev" in lead_tags and _text_has_tilda_markers(title, snippet, body=body):
+        tags = [t for t in lead_tags if t != "wordpress_dev"]
+        has_dev = any(category_for_canonical_tag(t) == "dev" for t in tags)
+        if (has_dev or not tags) and "tilda_dev" not in tags and len(tags) < _L1_MAX_TAGS:
+            tags.append("tilda_dev")
+        return tuple(tags[:_L1_MAX_TAGS])
+
+    if "wordpress_dev" not in lead_tags:
+        return lead_tags
+    if not _text_has_non_wp_cms(title, snippet, body=body):
         return lead_tags
     tags = [t for t in lead_tags if t != "wordpress_dev"]
     has_dev = any(category_for_canonical_tag(t) == "dev" for t in tags)

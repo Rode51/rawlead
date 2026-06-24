@@ -51,7 +51,53 @@ _SKILLS_MISMATCH_FIXTURE = PreprodLeadFixture(
     ),
     url="https://www.fl.ru/projects/skills-mismatch-node/",
 )
-_PREPROD_TEST_USER_ID = "895912a1-ffb6-46fb-be7e-4e051f2ff8c1"
+# VPS Postgres acc1 — см. docs/ops/PREPROD_ACCOUNTS.md (Neon legacy: 895912a1-…)
+_PREPROD_TEST_TG_USER_ID = 8233488286
+_PREPROD_TEST_USER_ID = "7a83dbd8-ab41-4350-a183-38370d5b5c1c"
+
+
+def _is_transient_db_error(exc: BaseException) -> bool:
+    msg = str(exc).casefold()
+    return any(
+        token in msg
+        for token in (
+            "server closed the connection",
+            "connection unexpectedly",
+            "connection reset",
+            "connection refused",
+            "could not connect",
+            "timeout expired",
+        )
+    )
+
+
+def _ensure_preprod_test_user(cur, preferred_user_id: str) -> str:
+    """Resolve acc1 on VPS Postgres; upsert if missing (FK user_tags_user_id_fkey)."""
+    cur.execute("SELECT id::text FROM users WHERE tg_user_id = %s", (_PREPROD_TEST_TG_USER_ID,))
+    row = cur.fetchone()
+    if row:
+        return str(row[0])
+
+    cur.execute("SELECT id::text FROM users WHERE id = %s::uuid", (preferred_user_id,))
+    row = cur.fetchone()
+    if row:
+        return str(row[0])
+
+    cur.execute(
+        """
+        INSERT INTO users (id, tg_user_id, tg_username, tg_first_name)
+        VALUES (%s::uuid, %s, %s, %s)
+        ON CONFLICT (id) DO NOTHING
+        """,
+        (preferred_user_id, _PREPROD_TEST_TG_USER_ID, "preprod_acc1", "Preprod Acc1"),
+    )
+    cur.execute("SELECT id::text FROM users WHERE id = %s::uuid", (preferred_user_id,))
+    row = cur.fetchone()
+    if not row:
+        raise RuntimeError(f"preprod user upsert failed for {preferred_user_id}")
+    return str(row[0])
+
+
 # O168 g3: ondemand L2 = up to 2×90s OR attempts + outer retry (match_push._analyze_shared_ondemand)
 _SKILLS_MISMATCH_MAX_MS = 300_000
 
@@ -232,6 +278,7 @@ def _run_skills_mismatch(cfg) -> dict:
     ext_id = f"skills-mismatch-{int(time.time())}"
     with psycopg.connect(db_url) as conn:
         with conn.cursor() as cur:
+            user_id = _ensure_preprod_test_user(cur, user_id)
             cur.execute("DELETE FROM user_tags WHERE user_id = %s::uuid", (user_id,))
             cur.execute(
                 "INSERT INTO user_tags (user_id, tag) VALUES (%s::uuid, %s)",
@@ -269,15 +316,32 @@ def _run_skills_mismatch(cfg) -> dict:
         conn.commit()
 
     t0 = time.perf_counter()
-    try:
-        result = generate_and_store_lead_draft(
-            cfg,
-            user_id=user_id,
-            lead_id=int(lead_id),
-            log_prefix="skills_mismatch:",
-            enforce_rate_limit=False,
-        )
-    except Exception as exc:
+    result = None
+    last_exc: Exception | None = None
+    for attempt in range(2):
+        try:
+            result = generate_and_store_lead_draft(
+                cfg,
+                user_id=user_id,
+                lead_id=int(lead_id),
+                log_prefix="skills_mismatch:",
+                enforce_rate_limit=False,
+            )
+            break
+        except Exception as exc:
+            last_exc = exc
+            if attempt == 0 and _is_transient_db_error(exc):
+                time.sleep(3)
+                continue
+            return {
+                "scenario": "skills_mismatch",
+                "pass": False,
+                "lead_id": lead_id,
+                "error": str(exc),
+                "summary": {"pass": False, "errors": [str(exc)]},
+            }
+    if result is None:
+        exc = last_exc or RuntimeError("draft generation failed")
         return {
             "scenario": "skills_mismatch",
             "pass": False,

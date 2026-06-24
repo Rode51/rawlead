@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily RawLead leads retention purge (7d)
+Description=Daily RawLead leads retention purge (2d)
 
 [Timer]
 OnCalendar=*-*-* 03:15:00

@@ -21,7 +21,7 @@
 
 | Env | Назначение |
 |-----|------------|
-| `RAWLEAD_PREPROD_ACCESS_TOKEN` | Bearer JWT **acc1 test user** в Neon — обязателен для O37c |
+| `RAWLEAD_PREPROD_ACCESS_TOKEN` | Bearer JWT **acc1 test user** в prod Postgres — обязателен для O37c |
 
 ### Способ 1 — mint на VPS (рекомендуется после O271)
 
@@ -42,11 +42,11 @@ ssh -i C:\Users\hramo\.ssh\id_rawlead_vps -L 15432:127.0.0.1:5432 root@62.113.10
 
 В `.env.site`: `DATABASE_URL=postgresql://rawlead:...@127.0.0.1:15432/rawlead?sslmode=disable` · затем `preprod_mint_token.py --account acc1 --write-env-site`.
 
-### Способ 1c — mint локально (legacy, только если Neon ожил)
+**Синхронизация с VPS (owner):** `python scripts/_fix_local_env_vps_db.py` — копирует `DATABASE_URL` с VPS → локальный tunnel `:15432`, Neon из `.env` → `NEON_DATABASE_URL`.
 
-```powershell
-.venv\Scripts\python.exe scripts\preprod_mint_token.py --account acc1 --write-env-site
-```
+### Способ 1c — устарел (Neon снят с prod)
+
+Не использовать. Если в `.env.site` остался `*.neon.tech` — заменить на VPS (§ 1b).
 
 **Проверка:** `user_id` в stdout **≠** owner `164786fe-b979-4bfa-a9dc-42416465f503` — иначе acc1 = ваш личный TG, нужен другой `.session`.
 
@@ -73,7 +73,7 @@ ssh -i C:\Users\hramo\.ssh\id_rawlead_vps -L 15432:127.0.0.1:5432 root@62.113.10
 
 ---
 
-## Neon test user (acc1)
+## Test user acc1 (VPS Postgres)
 
 После mint в docs здесь uuid (без секрета):
 
@@ -87,7 +87,7 @@ ssh -i C:\Users\hramo\.ssh\id_rawlead_vps -L 15432:127.0.0.1:5432 root@62.113.10
 
 ## Monica (O218 j5 · tier smoke trial path)
 
-**TG test persona** — не Telethon acc1. Сейчас на prod (**Neon 2026-06-17**):
+**TG test persona** — не Telethon acc1. Сейчас на prod (**VPS Postgres 2026-06-17**):
 
 | Поле | Значение |
 |------|----------|
@@ -95,7 +95,7 @@ ssh -i C:\Users\hramo\.ssh\id_rawlead_vps -L 15432:127.0.0.1:5432 root@62.113.10
 | `user_id` (uuid) | `8d5afb3d-e8bd-4970-a33d-21c3ddeafdef` |
 | TG username | `@RawLead` (display RawLead) |
 | `plan` | **agent** (premium) · `active_until` **2026-07-15** |
-| Quiz tags | **27** в Neon |
+| Quiz tags | **27** в prod Postgres |
 
 **O218 j5:** Monica **как есть** — premium даёт реальный % на карточках (то же, что trial для UI). **Wipe не нужен.**
 

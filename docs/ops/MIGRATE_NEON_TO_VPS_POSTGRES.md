@@ -1,6 +1,6 @@
 # Миграция Neon → Postgres на VPS (O271)
 
-**Статус:** ⏳ in progress · **ветка:** `o271/pre-vps-postgres-migration` · commit **перед** сменой `DATABASE_URL` на prod.
+**Статус:** ✅ **prod на VPS** (2026-06-19) · **локальный** `.env.site` с `*.neon.tech` — заменить (§ `PREPROD_ACCOUNTS` 1b).
 
 **Зачем:** Neon Free — `compute time quota exceeded` · оплата из РФ недоступна · Postgres на том же VPS = localhost, без квоты.
 

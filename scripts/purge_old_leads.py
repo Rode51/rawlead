@@ -1,4 +1,4 @@
-"""RETENTION-7D: удалить leads старше N дней (users/user_tags/subscriptions не трогаем).
+"""RETENTION-2D: удалить leads старше N дней (users/user_tags/subscriptions не трогаем).
 
 O181: второй проход — DELETE delisted rows (is_visible=false + delist_reason) после
 DELIST_PURGE_DAYS (env, default 1). FK child tables ON DELETE CASCADE.
@@ -28,7 +28,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 
 from config import load_radar_env
 
-_DEFAULT_DAYS = 7
+_DEFAULT_DAYS = 2
 _DEFAULT_DELIST_PURGE_DAYS = 1
 
 

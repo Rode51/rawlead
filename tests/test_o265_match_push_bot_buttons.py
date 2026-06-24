@@ -15,6 +15,7 @@ sys.path.insert(0, str(_ROOT))
 from match_push import (  # noqa: E402
     _NOPE_CALLBACK_RE,
     _push_keyboard,
+    _draft_result_keyboard,
     _send_tg_draft_result,
     handle_tg_draft_callback,
     handle_tg_nope_callback,
@@ -98,6 +99,61 @@ class TestO265NopeCallback(TestCase):
         self.assertTrue(touch)
 
 
+class TestO265DraftResultKeyboard(TestCase):
+    def test_keyboard_has_copy_text_and_url(self) -> None:
+        raw = _draft_result_keyboard(
+            reply_draft="Здравствуйте, готов взяться.",
+            order_url="https://kwork.ru/projects/123/view",
+            source="kwork",
+        )
+        data = json.loads(raw)
+        labels = [btn["text"] for row in data["inline_keyboard"] for btn in row]
+        self.assertEqual(labels, ["Скопировать текст", "На Kwork ↗"])
+
+    def test_copy_text_strips_price_deadline(self) -> None:
+        raw = _draft_result_keyboard(
+            reply_draft="Текст отклика\n\nЦена: 5000 ₽\nСрок: 3 дня",
+            order_url="https://fl.ru/projects/456/",
+            source="fl",
+        )
+        data = json.loads(raw)
+        copy_btn = data["inline_keyboard"][0][0]
+        self.assertIsInstance(copy_btn["copy_text"], dict)
+        self.assertEqual(copy_btn["copy_text"]["text"], "Текст отклика")
+        self.assertNotIn("5000", copy_btn["copy_text"]["text"])
+
+    def test_copy_text_truncates_at_256(self) -> None:
+        long_text = "А" * 300
+        raw = _draft_result_keyboard(
+            reply_draft=long_text,
+            order_url="https://kwork.ru/1",
+            source="kwork",
+        )
+        data = json.loads(raw)
+        copy_text = data["inline_keyboard"][0][0]["copy_text"]["text"]
+        self.assertLessEqual(len(copy_text), 256)
+        self.assertTrue(copy_text.endswith("…"))
+
+    def test_url_fallback_to_lenta(self) -> None:
+        raw = _draft_result_keyboard(
+            reply_draft="Текст",
+            order_url="",
+            source="youdo",
+        )
+        data = json.loads(raw)
+        url_btn = data["inline_keyboard"][0][1]
+        self.assertIn("rawlead.ru/lenta", url_btn["url"])
+
+    def test_empty_source_uses_generic_label(self) -> None:
+        raw = _draft_result_keyboard(
+            reply_draft="Текст",
+            order_url="https://example.com",
+            source="",
+        )
+        data = json.loads(raw)
+        self.assertEqual(data["inline_keyboard"][0][1]["text"], "На биржу ↗")
+
+
 class TestO265DraftCallback(TestCase):
     def test_send_tg_draft_result_applies_draft_weight(self) -> None:
         cfg = MagicMock()
@@ -119,6 +175,33 @@ class TestO265DraftCallback(TestCase):
             888,
             "draft",
         )
+
+    def test_send_tg_draft_result_includes_keyboard(self) -> None:
+        cfg = MagicMock()
+        errors: list[str] = []
+        with (
+            patch("match_push._send_draft_reply") as mock_reply,
+            patch("api_server._apply_tag_weight_event_for_lead"),
+        ):
+            _send_tg_draft_result(
+                cfg,
+                222,
+                888,
+                "Здравствуйте, готов взяться.",
+                errors,
+                "00000000-0000-0000-0000-000000000001",
+                source="kwork",
+                order_url="https://kwork.ru/projects/888/view",
+            )
+        mock_reply.assert_called_once()
+        call_args = mock_reply.call_args
+        reply_markup = call_args[1].get("reply_markup") or call_args[0][3] if len(call_args[0]) > 3 else None
+        # reply_markup is passed as keyword arg
+        self.assertIn("reply_markup", call_args[1])
+        markup = json.loads(call_args[1]["reply_markup"])
+        labels = [btn["text"] for row in markup["inline_keyboard"] for btn in row]
+        self.assertIn("Скопировать текст", labels)
+        self.assertIn("На Kwork ↗", labels)
 
     def test_draft_ready_triggers_send_result(self) -> None:
         cfg = MagicMock()

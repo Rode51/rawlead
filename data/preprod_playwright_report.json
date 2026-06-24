@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-07T13:27:17.430718+00:00",
+  "generated_at": "2026-06-20T09:53:59.046110+00:00",
   "base_url": "https://rawlead.ru",
   "scenarios_total": 5,
   "scenarios_pass": 5,
@@ -8,31 +8,31 @@
     {
       "name": "lenta_loads",
       "pass": true,
-      "ms": 1070,
+      "ms": 2136,
       "error": null
     },
     {
       "name": "multi_category",
       "pass": true,
-      "ms": 1708,
+      "ms": 1420,
       "error": null
     },
     {
       "name": "skills_apply",
       "pass": true,
-      "ms": 610,
+      "ms": 294,
       "error": null
     },
     {
       "name": "cabinet_login_stub",
       "pass": true,
-      "ms": 1216,
+      "ms": 207,
       "error": null
     },
     {
       "name": "no_verdict_chips",
       "pass": true,
-      "ms": 1878,
+      "ms": 1535,
       "error": null
     }
   ]

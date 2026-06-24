@@ -20,7 +20,7 @@ const DEFAULT: FooterContent = {
   sub1:     'Расскажи задачу в Telegram — отвечу за 24ч.',
   sub2:     'Фиксированная цена, без сюрпризов.',
   cta:      '→ Написать в Telegram',
-  handle:   '@rcnn43',
+  handle:   '@rode_51',
   city:     'МОСКВА',
 }
 
@@ -97,7 +97,7 @@ export default function Footer({ content, locale = 'ru' }: Props) {
           }}
         >
           <a
-            href="https://t.me/rcnn43"
+            href="https://t.me/rode_51"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-3 font-mono font-medium bg-amber text-void px-8 py-4 hover:opacity-90 transition-opacity"
@@ -106,12 +106,15 @@ export default function Footer({ content, locale = 'ru' }: Props) {
             {c.cta}
           </a>
 
-          <p
-            className="font-mono text-muted text-right"
+          <a
+            href="https://t.me/rode_51"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-muted text-right hover:text-snow transition-colors"
             style={{ fontSize: '10px', letterSpacing: '0.12em' }}
           >
             {c.handle}
-          </p>
+          </a>
         </div>
 
       </div>

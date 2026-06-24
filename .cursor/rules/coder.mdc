@@ -38,12 +38,13 @@ alwaysApply: false
 
 Перед правкой кода — **Read/grep** (skill `rawlead-search-first`, подхватывается сам). WP/CSS live — `rawlead-wp-live-dev` если в PROMPT или Local/BrowserSync. **Не** @ skill в чате — владелец не обязан.
 
-## Структура кода (жёстко)
+## Структура кода (жёстко — Lead verify)
 
 | Правило | Деталь |
 |---------|--------|
-| **Без простыней** | Не лить в `tg_monitor.py` / `config.py` — отдельный модуль |
-| **Один файл — одна роль** | см. [`CODE_STRUCTURE.md`](docs/team/architect/CODE_STRUCTURE.md) по ссылке из промпта |
+| **Без простыней** | Не лить в heavy/god-files — отдельный модуль · лимиты: `lead-architect.mdc` § **Архитектурный гард** |
+| **Один файл — одна роль** | см. [`CODE_STRUCTURE.md`](docs/team/architect/CODE_STRUCTURE.md) |
+| **Лимит файлов** | **≤3** на задачу (MiMo) · иначе Lead → **Маршрут: @coder** |
 | **Перенос папок** | Только по TZ Lead в `CODER_PROMPT` |
 | **После сессии** | `STATUS.md` → Сделано / Файлы / Как проверить |
 

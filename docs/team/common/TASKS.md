@@ -4,16 +4,15 @@
 
 ---
 
-## → Now (2026-06-22)
+## → Now (2026-06-23)
 
 | Кто | Что |
 |-----|-----|
-| **owner** | **M1** — реклама запущена · первые визиты ~23.06 · smoke `/lenta/` |
-| **@coder** (Cursor) | fallback · § **YOUDO-DETAIL** если >3 файлов |
-| **MiMo `coder`** | **основной** кодинг по § `CODER_PROMPT` |
-| **@lead-portfolio** | rode51.ru — только если owner хочет правки сайта |
+| **owner** | smoke TG «Смотреть в ленте» — карточка **остаётся** раскрытой |
+| **owner** | smoke `/lenta/` YouDo · квиз → cloud после ТЗ |
+| **@lead-product** + **@lead-designer** | § **QUIZ-REDESIGN** ТЗ |
 
-**Закрыто:** § YOUDO-RESTORE-SNIPPETS ✅ · § BOT-NOTIFY-START ✅ · PRE-ADS-GATE G0–G10 ✅ · O280 ✅
+**Закрыто:** YOUDO-CLICK-PROXY ⏸ (IMAP-only) · YOUDO-IMAP deploy ✅
 
 ---
 
@@ -21,9 +20,27 @@
 
 | # | Что | Кто | Приоритет | Статус |
 |---|-----|-----|-----------|--------|
-| **YOUDO-DETAIL** | detail-fetch `/t{id}` — полное ТЗ, метрика `detail_ok_rate` | **MiMo coder** | **P0 M1** | § `CODER_PROMPT` |
-| **ARTICLE** | demo inbox для статьи | **MiMo coder** | P1 | § `CODER_PROMPT` |
-| **M1** | посевы + мониторинг конверсии | owner | **→ сейчас** | live |
+| **LENTA-DEEPLINK-RACE** | deep link flash → стабильный focus | — | P0 | ✅ deploy 2026-06-23 |
+| **LENTA-LEAD-DEEPLINK** | TG «Смотреть в ленте» → карточка | — | P1 | ✅ deploy 2026-06-23 |
+| **TG-DRAFT-BUTTONS** | TG кнопки в сообщении черновика | — | P1 | ✅ deploy 2026-06-23 |
+| **NEXT-DRAFT-PLATFORM** | L2 черновик + link под биржу (Kwork t3203318) | — | **P1** | ✅ deploy 2026-06-23 |
+| **NEXT-UI-HOTFIX** | FeedCard без «Свернуть» · Hero без CTA flash | — | **P1** | ✅ deploy 2026-06-23 |
+| **YOUDO-IMAP-ONLY** | model B deploy | — | — | ✅ 2026-06-23 |
+| **QUIZ-REDESIGN** | переделать квиз | product+design → **cloud** | **P1** | после YouDo |
+| **YOUDO-IMAP** | timer deploy | — | — | ✅ 2026-06-22 |
+| **YOUDO-CLICK-PROXY** | sticky click | — | — | ⏸ отменено 2026-06-23 |
+| **YOUDO-SP-STABLE** | sticky human click | — | — | ✅ deploy (same bundle) |
+| **YOUDO-SOURCE-GATE** | detail_ok gate | — | — | ✅ deploy 2026-06-22 |
+| **YOUDO-AUDIT-P0** | dedup click-through | — | — | ✅ deploy |
+| **FEED-HYGIENE** | МИМО filter · `--apply` VPS | — | — | ⏸ owner отмена 2026-06-24 |
+| **YOUDO-AUDIT** | read-only аудит | **MiMo audit** | — | ✅ doc |
+| **ARTICLE** | demo inbox для статьи | — | — | ⏸ owner отмена 2026-06-24 |
+| **AUTH-LOGIN-PHONE** | телефон → код в TG | — | — | ⏸ owner отмена 2026-06-24 |
+| **RETENTION-2D** | лента + purge 2 дня (было 7) | — | — | ✅ deploy 2026-06-24 |
+| **AI-IMAP-REFRESH-L1** | invisible YouDo: не гонять L1 каждые 90 с если `has_l1` | — | — | ✅ deploy 2026-06-24 |
+| **RULES-AUDIT-W1** | CODER_PROMPT+STATUS архив → hot ≤ лимитов | **Lead** | **✅ 2026-06-24** | hot 54/58 · bulk `*_W1_20260624_BULK.md` |
+| **RULES-AUDIT-W2** | slim mimo · copy-paste · lead-no-code hotfix | **Lead** | **✅ 2026-06-24** | канон `mimo.mdc` § Копипаст |
+| **RULES-AUDIT-W3** | react-best-practices off always-on | **owner** | **✅ 2026-06-24** | Agent decides (Cursor Rules) |
 | **P1–P6** | post-M1 tech (см. CODER_PROMPT) | @coder | backlog | backlog |
 | **O39-docs** | TZ_API + schema docs | Lead | P2 | ⏳ |
 | **A9–A11** | repo hygiene (scripts archive) | @coder | P3 | ⏳ |

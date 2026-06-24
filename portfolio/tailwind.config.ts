@@ -17,8 +17,8 @@ const config: Config = {
         amber:   "#F5A623",
       },
       fontFamily: {
-        display: ["var(--font-barlow-condensed)", "sans-serif"],
-        mono:    ["var(--font-geist-mono)", "ui-monospace", "monospace"],
+        display: ["var(--font-barlow-condensed)", "var(--font-oswald)", "sans-serif"],
+        mono:    ["var(--font-geist-mono)", "var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
       },
       keyframes: {
         letterIn: {

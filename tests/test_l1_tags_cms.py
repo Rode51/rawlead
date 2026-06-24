@@ -42,11 +42,21 @@ _GOLDEN = (
         "expected": ("telegram_bot_dev", "python"),
     },
     {
-        "name": "one_c",
-        "title": "Обмен сайта с 1С",
-        "snippet": "1с предприятие выгрузка каталога, CommerceML",
-        "input_tags": ("api_integration",),
-        "expected": ("api_integration",),
+        "name": "tilda_turnkey",
+        "title": "Сайт под ключ",
+        "snippet": (
+            "Нужен специалист по Tilda для интернет-магазина цифровых товаров. "
+            "Zero Block, Tilda Commerce, корзина и ЮKassa."
+        ),
+        "input_tags": ("wordpress_dev", "html_css"),
+        "expected": ("html_css", "tilda_dev"),
+    },
+    {
+        "name": "tilda_zero_block",
+        "title": "Сделать лендинг",
+        "snippet": "Сверстать сайт на Тильде по макету, Zero Block, формы",
+        "input_tags": ("wordpress_dev",),
+        "expected": ("tilda_dev",),
     },
 )
 

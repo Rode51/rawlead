@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 const DEFAULT_REASONS = [
   { title: 'ФИКСИРОВАННАЯ ЦЕНА', body: 'Называю стоимость до начала работы. Никаких «немного доплатить» в процессе.' },
   { title: 'ОПЛАТА ПОСЛЕ',       body: 'Проверяешь что всё работает как надо — потом платишь.' },
-  { title: 'REMOTE',             body: 'Работаю из любой точки. Без офиса, без митингов без причины.' },
+  { title: 'УДАЛЕННО',           body: 'Работаю из любой точки. Без офиса, без митингов без причины.' },
   { title: 'ПОДДЕРЖКА',          body: 'Остаюсь на связи после сдачи. Сломается — починю.' },
 ]
 
@@ -57,9 +57,9 @@ export default function WhyMe({ content }: Props) {
               <h3
                 className="font-display font-black text-snow"
                 style={{
-                  fontSize: 'clamp(18px, 1.8vw, 26px)',
-                  lineHeight: 0.95,
-                  letterSpacing: '-0.01em',
+                  fontSize: 'clamp(22px, 2.2vw, 34px)',
+                  lineHeight: 0.92,
+                  letterSpacing: '-0.02em',
                 }}
               >
                 {r.title}
@@ -67,7 +67,7 @@ export default function WhyMe({ content }: Props) {
               <p
                 className="font-mono text-muted mt-auto"
                 style={{
-                  fontSize: 'clamp(10px, 0.85vw, 12px)',
+                  fontSize: 'clamp(11px, 0.85vw, 12px)',
                   letterSpacing: '0.04em',
                   lineHeight: 1.75,
                 }}

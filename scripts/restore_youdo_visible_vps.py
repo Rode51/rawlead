@@ -23,13 +23,15 @@ sys.path.insert(0, str(_ROOT / "src"))
 
 from config import apply_profile_argv, load_config, load_radar_env  # noqa: E402
 from pg_storage import pg_storage_from_config  # noqa: E402
+from vacancy_filter import is_physical_service_job  # noqa: E402
 
 _FETCH_SQL = """
-SELECT id, external_id, length(body) AS body_len, title
+SELECT id, external_id, length(body) AS body_len, title, body, ai_verdict
 FROM leads
 WHERE source = 'youdo'
   AND is_visible = FALSE
   AND (delist_reason IS NULL OR delist_reason = 'youdo_detail_short')
+  AND COALESCE(ai_verdict, '') <> 'МИМО'
 ORDER BY id
 LIMIT 1000
 """
@@ -40,7 +42,20 @@ SET is_visible = TRUE, delist_reason = NULL
 WHERE source = 'youdo'
   AND is_visible = FALSE
   AND (delist_reason IS NULL OR delist_reason = 'youdo_detail_short')
+  AND COALESCE(ai_verdict, '') <> 'МИМО'
+  AND id = ANY(%s::bigint[])
 """
+
+
+def _eligible_for_restore(
+    *,
+    title: str | None,
+    body: str | None,
+    ai_verdict: str | None,
+) -> bool:
+    if (ai_verdict or "").strip() == "МИМО":
+        return False
+    return not is_physical_service_job(title or "", body or "")
 
 
 def _fetch_hidden(pg) -> list[tuple]:
@@ -72,22 +87,37 @@ def main() -> int:
         return 1
 
     rows = _fetch_hidden(pg)
+    eligible = [
+        row
+        for row in rows
+        if _eligible_for_restore(
+            title=row[3],
+            body=row[4],
+            ai_verdict=row[5],
+        )
+    ]
+    skipped_physical = len(rows) - len(eligible)
     mode = "dry-run" if not args.apply else "apply"
-    print(f"[restore_youdo_visible] mode={mode} count={len(rows)}")
+    print(
+        f"[restore_youdo_visible] mode={mode} candidates={len(rows)} "
+        f"eligible={len(eligible)} skipped_physical_or_mimo={skipped_physical}"
+    )
 
-    for lead_id, external_id, body_len, title in rows[:5]:
+    for lead_id, external_id, body_len, title, _body, verdict in eligible[:5]:
         title_short = (title or "")[:60]
         print(
-            f"  id={lead_id} ext={external_id} body_len={body_len} title={title_short!r}"
+            f"  id={lead_id} ext={external_id} body_len={body_len} "
+            f"verdict={verdict!r} title={title_short!r}"
         )
-    if len(rows) > 5:
-        print(f"  ... and {len(rows) - 5} more")
+    if len(eligible) > 5:
+        print(f"  ... and {len(eligible) - 5} more")
 
     restored = 0
-    if args.apply:
+    if args.apply and eligible:
+        restore_ids = [int(row[0]) for row in eligible]
         with pg.connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(_UPDATE_SQL)
+                cur.execute(_UPDATE_SQL, (restore_ids,))
                 restored = cur.rowcount or 0
             conn.commit()
         print(f"restored={restored}")

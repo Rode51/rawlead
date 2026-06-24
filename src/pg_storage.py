@@ -370,6 +370,61 @@ class NeonLeadStorage:
             err.append(msg)
             return False
 
+    def lead_imap_dedup_skip(
+        self,
+        source: str,
+        external_id: str,
+        errors: list[str] | None = None,
+    ) -> bool:
+        """IMAP model B: skip ingest only if lead already visible in feed.
+
+        Invisible rows (e.g. old listing without detail) are refreshed from email.
+        """
+        return self.lead_imap_poll_skip(source, external_id, errors) == "visible"
+
+    def lead_imap_poll_skip(
+        self,
+        source: str,
+        external_id: str,
+        errors: list[str] | None = None,
+    ) -> str | None:
+        """IMAP poll: skip re-ingest when already in feed or L1 done.
+
+        Returns ``visible`` | ``l1_done`` | None (proceed — new or invisible w/o L1).
+        """
+        if not self.enabled:
+            return None
+        src = (source or "").strip()
+        eid = (external_id or "").strip()
+        if not src or not eid:
+            return None
+        err = errors if errors is not None else []
+        try:
+            with self.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT is_visible, ai_verdict, ai_score
+                        FROM leads
+                        WHERE source = %s AND external_id = %s
+                        LIMIT 1
+                        """,
+                        (src, eid),
+                    )
+                    row = cur.fetchone()
+            if row is None:
+                return None
+            if bool(row[0]):
+                return "visible"
+            if row[1] is not None or row[2] is not None:
+                return "l1_done"
+            return None
+        except Exception as exc:
+            msg = f"pg:imap_poll_skip:{src}:{eid}:{_short_pg_err(exc)}"
+            logger.warning("%s", msg)
+            err.append(msg)
+            return None
+
     def external_ids_in_neon(
         self,
         source: str,

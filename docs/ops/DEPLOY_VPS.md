@@ -437,7 +437,7 @@ sudo visudo -c
 
 ---
 
-## 10. Retention purge (7d)
+## 10. Retention purge (2d)
 
 ```bash
 sudo cp /opt/rawlead/deploy/systemd/rawlead-purge-leads.* /etc/systemd/system/

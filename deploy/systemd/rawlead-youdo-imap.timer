@@ -1,0 +1,11 @@
+[Unit]
+Description=YouDo IMAP Discovery Timer (90s)
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=90
+AccuracySec=10
+Unit=rawlead-youdo-imap.service
+
+[Install]
+WantedBy=timers.target

@@ -1,4 +1,4 @@
-"""O281: YouDo full TZ gate — no L1/feed without detail_ok + min body."""
+"""YOUDO-SOURCE-GATE rev2: detail_ok=True → pass, else → delist."""
 
 from __future__ import annotations
 
@@ -31,36 +31,30 @@ def _youdo_project(**kwargs) -> ListingProject:
     return ListingProject(**defaults)
 
 
-def test_gate_disabled_when_min_chars_zero(monkeypatch) -> None:
-    monkeypatch.setenv("YOUDO_DETAIL_MIN_CHARS", "0")
-    project = _youdo_project()
-    assert not _youdo_detail_short_skips_l1(project, "короткий", detail_ok=False)
-
-
-def test_gate_skips_when_detail_ok_false_and_short() -> None:
-    os.environ["YOUDO_DETAIL_MIN_CHARS"] = "300"
+def test_gate_skips_when_detail_ok_false() -> None:
     project = _youdo_project()
     assert _youdo_detail_short_skips_l1(project, "short listing", detail_ok=False)
 
 
-def test_gate_skips_when_detail_ok_none_and_short() -> None:
-    """O262g loophole: DETAIL_FETCH=0 → detail_ok=None must still skip."""
-    os.environ["YOUDO_DETAIL_MIN_CHARS"] = "300"
+def test_gate_skips_when_detail_ok_none() -> None:
+    """DETAIL_FETCH=0 → detail_ok=None must still skip."""
     project = _youdo_project()
     assert _youdo_detail_short_skips_l1(project, "short listing", detail_ok=None)
 
 
-def test_gate_skips_when_detail_ok_true_but_body_short() -> None:
-    os.environ["YOUDO_DETAIL_MIN_CHARS"] = "300"
+def test_gate_passes_when_detail_ok_true_any_length() -> None:
+    """Rev2: detail_ok=True passes regardless of body length."""
     project = _youdo_project()
-    assert _youdo_detail_short_skips_l1(project, "x" * 100, detail_ok=True)
+    assert not _youdo_detail_short_skips_l1(project, "x" * 50, detail_ok=True)
+    assert not _youdo_detail_short_skips_l1(project, "x" * 300, detail_ok=True)
+    assert not _youdo_detail_short_skips_l1(project, "full tz " * 50, detail_ok=True)
 
 
-def test_gate_allows_full_tz() -> None:
-    os.environ["YOUDO_DETAIL_MIN_CHARS"] = "300"
-    project = _youdo_project()
-    body = "full tz " * 50
-    assert not _youdo_detail_short_skips_l1(project, body, detail_ok=True)
+def test_gate_non_youdo_always_passes() -> None:
+    from listing import SOURCE_FL
+
+    project = _youdo_project(source=SOURCE_FL)
+    assert not _youdo_detail_short_skips_l1(project, "short", detail_ok=False)
 
 
 @patch("lead_pipeline._rollup_after_lite")
@@ -108,10 +102,10 @@ def test_ingest_detail_fail_not_visible_no_l1(
 
     assert was_new
     assert plan is None
-    assert any("pipeline:skip youdo:id=14868001 detail:short" in e for e in errors)
+    assert any("pipeline:skip youdo:id=14868001 no_detail" in e for e in errors)
     pg.delist_lead.assert_called_once_with(
         42,
-        reason="youdo_detail_short",
+        reason="youdo_no_detail",
         errors=errors,
     )
     mock_rollup.assert_not_called()
@@ -164,6 +158,6 @@ def test_ingest_detail_fetch_disabled_skips_l1(
     mock_detail.assert_not_called()
     assert was_new
     assert plan is None
-    assert any("detail:short" in e for e in errors)
+    assert any("no_detail" in e for e in errors)
     pg.delist_lead.assert_called_once()
     mock_rollup.assert_not_called()

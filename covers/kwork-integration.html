@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=660">
+<title>Kwork — Интеграция</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Oswald:wght@700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 660px; height: 440px; overflow: hidden; background: #0e0e0e; -webkit-font-smoothing: antialiased; }
+  .canvas { width: 660px; height: 440px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  .canvas::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.04; background-image: linear-gradient(#e8e8e8 1px, transparent 1px), linear-gradient(90deg, #e8e8e8 1px, transparent 1px); background-size: 40px 40px; }
+  .canvas::after { content: ''; position: absolute; left: -80px; top: 50%; transform: translateY(-50%); width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, rgba(245,166,35,0.10) 0%, transparent 70%); pointer-events: none; }
+  .main { flex: 1; position: relative; padding: 36px 48px 20px; }
+  .category { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500; color: #333; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 16px; }
+  .title { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 62px; color: #e8e8e8; line-height: 0.9; letter-spacing: -0.01em; }
+  .hook { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: #F5A623; margin-top: 14px; letter-spacing: 0.04em; line-height: 1.5; }
+  .deco { position: absolute; bottom: -10px; right: 36px; }
+  .node-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; fill: #333; }
+  .points { padding: 14px 48px; border-top: 1px solid #1e1e1e; display: flex; flex-direction: column; gap: 8px; }
+  .pt { display: flex; align-items: center; gap: 10px; }
+  .dot { width: 4px; height: 4px; border-radius: 50%; background: #F5A623; flex-shrink: 0; }
+  .pt h4 { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 14px; color: #e8e8e8; letter-spacing: 0.04em; white-space: nowrap; margin-right: 6px; }
+  .pt p { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #555; letter-spacing: 0.03em; }
+  .footer { height: 52px; border-top: 1px solid #1e1e1e; padding: 0 48px; display: flex; align-items: center; justify-content: space-between; }
+  .f-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 22px; color: #e8e8e8; }
+  .f-name span { color: #F5A623; }
+  .f-badge { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: #0e0e0e; background: #F5A623; padding: 4px 10px; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="main">
+    <div class="category">/ ИНТЕГРАЦИЯ</div>
+    <div class="title">ИНТЕГРАЦИЯ</div>
+    <div class="hook">Сервисы сами обмениваются данными</div>
+    <svg class="deco" width="190" height="170" viewBox="0 0 190 170" fill="none">
+      <!-- Center node -->
+      <circle cx="95" cy="85" r="20" stroke="#2a2a2a" stroke-width="1.5"/>
+      <circle cx="95" cy="85" r="6" stroke="#222" stroke-width="1"/>
+      <!-- Top node -->
+      <line x1="95" y1="65" x2="95" y2="28" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="4 3"/>
+      <circle cx="95" cy="18" r="12" stroke="#2a2a2a" stroke-width="1.2"/>
+      <text x="95" y="22" text-anchor="middle" class="node-label">CRM</text>
+      <!-- Right node -->
+      <line x1="115" y1="85" x2="150" y2="85" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="4 3"/>
+      <circle cx="162" cy="85" r="12" stroke="#2a2a2a" stroke-width="1.2"/>
+      <text x="162" y="89" text-anchor="middle" class="node-label">API</text>
+      <!-- Bottom node -->
+      <line x1="95" y1="105" x2="95" y2="140" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="4 3"/>
+      <circle cx="95" cy="152" r="12" stroke="#2a2a2a" stroke-width="1.2"/>
+      <text x="95" y="156" text-anchor="middle" class="node-label">TG</text>
+      <!-- Left node -->
+      <line x1="75" y1="85" x2="42" y2="85" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="4 3"/>
+      <circle cx="28" cy="85" r="14" stroke="#2a2a2a" stroke-width="1.2"/>
+      <text x="28" y="89" text-anchor="middle" class="node-label">Sheets</text>
+    </svg>
+  </div>
+  <div class="points">
+    <div class="pt"><div class="dot"></div><h4>БЕЗ РУЧНОГО КОПИРОВАНИЯ</h4><p>данные идут сами между системами</p></div>
+    <div class="pt"><div class="dot"></div><h4>ЛЮБЫЕ СЕРВИСЫ</h4><p>CRM, Telegram, Google Sheets, REST API</p></div>
+    <div class="pt"><div class="dot"></div><h4>ПО ТРИГГЕРУ</h4><p>событие в одном сервисе → действие в другом</p></div>
+  </div>
+  <div class="footer">
+    <div class="f-name">RODE<span>51</span></div>
+    <div class="f-badge">ОПЛАТА ПОСЛЕ</div>
+  </div>
+</div>
+</body>
+</html>

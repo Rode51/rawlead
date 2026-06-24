@@ -109,7 +109,7 @@ export default function Services({ content }: Props) {
     <section
       ref={ref}
       id="services"
-      className="border-t border-edge px-10 lg:px-20 py-20 lg:py-32"
+      className="border-t border-edge px-4 lg:px-20 py-20 lg:py-32"
     >
       {/* Label */}
       <div className="mb-12">
@@ -131,7 +131,7 @@ export default function Services({ content }: Props) {
             }}
           >
             <div
-              className="h-full flex flex-col gap-6 p-8 lg:p-10 transition-colors duration-300"
+              className="h-full flex flex-col gap-6 p-5 lg:p-10 transition-colors duration-300"
               style={{ background: 'transparent' }}
             >
               {/* Icon */}
@@ -158,7 +158,7 @@ export default function Services({ content }: Props) {
               <p
                 className="font-mono text-muted mt-auto"
                 style={{
-                  fontSize: 'clamp(10px, 0.85vw, 12px)',
+                  fontSize: 'clamp(11px, 0.85vw, 12px)',
                   letterSpacing: '0.04em',
                   lineHeight: 1.7,
                 }}

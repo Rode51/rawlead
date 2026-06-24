@@ -17,10 +17,10 @@ from config import Config
 from exchange_browser_fetch import (
     fetch_listing_html_browser_slots,
     fetch_listing_html_browser_slots_wall_clock,
-    fetch_youdo_detail_html,
     fetch_youdo_detail_snapshot,
     listing_browser_enabled,
     youdo_browser_only,
+    youdo_click_detail_enabled,
 )
 from exchange_proxy import (
     exchange_fetch_begin,
@@ -36,6 +36,33 @@ from radar_cycle_log import log_pipeline_line
 logger = logging.getLogger(__name__)
 
 _TRACE_SNIP_MAX = 120
+
+# --- Click-through detail cache (§ YOUDO-DETAIL-BREAKTHROUGH) ---
+_CLICK_DETAIL_CACHE: dict[str, dict[str, object]] = {}
+_CLICK_DETAIL_CACHE_TTL = 300  # 5 min
+
+
+def _click_detail_cache_get(ext_id: str) -> tuple[str, bool] | None:
+    entry = _CLICK_DETAIL_CACHE.get(ext_id)
+    if entry is None:
+        return None
+    age = time.time() - float(entry.get("_ts", 0))
+    if age > _CLICK_DETAIL_CACHE_TTL:
+        _CLICK_DETAIL_CACHE.pop(ext_id, None)
+        return None
+    return str(entry.get("body", "")), bool(entry.get("detail_ok", False))
+
+
+def _click_detail_cache_put(ext_id: str, body: str, detail_ok: bool) -> None:
+    _CLICK_DETAIL_CACHE[ext_id] = {
+        "body": body,
+        "detail_ok": detail_ok,
+        "_ts": time.time(),
+    }
+
+
+def _click_detail_cache_clear() -> None:
+    _CLICK_DETAIL_CACHE.clear()
 
 
 def _fmt_youdo_trace_fields(fields: dict[str, object]) -> str:
@@ -789,10 +816,36 @@ def _fetch_html_playwright(url: str, cfg: Config, *, timeout_sec: float) -> str:
         raise YoudoListingError(str(exc)) from exc
 
 
+def _youdo_detail_best_len(fallback_snippet: str) -> int:
+    return len((fallback_snippet or "").strip())
+
+
+def _youdo_longest_text_in_json(obj: object, *, floor: int = 0) -> str:
+    best = ""
+    if isinstance(obj, str):
+        s = obj.strip()
+        if len(s) >= floor and len(s) > len(best):
+            return s
+        return best
+    if isinstance(obj, dict):
+        for val in obj.values():
+            cand = _youdo_longest_text_in_json(val, floor=floor)
+            if len(cand) > len(best):
+                best = cand
+    elif isinstance(obj, list):
+        for item in obj:
+            cand = _youdo_longest_text_in_json(item, floor=floor)
+            if len(cand) > len(best):
+                best = cand
+    return best
+
+
 def _parse_youdo_detail_html(html: str, *, fallback_snippet: str = "") -> str:
     """Полный текст ТЗ со страницы /t{id}."""
     if not html or not html.strip():
         return fallback_snippet
+    floor = _youdo_detail_best_len(fallback_snippet)
+    best = (fallback_snippet or "").strip()
     soup = BeautifulSoup(html, "html.parser")
     script = soup.find("script", id="__NEXT_DATA__")
     if script and script.string:
@@ -804,25 +857,67 @@ def _parse_youdo_detail_html(html: str, *, fallback_snippet: str = "") -> str:
                 if isinstance(block, dict):
                     for field in ("description", "text", "content", "body"):
                         val = block.get(field)
-                        if isinstance(val, str) and len(val.strip()) > len(
-                            (fallback_snippet or "").strip()
-                        ):
-                            return val.strip()
+                        if isinstance(val, str):
+                            s = val.strip()
+                            if len(s) > len(best):
+                                best = s
+            nested = _youdo_longest_text_in_json(props, floor=max(floor + 1, 80))
+            if len(nested) > len(best):
+                best = nested
         except (json.JSONDecodeError, TypeError, AttributeError):
             pass
     for sel in (
         '[class*="TaskDescription"]',
         '[class*="Description_text"]',
         '[class*="taskDescription"]',
+        '[class*="TaskNeed"]',
+        '[class*="Need_text"]',
         ".task-description",
         "article",
+        "pre",
+        "code",
     ):
-        node = soup.select_one(sel)
-        if node:
-            text = node.get_text(" ", strip=True)
-            if len(text) > len((fallback_snippet or "").strip()):
-                return text
-    return fallback_snippet
+        for node in soup.select(sel):
+            text = node.get_text("\n", strip=True)
+            if len(text) > len(best):
+                best = text
+    return best if len(best) > floor else fallback_snippet
+
+
+def enrich_youdo_l1_snippet(
+    cfg: Config,
+    *,
+    url: str,
+    title: str,
+    snippet: str,
+    min_chars: int = 280,
+) -> str:
+    """Re-fetch YouDo detail when snippet too short for L1 (failed ingest / replay)."""
+    if "youdo.com" not in (url or "").casefold():
+        return snippet
+    text = (snippet or "").strip() or (title or "").strip()
+    hay = text.casefold()
+    if len(text) >= min_chars and any(
+        m in hay for m in ("tilda", "тильда", "wordpress", "joomla", "bitrix", "zero block")
+    ):
+        return text
+    detail, _, ok = fetch_project_detail(
+        url,
+        cfg,
+        fallback_snippet=text,
+    )
+    enriched = (detail or text).strip()
+    if ok and len(enriched) > len(text):
+        logger.info(
+            "youdo L1 enrich: %s chars → %s chars (detail_ok=%s)",
+            len(text),
+            len(enriched),
+            ok,
+        )
+        return enriched
+    if len(enriched) > len(text):
+        return enriched
+    return text
 
 
 def fetch_project_page_html(
@@ -838,15 +933,26 @@ def fetch_project_page_html(
         return "", False
     if youdo_browser_only():
         try:
-            html = fetch_youdo_detail_html(
+            html, _final_url = fetch_youdo_detail_snapshot(
                 url,
                 user_agent=cfg.http_user_agent,
-                timeout_sec=timeout_sec,
+                timeout_sec=max(float(timeout_sec), 60.0),
             )
             if html and not _looks_like_antibot(html):
                 return html, True
         except HtmlFetchError as exc:
             logger.warning("youdo_detail: browser failed: %s", exc)
+        try:
+            html = fetch_listing_html_browser_slots(
+                "youdo",
+                url,
+                user_agent=cfg.http_user_agent,
+                timeout_sec=max(float(timeout_sec), 90.0),
+            )
+            if html and not _looks_like_antibot(html):
+                return html, True
+        except Exception as exc:
+            logger.warning("youdo_detail: listing carousel failed: %s", exc)
         return "", False
     headers = {
         "User-Agent": cfg.http_user_agent,
@@ -895,6 +1001,10 @@ def fetch_listing_projects(
     storage=None,
 ) -> list[ListingProject]:
     """GET листинга YouDo; при антиботе — Playwright + прокси."""
+    # Model B: skip listing radar entirely when IMAP-only
+    if os.getenv("YOUDO_LISTING_FETCH", "1").strip() in ("0", "false", "no"):
+        log_pipeline_line(cfg.radar_log_path, "youdo:listing_skip reason=imap_only")
+        return []
     st = storage or _storage_for_cfg(cfg)
     every = _youdo_fetch_every_n()
     raw_cycle = st.get_setting(YOUDO_FETCH_CYCLE_KEY, "0") or "0"
@@ -967,17 +1077,91 @@ def fetch_listing_projects(
         projects = parse_listing_html(html, url)
         _reset_youdo_fail_streak(st)
         parsed_n = len(projects)
+
+        # --- Click-through detail (§ YOUDO-DETAIL-BREAKTHROUGH + CLICK-RETRY) ---
+        click_detail_count = 0
+        click_retry_count = 0
+        if youdo_click_detail_enabled() and projects:
+            seen_raw = st.list_project_ids(["youdo"])
+            seen_ids = {str(pid) for _, pid in seen_raw}
+            listing_ids = {str(p.project_id) for p in projects}
+            new_projects = [
+                p for p in projects
+                if str(p.project_id) not in seen_ids
+            ]
+            # Retry: pending IDs that are still on current listing
+            retry_projects = [
+                p for p in projects
+                if str(p.project_id) in seen_ids
+                and st.get_setting(f"youdo_detail_pending:{p.project_id}") == "1"
+            ]
+            click_retry_count = len(retry_projects)
+            # New first, then retry; cap by YOUDO_CLICK_DETAIL_MAX
+            from exchange_browser_fetch import _youdo_click_detail_max
+
+            max_clicks = _youdo_click_detail_max()
+            all_targets = new_projects + retry_projects
+            lead_ids = [str(p.project_id) for p in all_targets[:max_clicks]]
+            if lead_ids:
+                try:
+                    from exchange_browser_fetch import (
+                        youdo_click_through_details,
+                        exchange_primary_proxy_url,
+                    )
+
+                    proxy = exchange_primary_proxy_url("youdo") or hint
+                    click_results = youdo_click_through_details(
+                        lead_ids,
+                        listing_url=url,
+                        user_agent=cfg.http_user_agent,
+                        timeout_sec=60.0,
+                        proxy_url=proxy,
+                    )
+                    for ext_id, info in click_results.items():
+                        body = info.get("body", "")
+                        detail_ok = info.get("detail_ok", False)
+                        _click_detail_cache_put(ext_id, body, detail_ok)
+                        if detail_ok:
+                            click_detail_count += 1
+                        log_youdo_trace(
+                            cfg,
+                            "click_detail",
+                            ext=ext_id,
+                            selector=info.get("selector", ""),
+                            clicked=info.get("clicked", 0),
+                            outcome=info.get("outcome", ""),
+                            body_len=len(body),
+                            ms=info.get("ms", 0),
+                            fallback=info.get("fallback", ""),
+                        )
+                except Exception as exc:
+                    logger.warning("youdo click-through failed: %s", exc)
+
+        # Pending count for summary
+        pending_count = 0
+        if youdo_click_detail_enabled():
+            for pid in listing_ids - {str(p.project_id) for p in new_projects}:
+                if st.get_setting(f"youdo_detail_pending:{pid}") == "1":
+                    pending_count += 1
+        log_youdo_trace(
+            cfg,
+            "click_summary",
+            new=len(new_projects) if youdo_click_detail_enabled() else 0,
+            retry=click_retry_count,
+            pending=pending_count,
+            ok=click_detail_count,
+        )
         log_youdo_trace(
             cfg,
             "parse",
             cards_found=parsed_n,
-            new_ids=0,
+            click_ok=click_detail_count,
             skipped_reason="",
         )
         # O257: structured outcome line at fetch end.
         log_pipeline_line(
             cfg.radar_log_path,
-            f"fetch:youdo outcome=ok reason=ok tier=dc parsed={parsed_n}",
+            f"fetch:youdo outcome=ok reason=ok tier=dc parsed={parsed_n} click_ok={click_detail_count} pending={pending_count}",
         )
         return projects
     except YoudoListingError as exc:

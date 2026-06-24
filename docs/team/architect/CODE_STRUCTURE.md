@@ -25,6 +25,7 @@
 | `main.py` | Цикл FL/Kwork + secondary (O63) |
 | `fl_parser.py`, `kwork_parser.py` | Биржи primary |
 | `youdo_parser.py`, `freelance_ru_parser.py`, `freelancejob_parser.py`, `pchyol_parser.py` | Secondary ingest (O63) |
+| `youdo_imap.py` | YouDo IMAP discovery (mail.ru Newsletters → id+body) |
 | `exchange_browser_fetch.py` | Browser fetch: FL/Kwork Playwright Chromium · **YouDo Camoufox** (subprocess worker) |
 | `exchange_proxy.py` | HTTP proxy pool, per-source bans v2 |
 | `tg_client.py` | Telethon connect |
@@ -52,6 +53,7 @@
 
 | Файл | Строк | Риск | Как работать |
 |------|-------|------|--------------|
+| `exchange_browser_fetch.py` | **~3750** | 🔴 | YouDo sticky/Camoufox/click-through/FL browser — **god-file**; новое → `scripts/youdo_*_worker.py` или `src/youdo/` пакет; не +100 строк без § split |
 | `api_server.py` | ~2260 | 🔴 | Только по § «Файлы» в `CODER_PROMPT`; новые роуты → отдельный router-модуль, не +200 строк внутрь |
 | `ai_analyze.py` | ~2140 | 🔴 | L1/L2/L3 в одном месте; новая логика L2 → `l3_human_style.py` / отдельный guard; split — отдельная задача Lead |
 | `owner_admin.py` | ~1930 | 🟡 | Ops UI; правки точечно по секции `/ops/` |
@@ -72,20 +74,20 @@
 | `radar_control.py` | API пульта (:18765) |
 | `tg_queue_import.py` | CSV ← EXPORT |
 | `tg_join_queue.py` | Ручной join (редко; lock если tg_main жив) |
-| `tg_join_daemon.py` | **Deprecated** — no-op |
+| `youdo_sticky_worker.py` | subprocess sticky Camoufox (list_view, click-through detail) |
+| `youdo_imap_poller.py` | IMAP poll → `process_new_listing` (systemd timer) |
 | `start-radar-full.bat` | 2 cmd: биржи + TG |
 
 ---
 
-## Правила Coder (обязательно)
+## Правила Coder (обязательно — Lead verify)
 
-1. **Без «простынь»** — не добавлять в один файл сотни строк без разбиения; новая логика → новый модуль или явный подфайл пакета.
-2. **Один файл — одна роль** (см. таблицу выше). Не смешивать join + notify + парсинг FL в одном месте.
-3. **Перенос по папкам** — только отдельная задача Lead в `CODER_PROMPT.md`:
-   - карта «было → стало»;
-   - правка **всех** импортов, `scripts/`, `.bat`, `radar_control`, `.env.example`, `RUN.md`;
-   - чеклист запуска пульт + TG + биржи.
-4. **Мелкий diff** предпочтительнее «переехать весь src за раз».
+1. **Без «простынь»** — не добавлять в один файл **>80** строк без § split; **>200** за задачу → **запрещено**. Новая логика → новый модуль/worker.
+2. **Один файл — одна роль** (см. таблицу выше).
+3. **Heavy-файлы** — перед правкой открыть таблицу § heavy · не лить browser+parser в один diff.
+4. **Перенос по папкам** — только отдельная задача Lead в `CODER_PROMPT.md` (карта «было → стало»).
+5. **Мелкий diff** предпочтительнее «переехать весь src за раз».
+6. **Нарушение** → Lead **❌ verify** · см. `lead-architect.mdc` § **Архитектурный гард**.
 
 ---
 

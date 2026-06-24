@@ -1,54 +1,20 @@
 {
-  "generated_at": "2026-06-17T17:27:15.668694+00:00",
-  "base_url": "https://rawlead.ru",
-  "viewport": "mobile",
-  "scenarios_total": 5,
-  "scenarios_pass": 5,
-  "pass": true,
+  "generated_at": "2026-06-21T09:20:05.084987+00:00",
+  "base_url": "http://localhost:3001",
+  "viewport": "desktop",
+  "scenarios_total": 1,
+  "scenarios_pass": 0,
+  "pass": false,
   "has_preprod_token": true,
   "has_monica_token": true,
   "results": [
     {
-      "id": "j1",
-      "viewport": "mobile",
-      "pass": true,
-      "ms": 12057,
-      "error": null,
-      "screenshot": null
-    },
-    {
-      "id": "j2",
-      "viewport": "mobile",
-      "pass": true,
-      "ms": 22321,
-      "error": null,
-      "screenshot": null
-    },
-    {
-      "id": "j5",
-      "viewport": "mobile",
-      "pass": true,
-      "ms": 15454,
-      "error": null,
-      "screenshot": null,
-      "persona": "monica"
-    },
-    {
-      "id": "j5",
-      "viewport": "mobile",
-      "pass": true,
-      "ms": 6114,
-      "error": null,
-      "screenshot": null,
-      "persona": "anon"
-    },
-    {
-      "id": "j7",
-      "viewport": "mobile",
-      "pass": true,
-      "ms": 2575,
-      "error": null,
-      "screenshot": null
+      "id": "j3",
+      "viewport": "desktop",
+      "pass": false,
+      "ms": 49566,
+      "error": "Page.wait_for_selector: Timeout 45000ms exceeded.\nCall log:\n  - waiting for locator(\"[data-testid=\\\"feed-app\\\"]\") to be visible\n",
+      "screenshot": "data\\preprod_quiz_e2e\\j3_desktop_fail.png"
     }
   ],
   "artifacts_dir": "data\\preprod_quiz_e2e"

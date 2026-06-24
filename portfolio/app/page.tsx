@@ -6,6 +6,7 @@ import Projects from './components/Projects'
 import Process from './components/Process'
 import FAQ from './components/FAQ'
 import Footer from './components/Footer'
+import { ru } from '../lib/content/ru'
 
 export default function Home() {
   return (
@@ -16,7 +17,7 @@ export default function Home() {
       <WhyMe />
       <Projects />
       <Process />
-      <FAQ />
+      <FAQ      content={ru.faq} />
       <Footer />
     </main>
   )

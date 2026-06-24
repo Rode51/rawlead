@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=660">
+<title>Kwork — Автоматизация</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Oswald:wght@700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 660px; height: 440px; overflow: hidden; background: #0e0e0e; -webkit-font-smoothing: antialiased; }
+  .canvas { width: 660px; height: 440px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  .canvas::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.04; background-image: linear-gradient(#e8e8e8 1px, transparent 1px), linear-gradient(90deg, #e8e8e8 1px, transparent 1px); background-size: 40px 40px; }
+  .canvas::after { content: ''; position: absolute; left: -80px; top: 50%; transform: translateY(-50%); width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, rgba(245,166,35,0.10) 0%, transparent 70%); pointer-events: none; }
+  .main { flex: 1; position: relative; padding: 36px 48px 20px; }
+  .category { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500; color: #333; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 16px; }
+  .title { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 56px; color: #e8e8e8; line-height: 0.9; letter-spacing: -0.01em; }
+  .hook { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: #F5A623; margin-top: 14px; letter-spacing: 0.04em; line-height: 1.5; }
+  .deco { position: absolute; bottom: -10px; right: 36px; }
+  .points { padding: 14px 48px; border-top: 1px solid #1e1e1e; display: flex; flex-direction: column; gap: 8px; }
+  .pt { display: flex; align-items: center; gap: 10px; }
+  .dot { width: 4px; height: 4px; border-radius: 50%; background: #F5A623; flex-shrink: 0; }
+  .pt h4 { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 14px; color: #e8e8e8; letter-spacing: 0.04em; white-space: nowrap; margin-right: 6px; }
+  .pt p { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #555; letter-spacing: 0.03em; }
+  .footer { height: 52px; border-top: 1px solid #1e1e1e; padding: 0 48px; display: flex; align-items: center; justify-content: space-between; }
+  .f-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 22px; color: #e8e8e8; }
+  .f-name span { color: #F5A623; }
+  .f-badge { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: #0e0e0e; background: #F5A623; padding: 4px 10px; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="main">
+    <div class="category">/ СКРИПТ</div>
+    <div class="title">АВТОМАТИЗАЦИЯ</div>
+    <div class="hook">Скрипт делает за вас то, что делали руками</div>
+    <svg class="deco" width="180" height="170" viewBox="0 0 180 170" fill="none">
+      <!-- Circular arrow -->
+      <path d="M90 30 A60 60 0 1 1 30 90" stroke="#2a2a2a" stroke-width="2" stroke-linecap="round"/>
+      <polyline points="20,78 30,90 42,80" stroke="#2a2a2a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- Gear center -->
+      <circle cx="90" cy="90" r="22" stroke="#222" stroke-width="1.5"/>
+      <circle cx="90" cy="90" r="10" stroke="#222" stroke-width="1.5"/>
+      <!-- Gear teeth -->
+      <rect x="86" y="62" width="8" height="10" rx="1" stroke="#222" stroke-width="1.2"/>
+      <rect x="86" y="108" width="8" height="10" rx="1" stroke="#222" stroke-width="1.2"/>
+      <rect x="62" y="86" width="10" height="8" rx="1" stroke="#222" stroke-width="1.2"/>
+      <rect x="108" y="86" width="10" height="8" rx="1" stroke="#222" stroke-width="1.2"/>
+      <rect x="70" y="68" width="8" height="10" rx="1" stroke="#222" stroke-width="1.2" transform="rotate(-45 74 73)"/>
+      <rect x="102" y="68" width="8" height="10" rx="1" stroke="#222" stroke-width="1.2" transform="rotate(45 106 73)"/>
+      <rect x="70" y="102" width="8" height="10" rx="1" stroke="#222" stroke-width="1.2" transform="rotate(45 74 107)"/>
+      <rect x="102" y="102" width="8" height="10" rx="1" stroke="#222" stroke-width="1.2" transform="rotate(-45 106 107)"/>
+    </svg>
+  </div>
+  <div class="points">
+    <div class="pt"><div class="dot"></div><h4>ЛЮБАЯ РУТИНА</h4><p>выгрузка, рассылка, обработка файлов, отчёты</p></div>
+    <div class="pt"><div class="dot"></div><h4>ПО РАСПИСАНИЮ</h4><p>запускается сам в нужное время</p></div>
+    <div class="pt"><div class="dot"></div><h4>ОДИН РАЗ — НАВСЕГДА</h4><p>настроил и забыл</p></div>
+  </div>
+  <div class="footer">
+    <div class="f-name">RODE<span>51</span></div>
+    <div class="f-badge">ОПЛАТА ПОСЛЕ</div>
+  </div>
+</div>
+</body>
+</html>

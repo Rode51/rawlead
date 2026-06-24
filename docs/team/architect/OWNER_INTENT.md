@@ -48,7 +48,7 @@
 | **O13** | **Вход в ЛК на rawlead.ru** — без localhost | § **CABINET-PROD-LOGIN** · BotFather domain = `rawlead.ru` |
 | **O14** | **Страницы сайта** — не только главная/лента/ЛК | § **SITE-PAGES** · how, pricing, faq, contact (footer уже ссылается) |
 | **O15** | **ЛК: навыки** — picker из **полного L1-пула** (`skills_catalog.py`), не только из прошедших заказов; окно **сверху** страницы | § **CABINET-SKILLS-PICKER (L3)** |
-| **O16** | **Retention Neon:** лиды старше **7 дней** удалять (не засорять БД) | § **RETENTION-7D** · не трогать users/user_tags/subscriptions |
+| **O16** | **Retention:** лиды старше **2 дней** удалять (не засорять БД) | `purge_old_leads.py` · `FEED_VISIBILITY_DAYS=2` |
 | **O17** | **Console brand:** `▲ RawLead Architecture by Rode51 ▲` в devtools | § **CABINET-SKILLS-PICKER** l3-7 |
 | **O19** | **ЛК UX:** merge guest-навыков после TG-login; avatar в шапке; не путать вход и /start бота | § **LK-UX-POLISH** |
 | **O18** | **HTTPS rawlead.ru** — убрать «Не защищено» | § **DEPLOY_VPS.md** § 5b · **✅** certbot |
@@ -144,6 +144,9 @@
 
 | Дата | Мысль / запрос | Kуда ушло |
 |------|----------------|----------|
+| 2026-06-23 | **YouDo IMAP:** без UID-курсора — **last N + dedup PG** (owner **B**) | § **YOUDO-IMAP-ONLY** обновлён |
+| 2026-06-23 | **YouDo:** старый listing/браузер **стоп** · чинить **только почту** · реклама live | **§ YOUDO-IMAP-ONLY** P0 |
+| 2026-06-23 | **Квиз:** переделка в **стороннем cloud** (не MiMo/Cursor) | § **QUIZ-REDESIGN** |
 | 2026-06-22 | **Экономия:** весь кодинг → MiMo `coder` · Cursor Lead = verify/deploy | `mimo.mdc` · `MIMO_CODER.md` |
 | 2026-06-22 | **M1 реклама live** · YouDo 22.06: O281 скрыл ленту → restore · listing `parsed=50` жив | `problems/2026-06-22-youdo-m1-day.md` · YOUDO-DETAIL P0 |
 | 2026-06-22 | **YouDo:** вернуть snippets в ленту (ServicePipe detail) | **YOUDO-RESTORE-SNIPPETS** ✅ |

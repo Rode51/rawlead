@@ -11,13 +11,16 @@ import random
 from pathlib import Path
 from typing import Any, Callable
 
+from public_feed import FEED_VISIBILITY_DAYS
+
 logger = logging.getLogger(__name__)
 
 QUIZ_NICHES: tuple[str, ...] = ("dev", "design", "marketing", "text")
 QUIZ_PHASE1_SEED = 9
 QUIZ_MAX_CARDS = 20
-QUIZ_EARLY_STOP_MIN = 6
-QUIZ_NORMAL_STOP_MIN = 13
+QUIZ_MIN_TOTAL = 8
+QUIZ_EARLY_SIGNAL_MIN = 4
+QUIZ_NORMAL_STOP_MIN = 10
 
 QUIZ_POOL_EXCLUDE_IDS = frozenset({21483, 22251, 21419})
 
@@ -258,6 +261,29 @@ def _niches_ge2(conf: dict[str, int]) -> frozenset[str]:
     return frozenset(n for n in QUIZ_NICHES if conf[n] >= 2)
 
 
+def _distinct_signals_shown(
+    history: list[dict[str, Any]],
+    categories: dict[str, str],
+    niche: str,
+) -> int:
+    """Count unique signal values shown for niche (SHOWN cards, not only liked)."""
+    cards = _load_json_cards() or []
+    card_signal = {
+        c["id"]: c.get("signal")
+        for c in cards
+        if c.get("id")
+    }
+    signals: set[str] = set()
+    for item in history:
+        cid = str(item.get("card_id", ""))
+        if categories.get(cid) != niche:
+            continue
+        sig = card_signal.get(cid)
+        if isinstance(sig, str) and sig:
+            signals.add(sig)
+    return len(signals)
+
+
 def check_stop(
     history: list[dict[str, Any]],
     categories: dict[str, str],
@@ -275,12 +301,14 @@ def check_stop(
     if n >= QUIZ_NORMAL_STOP_MIN and all(c <= 0 for c in conf.values()):
         return True, True
 
-    if n >= QUIZ_EARLY_STOP_MIN:
+    if n >= QUIZ_MIN_TOTAL:
         strong = [niche for niche, c in conf.items() if c >= 4]
         if len(strong) == 1:
             leader = strong[0]
             if all(conf[other] <= 0 for other in QUIZ_NICHES if other != leader):
-                return True, False
+                signals_shown = _distinct_signals_shown(history, categories, leader)
+                if signals_shown >= QUIZ_EARLY_SIGNAL_MIN:
+                    return True, False
 
     if n >= QUIZ_NORMAL_STOP_MIN:
         sets: list[frozenset[str]] = []
@@ -678,9 +706,9 @@ def count_leads_per_week(cur: Any, niches: list[str]) -> int:
         FROM leads
         WHERE is_visible = TRUE
           AND category = ANY(%s)
-          AND created_at > NOW() - INTERVAL '7 days'
+          AND created_at > NOW() - make_interval(days => %s)
         """,
-        (niches,),
+        (niches, FEED_VISIBILITY_DAYS),
     )
     row = cur.fetchone()
     return int(row[0]) if row else 0

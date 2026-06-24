@@ -45,13 +45,13 @@ export default function ContactPage() {
                   <p className="font-display font-black text-rl-inverse leading-tight tracking-[-0.03em] mb-8"
                     style={{ fontSize: 'clamp(24px, 3vw, 36px)' }}
                   >
-                    @rcnn43
+                    @rode_51
                   </p>
                   <p className="font-sans text-rl-muted text-[15px] leading-relaxed mb-10">
                     По вопросам работы сервиса, ошибкам, предложениям или партнёрству.
                   </p>
                   <a
-                    href="https://t.me/rcnn43"
+                    href="https://t.me/rode_51"
                     data-testid="contact-telegram"
                     target="_blank"
                     rel="noopener noreferrer"
