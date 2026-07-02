@@ -1,16 +1,60 @@
 # RawLead
 
-Мониторинг **FL.ru + Kwork + TG (acc1–3)** → фильтр → ИИ → бот @FLPARSINGBOT.  
-Карта: [`docs/README.md`](docs/README.md) · фазы: [`docs/team/architect/ROADMAP.md`](docs/team/architect/ROADMAP.md).
+AI-assisted lead intelligence for freelancers: multi-source ingest, skill match scoring, and fast response workflow.
 
-## Старт
+Live product: [rawlead.ru](https://rawlead.ru)
 
-| Кто | Куда |
-|-----|------|
-| **Владелец** | [`docs/FOR_YOU.md`](docs/FOR_YOU.md) · [`docs/README.md`](docs/README.md) · [`docs/KAK_ETO_RABOTAET.md`](docs/KAK_ETO_RABOTAET.md) |
-| **Роли в Cursor** | `.cursor/rules/` · [`HOW_TO_USE_CURSOR.md`](docs/team/common/HOW_TO_USE_CURSOR.md) · цикл [`SCALE.md`](docs/team/common/SCALE.md) |
-| **Запуск** | [`docs/ops/RUN.md`](docs/ops/RUN.md) |
-| **Все docs** | [`docs/README.md`](docs/README.md) |
+## Product Summary
+
+RawLead aggregates opportunities from FL/Kwork/Telegram, filters noise, scores relevance by stack, and helps users react faster.
+
+Core value:
+- one feed instead of multiple source tabs
+- compatibility score per lead
+- tiered access flow (trial -> feed -> pro)
+- faster outreach workflow with AI-assisted draft path
+
+## What Is Implemented
+
+- Multi-source ingest pipeline (web + Telegram)
+- FastAPI backend with subscription/tier logic
+- Next.js frontend (`/lenta`, `/pricing`, `/cabinet`)
+- Paywall and checkout integration
+- Match push notifications in Telegram
+- Operational deploy scripts and smoke check flow
+
+## Architecture (High-Level)
+
+- **Frontend:** Next.js static export (`rawlead-next/`)
+- **Backend:** FastAPI (`src/`)
+- **Data:** Postgres
+- **Automation:** Python workers/parsers
+- **Infra:** VPS + systemd + nginx
+- **Messaging:** Telegram bot + Telethon accounts
+
+## My Engineering Focus (Interview Context)
+
+- designed safe rollout strategy (feature flags, smoke-first deploys)
+- implemented paywall/tier behavior and edge-case handling
+- hardened flow for anon vs expired-trial states
+- connected product UX decisions to backend access control
+- maintained deploy reliability and rollback readiness
+
+## Repository Map
+
+- `src/` - backend logic and domain services
+- `rawlead-next/` - web app
+- `scripts/` - deploy/ops tooling
+- `tests/` - automated checks
+- `docs/` - product and engineering documentation
+
+Primary docs:
+- docs index: [`docs/README.md`](docs/README.md)
+- product vision: [`docs/team/product/PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md)
+- roadmap: [`docs/team/architect/ROADMAP.md`](docs/team/architect/ROADMAP.md)
+- current prod facts: [`docs/team/common/PROD_FACTS.md`](docs/team/common/PROD_FACTS.md)
+
+## Quick Start (Local)
 
 ```powershell
 Copy-Item .env.example .env
@@ -18,8 +62,20 @@ pip install -r requirements.txt
 .venv\Scripts\python.exe src/main.py
 ```
 
-**TG:** один бот (уведомления), чтение чатов — Telethon **user**-аккаунты; радар слушает только **acc1** (`data/telethon_chat_ids.txt`).
+Frontend local:
 
-## Код
+```powershell
+cd rawlead-next
+npm install
+npm run dev
+```
 
-`src/` — парсеры, фильтр (`docs/ops/FILTERS.md`), ИИ (`docs/ops/PROFILE.md`).
+## Interviewer Notes
+
+This repository includes both product code and internal operational docs.
+For technical review, start with:
+
+1. `src/` (core backend flows)
+2. `rawlead-next/` (user-facing behavior)
+3. `tests/` (edge-case coverage)
+4. `docs/team/common/PROD_FACTS.md` (live state snapshot)
