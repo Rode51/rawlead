@@ -1,11 +1,11 @@
-# Health check: OperationalError database is locked (+66953964608)
+# Health check: OperationalError database is locked (+7XXXXXXXXX1)
 
 **Статус:** решено  
 **Дата:** 2026-05-23
 
 ## Симптом
 
-⚠️ Аккаунт +66953964608 не отвечает. Алерт бота: `OperationalError: database is locked`.
+⚠️ Аккаунт +7XXXXXXXXX1 не отвечает. Алерт бота: `OperationalError: database is locked`.
 
 ## Ожидалось
 
@@ -17,12 +17,12 @@
 
 ```
 2026-05-23 13:25:18 тг:монитор:старт чатов=6 …
-2026-05-23 13:25:27 здравье:сбой акк=+66953964608 OperationalError: database is locked
+2026-05-23 13:25:27 здравье:сбой акк=+7XXXXXXXXX1 OperationalError: database is locked
 ```
 
 Два процесса (`src/main.py` и `scripts/tg_main.py`) вызывали `run_health_check` → второй `TelegramClient` на тот же `*_telethon.session` → SQLite lock.
 
-Прокси и файл сессии в порядке: `+66953964608_telethon.session` существует, монитор стартует.
+Прокси и файл сессии в порядке: `+7XXXXXXXXX1_telethon.session` существует, монитор стартует.
 
 ## Контекст
 

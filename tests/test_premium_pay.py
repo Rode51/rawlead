@@ -65,7 +65,7 @@ def _cfg(**overrides: object) -> Config:
         stars_price_xtr=300,
         stars_subscription_days=30,
         pay_premium_rub=790,
-        pay_sbp_phone="+79249966496",
+        pay_sbp_phone="+79990001122",
         pay_sbp_bank="T-Bank",
         pay_btc_address="bc1qtest",
         pay_eth_address="0xeth",
@@ -99,7 +99,7 @@ class TestPremiumPayFormat(unittest.TestCase):
 
     def test_sbp_screen(self) -> None:
         text = format_sbp_screen(_cfg(), 12345, 7)
-        self.assertIn("+79249966496", text)
+        self.assertIn("+79990001122", text)
         self.assertIn("790", text)
         self.assertIn("#7", text)
 

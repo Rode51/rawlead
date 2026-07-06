@@ -12,7 +12,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 def main() -> None:
     if len(sys.argv) < 2:
         print("Использование: python scripts/tg_convert_session.py PATH_WITHOUT_EXT")
-        print("Пример: python scripts/tg_convert_session.py C:/Users/.../Parser/+66953964608")
+        print("Пример: python scripts/tg_convert_session.py C:/Users/.../Parser/+7XXXXXXXXX1")
         raise SystemExit(1)
 
     base = Path(sys.argv[1])

@@ -29,10 +29,20 @@ __pycache__/
 .venv/
 .tools/
 
-# Cursor: ignore all except team rules (must ship in git)
+# AI-agent tooling / internal workspace configs — never publish
 .cursor/
-!.cursor/rules/
-!.cursor/rules/**
+.agents/
+.mimocode/
+portfolio/.claude/
+skills-lock.json
+exclude-mimo.txt
+docs/team/
+docs/ops/
+docs/FOR_YOU.md
+docs/AUDIT_REPORT_2026-06-20.md
+docs/youtube_transcript.txt
+uisness.code-workspace
+app-icon-for-pc--dark-navy-blue-background--bold-w.ico.png
 
 # --- data/ — local runtime; whitelist only safe reports ---
 data/*

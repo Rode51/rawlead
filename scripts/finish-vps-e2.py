@@ -2,19 +2,20 @@
 """E2 deploy: sync code, env, Telethon sessions, enable site + legacy radars on VPS."""
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
 _STAGING = _ROOT / "data" / "vps-staging"
-_SESSIONS_PC = Path(r"C:/Users/hramo/Desktop/Parser")
+_SESSIONS_PC = Path(os.environ.get("TELETHON_SESSIONS_DIR", "./data/sessions"))
 _SESSION_FILES = (
-    "+66953964608_telethon.session",
-    "+66967716330_telethon.session",
-    "+66985780470_telethon.session",
-    "233333925_telethon.session",
-    "234694761_telethon.session",
+    "acc1_telethon.session",
+    "acc2_telethon.session",
+    "acc3_telethon.session",
+    "acc4_telethon.session",
+    "acc5_telethon.session",
 )
 
 

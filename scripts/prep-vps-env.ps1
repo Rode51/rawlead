@@ -5,8 +5,9 @@ $Out = Join-Path $Root "data\vps-staging"
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 
 function Convert-LinuxPaths([string]$text) {
-    $text = $text.Replace('C:/Users/hramo/Desktop/Parser/', '/opt/rawlead/data/sessions/')
-    $text = $text.Replace('C:\Users\hramo\Desktop\Parser\', '/opt/rawlead/data/sessions/')
+    $localSessionsDir = if ($env:TELETHON_SESSIONS_DIR) { $env:TELETHON_SESSIONS_DIR } else { "$Root\data\sessions" }
+    $text = $text.Replace(($localSessionsDir + '/'), '/opt/rawlead/data/sessions/')
+    $text = $text.Replace(($localSessionsDir + '\'), '/opt/rawlead/data/sessions/')
     return $text
 }
 

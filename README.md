@@ -50,9 +50,6 @@ RawLead собирает заказы из FL/Kwork/Telegram, фильтрует
 
 Основные документы:
 - индекс docs: [`docs/README.md`](docs/README.md)
-- продуктовый вектор: [`docs/team/product/PRODUCT_VISION.md`](docs/team/product/PRODUCT_VISION.md)
-- roadmap: [`docs/team/architect/ROADMAP.md`](docs/team/architect/ROADMAP.md)
-- текущий срез prod: [`docs/team/common/PROD_FACTS.md`](docs/team/common/PROD_FACTS.md)
 
 ## Быстрый старт (локально)
 
